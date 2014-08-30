@@ -558,6 +558,7 @@ static void build_type_constructor(AggregateType* ct) {
   // Create the type constructor function,
   FnSymbol* fn = new FnSymbol(astr("_type_construct_", ct->symbol->name));
 
+  fn->addFlag(FLAG_INLINE);
   fn->addFlag(FLAG_TYPE_CONSTRUCTOR);
   fn->cname = astr("_type_construct_", ct->symbol->cname);
 
@@ -725,6 +726,7 @@ static void build_constructor(AggregateType* ct) {
   // Create the default constructor function symbol,
   FnSymbol* fn = new FnSymbol(astr("_construct_", ct->symbol->name));
   fn->cname = fn->name;
+  fn->addFlag(FLAG_INLINE);
 
   fn->addFlag(FLAG_DEFAULT_CONSTRUCTOR);
   fn->addFlag(FLAG_CONSTRUCTOR);

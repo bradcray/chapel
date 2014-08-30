@@ -88,7 +88,7 @@ module ChapelRange {
   // If it is not a constructor, then the user can still create a maximal range
   // (for example) without being warned.
   //
-  proc range.range(type idxType = int,
+  inline proc range.range(type idxType = int,
                    param boundedType : BoundedRangeType = BoundedRangeType.bounded,
                    param stridable : bool = false,
                    _low : idxType = 1,
@@ -123,11 +123,11 @@ module ChapelRange {
   // Range builders for bounded ranges
   // Range builders are used by the parser to create literal ranges.
   //
-  proc _build_range(low: int(?w), high: int(w))
+  inline proc _build_range(low: int(?w), high: int(w))
     return new range(idxType = int(w), _low = low, _high = high);
-  proc _build_range(low: uint(?w), high: uint(w))
+  inline proc _build_range(low: uint(?w), high: uint(w))
     return new range(uint(w), _low = low, _high = high);
-  proc _build_range(low, high) {
+  inline proc _build_range(low, high) {
     compilerError("Bounds of '..' must be integers of compatible types, when specified.");
   }
   
@@ -135,11 +135,11 @@ module ChapelRange {
   //////////////////////////////////////////////////////////////////////////////////
   // Range builders for unbounded ranges
   //
-  proc _build_range(param bt: BoundedRangeType, bound: int(?w))
+  inline proc _build_range(param bt: BoundedRangeType, bound: int(?w))
     return new range(int(w), bt, false, bound, bound);
-  proc _build_range(param bt: BoundedRangeType, bound: uint(?w))
+  inline proc _build_range(param bt: BoundedRangeType, bound: uint(?w))
     return new range(uint(w), bt, false, bound, bound);
-  proc _build_range(param bt: BoundedRangeType)
+  inline proc _build_range(param bt: BoundedRangeType)
     return new range(int, bt);
   
   

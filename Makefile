@@ -22,7 +22,7 @@
 export CHPL_MAKE_HOME=$(shell pwd)
 include ./make/Makefile.base
 
-default: third-party-tries all
+default: all
 
 all: comprt
 	@test -r Makefile.devel && $(MAKE) develall || echo ""
@@ -43,12 +43,6 @@ runtime: FORCE
 
 third-party: FORCE
 	cd third-party && $(MAKE)
-
-third-party-tries: third-party-try-re2
-
-third-party-try-re2: FORCE
-	@echo "Speculatively trying to build re2"
-	-@if [[ -z "$$CHPL_REGEXP" ]]; then cd third-party && $(MAKE) re2; fi
 
 clean: FORCE
 	cd compiler && $(MAKE) clean

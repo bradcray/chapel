@@ -69,8 +69,7 @@
  *
  */
 
-// Chapel Strings
-module NewString {
+module BaseStringType {
   use CString;
   // This type must support the c_string interface
   type baseType = c_string;
@@ -83,6 +82,11 @@ module NewString {
   extern proc remoteStringCopy(src_loc: int, src_addr: c_string, len: int): c_string;
 
   config param debugStrings = false;
+}
+
+// Chapel Strings
+module NewString {
+  use BaseStringType;
 
   class string_refcnt {
     var val: atomic_refcnt;

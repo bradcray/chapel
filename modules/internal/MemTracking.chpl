@@ -22,6 +22,8 @@
 pragma "no use ChapelStandard"
 module MemTracking
 {
+  use NewString;
+
   config const
     memTrack: bool = false,
     memStats: bool = false, 

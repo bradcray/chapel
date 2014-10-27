@@ -1,6 +1,9 @@
-#Because inlining is turned off when baseline is run:
-trivial/mjoyner/inlinefunc/inlfunc1_report
-trivial/mjoyner/inlinefunc/inlfunc2_report
+##Because inlining is turned off when baseline is run:
+#Actually, it no longer is, so these shouldn't be suppressed for the time
+#being; though ultimately, I think we should try to get back to a point
+#of throwing --baseline without anything special w.r.t. inlining
+#trivial/mjoyner/inlinefunc/inlfunc1_report
+#trivial/mjoyner/inlinefunc/inlfunc2_report
 #Removing unnecessary autocopies necessary to get to minimum number of leaks
 memory/figueroa/LeakedMemory5
 # lack of optimizations lead to extra leaked memory

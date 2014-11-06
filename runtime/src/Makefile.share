@@ -29,8 +29,10 @@ COMMON_NOGEN_SRCS = \
 	chpl-cache.c \
 	chpl-comm.c \
 	chplexit.c \
-	chplio.c \
+	chpl-file-utils.c \
 	chplgmp.c \
+	chplio.c \
+        chplisdir.c \
 	chpl-mem.c \
 	chpl-mem-desc.c \
 	chpl-mem-hook.c \

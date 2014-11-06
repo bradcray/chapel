@@ -3,6 +3,12 @@ use AdvancedIters;
 
 extern proc memcpy(x : [], b, len:int);
 
+// For consistency with the other shootouts, a value is passed to this
+// benchmark in the Computer Language Benchmarks Game test suite, even though
+// the input set provided is used to determine the problem size.  Store that
+// passed value here.
+config const n = 0;
+
 config const tableSize = 1 << 16;
 config const lineSize = 61;
 
@@ -28,9 +34,9 @@ class Table {
   var table : [0..tableSize-1] Node;
   var size : int;
 
-  proc this(d : uint) var {
+  proc this(d : uint) ref {
     const slot :int = (d & (tableSize-1)):int;
-    refvar head = table[slot];
+    ref head = table[slot];
     var n = head;
     if n == nil {
       n = new Node(d, 0, nil);
@@ -51,10 +57,21 @@ class Table {
 
   iter these() {
     for t in table {
-      var n : Node = t;
+      var n = t;
       while n != nil {
         yield (n.data, n.count);
         n = n.next;
+      }
+    }
+  }
+
+  proc ~Table() {
+    for n in table do {
+      var cur = n;
+      while cur != nil {
+        var next = cur.next;
+        delete cur;
+        cur = next;
       }
     }
   }
@@ -94,6 +111,7 @@ proc calculate(data : [] uint(8), size : int) {
     lock; // acquire lock
     for (k,v) in curArr do freqs[k] += v;
     lock = true; // free lock
+    delete curArr;
   }
 
   return freqs;
@@ -111,15 +129,17 @@ proc write_frequencies(data : [] uint(8), size : int) {
 
   for (f, s) in arr do
     writef("%s %.3dr\n", decode(s, size), (100.0 * f) / sum);
+  delete freqs;
 }
 
 proc write_count(data : [] uint(8), str : string) {
   var freqs = calculate(data, str.length);
   var d = hash(str.toBytes(), 1, 0..str.length-1);
   writeln(freqs[d], "\t", decode(d, str.length));
+  delete freqs;
 }
 
-proc string.toBytes() var {
+proc string.toBytes() ref {
    var b : [1..this.length] uint(8);
    memcpy(b, this, this.length);
    return b;

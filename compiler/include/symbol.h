@@ -43,7 +43,7 @@ class SymExpr;
 
 enum RetTag {
   RET_VALUE,
-  RET_VAR,
+  RET_REF,
   RET_PARAM,
   RET_TYPE
 };
@@ -494,6 +494,7 @@ extern Symbol *gModuleToken;
 extern Symbol *gNoInit;
 extern Symbol *gVoid;
 extern Symbol *gStringC;
+extern Symbol *gStringCopy;
 extern Symbol *gFile;
 extern Symbol *gOpaque;
 extern Symbol *gTimer;

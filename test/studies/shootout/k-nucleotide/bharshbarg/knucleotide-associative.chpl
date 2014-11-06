@@ -3,6 +3,12 @@ use AdvancedIters;
 
 extern proc memcpy(x : [], b, len:int);
 
+// For consistency with the other shootouts, a value is passed to this
+// benchmark in the Computer Language Benchmarks Game test suite, even though
+// the input set provided is used to determine the problem size.  Store that
+// passed value here.
+config const n = 0;
+
 config const tableSize = 1 << 16;
 config const lineSize = 61;
 
@@ -79,7 +85,7 @@ proc write_count(data : [] uint(8), str : string) {
   writeln(freqs[d], "\t", decode(d, str.length));
 }
 
-proc string.toBytes() var {
+proc string.toBytes() ref {
    var b : [1..this.length] uint(8);
    memcpy(b, this, this.length);
    return b;

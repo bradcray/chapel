@@ -572,12 +572,6 @@ qioerr qio_file_close(qio_file_t* f);
 
 qioerr qio_file_sync(qio_file_t* f);
 
-// Renames the file from oldname to newname, returning a qioerr if one
-// occured.
-qioerr qio_file_rename(const char* oldname, const char* newname);
-// Removes the file specified, returning a qioerr if one occurred
-qioerr qio_file_remove(const char* name);
-
 // This one gets called automatically.
 void _qio_file_destroy(qio_file_t* f);
 
@@ -920,7 +914,7 @@ qioerr qio_channel_read(const int threadsafe, qio_channel_t* restrict ch, void* 
 
   // Is there room in our fast path buffer?
   if( len <= VOID_PTR_DIFF(ch->cached_end, ch->cached_cur) ) {
-    memcpy( ptr, ch->cached_cur, len );
+    qio_memcpy( ptr, ch->cached_cur, len );
     ch->cached_cur = VOID_PTR_ADD(ch->cached_cur, len);
     *amt_read = len;
     err = 0;
@@ -1074,7 +1068,7 @@ qioerr qio_channel_write(const int threadsafe, qio_channel_t* restrict ch, const
 
   // Is there room in our fast path buffer?
   if( len <= VOID_PTR_DIFF(ch->cached_end, ch->cached_cur) ) {
-    memcpy( ch->cached_cur, ptr, len );
+    qio_memcpy( ch->cached_cur, ptr, len );
     ch->cached_cur = VOID_PTR_ADD(ch->cached_cur, len);
     *amt_written = len;
     err = _qio_channel_post_cached_write(ch);
@@ -1104,7 +1098,7 @@ qioerr qio_channel_read_amt(const int threadsafe, qio_channel_t* restrict ch, vo
 
   // Is there room in our fast path buffer?
   if( len <= VOID_PTR_DIFF(ch->cached_end, ch->cached_cur) ) {
-    memcpy( ptr, ch->cached_cur, len );
+    qio_memcpy( ptr, ch->cached_cur, len );
     ch->cached_cur = VOID_PTR_ADD(ch->cached_cur, len);
     err = 0;
   } else {
@@ -1134,7 +1128,7 @@ qioerr qio_channel_write_amt(const int threadsafe, qio_channel_t* restrict ch, c
 
   // Is there room in our fast path buffer?
   if( len <= VOID_PTR_DIFF(ch->cached_end, ch->cached_cur) ) {
-    memcpy( ch->cached_cur, ptr, len );
+    qio_memcpy( ch->cached_cur, ptr, len );
     ch->cached_cur = VOID_PTR_ADD(ch->cached_cur, len);
     err = _qio_channel_post_cached_write(ch);
   } else {

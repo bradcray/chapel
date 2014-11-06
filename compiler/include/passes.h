@@ -52,6 +52,7 @@ void flattenFunctions();
 void inlineFunctions();
 void insertLineNumbers();
 void insertWideReferences();
+void narrowWideReferences();
 void localizeGlobals();
 void loopInvariantCodeMotion();
 void lowerIterators();
@@ -89,6 +90,12 @@ void checkReturnTypesHaveRefTypes();
 //
 // utility functions in pass-containing code files
 //
+
+// buildDefaultFunctions.cpp
+void buildDefaultDestructor(AggregateType* ct);
+
+// flattenFunctions.cpp
+void flattenNestedFunctions(Vec<FnSymbol*>& nestedFunctions);
 
 // parallel.cpp
 bool isRefWideString(Type* t);

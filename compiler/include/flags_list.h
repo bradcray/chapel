@@ -56,6 +56,7 @@ symbolFlag( FLAG_BEGIN_BLOCK , npr, "begin block" , ncm )
 symbolFlag( FLAG_BUILD_TUPLE , ypr, "build tuple" , "used to mark the build_tuple functions")
 symbolFlag( FLAG_COBEGIN_OR_COFORALL , npr, "cobegin or coforall" , ncm )
 symbolFlag( FLAG_COBEGIN_OR_COFORALL_BLOCK , npr, "cobegin or coforall block" , ncm )
+symbolFlag( FLAG_COERCE_TEMP , npr, "coerce temp" , "a temporary that was stores the result of a coercion" )
 symbolFlag( FLAG_CODEGENNED , npr, "codegenned" , "code has been generated for this type" )
 symbolFlag( FLAG_COFORALL_INDEX_VAR , npr, "coforall index var" , ncm )
 symbolFlag( FLAG_COMMAND_LINE_SETTING , ypr, "command line setting" , ncm )
@@ -67,7 +68,7 @@ symbolFlag( FLAG_COMMAND_LINE_SETTING , ypr, "command line setting" , ncm )
 // == false), the callstack is searched ignoring compiler-generated functions.
 // 3. Assignment operations flagged as 'compiler generated' shall contain only
 // field assignments and assignment primitives.
-symbolFlag( FLAG_COMPILER_GENERATED , ypr, "compiler generated" , "marks functions and labels that are compiler-generated or supplied by an internal module" )
+symbolFlag( FLAG_COMPILER_GENERATED , ypr, "compiler generated" , "marks functions that are compiler-generated or supplied by an internal module" )
 symbolFlag( FLAG_COMPILER_NESTED_FUNCTION , npr, "compiler nested function" , ncm )
 symbolFlag( FLAG_CONCURRENTLY_ACCESSED , npr, "concurrently accessed" , "local variables accessed by multiple threads" )
 symbolFlag( FLAG_CONFIG , npr, "config" , "config variable, constant, or parameter" )
@@ -106,6 +107,11 @@ symbolFlag( FLAG_HAS_USER_INIT_COPY_FN , npr, "has user init copy fn" , "applied
 symbolFlag( FLAG_HEAP , npr, "heap" , ncm )
 symbolFlag( FLAG_IMPLICIT_ALIAS_FIELD , npr, "implicit alias field" , ncm )
 symbolFlag( FLAG_INDEX_VAR , npr, "index var" , ncm )
+
+// This can also mark a temp that serves as an intermediate step of
+// destructuring a tuple-typed FLAG_INDEX_OF_INTEREST variable
+// into loop index variables.
+symbolFlag( FLAG_INDEX_OF_INTEREST , npr, "an _indexOfInterest or chpl__followIdx variable" , ncm )
 symbolFlag( FLAG_INIT_COPY_FN,  ypr, "init copy fn" , "init copy function" )
 symbolFlag( FLAG_INLINE , npr, "inline" , ncm )
 symbolFlag( FLAG_INLINE_ITERATOR , npr, "inline iterator" , "iterators that are always inlined, e.g., leaders" )
@@ -120,8 +126,6 @@ symbolFlag( FLAG_ITERATOR_CLASS , npr, "iterator class" , ncm )
 symbolFlag( FLAG_ITERATOR_FN , npr, "iterator fn" , ncm )
 symbolFlag( FLAG_ITERATOR_RECORD , npr, "iterator record" , ncm )
 symbolFlag( FLAG_ITERATOR_WITH_ON , npr, "iterator with on" , "iterator which contains an on block" )
-symbolFlag( FLAG_LABEL_BREAK , npr, "label break" , ncm )
-symbolFlag( FLAG_LABEL_CONTINUE , npr, "label continue" , ncm )
 symbolFlag( FLAG_LOCALE_MODEL_ALLOC , ypr, "locale model alloc" , "locale model specific alloc" )
 symbolFlag( FLAG_LOCALE_MODEL_FREE , ypr, "locale model free" , "locale model specific free" )
 
@@ -153,11 +157,6 @@ symbolFlag( FLAG_NO_INSTANTIATION_LIMIT , ypr, "no instantiation limit", "The in
 symbolFlag( FLAG_NO_OBJECT , ypr, "no object" , ncm )
 symbolFlag( FLAG_NO_PARENS , npr, "no parens" , "function without parentheses" )
 symbolFlag( FLAG_NO_PROTOTYPE , ypr, "no prototype" , "do not generate a prototype this symbol" )
-
-// When a sync type is instantiated as the argument type of a generic function, it is normally
-// unwrapped to reveal the underlying type.  This flag prevents that unwrapping, 
-// so the called routine gets to see the sync object as a whole.
-symbolFlag( FLAG_NO_SYNC_DEMOTION , ypr, "no sync demotion" , "prevents a sync type from being unwrapped" )
 symbolFlag( FLAG_NO_USE_CHAPELSTANDARD , ypr, "no use ChapelStandard" , "Do not implicitly use ChapelStandard" )
 symbolFlag( FLAG_NO_WIDE_CLASS , ypr, "no wide class" , ncm )
 symbolFlag( FLAG_NO_REMOTE_MEMORY_FENCE , ypr, "no remote memory fence" , ncm)
@@ -201,6 +200,7 @@ symbolFlag( FLAG_REF , ypr, "ref" , ncm )
 symbolFlag( FLAG_REF_FOR_CONST_FIELD_OF_THIS , npr, "reference to a const field of 'this'" , ncm )
 symbolFlag( FLAG_REF_ITERATOR_CLASS , npr, "ref iterator class" , ncm )
 symbolFlag( FLAG_REF_TO_CONST , npr, "reference to a const" , "a temp or a function that returns a reference to a Chapel const, e.g. an accessor to a const field or its result" )
+symbolFlag( FLAG_REF_TO_CONST_WHEN_CONST_THIS , ypr, "reference to const when const this" , "a function that returns a reference to a Chapel const when 'this' is const" )
 symbolFlag( FLAG_REF_VAR , ypr, "ref var" , "reference variable" )
 symbolFlag( FLAG_REMOVABLE_AUTO_COPY , ypr, "removable auto copy" , ncm )
 symbolFlag( FLAG_REMOVABLE_AUTO_DESTROY , ypr, "removable auto destroy" , ncm )
@@ -215,6 +215,7 @@ symbolFlag( FLAG_SINGLE , ypr, "single" , ncm )
 symbolFlag( FLAG_SPECIFIED_RETURN_TYPE , npr, "specified return type" , ncm )
 symbolFlag( FLAG_STAR_TUPLE , npr, "star tuple" , "mark tuple types as star tuple types" )
 symbolFlag( FLAG_SUPER_CLASS , npr, "super class" , ncm )
+symbolFlag( FLAG_SUPPRESS_LVALUE_ERRORS , ypr, "suppress lvalue error" , "do not report an lvalue error if it occurs in a function with this flag" )
 symbolFlag( FLAG_SYNC , ypr, "sync" , ncm )
 symbolFlag( FLAG_SYNTACTIC_DISTRIBUTION , ypr, "syntactic distribution" , ncm )
 symbolFlag( FLAG_TEMP , npr, "temp" , "compiler-inserted temporary" )

@@ -96,8 +96,7 @@
 %token TRECORD TREDUCE TREF TRETURN
 %token TSCAN TSELECT TSERIAL TSINGLE TSPARSE TSUBDOMAIN
 %token TSYNC TTHEN TTYPE TUNDERSCORE TUNION TUSE TVAR
-%token TWHEN TWHERE TWHILE TYIELD TZIP
-%token TREFVAR
+%token TWHEN TWHERE TWHILE TWITH TYIELD TZIP
 
 //
 // operators and punctuation (alphabetical)
@@ -199,14 +198,15 @@
 %type <pexpr> parenthesized_expr expr actual_expr
 %type <pexpr> literal_expr opt_where_part
 %type <pexpr> stmt_level_expr type_level_expr
-%type <pexpr> ident_expr for_expr cond_expr nil_expr io_expr new_expr let_expr
+%type <pexpr> ident_expr for_expr cond_expr nil_expr io_expr new_expr let_expr intent_expr
 %type <pexpr> reduce_expr scan_expr reduce_scan_op_expr opt_init_expr opt_init_type var_arg_expr
 %type <pexpr> tuple_component tuple_var_decl_component
 %type <pdefexpr> formal enum_item
 %type <pdefexpr> query_expr opt_query_expr
 
 %type <pcallexpr> opt_inherit expr_ls assoc_expr_ls tuple_expr_ls
-%type <pcallexpr> opt_actual_ls actual_ls opt_ref_var_ls ref_var_ls
+%type <pcallexpr> opt_actual_ls actual_ls
+%type <pcallexpr> opt_task_intent_ls task_intent_ls
 
 %type <pfnsymbol> fn_decl_stmt_inner formal_ls opt_formal_ls req_formal_ls
 %type <procIter> proc_or_iter
@@ -252,9 +252,9 @@ stmt:
 | return_stmt
 | stmt_level_expr TSEMI                { $$ = buildChapelStmt($1); }
 | TATOMIC stmt                         { $$ = buildAtomicStmt($2); }
-| TBEGIN opt_ref_var_ls stmt           { $$ = buildBeginStmt($2, $3); }
+| TBEGIN opt_task_intent_ls stmt       { $$ = buildBeginStmt($2, $3); }
 | TBREAK opt_ident TSEMI               { $$ = buildGotoStmt(GOTO_BREAK, $2); }
-| TCOBEGIN opt_ref_var_ls block_stmt   { $$ = buildCobeginStmt($2, $3);  }
+| TCOBEGIN opt_task_intent_ls block_stmt { $$ = buildCobeginStmt($2, $3);  }
 | TCONTINUE opt_ident TSEMI            { $$ = buildGotoStmt(GOTO_CONTINUE, $2); }
 | TDELETE expr TSEMI                   { $$ = buildPrimitiveStmt(PRIM_DELETE, $2); }
 | TLABEL ident stmt                    { $$ = buildLabelStmt($2, $3); }
@@ -367,15 +367,15 @@ extern_block_stmt:
 ;
 
 loop_stmt:
-  TDO stmt TWHILE expr TSEMI                    { $$ = buildDoWhileLoopStmt($4, $2); }
-| TWHILE expr do_stmt                           { $$ = buildWhileDoLoopStmt($2, $3); }
-| TCOFORALL expr TIN expr opt_ref_var_ls do_stmt               { $$ = buildCoforallLoopStmt($2, $4, $5, $6); }
-| TCOFORALL expr TIN zippered_iterator opt_ref_var_ls do_stmt  { $$ = buildCoforallLoopStmt($2, $4, $5, $6, true); }
-| TCOFORALL expr opt_ref_var_ls do_stmt                        { $$ = buildCoforallLoopStmt(NULL, $2, $3, $4); }
-| TFOR expr TIN expr do_stmt                    { $$ = buildForLoopStmt($2, $4, $5); }
-| TFOR expr TIN zippered_iterator do_stmt       { $$ = buildForLoopStmt($2, $4, $5, false, true); }
-| TFOR expr do_stmt                             { $$ = buildForLoopStmt(NULL, $2, $3); }
-| TFOR zippered_iterator do_stmt                { $$ = buildForLoopStmt(NULL, $2, $3, false, true); }
+  TDO stmt TWHILE expr TSEMI                    { $$ = DoWhileStmt::build($4, $2); }
+| TWHILE expr do_stmt                           { $$ = WhileDoStmt::build($2, $3); }
+| TCOFORALL expr TIN expr opt_task_intent_ls do_stmt { $$ = buildCoforallLoopStmt($2, $4, $5, $6); }
+| TCOFORALL expr TIN zippered_iterator opt_task_intent_ls do_stmt { $$ = buildCoforallLoopStmt($2, $4, $5, $6, true); }
+| TCOFORALL expr opt_task_intent_ls do_stmt     { $$ = buildCoforallLoopStmt(NULL, $2, $3, $4); }
+| TFOR expr TIN expr do_stmt                    { $$ = ForLoop::buildForLoop(  $2, $4, $5, false, false); }
+| TFOR expr TIN zippered_iterator do_stmt       { $$ = ForLoop::buildForLoop(  $2, $4, $5, false,  true); }
+| TFOR expr do_stmt                             { $$ = ForLoop::buildForLoop(NULL, $2, $3, false, false); }
+| TFOR zippered_iterator do_stmt                { $$ = ForLoop::buildForLoop(NULL, $2, $3, false,  true); }
 | TFOR TPARAM ident TIN expr do_stmt            { $$ = buildParamForLoopStmt($3, $5, $6); }
 | TFORALL expr TIN expr do_stmt                 { $$ = buildForallLoopStmt($2, $4, $5); }
 | TFORALL expr TIN zippered_iterator do_stmt    { $$ = buildForallLoopStmt($2, $4, $5, true); }
@@ -518,8 +518,8 @@ lambda_decl_expr:
   opt_ret_tag opt_type opt_where_part function_body_stmt
     {
       $3->retTag = $5;
-      if ($5 == RET_VAR)
-        USR_FATAL("'var' return types are not allowed in lambdas");
+      if ($5 == RET_REF)
+        USR_FATAL("'ref' return types are not allowed in lambdas");
       if ($5 == RET_PARAM)
         USR_FATAL("'param' return types are not allowed in lambdas");
       if ($5 == RET_TYPE)
@@ -707,7 +707,14 @@ proc_or_iter:
 opt_ret_tag:
             { $$ = RET_VALUE; }
 | TCONST    { $$ = RET_VALUE; }
-| TVAR      { $$ = RET_VAR; }
+| TVAR      {
+    $$ = RET_REF;
+    // create a new dummy AST node to get a location into USR_WARN
+    USR_WARN(new BlockStmt(), "In the next release, 'var' return intents will "
+                              "no longer be supported. Please use the "
+                              "equivalent 'ref' return intent.");
+            }
+| TREF      { $$ = RET_REF; }
 | TPARAM    { $$ = RET_PARAM; }
 | TTYPE     { $$ = RET_TYPE; }
 ;
@@ -782,23 +789,38 @@ opt_init_type:
 var_decl_stmt:
   opt_config TPARAM var_decl_stmt_inner_ls TSEMI
     {
-      $$ = buildVarDecls($3, $1, FLAG_PARAM, FLAG_UNKNOWN, @1.comment);
+      std::set<Flag> flags;
+      flags.insert($1);
+      flags.insert(FLAG_PARAM);
+      $$ = buildVarDecls($3, flags, @1.comment);
     }
 | opt_config TCONST var_decl_stmt_inner_ls TSEMI
     {
-      $$ = buildVarDecls($3, $1, FLAG_CONST, FLAG_UNKNOWN, @1.comment);
+      std::set<Flag> flags;
+      flags.insert($1);
+      flags.insert(FLAG_CONST);
+      $$ = buildVarDecls($3, flags, @1.comment);
     }
-| opt_config TREFVAR var_decl_stmt_inner_ls TSEMI
+| opt_config TREF var_decl_stmt_inner_ls TSEMI
     {
-      $$ = buildVarDecls($3, $1, FLAG_UNKNOWN, FLAG_REF_VAR, @1.comment);
+      std::set<Flag> flags;
+      flags.insert($1);
+      flags.insert(FLAG_REF_VAR);
+      $$ = buildVarDecls($3, flags, @1.comment);
     }
-| opt_config TCONST TREFVAR var_decl_stmt_inner_ls TSEMI
+| opt_config TCONST TREF var_decl_stmt_inner_ls TSEMI
     {
-      $$ = buildVarDecls($4, $1, FLAG_CONST, FLAG_REF_VAR, @1.comment);
+      std::set<Flag> flags;
+      flags.insert($1);
+      flags.insert(FLAG_CONST);
+      flags.insert(FLAG_REF_VAR);
+      $$ = buildVarDecls($4, flags, @1.comment);
     }
 | opt_config TVAR var_decl_stmt_inner_ls TSEMI
     {
-      $$ = buildVarDecls($3, $1, FLAG_UNKNOWN, FLAG_UNKNOWN, @1.comment);
+      std::set<Flag> flags;
+      flags.insert($1);
+      $$ = buildVarDecls($3, flags, @1.comment);
     }
 ;
 
@@ -1092,14 +1114,25 @@ stmt_level_expr:
     { $$ = new CallExpr("<~>", $1, $3); }
 ;
 
-opt_ref_var_ls:
-                             { $$ = NULL; }
-| TREF TLP ref_var_ls TRP    { $$ = $3;   }
+opt_task_intent_ls:
+                                { $$ = NULL; }
+| TWITH TLP task_intent_ls TRP  { $$ = $3; }
 ;
 
-ref_var_ls:
-  ident_expr                    { $$ = new CallExpr(PRIM_ACTUALS_LIST, $1); }
-| ref_var_ls TCOMMA ident_expr  { $1->insertAtTail($3); }
+task_intent_ls:
+  intent_expr                       { $$ = new CallExpr(PRIM_ACTUALS_LIST, $1); }
+| task_intent_ls TCOMMA intent_expr { $1->insertAtTail($3); }
+;
+
+intent_expr:
+  opt_intent_tag ident_expr
+    {
+      if ($1 != INTENT_REF) {
+        USR_FATAL($2, "Only 'ref' intents are currently supported in with clauses");
+      } else {
+        $$ = $2;
+      }
+    }
 ;
 
 io_expr:

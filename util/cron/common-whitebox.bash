@@ -21,7 +21,10 @@ fi
 
 # Variable set by Jenkins to indicate type of whitebox. If it is not set, assume cray-xc.
 platform=${CRAY_PLATFORM_FROM_JENKINS:-cray-xc}
-log_info="Using platform: ${platform}"
+log_info "Using platform: ${platform}"
+
+short_platform=$(echo "${platform}" | cut -d- -f2)
+log_info "Short platform: ${short_platform}"
 
 # Setup vars that will help load the correct compiler module.
 case $COMP_TYPE in
@@ -31,6 +34,8 @@ case $COMP_TYPE in
 
         export CHPL_TARGET_PLATFORM=$platform
         log_info "Set CHPL_TARGET_PLATFORM to: ${CHPL_TARGET_PLATFORM}"
+
+        export CHPL_NIGHTLY_TEST_CONFIG_NAME="${short_platform}-wb.prgenv-${COMPILER}"
         ;;
     HOST-TARGET)
         module_name=PrgEnv-${COMPILER}
@@ -40,6 +45,8 @@ case $COMP_TYPE in
         export CHPL_TARGET_PLATFORM=$platform
         log_info "Set CHPL_HOST_PLATFORM to: ${CHPL_HOST_PLATFORM}"
         log_info "Set CHPL_TARGET_PLATFORM to: ${CHPL_TARGET_PLATFORM}"
+
+        export CHPL_NIGHTLY_TEST_CONFIG_NAME="${short_platform}-wb.host.prgenv-${COMPILER}"
         ;;
     HOST-TARGET-no-PrgEnv)
         the_cc=${COMPILER}
@@ -48,6 +55,8 @@ case $COMP_TYPE in
         fi
         module_name=${the_cc}
         chpl_host_value=${COMPILER}
+
+        export CHPL_NIGHTLY_TEST_CONFIG_NAME="${short_platform}-wb.${COMPILER}"
         ;;
     *)
         log_error "Unknown COMP_TYPE value: ${COMP_TYPE}. Exiting."
@@ -61,22 +70,14 @@ case $COMPILER in
         log_info "Loading module: ${module_name}"
         module load ${module_name}
 
+        # Use cce version 8.3.0 for consistency.
+        module swap cce cce/8.3.0
+
         # swap out network modules to get "host-only" environment
         log_info "Swap network module for host-only environment."
         module swap craype-network-aries craype-target-local_host
-
-        # TODO: Is this still needed? (thomasvandoren, 2014-07-02)
-        log_info "Unloading cray-libsci module."
-        module unload cray-libsci
         ;;
-    intel|gnu)
-        export CHPL_REGEXP=re2
-        export CHPL_GMP=gmp
-
-        log_info "Loading module: ${module_name}"
-        module load ${module_name}
-        ;;
-    pgi)
+    intel|gnu|pgi)
         log_info "Loading module: ${module_name}"
         module load ${module_name}
         ;;
@@ -85,6 +86,12 @@ case $COMPILER in
         exit 4
         ;;
 esac
+
+libsci_module=$(module list -t 2>&1 | grep libsci)
+if [ -n "${libsci_module}" ] ; then
+    log_info "Unloading cray-libsci module: ${libsci_module}"
+    module unload $libsci_module
+fi
 
 export CHPL_HOME=$(cd $CWD/../.. ; pwd)
 
@@ -99,7 +106,7 @@ export CHPL_LAUNCHER=none
 export CHPL_COMM=none
 
 # Set some vars that nightly cares about.
-export CHPL_NIGHTLY_LOGDIR=/data/sea/chapel/Nightly/whitebox/${platform}
+export CHPL_NIGHTLY_LOGDIR=/data/sea/chapel/Nightly
 export CHPL_NIGHTLY_CRON_LOGDIR="$CHPL_NIGHTLY_LOGDIR"
 
 # Ensure that one of the CPU modules is loaded.

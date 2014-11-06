@@ -519,6 +519,9 @@ AggregateType::copyInner(SymbolMap* map) {
 
 static void
 addDeclaration(AggregateType* ct, DefExpr* def, bool tail) {
+  if (def->sym->hasFlag(FLAG_REF_VAR)) {
+      USR_FATAL_CONT(def, "References cannot be members of classes or records yet.");
+  }
   if (FnSymbol* fn = toFnSymbol(def->sym)) {
     ct->methods.add(fn);
     if (fn->_this) {
@@ -1284,6 +1287,15 @@ void initPrimitiveTypes(void) {
   dtStringC = createPrimitiveType( "c_string", "c_string" );
   dtStringC->defaultValue = new_StringSymbol("");
   dtStringC->symbol->addFlag(FLAG_NO_CODEGEN);
+
+  dtStringCopy = createPrimitiveType( "c_string_copy", "c_string_copy" );
+  dtStringCopy->defaultValue = gOpaque;
+  dtStringCopy->symbol->addFlag(FLAG_NO_CODEGEN);
+  CREATE_DEFAULT_SYMBOL(dtStringCopy, gStringCopy, "_nullString");
+  gStringCopy->cname = "NULL";
+  // In codegen, this prevents the "&NULL" absurdity.
+  gStringCopy->addFlag(FLAG_EXTERN);
+
   dtString = createPrimitiveType( "string", "chpl_string");
   dtString->defaultValue = NULL;
 
@@ -1772,9 +1784,10 @@ bool needsCapture(Type* t) {
       isClass(t) ||
       isRecord(t) ||
       isUnion(t) ||
-      t == dtTaskID ||
+      t == dtTaskID || // false?
       t == dtFile ||
       t == dtTaskList ||
+      // TODO: Move these down to the "no" section.
       t == dtNil ||
       t == dtOpaque ||
       t->symbol->hasFlag(FLAG_EXTERN)) {

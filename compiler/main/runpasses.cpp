@@ -74,6 +74,7 @@ struct PassInfo {
 #define LOG_prune2                             'Y'
 #define LOG_returnStarTuplesByRefArgs          's'
 #define LOG_insertWideReferences               'W'
+#define LOG_narrowWideReferences               'a'
 #define LOG_optimizeOnClauses                  'o'
 #define LOG_addInitCalls                       'M'
 #define LOG_insertLineNumbers                  'n'
@@ -137,14 +138,15 @@ static PassInfo sPassList[] = {
                                 // _distribution records
   RUN(removeEmptyRecords),      // remove empty records
   RUN(localizeGlobals),         // pull out global constants from loop runs
+  RUN(loopInvariantCodeMotion), // move loop invarient code above loop runs
   RUN(prune2),                  // prune AST of dead functions and types again
 
   RUN(returnStarTuplesByRefArgs),
 
   RUN(insertWideReferences),    // inserts wide references for on clauses
+  RUN(narrowWideReferences),    // narrows wide references where possible
   RUN(optimizeOnClauses),       // Optimize on clauses
   RUN(addInitCalls),            // Add module init calls and guards.
-  RUN(loopInvariantCodeMotion), // move loop invarient code above loop runs
 
   // AST to C or LLVM
   RUN(insertLineNumbers),       // insert line numbers for error messages

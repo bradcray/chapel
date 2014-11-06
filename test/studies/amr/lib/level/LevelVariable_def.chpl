@@ -71,14 +71,14 @@ class LevelVariable {
   // the GridVariable's 'value' field.
   //---------------------------------------------------------------
   
-  proc this(grid: Grid) var {
+  proc this(grid: Grid) ref {
     return grid_variables(grid);
   }
 
   proc this(
     grid: Grid, 
     D: domain(dimension, stridable=true)) 
-  var {
+  ref {
     var alias => grid_variables(grid).value(D);
     return alias;
   }

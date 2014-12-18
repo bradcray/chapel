@@ -111,7 +111,13 @@ static void addPragmaFlags(Symbol* sym, Vec<const char*>* pragmas) {
     else {
       sym->addFlag(flag);
 
-      if (flag == FLAG_RUNTIME_TYPE_INIT_FN) {
+      if (flag == FLAG_RANGE_BUILDER) {
+        printf("Found a range builder: %s\n", sym->name);
+        FnSymbol* fn = toFnSymbol(sym);
+        INT_ASSERT(fn);
+        // decide which of the three it is (or add three flags?)
+        // store into some global (e.g., 'gRangeBuilderUnbounded = ...;')
+      } else if (flag == FLAG_RUNTIME_TYPE_INIT_FN) {
         //
         // These functions must be marked as type functions early in
         // compilation, as calls to them are inserted by the compiler
@@ -140,9 +146,10 @@ static void addPragmaFlags(Symbol* sym, Vec<const char*>* pragmas) {
 
 BlockStmt* buildPragmaStmt(Vec<const char*>* pragmas,
                            BlockStmt* stmt) {
-  if (DefExpr* def = toDefExpr(stmt->body.first()))
-    addPragmaFlags(def->sym, pragmas);
-  else if (pragmas->n > 0) {
+  if (DefExpr* def = toDefExpr(stmt->body.first())) {
+    Symbol* sym = def->sym;
+    addPragmaFlags(sym, pragmas);
+  } else if (pragmas->n > 0) {
     USR_FATAL_CONT(stmt, "cannot attach pragmas to this statement");
     USR_PRINT(stmt, "   %s \"%s\"",
               pragmas->n == 1 ? "pragma" : "starting with pragma",
@@ -1834,7 +1841,7 @@ buildFunctionDecl(FnSymbol*  fn,
 
   fn->doc = docs;
 
-  return buildChapelStmt(new DefExpr(fn));
+  return buildChapelStmt(new DefExpr(fn));  return buildChapelStmt(new DefExpr(fn));
 }
 
 

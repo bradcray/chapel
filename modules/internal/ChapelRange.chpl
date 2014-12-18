@@ -125,24 +125,33 @@ module ChapelRange {
   //
 
   // Range builders for fully bounded ranges
+  pragma "range builder"
   proc chpl_build_bounded_range(low: int(?w), high: int(w))
     return new range(idxType = int(w), _low = low, _high = high);
+
+  pragma "range builder"
   proc chpl_build_bounded_range(low: uint(?w), high: uint(w))
     return new range(uint(w), _low = low, _high = high);
+
+  pragma "range builder"
   proc chpl_build_bounded_range(low, high) {
     compilerError("Bounds of '..' must be integers of compatible types, when specified.");
   }
 
   // Range builders for partially bounded ranges
+  pragma "range builder"
   proc chpl_build_partially_bounded_range(param bt: BoundedRangeType, bound: int(?w))
     return new range(int(w), bt, false, bound, bound);
+  pragma "range builder"
   proc chpl_build_partially_bounded_range(param bt: BoundedRangeType, bound: uint(?w))
     return new range(uint(w), bt, false, bound, bound);
+  pragma "range builder"
   proc chpl_build_partially_bounded_range(param bt: BoundedRangeType, bound) {
     compilerError("Bounds of '..' must be integers of compatible types, when specified.");
   }
 
   // Range builder for unbounded ranges
+  pragma "range builder"
   proc chpl_build_unbounded_range(param bt: BoundedRangeType)
     return new range(int, bt);
   

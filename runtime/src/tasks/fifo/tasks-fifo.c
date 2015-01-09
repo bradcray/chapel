@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2014 Cray Inc.
+ * Copyright 2004-2015 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
  * The entirety of this work is licensed under the Apache License,
@@ -864,11 +864,7 @@ uint32_t chpl_task_getMaxPar(void) {
 }
 
 c_sublocid_t chpl_task_getNumSublocales(void) {
-#ifdef CHPL_LOCALE_MODEL_NUM_SUBLOCALES
-  return CHPL_LOCALE_MODEL_NUM_SUBLOCALES;
-#else
   return 0;
-#endif
 }
 
 chpl_task_prvData_t* chpl_task_getPrvData(void) {

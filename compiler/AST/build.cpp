@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2014 Cray Inc.
+ * Copyright 2004-2015 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -880,6 +880,14 @@ CallExpr* buildForallLoopExprFromArrayType(CallExpr* buildArrRTTypeCall,
   }
 }
 
+static void
+checkForNonRefIntents(CallExpr* byrefVars) {
+  for_actuals(actual, byrefVars)
+    if (ArgSymbol* arg = toArgSymbol(actual))
+      if (arg->intent != INTENT_REF)
+        USR_FATAL_CONT(byrefVars, "intents other than 'ref' are not allowed in a 'with' clause of a 'forall' loop or expression");
+}
+
 static BlockStmt*
 buildFollowLoop(VarSymbol* iter,
                 VarSymbol* leadIdxCopy,
@@ -1019,6 +1027,8 @@ buildForallLoopStmt(Expr*      indices,
   //
   INT_ASSERT(!loopBodyCopy->byrefVars);
   if (byref_vars) {
+    // todo: push this check downstream, e.g. into checkParsed()
+    checkForNonRefIntents(byref_vars);
     INT_ASSERT(byref_vars->isPrimitive(PRIM_ACTUALS_LIST));
     byref_vars->primitive = primitives[PRIM_FORALL_LOOP];
   } else {
@@ -1318,71 +1328,6 @@ BlockStmt* buildSelectStmt(Expr* selectCond, BlockStmt* whenstmts) {
     condStmt->elseStmt = otherwise->thenStmt;
   }
   return buildChapelStmt(top);
-}
-
-
-BlockStmt* buildTypeSelectStmt(CallExpr* exprs, BlockStmt* whenstmts) {
-  static int uid = 1;
-  int caseId = 1;
-  FnSymbol* fn = NULL;
-  BlockStmt* stmts = buildChapelStmt();
-  BlockStmt* newWhenStmts = buildChapelStmt();
-  bool has_otherwise = false;
-
-  INT_ASSERT(exprs->isPrimitive(PRIM_ACTUALS_LIST));
-
-  for_alist(stmt, whenstmts->body) {
-    CondStmt* when = toCondStmt(stmt);
-    if (!when)
-      INT_FATAL("error in buildSelectStmt");
-    CallExpr* conds = toCallExpr(when->condExpr);
-    if (!conds || !conds->isPrimitive(PRIM_WHEN))
-      INT_FATAL("error in buildSelectStmt");
-    if (conds->numActuals() == 0) {
-      if (has_otherwise)
-        USR_FATAL(conds, "Type select statement has multiple otherwise clauses");
-      has_otherwise = true;
-      fn = new FnSymbol(astr("_typeselect", istr(uid)));
-      int lid = 1;
-      for_actuals(expr, exprs) {
-        fn->insertFormalAtTail(
-          new DefExpr(
-            new ArgSymbol(INTENT_BLANK,
-                          astr("_t", istr(lid++)),
-                          dtAny)));
-      }
-      fn->retTag = RET_PARAM;
-      fn->insertAtTail(new CallExpr(PRIM_RETURN, new_IntSymbol(caseId)));
-      newWhenStmts->insertAtTail(
-        new CondStmt(new CallExpr(PRIM_WHEN, new_IntSymbol(caseId++)),
-        when->thenStmt->copy()));
-      stmts->insertAtTail(new DefExpr(fn));
-    } else {
-      if (conds->numActuals() != exprs->argList.length)
-        USR_FATAL(when, "Type select statement requires number of selectors to be equal to number of when conditions");
-      fn = new FnSymbol(astr("_typeselect", istr(uid)));
-      int lid = 1;
-      for_actuals(expr, conds) {
-        fn->insertFormalAtTail(
-          new DefExpr(new ArgSymbol(INTENT_BLANK, astr("_t", istr(lid++)),
-                                    dtUnknown, expr->copy())));
-      }
-      fn->retTag = RET_PARAM;
-      fn->insertAtTail(new CallExpr(PRIM_RETURN, new_IntSymbol(caseId)));
-      newWhenStmts->insertAtTail(
-        new CondStmt(new CallExpr(PRIM_WHEN, new_IntSymbol(caseId++)),
-        when->thenStmt->copy()));
-      stmts->insertAtTail(new DefExpr(fn));
-    }
-  }
-  VarSymbol* tmp = newTemp();
-  tmp->addFlag(FLAG_MAYBE_PARAM);
-  stmts->insertAtHead(new DefExpr(tmp));
-  stmts->insertAtTail(new CallExpr(PRIM_MOVE,
-                                   tmp,
-                                   new CallExpr(fn->name, exprs)));
-  stmts->insertAtTail(buildSelectStmt(new SymExpr(tmp), newWhenStmts));
-  return stmts;
 }
 
 

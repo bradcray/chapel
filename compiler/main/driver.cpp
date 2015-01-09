@@ -1,15 +1,15 @@
 /*
- * Copyright 2004-2014 Cray Inc.
+ * Copyright 2004-2015 Cray Inc.
  * Other additional copyright holders may be indicated within.
- * 
+ *
  * The entirety of this work is licensed under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License.
- * 
+ *
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -44,8 +44,6 @@
 #include <inttypes.h>
 #include <string>
 #include <sstream>
-
-const char* chplBinaryName = NULL;
 
 char CHPL_HOME[FILENAME_MAX+1] = "";
 
@@ -139,6 +137,8 @@ bool fNoPrivatization = false;
 bool fNoOptimizeOnClauses = false;
 bool fNoRemoveEmptyRecords = true;
 bool fMinimalModules = false;
+bool fUseIPE         = false;
+
 int optimize_on_clause_limit = 20;
 int scalar_replace_limit = 8;
 int tuple_copy_limit = scalar_replace_limit;
@@ -190,13 +190,6 @@ bool debugCCode = false;
 bool optimizeCCode = false;
 bool specializeCCode = false;
 
-bool fEnableTimers = false;
-Timer timer1;
-Timer timer2;
-Timer timer3;
-Timer timer4;
-Timer timer5;
-
 bool fNoMemoryFrees = false;
 int numGlobalsOnHeap = 0;
 bool preserveInlinedLineNumbers = false;
@@ -228,10 +221,11 @@ llvm::sys::Path GetExecutablePath(const char *Argv0) {
 
 static bool isMaybeChplHome(const char* path)
 {
-  bool ret = false;
+  bool  ret  = false;
   char* real = dirHasFile(path, "util/chplenv");
-  
-  if( real ) ret = true;
+
+  if (real)
+    ret = true;
 
   free(real);
 
@@ -240,11 +234,11 @@ static bool isMaybeChplHome(const char* path)
 
 static void setupChplHome(const char* argv0) {
   const char* chpl_home = getenv("CHPL_HOME");
-  char* guess = NULL;
-
+  char*       guess     = NULL;
 
   // Get the executable path.
   guess = findProgramPath(argv0);
+
   if (guess) {
     // Determine CHPL_HOME based on the exe path.
     // Determined exe path, but don't have a env var set
@@ -299,7 +293,7 @@ static void setupChplHome(const char* argv0) {
       USR_FATAL("$CHPL_HOME must be set to run chpl");
     } else {
       int rc;
-      
+
       if( strlen(guess) > FILENAME_MAX )
         USR_FATAL("chpl guessed home %s too long", guess);
 
@@ -317,7 +311,8 @@ static void setupChplHome(const char* argv0) {
     USR_WARN("CHPL_HOME=%s is not a Chapel distribution", CHPL_HOME);
   }
 
-  if( guess ) free(guess);
+  if( guess )
+    free(guess);
 
   parseCmdLineConfig("CHPL_HOME", astr("\"", CHPL_HOME, "\""));
 }
@@ -486,24 +481,6 @@ static void handleMake(const ArgumentState* state, const char* arg_unused) {
 static void handleIncDir(const ArgumentState* state, const char* arg_unused) {
   addIncInfo(incFilename);
 }
-
-static void compute_program_name_loc(const char*  orig_argv0,
-                                     const char** name, 
-                                     const char** loc) {
-  char* argv0     = strdup(orig_argv0);
-  char* lastslash = strrchr(argv0, '/');
-
-  if (lastslash == NULL) {
-    *name = argv0;
-    *loc = findProgramPath(orig_argv0);
-  } else {
-    *lastslash = '\0';
-    *name = lastslash+1;
-    *loc = findProgramPath(orig_argv0);
-  }
-  chplBinaryName = *name;
-}
-
 
 static void runCompilerInGDB(int argc, char* argv[]) {
   const char* gdbCommandFilename = createDebuggerFile("gdb", argc, argv);
@@ -733,7 +710,7 @@ static ArgumentDescription arg_desc[] = {
  {"tuple-copy-opt", ' ', NULL, "Enable [disable] tuple (memcpy) optimization", "n", &fNoTupleCopyOpt, "CHPL_DISABLE_TUPLE_COPY_OPT", NULL},
  {"tuple-copy-limit", ' ', "<limit>", "Limit on the size of tuples considered for optimization", "I", &tuple_copy_limit, "CHPL_TUPLE_COPY_LIMIT", NULL},
  {"use-noinit", ' ', NULL, "Enable [disable] ability to skip default initialization through the keyword noinit", "N", &fUseNoinit, NULL, NULL},
- 
+
  {"", ' ', NULL, "Run-time Semantic Check Options", NULL, NULL, NULL, NULL},
  {"no-checks", ' ', NULL, "Disable all following run-time checks", "F", &fNoChecks, "CHPL_NO_CHECKS", turnOffChecks},
  {"bounds-checks", ' ', NULL, "Enable [disable] bounds checking", "n", &fNoBoundsChecks, "CHPL_NO_BOUNDS_CHECKING", NULL},
@@ -851,26 +828,28 @@ static ArgumentDescription arg_desc[] = {
  {"preserve-inlined-line-numbers", ' ', NULL, "[Don't] Preserve file names/line numbers in inlined code", "N", &preserveInlinedLineNumbers, "CHPL_PRESERVE_INLINED_LINE_NUMBERS", NULL},
  {"print-id-on-error", ' ', NULL, "[Don't] print AST id in error messages", "N", &fPrintIDonError, "CHPL_PRINT_ID_ON_ERROR", NULL},
  {"remove-empty-records", ' ', NULL, "Enable [disable] empty record removal", "n", &fNoRemoveEmptyRecords, "CHPL_DISABLE_REMOVE_EMPTY_RECORDS", NULL},
- {"minimal-modules", ' ', NULL, "Enable [disable] using minimal modules", "N", &fMinimalModules, "CHPL_MINIMAL_MODULES", NULL},
- {"timers", ' ', NULL, "Enable [disable] general timers one to five", "N", &fEnableTimers, "CHPL_ENABLE_TIMERS", NULL},
- {"print-chpl-home", ' ', NULL, "Print CHPL_HOME and path to this executable and exit", "F", &printChplHome, NULL, NULL},
+
+ {"minimal-modules", ' ', NULL, "Enable [disable] using minimal modules",               "N", &fMinimalModules, "CHPL_MINIMAL_MODULES", NULL},
+ {"ipe",             ' ', NULL, "Enable the Interactive Programming Environment (IPE)", "F", &fUseIPE,         NULL,                   NULL },
+ {"print-chpl-home", ' ', NULL, "Print CHPL_HOME and path to this executable and exit", "F", &printChplHome,   NULL,                   NULL},
  {0}
 };
 
 
-static ArgumentState arg_state = {
-  0, 
+static ArgumentState sArgState = {
   0,
-  "program", 
+  0,
+  "program",
   "path",
   arg_desc
 };
 
 
-static void setupDependentVars(void) {
+static void setupDependentVars() {
   if (developer && !userSetCppLineno) {
     printCppLineno = false;
   }
+
 #ifndef HAVE_LLVM
   if (llvmCodegen)
     USR_FATAL("This compiler was built without LLVM support");
@@ -885,45 +864,57 @@ static void setupDependentVars(void) {
 
 
 static void printStuff(const char* argv0) {
-  bool shouldExit = false;
+  bool shouldExit       = false;
   bool printedSomething = false;
 
   if (printVersion) {
-    fprintf(stdout, "%s Version %s\n", arg_state.program_name, compileVersion);
-    printCopyright = true;
+    fprintf(stdout, "%s Version %s\n", sArgState.program_name, compileVersion);
+
+    printCopyright   = true;
     printedSomething = true;
-    shouldExit = true;
+    shouldExit       = true;
   }
+
   if (printLicense) {
     fprintf(stdout,
 #include "LICENSE"
             );
-    printCopyright = false;
-    shouldExit = true;
+
+    printCopyright   = false;
+    shouldExit       = true;
     printedSomething = true;
   }
+
   if (printCopyright) {
     fprintf(stdout,
 #include "COPYRIGHT"
             );
+
     printedSomething = true;
   }
   if( printChplHome ) {
     char* guess = findProgramPath(argv0);
+
     printf("%s\t%s\n", CHPL_HOME, guess);
+
     free(guess);
+
     printedSomething = true;
   }
 
-  if (printHelp || (!printedSomething && arg_state.nfile_arguments < 1)) {
+  if (printHelp || (!printedSomething && sArgState.nfile_arguments < 1)) {
     if (printedSomething) printf("\n");
-    usage(&arg_state, (!printHelp), printEnvHelp, printSettingsHelp);
-    shouldExit = true;
+
+    usage(&sArgState, (!printHelp), printEnvHelp, printSettingsHelp);
+
+    shouldExit       = true;
     printedSomething = true;
   }
-  if (printedSomething && arg_state.nfile_arguments < 1) {
-    shouldExit = true;
+
+  if (printedSomething && sArgState.nfile_arguments < 1) {
+    shouldExit       = true;
   }
+
   if (shouldExit) {
     clean_exit(0);
   }
@@ -937,22 +928,28 @@ int main(int argc, char* argv[]) {
 
   {
     astlocMarker markAstLoc(0, "<internal>");
+    DefExpr*     objectClass = 0;
 
     tracker.StartPhase("init");
 
+    init_args(&sArgState, argv[0]);
+
+    for (int i = 1; i < argc; i++)
+      if (strcmp(argv[i], "--ipe") == 0)
+        fUseIPE = true;
+
     initFlags();
-    initChplProgram();
+    initRootModule();
     initPrimitive();
     initPrimitiveTypes();
-    initTheProgram();
+
+    objectClass = defineObjectClass();
+
+    initChplProgram(objectClass);
 
     setupOrderedGlobals(argv[0]);
 
-    compute_program_name_loc(argv[0], 
-                             &(arg_state.program_name),
-                             &(arg_state.program_loc));
-
-    process_args(&arg_state, argc, argv);
+    process_args(&sArgState, argc, argv);
 
     initCompilerGlobals(); // must follow argument parsing
 
@@ -970,25 +967,16 @@ int main(int argc, char* argv[]) {
   if (runlldb)
     runCompilerInLLDB(argc, argv);
 
-  testInputFiles(arg_state.nfile_arguments, arg_state.file_argument);
+  testInputFiles(sArgState.nfile_arguments, sArgState.file_argument);
 
-  if (strcmp(chplBinaryName, "chpldoc") == 0)
+  if (fDocs == false && strcmp(sArgState.program_name, "chpldoc") == 0)
     fDocs = true;
 
-
-  runPasses(tracker);
+  runPasses(tracker, strcmp(sArgState.program_name, "chpldoc") == 0);
 
   tracker.StartPhase("driverCleanup");
 
-  if (fEnableTimers) {
-    printf("timer 1: %8.3lf\n", timer1.elapsedSecs());
-    printf("timer 2: %8.3lf\n", timer2.elapsedSecs());
-    printf("timer 3: %8.3lf\n", timer3.elapsedSecs());
-    printf("timer 4: %8.3lf\n", timer4.elapsedSecs());
-    printf("timer 5: %8.3lf\n", timer5.elapsedSecs());
-  }
-
-  free_args(&arg_state);
+  free_args(&sArgState);
 
   tracker.Stop();
 

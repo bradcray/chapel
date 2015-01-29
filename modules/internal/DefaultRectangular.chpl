@@ -524,6 +524,7 @@ module DefaultRectangular {
     param rank : int;
     type idxType;
     param stridable: bool;
+    param noInnerMult: bool = true;
   
     var dom : DefaultRectangularDom(rank=rank, idxType=idxType,
                                            stridable=stridable);
@@ -705,7 +706,7 @@ module DefaultRectangular {
         // then blk(rank) == 1. Knowing this, we need not multiply the final
         // ind(...) by anything. This may lead to performance improvements for
         // array accesses.
-        if assertNoSlicing {
+        if noInnerMult {
           for param i in 1..rank-1 {
             sum += ind(i) * blk(i);
           }
@@ -765,6 +766,7 @@ module DefaultRectangular {
       var alias = new DefaultRectangularArr(eltType=eltType, rank=d.rank,
                                            idxType=d.idxType,
                                            stridable=d.stridable,
+                                            noInnerMult = false,
                                            dom=d, noinit_data=true,
                                            str=str,
                                            blk=blk);
@@ -801,6 +803,7 @@ module DefaultRectangular {
       var alias = new DefaultRectangularArr(eltType=eltType, rank=rank,
                                            idxType=idxType,
                                            stridable=d.stridable,
+                                           noInnerMult=this.noInnerMult,
                                            dom=d, noinit_data=true);
       alias.data = data;
       //alias.numelm = numelm;
@@ -826,6 +829,7 @@ module DefaultRectangular {
       var alias = new DefaultRectangularArr(eltType=eltType, rank=newRank,
                                            idxType=idxType,
                                            stridable=newStridable,
+                                            noInnerMult = false,
                                            dom=d, noinit_data=true);
       alias.data = data;
       //alias.numelm = numelm;
@@ -849,6 +853,7 @@ module DefaultRectangular {
   
     proc dsiReallocate(d: domain) {
       if (d._value.type == dom.type) {
+        assert (this.noInnerMult == false);
         var copy = new DefaultRectangularArr(eltType=eltType, rank=rank,
                                             idxType=idxType,
                                             stridable=d._value.stridable,

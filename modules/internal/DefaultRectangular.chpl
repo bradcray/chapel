@@ -763,10 +763,14 @@ module DefaultRectangular {
     }
   
     proc dsiReindex(d: DefaultRectangularDom) {
+      /*
+      if this.stridable then
+        compilerWarning("*** in reindex things are stridable");
+      */
       var alias = new DefaultRectangularArr(eltType=eltType, rank=d.rank,
                                            idxType=d.idxType,
                                            stridable=d.stridable,
-                                            noInnerMult = false,
+                                            noInnerMult = !this.stridable,
                                            dom=d, noinit_data=true,
                                            str=str,
                                            blk=blk);
@@ -800,6 +804,10 @@ module DefaultRectangular {
     }
   
     proc dsiSlice(d: DefaultRectangularDom) {
+      /*
+      if (this.noInnerMult == false) then
+        compilerWarning("*** noInnerMult is true in dsiSlice");
+      */
       var alias = new DefaultRectangularArr(eltType=eltType, rank=rank,
                                            idxType=idxType,
                                            stridable=d.stridable,

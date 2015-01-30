@@ -1019,7 +1019,21 @@ proc BlockArr.dsiSlice(d: BlockDom) {
   var alias = new BlockArr(eltType=eltType, rank=rank, idxType=idxType, stridable=d.stridable, dom=d);
   var thisid = this.locale.id;
   coforall i in d.dist.targetLocDom {
+    /*
     on d.dist.targetLocales(i) {
+      if (locArr[i].myElems[d.locDoms[i].myBlock]._value.noInnerMult == false) then
+        compilerWarning("\n\n\n***** Found false!!!");
+    */
+
+
+      if d.stridable then
+        compilerError("Can't currently slice stridable Block arrays");
+
+      /*
+      if (locArr[i].myElems._value.stridable) then
+        compilerWarning("\n\n\n***** myElems is stridable?!?!");
+      */
+
       alias.locArr[i] = new LocBlockArr(eltType=eltType, rank=rank, idxType=idxType, stridable=d.stridable, locDom=d.locDoms[i], myElems=>locArr[i].myElems[d.locDoms[i].myBlock]);
       if thisid == here.id then
         alias.myLocArr = alias.locArr[i];

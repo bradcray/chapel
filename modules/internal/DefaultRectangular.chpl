@@ -853,7 +853,7 @@ module DefaultRectangular {
   
     proc dsiReallocate(d: domain) {
       if (d._value.type == dom.type) {
-        assert (this.noInnerMult == false);
+        assert (this.noInnerMult == true);
         var copy = new DefaultRectangularArr(eltType=eltType, rank=rank,
                                             idxType=idxType,
                                             stridable=d._value.stridable,

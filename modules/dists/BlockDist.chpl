@@ -1019,8 +1019,8 @@ proc BlockArr.dsiSlice(d: BlockDom) {
   var alias = new BlockArr(eltType=eltType, rank=rank, idxType=idxType, stridable=d.stridable, dom=d);
   var thisid = this.locale.id;
   coforall i in d.dist.targetLocDom {
-    /*
     on d.dist.targetLocales(i) {
+    /*
       if (locArr[i].myElems[d.locDoms[i].myBlock]._value.noInnerMult == false) then
         compilerWarning("\n\n\n***** Found false!!!");
     */

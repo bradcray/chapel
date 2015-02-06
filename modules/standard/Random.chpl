@@ -302,12 +302,17 @@ class RandomStream {
     return result;
   }
 
+
+  // CHPLDOC FIXME: array of eltType in the formal below is rendered
+  // as .(this "eltType")
+
   /*
-    Fill the argument array with pseudorandom values.  This method is
-    identical to the standalone :chpl:proc:`fillRandom` procedure,
-    except that it consumes random values from the
-    :chpl:class:`RandomStream` object on which it's invoked rather
-    than creating a new stream for the purpose of the call.
+    Fill the argument array of :chpl:type:`eltType` with pseudorandom
+    values.  This method is similar to the standalone
+    :chpl:proc:`fillRandom` procedure, except that it consumes random
+    values from the :chpl:class:`RandomStream` object on which it's
+    invoked rather than creating a new stream for the purpose of the
+    call.
 
     :arg arr: The array to be filled.
     :type arr: [] eltType

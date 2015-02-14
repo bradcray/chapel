@@ -1368,8 +1368,17 @@ module ChapelArray {
       if d.rank == rank {
         d._value.incRefCount();
         this._value.incRefCount();
-        return _newArray(new ArrayViewArr(eltType=this._value.eltType,
-                                          dom=d._value, arr=this._value));
+        //
+        // Avoid stacking array views arbitrarily deep -- short-circuit
+        // to the original array.
+        //
+        if (_value.isArrayView()) {
+          return _newArray(new ArrayViewArr(eltType=this._value.eltType,
+                                            dom=d._value, arr=this._value.arr));
+        } else {
+            return _newArray(new ArrayViewArr(eltType=this._value.eltType,
+                                            dom=d._value, arr=this._value));
+        }
       } else
         compilerError("slicing an array with a domain of a different rank");
     }

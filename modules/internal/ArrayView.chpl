@@ -3,6 +3,8 @@ class ArrayViewArr: BaseArr {
   var dom;
   var arr;
 
+  proc isArrayView() param { return true; }
+
   iter these() ref {
     for i in dom do
       yield arr.dsiAccess(i);

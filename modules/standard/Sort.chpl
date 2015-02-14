@@ -157,7 +157,7 @@ iter _MergeIterator(A1: [] ?elType, A2: [] elType, param reverse=false) {
 }
 
 
-proc QuickSort(Data: [?Dom] ?elType, minlen=16, doublecheck=false, param reverse=false, dom = Dom) where Dom.rank == 1 {
+proc QuickSort(Data: [?Dom] ?elType, minlen=16, doublecheck=false, param reverse=false) where Dom.rank == 1 {
   // grab obvious indices
   const lo = Dom.low, 
         hi = Dom.high,
@@ -192,12 +192,8 @@ proc QuickSort(Data: [?Dom] ?elType, minlen=16, doublecheck=false, param reverse
   Data(loptr) = pivotVal;
 
   //  cobegin {
-  //
-  // get eternal instantiation loop in ArrayView otherwise...
-  // TODO: Oh!  Need to make array view itself short-circuit other array views
-  //
-  QuickSort(Data, reverse=reverse, dom = Data.domain[..loptr-1]);  // could use unbounded ranges here
-  QuickSort(Data, reverse=reverse, dom = Data.domain[loptr+1..]);
+    QuickSort(Data[..loptr-1], reverse=reverse);  // could use unbounded ranges here
+    QuickSort(Data[loptr+1..], reverse=reverse);
     //  }
 
   if (doublecheck) then VerifySort(Data, "QuickSort", reverse);

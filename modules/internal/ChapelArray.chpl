@@ -24,6 +24,8 @@ module ChapelArray {
   use ChapelBase; // For opaque type.
   use ChapelTuple;
   use ChapelLocale;
+  use ArrayView;
+  
 
   // Explicitly use a processor atomic, as most calls to this function are
   // likely be on locale 0
@@ -1276,8 +1278,8 @@ module ChapelArray {
   inline proc !=(d1: domain, d2: domain) param {
     return true;
   }
-  
-  
+
+
   //
   // Array wrapper record
   //
@@ -1364,7 +1366,8 @@ module ChapelArray {
     pragma "reference to const when const this"
     proc this(d: domain) {
       if d.rank == rank then
-        return this((...d.getIndices()));
+        return _newArray(new ArrayViewArr(eltType=this._value.eltType,
+                                          dom=d._value, arr=this._value));
       else
         compilerError("slicing an array with a domain of a different rank");
     }
@@ -1374,7 +1377,7 @@ module ChapelArray {
         if !_value.dom.dsiDim(i).boundsCheck(ranges(i)) then
           halt("array slice out of bounds in dimension ", i, ": ", ranges(i));
     }
-  
+
     pragma "reference to const when const this"
     proc this(ranges: range(?) ...rank) {
       if boundsChecking then

@@ -1479,29 +1479,27 @@ module ChapelArray {
       // Optimization: Just return an alias of this array when
       // reindexing to the same domain. We skip same-ness test
       // if the domain descriptors' types are disjoint.
+      /*
       if isSubtype(_value.dom.type, d._value.type) ||
          isSubtype(d._value.type, _value.dom.type)
       then
         if _value.dom:object == d._value:object then
           return newAlias();
+      */
   
       for param i in 1..rank do
         if d.dim(i).length != _value.dom.dsiDim(i).length then
           halt("extent in dimension ", i, " does not match actual");
-  
-      var newDist = new dmap(_value.dom.dist.dsiCreateReindexDist(d.dims(),
-                                                                  _value.dom.dsiDims()));
-      var newDom = {(...d.dims())} dmapped newDist;
-      var x = _value.dsiReindex(newDom._value);
-      x._arrAlias = _value;
-      pragma "dont disable remote value forwarding"
-      proc help() {
-        newDom._value.incRefCount();
-        x._arrAlias.incRefCount();
+
+      d._value.incRefCount();
+      this._value.incRefCount();
+      if (_value.isArrayReindexView()) {
+        return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
+                                                 dom=d._value, arr=this._value.arr));
+      } else {
+        return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
+                                                 dom=d._value, arr=this._value));
       }
-      if !noRefCount then
-        help();
-      return _newArray(x);
     }
   
     // reindex for all non-rectangular domain types.

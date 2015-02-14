@@ -16,6 +16,8 @@ writeln("A is: ", A);
 foo(A[2..n-1]);
 writeln("A is: ", A);
 
+bar(A);
+
 proc foo(Arr) {
   for a in Arr do
     writeln(a);
@@ -31,4 +33,11 @@ proc foo(Arr) {
 
   forall a in A[D2] do
     a += 1;
+}
+
+proc bar(Arr: [4..n+3]) {
+  for i in Arr.domain do
+    writeln(i);
+  for a in Arr do
+    writeln(a);
 }

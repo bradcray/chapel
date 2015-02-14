@@ -275,6 +275,7 @@ module ChapelDistribution {
     var _arrAlias: BaseArr;    // reference to base array if an alias
 
     proc isArrayView() param { return false; }
+    proc isArrayReindexView() param { return false; }
   
     proc dsiStaticFastFollowCheck(type leadType) param return false;
   

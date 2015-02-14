@@ -1019,20 +1019,6 @@ proc BlockArr.dsiSerialWrite(f: Writer) {
   }
 }
 
-proc BlockArr.dsiSlice(d: BlockDom) {
-  var alias = new BlockArr(eltType=eltType, rank=rank, idxType=idxType, stridable=d.stridable, dom=d);
-  var thisid = this.locale.id;
-  coforall i in d.dist.targetLocDom {
-    on d.dist.targetLocales(i) {
-      alias.locArr[i] = new LocBlockArr(eltType=eltType, rank=rank, idxType=idxType, stridable=d.stridable, locDom=d.locDoms[i], myElems=>locArr[i].myElems[d.locDoms[i].myBlock]);
-      if thisid == here.id then
-        alias.myLocArr = alias.locArr[i];
-    }
-  }
-  if doRADOpt then alias.setupRADOpt();
-  return alias;
-}
-
 proc BlockArr.dsiLocalSlice(ranges) {
   var low: rank*idxType;
   for param i in 1..rank {
@@ -1566,7 +1552,7 @@ proc BlockArr.doiBulkTransferToDR(Barg)
           writeln("A[",r1,"] = B[",r2,"]");
       
         const d ={(...r1)};
-        const slice = B.dsiSlice(d._value);
+        const slice = B.dsiClosedSlice(d._value);
         //Necessary to calculate the value of blk variable in DR
         //with the new domain r1
         slice.adjustBlkOffStrForNewDomain(d._value, slice);
@@ -1610,7 +1596,7 @@ proc BlockArr.doiBulkTransferFromDR(Barg)
           writeln("A[",r2,"] = B[",r1,"]");
           
         const d ={(...r1)};
-        const slice = B.dsiSlice(d._value);
+        const slice = B.dsiClosedSlice(d._value);
         //this step it's necessary to calculate the value of blk variable in DR
         //with the new domain r1
         slice.adjustBlkOffStrForNewDomain(d._value, slice);

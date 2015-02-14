@@ -1365,10 +1365,12 @@ module ChapelArray {
     //
     pragma "reference to const when const this"
     proc this(d: domain) {
-      if d.rank == rank then
+      if d.rank == rank {
+        d._value.incRefCount();
+        this._value.incRefCount();
         return _newArray(new ArrayViewArr(eltType=this._value.eltType,
                                           dom=d._value, arr=this._value));
-      else
+      } else
         compilerError("slicing an array with a domain of a different rank");
     }
   
@@ -1383,16 +1385,7 @@ module ChapelArray {
       if boundsChecking then
         checkSlice((... ranges));
       var d = _dom((...ranges));
-      var a = _value.dsiSlice(d._value);
-      a._arrAlias = _value;
-      pragma "dont disable remote value forwarding"
-      proc help() {
-        d._value.incRefCount();
-        a._arrAlias.incRefCount();
-      }
-      if !noRefCount then
-        help();
-      return _newArray(a);
+      return this(d);
     }
   
     pragma "reference to const when const this"

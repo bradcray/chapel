@@ -585,24 +585,6 @@ class CyclicArr: BaseArr {
   const SENTINEL = max(rank*idxType);
 }
 
-proc CyclicArr.dsiSlice(d: CyclicDom) {
-  var alias = new CyclicArr(eltType=eltType, rank=rank, idxType=idxType,
-                            stridable=d.stridable, dom=d);
-  var thisid = this.locale.id;
-  for i in dom.dist.targetLocDom {
-    on dom.dist.targetLocs(i) {
-      alias.locArr[i] =
-        new LocCyclicArr(eltType=eltType, rank=rank, idxType=idxType,
-                         stridable=d.stridable, locDom=d.locDoms[i],
-                         myElems=>locArr[i].myElems[d.locDoms[i].myBlock]);
-      if thisid == here.id then
-        alias.myLocArr = alias.locArr[i];
-    }
-  }
-  if doRADOpt then alias.setupRADOpt();
-  return alias;
-}
-
 proc CyclicArr.dsiRankChange(d, param newRank: int, param stridable: bool, args) {
   var alias = new CyclicArr(eltType=eltType, rank=newRank, idxType=idxType, stridable=stridable, dom = d);
   var thisid = this.locale.id;
@@ -1095,7 +1077,7 @@ proc CyclicArr.doiBulkTransferToDR(Barg)
         }
             
         const d ={(...r1)};
-        const slice = B.dsiSlice(d._value);
+        const slice = B.dsiClosedSlice(d._value);
         //Necessary to calculate the value of blk variable in DR
         //with the new domain r1
         slice.adjustBlkOffStrForNewDomain(d._value, slice);
@@ -1143,7 +1125,7 @@ proc CyclicArr.doiBulkTransferFromDR(Barg)
             writeln("A[",(...r2),"] = B[",(...r1), "] ");
         
         const d ={(...r1)};
-        const slice = B.dsiSlice(d._value);
+        const slice = B.dsiClosedSlice(d._value);
         //this step it's necessary to calculate the value of blk variable in DR
         //with the new domain r1
         slice.adjustBlkOffStrForNewDomain(d._value, slice);

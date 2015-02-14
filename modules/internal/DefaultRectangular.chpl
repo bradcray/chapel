@@ -798,8 +798,10 @@ module DefaultRectangular {
         alias.str(i) = d.dsiDim(i).stride;
       }
     }
-  
-    proc dsiSlice(d: DefaultRectangularDom) {
+
+    proc dsiSupportsClosedSlice() param return true;
+
+    proc dsiClosedSlice(d: DefaultRectangularDom) {
       var alias = new DefaultRectangularArr(eltType=eltType, rank=rank,
                                            idxType=idxType,
                                            stridable=d.stridable,

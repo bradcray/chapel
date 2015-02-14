@@ -763,7 +763,7 @@ module DefaultRectangular {
       return dsiAccess(i);
     }
   
-    proc dsiReindex(d: DefaultRectangularDom) {
+    proc dsiClosedReindex(d: DefaultRectangularDom) {
       var alias = new DefaultRectangularArr(eltType=eltType, rank=d.rank,
                                            idxType=d.idxType,
                                            stridable=d.stridable,
@@ -772,7 +772,7 @@ module DefaultRectangular {
                                            blk=blk);
       alias.data = data;
       //alias.numelm = numelm;
-      //writeln("DR.dsiReindex blk: ", blk, " stride: ",dom.dsiDim(1).stride," str:",str(1));
+      //writeln("DR.dsiClosedReindex blk: ", blk, " stride: ",dom.dsiDim(1).stride," str:",str(1));
       adjustBlkOffStrForNewDomain(d, alias);
       alias.origin = origin:d.idxType;
       alias.computeFactoredOffs();

@@ -3,6 +3,11 @@
 // to not use these ArrayView wrappers.  Re-use/redefine the param functions
 // below?
 //
+// TODOs:
+// - run distribution suite across all distributions
+// - enable in-place cases for DefaultRectangular
+// - can mult be removed?
+//
 
 class ArrayViewArr: BaseArr {
   type eltType;

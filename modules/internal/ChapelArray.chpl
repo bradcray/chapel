@@ -765,7 +765,7 @@ module ChapelArray {
           d.dist.incRefCount();
       return _newDomain(d);
     }
-  
+
     proc this(args ...rank) where _validRankChangeArgs(args, _value.idxType) {
       var ranges = _getRankChangeRanges(args);
       param newRank = ranges.size, stridable = chpl__anyStridable(ranges);

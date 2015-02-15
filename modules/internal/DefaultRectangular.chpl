@@ -826,7 +826,7 @@ module DefaultRectangular {
       return alias;
     }
   
-    proc dsiRankChange(d, param newRank: int, param newStridable: bool, args) {
+    proc dsiClosedRankChange(d, param newRank: int, param newStridable: bool, args) {
       var alias = new DefaultRectangularArr(eltType=eltType, rank=newRank,
                                            idxType=idxType,
                                            stridable=newStridable,

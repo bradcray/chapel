@@ -7,6 +7,7 @@
 // - run distribution suite across all distributions
 // - enable in-place cases for DefaultRectangular
 // - can mult be removed?
+// - insert destructors that don't auto-decrement stuff?
 //
 
 class ArrayViewArr: BaseArr {
@@ -15,6 +16,8 @@ class ArrayViewArr: BaseArr {
   var arr;
 
   proc isArrayView() param { return true; }
+  proc idxType type return arr.idxType;
+  proc rank param return arr.rank;
 
   iter these() ref {
     for i in dom do
@@ -83,11 +86,6 @@ class ArrayViewArr: BaseArr {
       }
     }
   }
-
-  proc dsiRankChange(a,b,c,d) {
-    halt("rank change not yet supported on array views");
-    return this;
-  }
 }
 
 
@@ -97,6 +95,8 @@ class ArrayReindexViewArr: BaseArr {
   var arr;
 
   proc isArrayReindexView() param { return true; }
+  proc idxType type return arr.idxType;
+  proc rank param return arr.rank;
 
   iter these() ref {
     for i in dom do
@@ -177,11 +177,6 @@ class ArrayReindexViewArr: BaseArr {
       }
     }
   }
-
-  proc dsiRankChange(a, param b,param c,d) {
-    halt("rank change not yet supported on array views");
-    return this;
-  }
 }
 
 
@@ -191,6 +186,9 @@ class ArrayRankchangeViewArr: BaseArr {
   const arr;
   const collapsedDim;
   const idx;
+
+  proc idxType type return arr.idxType;
+  proc rank param return dom.rank;
 
   iter these() ref {
     for i in dom do
@@ -216,11 +214,9 @@ class ArrayRankchangeViewArr: BaseArr {
   }
 
   proc dsiAccess(i) ref {
-    /*
     if boundsChecking then
       if !dom.dsiMember(i) then
         halt("array index out of bounds: ", i);
-    */
     //    writeln("Incoming index = ", i);
     param arrRank = arr.rank;
     type idxType = dom.idxType;
@@ -275,10 +271,5 @@ class ArrayRankchangeViewArr: BaseArr {
         break;
       }
     }
-  }
-
-  proc dsiRankChange(a, param b,param c,d) {
-    halt("rank change not yet supported on array views");
-    return this;
   }
 }

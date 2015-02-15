@@ -1401,16 +1401,37 @@ module ChapelArray {
     proc this(args ...rank) where _validRankChangeArgs(args, _value.dom.idxType) {
       if boundsChecking then
         checkRankChange(args);
-      var ranges = _getRankChangeRanges(args);
-      param rank = ranges.size, stridable = chpl__anyStridable(ranges);
-      var d = _dom((...args));
+      //      param rank = ranges.size, stridable = chpl__anyStridable(ranges);
+      var newD = _dom((...args));
+      var ranges = _getRankChangeRanges(newD.dims());
+      var d = {(...ranges)};
+      
+      //      var d = _dom((...ranges));
       if !noRefCount then
         d._value.incRefCount();
-      var a = _value.dsiRankChange(d._value, rank, stridable, args);
-      a._arrAlias = _value;
-      if !noRefCount then
-        a._arrAlias.incRefCount();
-      return _newArray(a);
+
+      var collapsedDim: rank*bool;
+      var idx: rank*idxType;
+      for param i in 1..rank {
+        if (isRange(args(i))) {
+          collapsedDim(i) = false;
+        } else {
+          collapsedDim(i) = true;
+          idx(i) = args(i);
+        }
+      }
+      /*
+      writeln("collapsed dim = ", collapsedDim);
+      writeln("idx = ", idx);
+      writeln("d = ", d);
+      */
+
+      //      return this;
+      
+      return _newArray(new ArrayRankchangeViewArr(eltType=this._value.eltType,
+                                                  dom = d._value, arr=this._value,
+                                                  collapsedDim=collapsedDim, 
+                                                  idx=idx));
     }
   
     proc checkRankChange(args) {

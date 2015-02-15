@@ -83,6 +83,11 @@ class ArrayViewArr: BaseArr {
       }
     }
   }
+
+  proc dsiRankChange(a,b,c,d) {
+    halt("rank change not yet supported on array views");
+    return this;
+  }
 }
 
 
@@ -171,5 +176,10 @@ class ArrayReindexViewArr: BaseArr {
         break;
       }
     }
+  }
+
+  proc dsiRankChange(a, param b,param c,d) {
+    halt("rank change not yet supported on array views");
+    return this;
   }
 }

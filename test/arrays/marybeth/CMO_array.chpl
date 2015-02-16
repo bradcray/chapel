@@ -66,6 +66,9 @@ class CMODom: BaseRectangularDom {
     return true;
   }
 
+  proc dsiDims()
+    return ranges;
+
   proc dsiDim(d : int)
     return ranges(d);
 

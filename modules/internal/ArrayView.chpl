@@ -24,17 +24,17 @@ class ArrayViewArr: BaseArr {
   proc idxType type return arr.idxType;
   proc rank param return arr.rank;
 
-  iter these() ref {
+  inline iter these() ref {
     for i in dom do
       yield arr.dsiAccess(i);
   }
 
-  iter these(param tag: iterKind) where tag == iterKind.leader {
+  inline iter these(param tag: iterKind) where tag == iterKind.leader {
     for followThis in dom.these(tag) do
       yield followThis;
   }
 
-  iter these(param tag: iterKind, followThis) ref
+  inline iter these(param tag: iterKind, followThis) ref
     where tag == iterKind.follower {
     for i in dom.these(tag, followThis) do
       yield arr.dsiAccess[i];
@@ -43,11 +43,11 @@ class ArrayViewArr: BaseArr {
   //
   // TODO: Should I need both these overloads
   //
-  proc dsiAccess(i:integral) ref {
+  inline proc dsiAccess(i:integral) ref {
     return dsiAccess((i,));
   }
 
-  proc dsiAccess(i) ref {
+  inline proc dsiAccess(i) ref {
     if boundsChecking then
       if !dom.dsiMember(i) then
         halt("array index out of bounds: ", i);
@@ -55,7 +55,7 @@ class ArrayViewArr: BaseArr {
     return arr.dsiAccess(i);
   }
 
-  proc dsiGetBaseDom() {
+  inline proc dsiGetBaseDom() {
     return dom;
   }
 
@@ -102,17 +102,17 @@ class ArrayReindexViewArr: BaseArr {
   proc idxType type return arr.idxType;
   proc rank param return arr.rank;
 
-  iter these() ref {
+  inline iter these() ref {
     for i in dom do
       yield dsiAccess(i);
   }
 
-  iter these(param tag: iterKind) where tag == iterKind.leader {
+  inline iter these(param tag: iterKind) where tag == iterKind.leader {
     for followThis in dom.these(tag) do
       yield followThis;
   }
 
-  iter these(param tag: iterKind, followThis) ref
+  inline iter these(param tag: iterKind, followThis) ref
     where tag == iterKind.follower {
     for i in dom.these(tag, followThis) do
       yield dsiAccess[i];
@@ -121,11 +121,11 @@ class ArrayReindexViewArr: BaseArr {
   //
   // TODO: Should I need both these overloads
   //
-  proc dsiAccess(i: integral) ref {
+  inline proc dsiAccess(i: integral) ref {
     return dsiAccess((i,));
   }
 
-  proc dsiAccess(i) ref {
+  inline proc dsiAccess(i) ref {
     if boundsChecking then
       if !dom.dsiMember(i) then
         halt("array index out of bounds: ", i);
@@ -145,7 +145,7 @@ class ArrayReindexViewArr: BaseArr {
     return arr.dsiAccess(i);
   }
 
-  proc dsiGetBaseDom() {
+  inline proc dsiGetBaseDom() {
     return dom;
   }
 
@@ -193,17 +193,17 @@ class ArrayRankchangeViewArr: BaseArr {
   proc idxType type return arr.idxType;
   proc rank param return dom.rank;
 
-  iter these() ref {
+  inline iter these() ref {
     for i in dom do
       yield dsiAccess(i);
   }
 
-  iter these(param tag: iterKind) where tag == iterKind.leader {
+  inline iter these(param tag: iterKind) where tag == iterKind.leader {
     for followThis in dom.these(tag) do
       yield followThis;
   }
 
-  iter these(param tag: iterKind, followThis) ref
+  inline iter these(param tag: iterKind, followThis) ref
     where tag == iterKind.follower {
     for i in dom.these(tag, followThis) do
       yield dsiAccess[i];
@@ -212,11 +212,11 @@ class ArrayRankchangeViewArr: BaseArr {
   //
   // TODO: Should I need both these overloads
   //
-  proc dsiAccess(i: integral) ref {
+  inline proc dsiAccess(i: integral) ref {
     return dsiAccess((i,));
   }
 
-  proc dsiAccess(i) ref {
+  inline proc dsiAccess(i) ref {
     if boundsChecking then
       if !dom.dsiMember(i) then
         halt("array index out of bounds: ", i);
@@ -236,10 +236,7 @@ class ArrayRankchangeViewArr: BaseArr {
     return arr.dsiAccess(ind);
   }
 
-  proc dsiGetBaseDom() {
-    //
-    // WARNING!!!
-    //
+  inline proc dsiGetBaseDom() {
     return dom;
   }
 

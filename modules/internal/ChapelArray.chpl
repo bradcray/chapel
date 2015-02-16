@@ -1384,6 +1384,8 @@ module ChapelArray {
 
     pragma "reference to const when const this"
     proc this(ranges: range(?) ...rank) {
+      if boundsChecking then
+        checkSlice((... ranges));
       var d = _dom((...ranges));
 
       d._value.incRefCount();

@@ -245,7 +245,7 @@ proc dgemm(p: indexType,       // number of rows in A
 // pivot vector accordingly
 //
 proc panelSolve(Ab: [] ?t,
-               panel: domain(2, indexType) dmapped Dist2D,
+                panel: domain(2, indexType),
                piv: [] indexType) {
   const pnlRows = panel.dim(1),
         pnlCols = panel.dim(2);
@@ -294,7 +294,7 @@ proc panelSolve(Ab: [] ?t,
 // solve a block (tl for top-left) portion of a matrix. This function
 // solves the rows to the right of the block.
 //
-proc updateBlockRow(Ab: [] ?t, tl: domain(2) dmapped Dist2D, tr: domain(2) dmapped Dist2D) {
+proc updateBlockRow(Ab: [] ?t, tl: domain(2), tr: domain(2)) {
   const tlRows = tl.dim(1),
         tlCols = tl.dim(2),
         trRows = tr.dim(1),

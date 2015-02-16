@@ -991,6 +991,9 @@ iter BlockArr.these(param tag: iterKind, followThis, param fast: bool = false) r
 //
 // output array
 //
+//
+// TODO: BLC is reasonably positive this will fail with a negative stride
+//
 proc BlockArr.dsiSerialWrite(f: Writer) {
   type strType = chpl__signedType(idxType);
   var binary = f.binary();

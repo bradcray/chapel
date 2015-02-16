@@ -6,7 +6,8 @@
 // TODOs:
 // - run distribution suite across all distributions
 // - enable in-place cases for DefaultRectangular
-// - can mult be removed?
+// - need to privatize distributed cases to avoid locality violations?
+// - can mult be removed from DefaultRectangular?
 // - insert destructors that don't auto-decrement stuff?
 // - rename ArrayViewArr to imply slicing view
 // - replace isArrayView-style routines with chpl try tokens (?)
@@ -16,8 +17,8 @@
 
 class ArrayViewArr: BaseArr {
   type eltType;
-  var dom;
-  var arr;
+  const dom;
+  const arr;
 
   proc isArrayView() param { return true; }
   proc idxType type return arr.idxType;
@@ -94,8 +95,8 @@ class ArrayViewArr: BaseArr {
 
 class ArrayReindexViewArr: BaseArr {
   type eltType;
-  var dom;
-  var arr;
+  const dom;
+  const arr;
 
   proc isArrayReindexView() param { return true; }
   proc idxType type return arr.idxType;

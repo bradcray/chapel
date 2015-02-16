@@ -1365,22 +1365,15 @@ module ChapelArray {
     //
     pragma "reference to const when const this"
     proc this(d: domain) {
-      if d.rank == rank {
-        d._value.incRefCount();
-        this._value.incRefCount();
+      if d.rank == rank then
         //
-        // Avoid stacking array views arbitrarily deep -- short-circuit
-        // to the original array.
+        // Call the range version; we need to convert 'd' to the domain
+        // map of the array anyway, and the range version does this.
         //
-        if (_value.isArrayView()) {
-          return _newArray(new ArrayViewArr(eltType=this._value.eltType,
-                                            dom=d._value, arr=this._value.arr));
-        } else {
-            return _newArray(new ArrayViewArr(eltType=this._value.eltType,
-                                            dom=d._value, arr=this._value));
-        }
-      } else
+        return this((...d.getIndices()));
+      else
         compilerError("slicing an array with a domain of a different rank");
+
     }
   
     proc checkSlice(ranges: range(?) ...rank) {
@@ -1391,10 +1384,21 @@ module ChapelArray {
 
     pragma "reference to const when const this"
     proc this(ranges: range(?) ...rank) {
-      if boundsChecking then
-        checkSlice((... ranges));
       var d = _dom((...ranges));
-      return this(d);
+
+      d._value.incRefCount();
+      this._value.incRefCount();
+      //
+      // Avoid stacking array views arbitrarily deep -- short-circuit
+      // to the original array.
+      //
+      if (_value.isArrayView()) {
+        return _newArray(new ArrayViewArr(eltType=this._value.eltType,
+                                          dom=d._value, arr=this._value.arr));
+      } else {
+        return _newArray(new ArrayViewArr(eltType=this._value.eltType,
+                                          dom=d._value, arr=this._value));
+      }
     }
   
     pragma "reference to const when const this"
@@ -1407,8 +1411,10 @@ module ChapelArray {
       var d = {(...ranges)};
       
       //      var d = _dom((...ranges));
-      if !noRefCount then
+      if !noRefCount {
         d._value.incRefCount();
+        this._value.incRefCount();
+      }
 
       var collapsedDim: rank*bool;
       var idx: rank*idxType;

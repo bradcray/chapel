@@ -1392,12 +1392,16 @@ module ChapelArray {
       if (!alwaysUseArrayViews && this._value.dsiCanSlice(d._value)) {
         var a = _value.dsiSlice(d._value);
         a._arrAlias = _value;
-        d._value.incRefCount();
-        a._arrAlias.incRefCount();
+        if !noRefCount {
+          d._value.incRefCount();
+          a._arrAlias.incRefCount();
+        }
         return _newArray(a);
       } else {
-        d._value.incRefCount();
-        this._value.incRefCount();
+        if !noRefCount {
+          d._value.incRefCount();
+          this._value.incRefCount();
+        }
         //
         // Avoid stacking array views arbitrarily deep -- short-circuit
         // to the original array.
@@ -1557,8 +1561,10 @@ module ChapelArray {
           help();
         return _newArray(x);
       } else {
-        d._value.incRefCount();
-        this._value.incRefCount();
+        if (!noRefCount) {
+          d._value.incRefCount();
+          this._value.incRefCount();
+        }
         if (_value.isArrayReindexView()) {
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
                                                    dom=d._value, arr=this._value.arr));

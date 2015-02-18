@@ -1545,14 +1545,27 @@ module ChapelArray {
         if d.dim(i).length != _value.dom.dsiDim(i).length then
           halt("extent in dimension ", i, " does not match actual");
 
-      d._value.incRefCount();
-      this._value.incRefCount();
-      if (_value.isArrayReindexView()) {
-        return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
-                                                 dom=d._value, arr=this._value.arr));
+      if (!alwaysUseArrayViews && this._value.dsiCanReindex(d._value)) {
+        var x = _value.dsiReindex(d._value);
+        x._arrAlias = _value;
+        pragma "dont disable remote value forwarding"
+          proc help() {
+          d._value.incRefCount();
+          x._arrAlias.incRefCount();
+        }
+        if !noRefCount then
+          help();
+        return _newArray(x);
       } else {
-        return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
-                                                 dom=d._value, arr=this._value));
+        d._value.incRefCount();
+        this._value.incRefCount();
+        if (_value.isArrayReindexView()) {
+          return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
+                                                   dom=d._value, arr=this._value.arr));
+        } else {
+          return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
+                                                   dom=d._value, arr=this._value));
+        }
       }
     }
   

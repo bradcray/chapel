@@ -762,8 +762,10 @@ module DefaultRectangular {
     inline proc dsiLocalAccess(i) ref {
       return dsiAccess(i);
     }
+
+    proc dsiCanReindex(d) param return true;
   
-    proc dsiClosedReindex(d: DefaultRectangularDom) {
+    proc dsiReindex(d: DefaultRectangularDom) {
       var alias = new DefaultRectangularArr(eltType=eltType, rank=d.rank,
                                            idxType=d.idxType,
                                            stridable=d.stridable,

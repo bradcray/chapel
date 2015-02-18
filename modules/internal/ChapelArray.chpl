@@ -1420,10 +1420,10 @@ module ChapelArray {
       var ranges = _getRankChangeRanges(newD.dims());
       var d = {(...ranges)};
 
-      param rank = ranges.size, stridable = chpl__anyStridable(ranges);
+      param newRank = ranges.size, stridable = chpl__anyStridable(ranges);
       if (!alwaysUseArrayViews &&
           this._value.dsiCanRankChange(d._value, rank, stridable, args)) {
-        var a = _value.dsiRankChange(d._value, rank, stridable, args);
+        var a = _value.dsiRankChange(d._value, newRank, stridable, args);
         a._arrAlias = _value;
         if !noRefCount {
           d._value.incRefCount();

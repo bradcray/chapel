@@ -146,7 +146,7 @@ module ChapelBase {
   // Is the cache for remote data enabled at compile time?
   config param CHPL_CACHE_REMOTE: bool = false;
 
-  config param noRefCount = false;
+  config param noRefCount = true;
   
   config param warnMaximalRange = false;    // Warns if integer rollover will cause
                     // the iterator to yield zero times.

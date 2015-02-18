@@ -587,6 +587,8 @@ module ChapelArray {
           }
         }
       }
+     } else {
+       _value.dsiDestroyDistClass();
      }
     }
   
@@ -697,6 +699,8 @@ module ChapelArray {
             delete _value;
         }
       }
+     } else {
+       delete _value;
      }
     }
   
@@ -1320,6 +1324,8 @@ module ChapelArray {
           }
         }
       }
+     } else {
+       delete _value;
      }
     }
   

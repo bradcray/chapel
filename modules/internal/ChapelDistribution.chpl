@@ -105,6 +105,9 @@ module ChapelDistribution {
 
     proc dsiSupportsPrivatization() param return false;
     proc dsiRequiresPrivatization() param return false;
+
+    proc dsiCanSlice(dom) param return false;
+    proc dsiCanRankChange(d, param newRank: int, param newStridable: bool, args) param return false;
   
     proc dsiDestroyDistClass() { }
   

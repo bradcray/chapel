@@ -25,7 +25,8 @@ module ChapelArray {
   use ChapelTuple;
   use ChapelLocale;
   use ArrayView;
-  
+
+  config param alwaysUseArrayViews = false;
 
   // Explicitly use a processor atomic, as most calls to this function are
   // likely be on locale 0
@@ -1388,18 +1389,26 @@ module ChapelArray {
         checkSlice((... ranges));
       var d = _dom((...ranges));
 
-      d._value.incRefCount();
-      this._value.incRefCount();
-      //
-      // Avoid stacking array views arbitrarily deep -- short-circuit
-      // to the original array.
-      //
-      if (_value.isArrayView()) {
-        return _newArray(new ArrayViewArr(eltType=this._value.eltType,
-                                          dom=d._value, arr=this._value.arr));
+      if (!alwaysUseArrayViews && this._value.dsiCanSlice(d._value)) {
+        var a = _value.dsiSlice(d._value);
+        a._arrAlias = _value;
+        d._value.incRefCount();
+        a._arrAlias.incRefCount();
+        return _newArray(a);
       } else {
-        return _newArray(new ArrayViewArr(eltType=this._value.eltType,
-                                          dom=d._value, arr=this._value));
+        d._value.incRefCount();
+        this._value.incRefCount();
+        //
+        // Avoid stacking array views arbitrarily deep -- short-circuit
+        // to the original array.
+        //
+        if (_value.isArrayView()) {
+          return _newArray(new ArrayViewArr(eltType=this._value.eltType,
+                                            dom=d._value, arr=this._value.arr));
+        } else {
+          return _newArray(new ArrayViewArr(eltType=this._value.eltType,
+                                            dom=d._value, arr=this._value));
+        }
       }
     }
   
@@ -1407,39 +1416,50 @@ module ChapelArray {
     proc this(args ...rank) where _validRankChangeArgs(args, _value.dom.idxType) {
       if boundsChecking then
         checkRankChange(args);
-      //      param rank = ranges.size, stridable = chpl__anyStridable(ranges);
       var newD = _dom((...args));
       var ranges = _getRankChangeRanges(newD.dims());
       var d = {(...ranges)};
-      
-      //      var d = _dom((...ranges));
-      if !noRefCount {
-        d._value.incRefCount();
-        this._value.incRefCount();
-      }
 
-      var collapsedDim: rank*bool;
-      var idx: rank*idxType;
-      for param i in 1..rank {
-        if (isRange(args(i))) {
-          collapsedDim(i) = false;
-        } else {
-          collapsedDim(i) = true;
-          idx(i) = args(i);
+      param rank = ranges.size, stridable = chpl__anyStridable(ranges);
+      if (!alwaysUseArrayViews &&
+          this._value.dsiCanRankChange(d._value, rank, stridable, args)) {
+        var a = _value.dsiRankChange(d._value, rank, stridable, args);
+        a._arrAlias = _value;
+        if !noRefCount {
+          d._value.incRefCount();
+          a._arrAlias.incRefCount();
         }
-      }
-      /*
-      writeln("collapsed dim = ", collapsedDim);
-      writeln("idx = ", idx);
-      writeln("d = ", d);
-      */
+        return _newArray(a);
+      } else {
+        //      var d = _dom((...ranges));
+        if !noRefCount {
+          d._value.incRefCount();
+          this._value.incRefCount();
+        }
 
-      //      return this;
-      
-      return _newArray(new ArrayRankchangeViewArr(eltType=this._value.eltType,
-                                                  dom = d._value, arr=this._value,
-                                                  collapsedDim=collapsedDim, 
-                                                  idx=idx));
+        var collapsedDim: rank*bool;
+        var idx: rank*idxType;
+        for param i in 1..rank {
+          if (isRange(args(i))) {
+            collapsedDim(i) = false;
+          } else {
+            collapsedDim(i) = true;
+            idx(i) = args(i);
+          }
+        }
+        /*
+          writeln("collapsed dim = ", collapsedDim);
+          writeln("idx = ", idx);
+          writeln("d = ", d);
+        */
+        
+        //      return this;
+        
+        return _newArray(new ArrayRankchangeViewArr(eltType=this._value.eltType,
+                                                    dom = d._value, arr=this._value,
+                                                    collapsedDim=collapsedDim, 
+                                                    idx=idx));
+      }
     }
   
     proc checkRankChange(args) {
@@ -1504,6 +1524,11 @@ module ChapelArray {
     {
       if rank != d.rank then
         compilerError("illegal implicit rank change");
+
+      //
+      // BLC: Commented the following out b/c it didn't work out
+      // of the box, but should try and restore it before committing.
+      //
   
       // Optimization: Just return an alias of this array when
       // reindexing to the same domain. We skip same-ness test

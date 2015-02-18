@@ -799,9 +799,9 @@ module DefaultRectangular {
       }
     }
 
-    proc dsiSupportsClosedSlice() param return true;
+    proc dsiCanSlice(dom) param return true;
 
-    proc dsiClosedSlice(d: DefaultRectangularDom) {
+    proc dsiSlice(d: DefaultRectangularDom) {
       var alias = new DefaultRectangularArr(eltType=eltType, rank=rank,
                                            idxType=idxType,
                                            stridable=d.stridable,
@@ -825,8 +825,11 @@ module DefaultRectangular {
       alias.initShiftedData();
       return alias;
     }
+
+    proc dsiCanRankChange(d, param newRank: int, param newStridable: bool, args) param
+      return true;
   
-    proc dsiClosedRankChange(d, param newRank: int, param newStridable: bool, args) {
+    proc dsiRankChange(d, param newRank: int, param newStridable: bool, args) {
       var alias = new DefaultRectangularArr(eltType=eltType, rank=newRank,
                                            idxType=idxType,
                                            stridable=newStridable,

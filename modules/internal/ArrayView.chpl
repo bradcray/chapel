@@ -19,6 +19,7 @@ class ArrayViewArr: BaseArr {
   type eltType;
   const dom;
   const arr;
+  var pid = -1;
 
   proc isArrayView() param { return true; }
   proc idxType type return arr.idxType;
@@ -89,6 +90,18 @@ class ArrayViewArr: BaseArr {
     }
     const zeroTup: rank*idxType;
     recursiveArrayWriter(zeroTup);
+  }
+
+  proc dsiSupportsPrivatization() param
+    return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
+
+  proc dsiGetPrivatizeData() return (dom.pid, arr.pid);
+
+  proc dsiPrivatize(privatizeData) {
+    const (privdomID, privarrID) = privatizeData;
+    const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
+    const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
+    return new ArrayViewArr(eltType=eltType, dom=privdom, arr=privarr);
   }
 }
 

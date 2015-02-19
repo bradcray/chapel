@@ -13,6 +13,8 @@
 // - replace isArrayView-style routines with chpl try tokens (?)
 // - creating arrays over arrayview.dom queries -- will it work?
 // - can the dsi distribution create rank change view routine be removed?
+// - refactor I/O routine into a shared helper (and apply to Block,
+//   which seems broken?
 //
 
 class ArrayViewArr: BaseArr {
@@ -213,6 +215,20 @@ class ArrayReindexViewArr: BaseArr {
     const zeroTup: rank*idxType;
     recursiveArrayWriter(zeroTup);
   }
+
+  /*
+  proc dsiSupportsPrivatization() param
+    return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
+
+  proc dsiGetPrivatizeData() return (dom.pid, arr.pid);
+
+  proc dsiPrivatize(privatizeData) {
+    const (privdomID, privarrID) = privatizeData;
+    const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
+    const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
+    return new ArrayReindexViewArr(eltType=eltType, dom=privdom, arr=privarr);
+  }
+  */
 }
 
 
@@ -314,4 +330,18 @@ class ArrayRankchangeViewArr: BaseArr {
     const zeroTup: rank*idxType;
     recursiveArrayWriter(zeroTup);
   }
+
+  /*
+  proc dsiSupportsPrivatization() param
+    return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
+
+  proc dsiGetPrivatizeData() return (dom.pid, arr.pid, collapsedDim, idx);
+
+  proc dsiPrivatize(privatizeData) {
+    const (privdomID, privarrID, collapsedDim, idx) = privatizeData;
+    const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
+    const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
+    return new ArrayRankChangeViewArr(eltType=eltType, dom=privdom, arr=privarr, collapsedDim, idx);
+  }
+  */
 }

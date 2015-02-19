@@ -1550,11 +1550,12 @@ module ChapelArray {
           halt("extent in dimension ", i, " does not match actual");
 
       if (!alwaysUseArrayViews && this._value.dsiCanReindex(d._value)) {
-        var x = _value.dsiReindex(d._value);
+        var newDom = {(...d.dims())};
+        var x = _value.dsiReindex(newDom._value);
         x._arrAlias = _value;
         pragma "dont disable remote value forwarding"
           proc help() {
-          d._value.incRefCount();
+          newDom._value.incRefCount();
           x._arrAlias.incRefCount();
         }
         if !noRefCount then

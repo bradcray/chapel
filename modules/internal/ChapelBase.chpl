@@ -1013,6 +1013,7 @@ module ChapelBase {
   pragma "init copy fn"
   inline proc chpl__initCopy(x) return x;
 
+  /*
   pragma "dont disable remote value forwarding"
   pragma "removable auto copy"
   pragma "donor fn"
@@ -1036,6 +1037,7 @@ module ChapelBase {
     if !noRefCount then x._value.incRefCount();
     return x;
   }
+  */
   
 
   pragma "donor fn"

@@ -2489,12 +2489,15 @@ module ChapelArray {
     for x in Xs do yield x;
   }
 
+  /*
   pragma "init copy fn"
   proc chpl__initCopy(a: _distribution) {
     pragma "no copy" var b = chpl__autoCopy(a.clone());
     return b;
   }
-  
+  */
+
+  /*  
   pragma "init copy fn"
   proc chpl__initCopy(a: domain) {
     var b: a.type;
@@ -2512,7 +2515,9 @@ module ChapelArray {
     }
     return b;
   }
-  
+  */
+
+  /*  
   pragma "init copy fn"
   proc chpl__initCopy(a: []) {
     var b : [a._dom] a.eltType;
@@ -2526,6 +2531,7 @@ module ChapelArray {
     chpl__transferArray(b, a);
     return b;
   }
+  */
   
   pragma "init copy fn"
   proc chpl__initCopy(ir: _iteratorRecord) {

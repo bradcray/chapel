@@ -279,7 +279,7 @@ module ChapelDistribution {
 
     proc dsiCanSlice(dom) param return false;
     proc dsiCanRankChange(d, param newRank: int, param newStridable: bool, args) param return false;
-    proc dsiCanReindx(dom) param return false;
+    proc dsiCanReindex(dom) param return false;
   
   
     proc dsiStaticFastFollowCheck(type leadType) param return false;

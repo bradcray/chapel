@@ -60,6 +60,16 @@ class ArrayViewArr: BaseArr {
     return dom;
   }
 
+  proc dsiTargetLocales() {
+    return arr.dsiTargetLocales();
+  }
+
+  /*
+  proc doiBulkTransfer(B) {
+    arr.doiBulkTransfer(B);
+  }
+  */
+
   proc dsiSerialWrite(f: Writer) {
     //
     // Copied from DefaultRectangular -- refactor
@@ -162,6 +172,16 @@ class ArrayReindexViewArr: BaseArr {
     return dom;
   }
 
+  proc dsiTargetLocales() {
+    return arr.dsiTargetLocales();
+  }
+
+  /*
+  proc doiBulkTransfer(B) {
+    arr.doiBulkTransfer(B);
+  }
+  */
+
   proc dsiSerialWrite(f: Writer) {
     //
     // Copied from DefaultRectangular -- refactor
@@ -252,6 +272,16 @@ class ArrayRankchangeViewArr: BaseArr {
   inline proc dsiGetBaseDom() {
     return dom;
   }
+
+  proc dsiTargetLocales() {
+    return arr.dsiTargetLocales();
+  }
+
+  /*
+  proc doiBulkTransfer(B) {
+    arr.doiBulkTransfer(B);
+  }
+  */
 
   proc dsiSerialWrite(f: Writer) {
     //

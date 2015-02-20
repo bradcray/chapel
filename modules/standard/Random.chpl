@@ -133,8 +133,6 @@ record SeedGenerators {
 // argument as in the function's signature.
 
 
-// CHPLDOC FIXME: int(64) prints out as int(64)(64)
-
 // CHPLDOC FIXME: if the first line below is shifted one character to the
 // left, it ends up being rendered like a method
 
@@ -142,6 +140,19 @@ record SeedGenerators {
 // right, it ends up causing a warning (promoted to error) in the .rst
 // file.  It'd be preferable to have it declare the issue in terms of
 // the .chpl line numbers.
+//
+// CHPLDOC FIXME: When a formal argument is of inferred/unknown type,
+// and has a default value, it is currently getting both '->' and '='
+// I think it should only get the '='.
+//
+// CHPLDOC FIXME: For that matter, it seems to me that we should be
+// rendering types as ':' rather than '->'.  I'm not seeing the
+// rationale for using non-syntax in this context and while it
+// seemed acceptable in some cases I was seeing it before (return
+// values, variables without default values), the more I think about
+// it, the more it seems like ':' would be more clear for Chapel
+// (even in the context where I was just looking past it earlier).
+//
 
 /*
   Fill an array of `real(64)`, `imag(64)`, or `complex(128)` elements
@@ -176,11 +187,7 @@ proc fillRandom(arr: [], seed: int(64) = SeedGenerator.currentTime) {
   Models a stream of pseudorandom numbers.  See the module-level
   notes for :chpl:mod:`Random` for details on the PRNG used.
 */
-
 class RandomStream {
-  //
-  // CHPLDOC FIXME: We should print the type and default value for parSafe
-  //
   /*
     Indicates whether or not the RandomStream needs to be
     parallel-safe by default.  If multiple tasks interact with it in
@@ -195,6 +202,7 @@ class RandomStream {
     range (1, 2**46).
   */
   const seed: int(64);
+
 
   /*
     Constructs a new stream of random numbers using the specified seed
@@ -213,13 +221,6 @@ class RandomStream {
       halt("RandomStream seed must be an odd integer between 0 and 2**46");
     RandomStreamPrivate_init(seed);
   }
-
-  //
-  // CHPL FIXME: the type of parSafe below is printed out as _unknown
-  //
-
-  //
-  // CHPL FIXME: the real(64) below gets rendered as real(64)(64)
 
   /*
     Returns the next value in the random stream as a `real(64)`
@@ -354,8 +355,6 @@ class RandomStream {
   }    
 }
 
-// CHPLDOC FIXME: Prints "inherited from object" at the bottom which
-// seems out of place.
 
 ////////////////////////////////////////////////////////////// MODULE PRIVATE //
 //

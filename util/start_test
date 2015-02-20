@@ -646,7 +646,7 @@ if ($?CHPL_TEST_UTIL_DIR) then
     set utildir = "$CHPL_TEST_UTIL_DIR"
 else
     set start_test_dir = `dirname $0`
-    set utildir = `cd $start_test_dir && pwd`
+    set utildir = `cd $start_test_dir/../util && pwd`
     setenv CHPL_TEST_UTIL_DIR $utildir
 endif
 if (! -d $utildir || ! -x $utildir) then
@@ -865,7 +865,7 @@ while ( $#argv > 0 )
     case --performance-configs:
     case -performance-configs:
         shift
-        set genGraphOpts = "$genGraphOpts --multiple-configurations $argv[1]"
+        set genGraphOpts = "$genGraphOpts --configs $argv[1]"
         shift
         breaksw
     case --compperformance:
@@ -1391,7 +1391,7 @@ if ($performance || $compperformance) then
 
   # the name of the .dat file to store the sha (store in env var for gengraphs)
   set shaDatFileName = "perfSha"
-  set shaDatFilePath = "$perfdir/$shaDatFileName.dat"
+  set shaDatFilePath = "$datdir/$shaDatFileName.dat"
   setenv CHPL_TEST_SHA_DAT_FILE "$shaDatFilePath"
 
   echo "[Saving current git sha to $shaDatFilePath]" |& $tee -a $logfile

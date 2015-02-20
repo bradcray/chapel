@@ -20,6 +20,8 @@
 //
 //
 // TODOs:
+// - run distribution suite cleanly for "always use array views"
+//   - and set up nightly testing against this (?)
 // - run distribution suite across all distributions
 // - consider privatizing other operators?
 // - check memory leaks
@@ -31,6 +33,8 @@
 // - refactor I/O routine into a shared helper (and apply to Block,
 //   which seems broken?
 //
+
+use DefaultRectangular;
 
 class ArraySliceViewArr: BaseArr {
   type eltType;
@@ -58,9 +62,6 @@ class ArraySliceViewArr: BaseArr {
       yield arr.dsiAccess[i];
   }
 
-  //
-  // TODO: Should I need both these overloads
-  //
   inline proc dsiAccess(i:integral) ref {
     return dsiAccess((i,));
   }
@@ -88,7 +89,7 @@ class ArraySliceViewArr: BaseArr {
   */
 
   proc dsiSerialWrite(f: Writer) {
-    chpl_ArrayReadWriteHelper(f, arr, dom);
+    chpl_rectArrayReadWriteHelper(f, arr, dom);
   }
 
   proc dsiSupportsPrivatization() param
@@ -130,9 +131,6 @@ class ArrayReindexViewArr: BaseArr {
       yield dsiAccess[i];
   }
 
-  //
-  // TODO: Should I need both these overloads
-  //
   inline proc dsiAccess(i: integral) ref {
     return dsiAccess((i,));
   }
@@ -172,7 +170,7 @@ class ArrayReindexViewArr: BaseArr {
   */
 
   proc dsiSerialWrite(f: Writer) {
-    chpl_ArrayReadWriteHelper(f, arr, dom);
+    chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
   /*
@@ -217,9 +215,6 @@ class ArrayRankchangeViewArr: BaseArr {
       yield dsiAccess[i];
   }
 
-  //
-  // TODO: Should I need both these overloads
-  //
   inline proc dsiAccess(i: integral) ref {
     return dsiAccess((i,));
   }
@@ -259,7 +254,7 @@ class ArrayRankchangeViewArr: BaseArr {
   */
 
   proc dsiSerialWrite(f: Writer) {
-    chpl_ArrayReadWriteHelper(f, arr, dom);
+    chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
   /*

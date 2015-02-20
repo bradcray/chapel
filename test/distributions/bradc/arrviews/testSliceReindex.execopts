@@ -1,0 +1,2 @@
+--checkOutOfBounds=false
+--checkOutOfBounds=true   # testSliceReindex.outOfBounds.good

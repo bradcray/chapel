@@ -520,6 +520,45 @@ module DefaultRectangular {
       targetLocDom=newTargetLocDom;
     }
   }
+
+  //
+  // This is a helper routine that was factored out of DefaultRectangular
+  // because it seems broadly applicable to most rectangular arrays.
+  // the arr and dom fields are instances of a domain map's array and
+  // domain classes.
+  //
+  proc chpl_rectArrayReadWriteHelper(f /*: Reader or Writer */, arr, 
+                                     dom = arr.dom) {
+    param rank = arr.rank;
+    type idxType = arr.idxType;
+    const zeroTup: rank*idxType;
+    recursiveArrayWriter(zeroTup);
+
+    proc recursiveArrayWriter(in idx: rank*idxType, dim=1, in last=false) {
+      var binary = f.binary();
+      type strType = chpl__signedType(idxType);
+      var makeStridePositive = if dom.ranges(dim).stride > 0 then 1:strType else (-1):strType;
+      if dim == rank {
+        var first = true;
+        if debugDefaultDist && f.writing then f.writeln(dom.ranges(dim));
+        for j in dom.ranges(dim) by makeStridePositive {
+          if first then first = false;
+          else if ! binary then f <~> new ioLiteral(" ");
+          idx(dim) = j;
+          f <~> arr.dsiAccess(idx);
+        }
+      } else {
+        for j in dom.ranges(dim) by makeStridePositive {
+          var lastIdx =  dom.ranges(dim).last;
+          idx(dim) = j;
+          recursiveArrayWriter(idx, dim=dim+1,
+                               last=(last || dim == 1) && (j == lastIdx));
+        }
+      }
+      if !last && dim != 1 && ! binary then
+        f <~> new ioNewline();
+    }
+  }
   
   class DefaultRectangularArr: BaseArr {
     type eltType;
@@ -923,32 +962,7 @@ module DefaultRectangular {
   proc DefaultRectangularDom.dsiSerialRead(f: Reader) { this.dsiSerialReadWrite(f); }
 
   proc DefaultRectangularArr.dsiSerialReadWrite(f /*: Reader or Writer*/) {
-    proc recursiveArrayWriter(in idx: rank*idxType, dim=1, in last=false) {
-      var binary = f.binary();
-      type strType = chpl__signedType(idxType);
-      var makeStridePositive = if dom.ranges(dim).stride > 0 then 1:strType else (-1):strType;
-      if dim == rank {
-        var first = true;
-        if debugDefaultDist && f.writing then f.writeln(dom.ranges(dim));
-        for j in dom.ranges(dim) by makeStridePositive {
-          if first then first = false;
-          else if ! binary then f <~> new ioLiteral(" ");
-          idx(dim) = j;
-          f <~> dsiAccess(idx);
-        }
-      } else {
-        for j in dom.ranges(dim) by makeStridePositive {
-          var lastIdx =  dom.ranges(dim).last;
-          idx(dim) = j;
-          recursiveArrayWriter(idx, dim=dim+1,
-                               last=(last || dim == 1) && (j == lastIdx));
-        }
-      }
-      if !last && dim != 1 && ! binary then
-        f <~> new ioNewline();
-    }
-    const zeroTup: rank*idxType;
-    recursiveArrayWriter(zeroTup);
+    chpl_rectArrayReadWriteHelper(f, this);
   }
 
   proc DefaultRectangularArr.dsiSerialWrite(f: Writer) {

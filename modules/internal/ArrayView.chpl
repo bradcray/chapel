@@ -1,14 +1,29 @@
+/*
+ * Copyright 2004-2015 Cray Inc.
+ * Other additional copyright holders may be indicated within.
+ * 
+ * The entirety of this work is licensed under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * 
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 //
-// TODO: Re-optimize cases that can be done in-place like DefaultRectangular
-// to not use these ArrayView wrappers.  Re-use/redefine the param functions
-// below?
 //
 // TODOs:
 // - run distribution suite across all distributions
-// - enable in-place cases for DefaultRectangular
-// - need to privatize distributed cases to avoid locality violations?
-// - can mult be removed from DefaultRectangular?
-// - insert destructors that don't auto-decrement stuff?
+// - consider privatizing other operators?
+// - check memory leaks
+//   - insert destructors that don't auto-decrement stuff?
 // - rename ArrayViewArr to imply slicing view
 // - replace isArrayView-style routines with chpl try tokens (?)
 // - creating arrays over arrayview.dom queries -- will it work?
@@ -17,7 +32,7 @@
 //   which seems broken?
 //
 
-class ArrayViewArr: BaseArr {
+class ArraySliceViewArr: BaseArr {
   type eltType;
   const dom;
   const arr;
@@ -73,35 +88,7 @@ class ArrayViewArr: BaseArr {
   */
 
   proc dsiSerialWrite(f: Writer) {
-    //
-    // Copied from DefaultRectangular -- refactor
-    //
-    proc recursiveArrayWriter(in idx: rank*idxType, dim=1, in last=false) {
-      var binary = f.binary();
-      type strType = chpl__signedType(idxType);
-      var makeStridePositive = if dom.dsiDim(dim).stride > 0 then 1:strType else (-1):strType;
-      if dim == rank {
-        var first = true;
-        if debugDefaultDist && f.writing then f.writeln(dom.dsiDim(dim));
-        for j in dom.dsiDim(dim) by makeStridePositive {
-          if first then first = false;
-          else if ! binary then f <~> new ioLiteral(" ");
-          idx(dim) = j;
-          f <~> dsiAccess(idx);
-        }
-      } else {
-        for j in dom.dsiDim(dim) by makeStridePositive {
-          var lastIdx =  dom.dsiDim(dim).last;
-          idx(dim) = j;
-          recursiveArrayWriter(idx, dim=dim+1,
-                               last=(last || dim == 1) && (j == lastIdx));
-        }
-      }
-      if !last && dim != 1 && ! binary then
-        f <~> new ioNewline();
-    }
-    const zeroTup: rank*idxType;
-    recursiveArrayWriter(zeroTup);
+    chpl_ArrayReadWriteHelper(f, arr, dom);
   }
 
   proc dsiSupportsPrivatization() param
@@ -113,7 +100,7 @@ class ArrayViewArr: BaseArr {
     const (privdomID, privarrID) = privatizeData;
     const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
-    return new ArrayViewArr(eltType=eltType, dom=privdom, arr=privarr);
+    return new ArraySliceViewArr(eltType=eltType, dom=privdom, arr=privarr);
   }
 }
 
@@ -185,35 +172,7 @@ class ArrayReindexViewArr: BaseArr {
   */
 
   proc dsiSerialWrite(f: Writer) {
-    //
-    // Copied from DefaultRectangular -- refactor
-    //
-    proc recursiveArrayWriter(in idx: rank*idxType, dim=1, in last=false) {
-      var binary = f.binary();
-      type strType = chpl__signedType(idxType);
-      var makeStridePositive = if dom.dsiDim(dim).stride > 0 then 1:strType else (-1):strType;
-      if dim == rank {
-        var first = true;
-        if debugDefaultDist && f.writing then f.writeln(dom.dsiDim(dim));
-        for j in dom.dsiDim(dim) by makeStridePositive {
-          if first then first = false;
-          else if ! binary then f <~> new ioLiteral(" ");
-          idx(dim) = j;
-          f <~> dsiAccess(idx);
-        }
-      } else {
-        for j in dom.dsiDim(dim) by makeStridePositive {
-          var lastIdx =  dom.dsiDim(dim).last;
-          idx(dim) = j;
-          recursiveArrayWriter(idx, dim=dim+1,
-                               last=(last || dim == 1) && (j == lastIdx));
-        }
-      }
-      if !last && dim != 1 && ! binary then
-        f <~> new ioNewline();
-    }
-    const zeroTup: rank*idxType;
-    recursiveArrayWriter(zeroTup);
+    chpl_ArrayReadWriteHelper(f, arr, dom);
   }
 
   /*
@@ -300,35 +259,7 @@ class ArrayRankchangeViewArr: BaseArr {
   */
 
   proc dsiSerialWrite(f: Writer) {
-    //
-    // Copied from DefaultRectangular -- refactor
-    //
-    proc recursiveArrayWriter(in idx: rank*idxType, dim=1, in last=false) {
-      var binary = f.binary();
-      type strType = chpl__signedType(idxType);
-      var makeStridePositive = if dom.dsiDim(dim).stride > 0 then 1:strType else (-1):strType;
-      if dim == rank {
-        var first = true;
-        if debugDefaultDist && f.writing then f.writeln(dom.dsiDim(dim));
-        for j in dom.dsiDim(dim) by makeStridePositive {
-          if first then first = false;
-          else if ! binary then f <~> new ioLiteral(" ");
-          idx(dim) = j;
-          f <~> dsiAccess(idx);
-        }
-      } else {
-        for j in dom.dsiDim(dim) by makeStridePositive {
-          var lastIdx =  dom.dsiDim(dim).last;
-          idx(dim) = j;
-          recursiveArrayWriter(idx, dim=dim+1,
-                               last=(last || dim == 1) && (j == lastIdx));
-        }
-      }
-      if !last && dim != 1 && ! binary then
-        f <~> new ioNewline();
-    }
-    const zeroTup: rank*idxType;
-    recursiveArrayWriter(zeroTup);
+    chpl_ArrayReadWriteHelper(f, arr, dom);
   }
 
   /*

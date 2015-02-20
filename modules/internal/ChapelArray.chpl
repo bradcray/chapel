@@ -1407,11 +1407,11 @@ module ChapelArray {
         // to the original array.
         //
         if (_value.isArrayView()) {
-          return _newArray(new ArrayViewArr(eltType=this._value.eltType,
-                                            dom=d._value, arr=this._value.arr));
+          return _newArray(new ArraySliceViewArr(eltType=this._value.eltType,
+                                                 dom=d._value, arr=this._value.arr));
         } else {
-          return _newArray(new ArrayViewArr(eltType=this._value.eltType,
-                                            dom=d._value, arr=this._value));
+          return _newArray(new ArraySliceViewArr(eltType=this._value.eltType,
+                                                 dom=d._value, arr=this._value));
         }
       }
     }

@@ -30,8 +30,7 @@
 // - replace isArrayView-style routines with chpl try tokens (?)
 // - creating arrays over arrayview.dom queries -- will it work?
 // - can the dsi distribution create rank change view routine be removed?
-// - refactor I/O routine into a shared helper (and apply to Block,
-//   which seems broken?
+// - update README.dsi
 //
 
 use DefaultRectangular;

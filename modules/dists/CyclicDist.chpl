@@ -997,7 +997,9 @@ proc CyclicArr.doiBulkTransferToDR(Barg)
         }
             
         const d ={(...r1)};
-        const slice = B.dsiClosedSlice(d._value);
+        if (!B.dsiCanSlice(d._value)) then
+          halt("Unexpected slicee type in doiBulkTransferFromDR");
+        const slice = B.dsiSlice(d._value);
         //Necessary to calculate the value of blk variable in DR
         //with the new domain r1
         slice.adjustBlkOffStrForNewDomain(d._value, slice);
@@ -1045,7 +1047,9 @@ proc CyclicArr.doiBulkTransferFromDR(Barg)
             writeln("A[",(...r2),"] = B[",(...r1), "] ");
         
         const d ={(...r1)};
-        const slice = B.dsiClosedSlice(d._value);
+        if (!B.dsiCanSlice(d._value)) then
+          halt("Unexpected slicee type in doiBulkTransferFromDR");
+        const slice = B.dsiSlice(d._value);
         //this step it's necessary to calculate the value of blk variable in DR
         //with the new domain r1
         slice.adjustBlkOffStrForNewDomain(d._value, slice);

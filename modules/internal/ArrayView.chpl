@@ -20,6 +20,9 @@
 //
 //
 // TODOs:
+// - test privatization routines for non-slice routines and get
+//   them working -- started on new test for this
+// - add comments to each class and method
 // - run distribution suite cleanly for "always use array views"
 //   - and set up nightly testing against this (?)
 // - run distribution suite across all distributions

@@ -81,11 +81,9 @@ class ArraySliceViewArr: BaseArr {
     return arr.dsiTargetLocales();
   }
 
-  /*
-  proc doiBulkTransfer(B) {
-    arr.doiBulkTransfer(B);
+  proc doiBulkTransferToDR(B) {
+    arr.doiBulkTransferToDR(B);
   }
-  */
 
   proc dsiSerialWrite(f: Writer) {
     chpl_rectArrayReadWriteHelper(f, arr, dom);

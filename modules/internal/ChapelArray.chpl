@@ -2355,22 +2355,30 @@ module ChapelArray {
   inline proc chpl__bulkTransferHelper(a, b) {
     if a._value.isDefaultRectangular() {
       if b._value.isDefaultRectangular() {
+        writeln(here.id, " both are default rectangular");
         // implemented in DefaultRectangular
         a._value.adjustBlkOffStrForNewDomain(a._value.dom, a._value);
         b._value.adjustBlkOffStrForNewDomain(b._value.dom, b._value);
         a._value.doiBulkTransferStride(b._value);
       }
-      else
+      else {
+        writeln(here.id, " b must implement");
         // b's domain map must implement this
         b._value.doiBulkTransferToDR(a);
+      }
     } else {
-      if b._value.isDefaultRectangular() then
+      if b._value.isDefaultRectangular() then {
+        writeln(here.id, " a must implement");
         // a's domain map must implement this
         a._value.doiBulkTransferFromDR(b);
-      else
+      }
+      else {
+        writeln(here.id, " a must implement for other reasons");
         // a's domain map must implement this,
         // possibly using b._value.doiBulkTransferToDR()
         a._value.doiBulkTransferFrom(b);
+        writeln(here.id, " a done implementing for other reasons");
+      }
     }
  }
   
@@ -2391,8 +2399,9 @@ module ChapelArray {
   }
   
   inline proc =(ref a: [], b:[]) {
+    writeln(here.id, "Entering array assignment");
     if a.rank != b.rank then
-      compilerError("rank mismatch in array assignment");
+      compilerError(here.id, "rank mismatch in array assignment");
     
     if b._value == nil then
       // This happens e.g. for 'new' on a record with an array field whose
@@ -2409,27 +2418,33 @@ module ChapelArray {
     else
       // Do non-bulk transfer.
       chpl__transferArray(a, b);
+    writeln(here.id, "Exiting array assignment");
   }
   
   inline proc chpl__bulkTransferArray(a: [], b) {
+    writeln(here.id, "Entering bulkTransfer");
     if (useBulkTransfer &&
         chpl__compatibleForBulkTransfer(a, b) &&
         chpl__useBulkTransfer(a, b))
     {
+      writeln(here.id, "Calling doiBulkTransfer");
       a._value.doiBulkTransfer(b);
     }
     else if (useBulkTransferStride &&
         chpl__compatibleForBulkTransferStride(a, b) &&
         chpl__useBulkTransferStride(a, b))
     {
+      writeln(here.id, "Calling bulkTransferHelper");
       chpl__bulkTransferHelper(a, b);
     }
     else {
       if debugBulkTransfer then
         // just writeln() clashes with writeln.chpl
         stdout.writeln("proc =(a:[],b): bulk transfer did not happen");
+      writeln(here.id, "Not using bulk transfer");
       chpl__transferArray(a, b);
     }
+    writeln(here.id, "Exiting bulkTransfer");
   }
 
   inline proc chpl__transferArray(a: [], b) {

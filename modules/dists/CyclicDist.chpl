@@ -29,7 +29,7 @@ proc _determineIdxTypeFromStartIdx(startIdx) type {
 
 config param debugCyclicDist = false;
 config param verboseCyclicDistWriters = false;
-config param debugCyclicDistBulkTransfer = false;
+config param debugCyclicDistBulkTransfer = true;
 
 //
 // If the testFastFollowerOptimization flag is set to true, the
@@ -956,8 +956,15 @@ proc CyclicArr.doiBulkTransferFrom(Barg)
             r1[t] = (ini[t]:el..end[t]:el by (end[t] - ini[t]):el/(r2[t].length-1));
         }
        
-        if debugCyclicDistBulkTransfer then
+        if debugCyclicDistBulkTransfer then {
           writeln("B[",(...r1),"] ToDR A[",regionA, "] ");
+          writeln("Barg:");
+          writeln(Barg[(...r1)]);
+          writeln("Barg ranges: ", r1);
+          writeln("Aarg:");
+          writeln(A.locArr[i].myElems[regionA]);
+          writeln("regionA = ", regionA);
+        }
         
         Barg[(...r1)]._value.doiBulkTransferToDR(A.locArr[i].myElems[regionA]);
       }
@@ -979,9 +986,16 @@ proc CyclicArr.doiBulkTransferToDR(Barg)
       const inters=A.dom.locDoms(j).myBlock;
       if(inters.numIndices>0)
       {
+        writeln((here.id, A.dom, B.dom, inters));
+        writeln(here.id, " in coforall");
         const ini=bulkCommConvertCoordinate(inters.first, A, B);
+        writeln(here.id, " past bulk comm convert coordinate");
         const end=bulkCommConvertCoordinate(inters.last, A, B);
+        writeln(here.id, " past bulk comm convert coordinate 2");
         const sa = chpl__tuplify(B.dom.dsiStride); //return a tuple
+        writeln(here.id, " chpl_tuplify");
+
+        writeln("past const assignments");
         
         //r2 is the domain to refer the elements of A in locale j
         //r1 is the domain to refer the correspondig elements of B

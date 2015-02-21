@@ -501,7 +501,7 @@ module ChapelRange {
         halt("invoking orderToIndex on a negative integer: ", ord);
   
       if isBoundedRange(this) && ord >= this.length then
-        halt("invoking orderToIndex on an integer ", ord,
+        halt(here.id,"invoking orderToIndex on an integer ", ord,
              " that is larger than the range's number of indices ", this.length);
     }
   

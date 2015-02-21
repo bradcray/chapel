@@ -528,7 +528,7 @@ module DefaultRectangular {
   // domain classes.
   //
   proc chpl_rectArrayReadWriteHelper(f /*: Reader or Writer */, arr, 
-                                     dom = arr.dom) {
+                                     dom) {
     param rank = arr.rank;
     type idxType = arr.idxType;
     const zeroTup: rank*idxType;
@@ -537,19 +537,19 @@ module DefaultRectangular {
     proc recursiveArrayWriter(in idx: rank*idxType, dim=1, in last=false) {
       var binary = f.binary();
       type strType = chpl__signedType(idxType);
-      var makeStridePositive = if dom.ranges(dim).stride > 0 then 1:strType else (-1):strType;
+      var makeStridePositive = if dom.dsiDim(dim).stride > 0 then 1:strType else (-1):strType;
       if dim == rank {
         var first = true;
-        if debugDefaultDist && f.writing then f.writeln(dom.ranges(dim));
-        for j in dom.ranges(dim) by makeStridePositive {
+        if debugDefaultDist && f.writing then f.writeln(dom.dsiDim(dim));
+        for j in dom.dsiDim(dim) by makeStridePositive {
           if first then first = false;
           else if ! binary then f <~> new ioLiteral(" ");
           idx(dim) = j;
           f <~> arr.dsiAccess(idx);
         }
       } else {
-        for j in dom.ranges(dim) by makeStridePositive {
-          var lastIdx =  dom.ranges(dim).last;
+        for j in dom.dsiDim(dim) by makeStridePositive {
+          var lastIdx =  dom.dsiDim(dim).last;
           idx(dim) = j;
           recursiveArrayWriter(idx, dim=dim+1,
                                last=(last || dim == 1) && (j == lastIdx));
@@ -962,7 +962,7 @@ module DefaultRectangular {
   proc DefaultRectangularDom.dsiSerialRead(f: Reader) { this.dsiSerialReadWrite(f); }
 
   proc DefaultRectangularArr.dsiSerialReadWrite(f /*: Reader or Writer*/) {
-    chpl_rectArrayReadWriteHelper(f, this);
+    chpl_rectArrayReadWriteHelper(f, this, this.dom);
   }
 
   proc DefaultRectangularArr.dsiSerialWrite(f: Writer) {
@@ -1615,6 +1615,7 @@ module DefaultRectangular {
     for param i in 1..rank {
       const ar = AD(i), br = BD(i);
       if boundsChecking then assert(br.member(b(i)));
+      writeln("Converting ", ar, ", ", br);
       result(i) = ar.orderToIndex(br.indexOrder(b(i)));
     }
     return result;

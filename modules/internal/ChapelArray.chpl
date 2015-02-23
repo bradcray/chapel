@@ -1550,6 +1550,11 @@ module ChapelArray {
           halt("extent in dimension ", i, " does not match actual");
 
       if (!alwaysUseArrayViews && this._value.dsiCanReindex(d._value)) {
+        //
+        // BLC: Note that I'm not creating the reindex dist anymore here.
+        // This seems problematic.  E.g., will my new testAligned tests
+        // still work (not that Block supports reindexing anymore...
+        //
         var newDom = {(...d.dims())};
         var x = _value.dsiReindex(newDom._value);
         x._arrAlias = _value;

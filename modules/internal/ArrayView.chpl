@@ -20,6 +20,12 @@
 //
 //
 // TODOs:
+// - review dsi routines in Block -- which am I missing?
+// - rename dsiSlice/Reindex/RankChange to doi
+// - update README.dsi
+// - test privatization routines for non-slice routines and get
+//   them working -- started on new test for this
+// - add comments to each class and method
 // - run distribution suite cleanly for "always use array views"
 //   - and set up nightly testing against this (?)
 // - run distribution suite across all distributions
@@ -30,8 +36,17 @@
 // - replace isArrayView-style routines with chpl try tokens (?)
 // - creating arrays over arrayview.dom queries -- will it work?
 // - can the dsi distribution create rank change view routine be removed?
-// - update README.dsi
 //
+
+
+//// *** INSIGHT:  Do I need a distributed/privatized domain for anything,
+//// or can I rely on the array for everything, other than bounds checking,
+//// given that the leader/follower interface is independent of indices?
+////
+//// The main question being things like "forall (i,j) in A.domain, though
+//// that seems congruent with the B: [A.domain] issue I'm having....
+//// and can perhaps be handled by using arr.dom as the leader rather than
+//// dom?  Then use a reindex dom itself to handle the declaration case?
 
 use DefaultRectangular;
 
@@ -112,20 +127,27 @@ class ArrayReindexViewArr: BaseArr {
   proc idxType type return arr.idxType;
   proc rank param return arr.rank;
 
+  //
+  // For serial/standalone/leader/follower, the arity of the domains
+  // is identical even though the indices are different, so given that
+  // the leader/follower interface already factors the precise index
+  // values out of the equation, we can just call into the array's
+  // leader/follower iterators directly.
+  //
   inline iter these() ref {
-    for i in dom do
-      yield dsiAccess(i);
+    for a in arr do
+      yield a;
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    for followThis in dom.these(tag) do
+    for followThis in arr.these(tag) do
       yield followThis;
   }
 
   inline iter these(param tag: iterKind, followThis) ref
     where tag == iterKind.follower {
-    for i in dom.these(tag, followThis) do
-      yield dsiAccess[i];
+    for i in arr.these(tag, followThis) do
+      yield i;
   }
 
   inline proc dsiAccess(i: integral) ref {
@@ -170,7 +192,6 @@ class ArrayReindexViewArr: BaseArr {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
-  /*
   proc dsiSupportsPrivatization() param
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
 
@@ -182,7 +203,6 @@ class ArrayReindexViewArr: BaseArr {
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
     return new ArrayReindexViewArr(eltType=eltType, dom=privdom, arr=privarr);
   }
-  */
 }
 
 
@@ -254,7 +274,6 @@ class ArrayRankchangeViewArr: BaseArr {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
-  /*
   proc dsiSupportsPrivatization() param
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
 
@@ -266,5 +285,4 @@ class ArrayRankchangeViewArr: BaseArr {
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
     return new ArrayRankChangeViewArr(eltType=eltType, dom=privdom, arr=privarr, collapsedDim, idx);
   }
-  */
 }

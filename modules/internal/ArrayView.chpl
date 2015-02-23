@@ -45,6 +45,8 @@
 ////
 //// The main question being things like "forall (i,j) in A.domain, though
 //// that seems congruent with the B: [A.domain] issue I'm having....
+//// and can perhaps be handled by using arr.dom as the leader rather than
+//// dom?  Then use a reindex dom itself to handle the declaration case?
 
 use DefaultRectangular;
 

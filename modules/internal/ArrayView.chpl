@@ -38,6 +38,14 @@
 // - can the dsi distribution create rank change view routine be removed?
 //
 
+
+//// *** INSIGHT:  Do I need a distributed/privatized domain for anything,
+//// or can I rely on the array for everything, other than bounds checking,
+//// given that the leader/follower interface is independent of indices?
+////
+//// The main question being things like "forall (i,j) in A.domain, though
+//// that seems congruent with the B: [A.domain] issue I'm having....
+
 use DefaultRectangular;
 
 class ArraySliceViewArr: BaseArr {
@@ -47,7 +55,7 @@ class ArraySliceViewArr: BaseArr {
   var pid = -1;
 
   proc isArrayView() param { return true; }
-  proc idxType type return arr.idxType;
+OA  proc idxType type return arr.idxType;
   proc rank param return arr.rank;
 
   inline iter these() ref {
@@ -175,7 +183,6 @@ class ArrayReindexViewArr: BaseArr {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
-  /*
   proc dsiSupportsPrivatization() param
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
 
@@ -187,7 +194,6 @@ class ArrayReindexViewArr: BaseArr {
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
     return new ArrayReindexViewArr(eltType=eltType, dom=privdom, arr=privarr);
   }
-  */
 }
 
 
@@ -259,7 +265,6 @@ class ArrayRankchangeViewArr: BaseArr {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
-  /*
   proc dsiSupportsPrivatization() param
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
 
@@ -271,5 +276,4 @@ class ArrayRankchangeViewArr: BaseArr {
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
     return new ArrayRankChangeViewArr(eltType=eltType, dom=privdom, arr=privarr, collapsedDim, idx);
   }
-  */
 }

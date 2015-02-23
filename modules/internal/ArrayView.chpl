@@ -20,6 +20,9 @@
 //
 //
 // TODOs:
+// - review dsi routines in Block -- which am I missing?
+// - rename dsiSlice/Reindex/RankChange to doi
+// - update README.dsi
 // - test privatization routines for non-slice routines and get
 //   them working -- started on new test for this
 // - add comments to each class and method
@@ -33,7 +36,6 @@
 // - replace isArrayView-style routines with chpl try tokens (?)
 // - creating arrays over arrayview.dom queries -- will it work?
 // - can the dsi distribution create rank change view routine be removed?
-// - update README.dsi
 //
 
 use DefaultRectangular;

@@ -57,7 +57,7 @@ class ArraySliceViewArr: BaseArr {
   var pid = -1;
 
   proc isArrayView() param { return true; }
-OA  proc idxType type return arr.idxType;
+  proc idxType type return arr.idxType;
   proc rank param return arr.rank;
 
   inline iter these() ref {
@@ -127,20 +127,27 @@ class ArrayReindexViewArr: BaseArr {
   proc idxType type return arr.idxType;
   proc rank param return arr.rank;
 
+  //
+  // For serial/standalone/leader/follower, the arity of the domains
+  // is identical even though the indices are different, so given that
+  // the leader/follower interface already factors the precise index
+  // values out of the equation, we can just call into the array's
+  // leader/follower iterators directly.
+  //
   inline iter these() ref {
-    for i in dom do
-      yield dsiAccess(i);
+    for a in arr do
+      yield a;
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    for followThis in dom.these(tag) do
+    for followThis in arr.these(tag) do
       yield followThis;
   }
 
   inline iter these(param tag: iterKind, followThis) ref
     where tag == iterKind.follower {
-    for i in dom.these(tag, followThis) do
-      yield dsiAccess[i];
+    for i in arr.these(tag, followThis) do
+      yield i;
   }
 
   inline proc dsiAccess(i: integral) ref {

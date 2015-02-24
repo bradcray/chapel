@@ -1567,19 +1567,38 @@ module ChapelArray {
           help();
         return _newArray(x);
       } else {
-        var newdom = new ArrayReindexViewDom(idxType=d.idxType, dom=d._value);
+        // TODO: Optimze the case where d's domain map already matches
+        //        const dWithArrsDomMap = _dom.dist.foo();
+        writeln("1");
+        const dWithArrsDomMap = _dom.dist.newRectangularDom(d.rank, d.idxType, d.stridable);
+        writeln("2");
+        dWithArrsDomMap.setIndices(d.getIndices());
+        writeln("3");
+        const newdom = new ArrayReindexViewDom(idxType=d.idxType, dom=dWithArrsDomMap);
+        writeln("4");
         if (!noRefCount) {
           d._value.incRefCount();
           this._value.incRefCount();
           newdom.incRefCount();
         }
+        writeln("5");
+        writeln(typeToString(this._value.eltType));
+        writeln("6");
+        writeln(newdom);
         if (_value.isArrayReindexView()) {
+        writeln("7a");
+          writeln(this._value.arr);
+          writeln("8");
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
                                                    dom=newdom, arr=this._value.arr));
         } else {
+          writeln("7b");
+          //          writeln(this._value);
+          writeln("8");
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
                                                    dom=newdom, arr=this._value));
         }
+        writeln("6");
       }
     }
   

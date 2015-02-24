@@ -122,6 +122,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
   type idxType;
   const dom;
   const dist = dom.dist;
+  var pid = -1;
 
   proc rank param {
     return dom.rank;
@@ -167,6 +168,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
       yield i;
   }
 
+  /*
   proc dsiSupportsPrivatization() param
     return dom.dsiSupportsPrivatization();
 
@@ -177,6 +179,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
     const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
     return new ArraySliceViewArr(dom=privdom);
   }
+  */
 }
 
 
@@ -184,6 +187,7 @@ class ArrayReindexViewArr: BaseArr {
   type eltType;
   const dom;
   const arr;
+  var pid = -1;
 
   proc isArrayReindexView() param { return true; }
   proc idxType type return arr.idxType;
@@ -254,6 +258,7 @@ class ArrayReindexViewArr: BaseArr {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
+  /*
   proc dsiSupportsPrivatization() param
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
 
@@ -265,6 +270,7 @@ class ArrayReindexViewArr: BaseArr {
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
     return new ArrayReindexViewArr(eltType=eltType, dom=privdom, arr=privarr);
   }
+  */
 }
 
 
@@ -274,6 +280,7 @@ class ArrayRankchangeViewArr: BaseArr {
   const arr;
   const collapsedDim;
   const idx;
+  var pid = -1;
 
   proc idxType type return arr.idxType;
   proc rank param return dom.rank;

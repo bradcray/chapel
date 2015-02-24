@@ -118,12 +118,21 @@ class ArraySliceViewArr: BaseArr {
 }
 
 
-class ArrayReindexViewDom: BaseDom {
+class ArrayReindexViewDom: BaseRectangularDom {
   type idxType;
   const dom;
+  const dist = dom.dist;
 
   proc rank param {
     return dom.rank;
+  }
+
+  proc stridable param {
+    return dom.stridable;
+  }
+
+  proc dsiMyDist() {
+    return dom.dsiMyDist();
   }
 
   proc dsiBuildArray(type eltType) {

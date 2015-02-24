@@ -1567,11 +1567,12 @@ module ChapelArray {
           help();
         return _newArray(x);
       } else {
+        var newdom = new ArrayReindexViewDom(idxType=d.idxType, dom=d._value);
         if (!noRefCount) {
           d._value.incRefCount();
           this._value.incRefCount();
+          newdom.incRefCount();
         }
-        var newdom = new ArrayReindexViewDom(idxType=d.idxType, dom=d._value);
         if (_value.isArrayReindexView()) {
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
                                                    dom=newdom, arr=this._value.arr));

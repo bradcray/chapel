@@ -1570,11 +1570,11 @@ module ChapelArray {
         // TODO: Optimze the case where d's domain map already matches
         //        const dWithArrsDomMap = _dom.dist.foo();
         writeln("1");
-        const dWithArrsDomMap = _dom.dist.newRectangularDom(d.rank, d.idxType, d.stridable);
+        //        const dWithArrsDomMap = _dom.dist.newRectangularDom(d.rank, d.idxType, d.stridable);
         writeln("2");
-        dWithArrsDomMap.setIndices(d.getIndices());
+        //        dWithArrsDomMap.setIndices(d.getIndices());
         writeln("3");
-        const newdom = new ArrayReindexViewDom(idxType=d.idxType, dom=dWithArrsDomMap);
+        const newdom = new ArrayReindexViewDom(idxType=d.idxType, updom=d, downdom=_dom);
         writeln("4");
         if (!noRefCount) {
           d._value.incRefCount();

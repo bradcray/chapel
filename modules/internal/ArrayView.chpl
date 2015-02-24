@@ -120,51 +120,70 @@ class ArraySliceViewArr: BaseArr {
 
 class ArrayReindexViewDom: BaseRectangularDom {
   type idxType;
-  const dom;
-  const dist = dom.dist;
+  const updom;
+  const downdom;
+  const dist: DefaultDist;
   var pid = -1;
 
   proc rank param {
-    return dom.rank;
+    return updom.rank;
   }
 
   proc stridable param {
-    return dom.stridable;
+    return updom.stridable;
   }
 
+  proc linksDistribution() param return false;
+
+  /*
   proc linksDistribution() param return dom.linksDistribution();
   proc dsiLinksDistribution() return dom.dsiLinksDistribution();
 
   proc dsiMyDist() {
     return dom.dsiMyDist();
   }
+  */
 
   proc dsiBuildArray(type eltType) {
-    var newarr = dom.dsiBuildArray(eltType);
+    //
+    // Do I need to do something different here, if privatized?
+    //
+    var newarr = downdom._value.dsiBuildArray(eltType);
     return new ArrayReindexViewArr(eltType=eltType, dom=this, arr=newarr);
   }
 
   proc dsiDim(i) {
-    return dom.dsiDim(i);
+    return updom._value.dsiDim(i);
   }
 
   proc dsiMember(i) {
-    return dom.dsiMember(i);
+    if (rank == 1) {
+      const pos_i = updom._value.dsiDim(1).indexOrder((...i));
+      const ind_i = downdom._value.dsiDim(1).orderToIndex(pos_i);
+      return downdom._value.dsiMember(i);
+    } else {
+      var ind_i: rank*idxType;
+      for d in 1..rank {
+        const pos_i_d = updom._value.dsiDim(d).indexOrder(i(d));
+        ind_i(d) = downdom._value.dsiDim(d).orderToIndex(pos_i_d);
+      }
+      return downdom._value.dsiMember(ind_i);
+    }
   }
 
   inline iter these() {
-    for i in dom do
+    for i in updom do
       yield i;
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    for followThis in dom.these(tag) do
+    for followThis in downdom.these(tag) do
       yield followThis;
   }
 
   inline iter these(param tag: iterKind, followThis)
     where tag == iterKind.follower {
-    for i in dom.these(tag, followThis) do
+    for i in updom.these(tag, followThis) do
       yield i;
   }
 

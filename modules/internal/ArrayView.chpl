@@ -131,6 +131,9 @@ class ArrayReindexViewDom: BaseRectangularDom {
     return dom.stridable;
   }
 
+  proc linksDistribution() param return dom.linksDistribution();
+  proc dsiLinksDistribution() return dom.dsiLinksDistribution();
+
   proc dsiMyDist() {
     return dom.dsiMyDist();
   }

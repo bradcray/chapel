@@ -72,11 +72,6 @@ module DefaultRectangular {
   pragma "private" var defaultDist = new dmap(new DefaultDist());
   inline proc chpl_defaultDistInitPrivate() {
     if defaultDist._value==nil then defaultDist = new dmap(new DefaultDist());
-    //
-    // This is ridiculous and becamre necessary when I put in a
-    // 
-    //
-    defaultDist._value._distCnt._cnt.poke(999);
   }
   
   class DefaultRectangularDom: BaseRectangularDom {
@@ -93,10 +88,6 @@ module DefaultRectangular {
       this.dist = dist;
     }
 
-    proc dsiMyDist() {
-      return defaultDist._value;
-    }
-  
     proc dsiDisplayRepresentation() {
       writeln("ranges = ", ranges);
     }

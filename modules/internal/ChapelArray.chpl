@@ -1571,12 +1571,13 @@ module ChapelArray {
           d._value.incRefCount();
           this._value.incRefCount();
         }
+        var newdom = new ArrayReindexViewDom(idxType=d.idxType, dom=d._value);
         if (_value.isArrayReindexView()) {
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
-                                                   dom=d._value, arr=this._value.arr));
+                                                   dom=newdom, arr=this._value.arr));
         } else {
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
-                                                   dom=d._value, arr=this._value));
+                                                   dom=newdom, arr=this._value));
         }
       }
     }

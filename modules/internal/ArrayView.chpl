@@ -118,6 +118,56 @@ class ArraySliceViewArr: BaseArr {
 }
 
 
+class ArrayReindexViewDom: BaseDom {
+  type idxType;
+  const dom;
+
+  proc rank param {
+    return dom.rank;
+  }
+
+  proc dsiBuildArray(type eltType) {
+    var newarr = dom.dsiBuildArray(eltType);
+    return new ArrayReindexViewArr(eltType=eltType, dom=this, arr=newarr);
+  }
+
+  proc dsiDim(i) {
+    return dom.dsiDim(i);
+  }
+
+  proc dsiMember(i) {
+    return dom.dsiMember(i);
+  }
+
+  inline iter these() {
+    for i in dom do
+      yield i;
+  }
+
+  inline iter these(param tag: iterKind) where tag == iterKind.leader {
+    for followThis in dom.these(tag) do
+      yield followThis;
+  }
+
+  inline iter these(param tag: iterKind, followThis)
+    where tag == iterKind.follower {
+    for i in dom.these(tag, followThis) do
+      yield i;
+  }
+
+  proc dsiSupportsPrivatization() param
+    return dom.dsiSupportsPrivatization();
+
+  proc dsiGetPrivatizeData() return dom.pid;
+
+  proc dsiPrivatize(privatizeData) {
+    const privdomID = privatizeData;
+    const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
+    return new ArraySliceViewArr(dom=privdom);
+  }
+}
+
+
 class ArrayReindexViewArr: BaseArr {
   type eltType;
   const dom;

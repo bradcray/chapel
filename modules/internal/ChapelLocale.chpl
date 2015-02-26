@@ -400,8 +400,11 @@ module ChapelLocale {
   extern proc chpl_memhook_free_pre(ptr:opaque): void;
   extern proc chpl_memhook_md_num(): int(16);
 
-  proc chpl_getPrivatizedCopy(type objectType, objectPid:int): objectType
+  proc chpl_getPrivatizedCopy(type objectType, objectPid:int): objectType {
+    if (objectPid < 0) then
+      halt("Got an invalid object PID in chpl_getPrivatizedCopy(): ", objectPid);
     return __primitive("chpl_getPrivatizedClass", nil:objectType, objectPid);
+  }
   
 
 //########################################################################{

@@ -195,11 +195,12 @@ class ArrayReindexViewDom: BaseRectangularDom {
   //  proc dist return downdom.dist;
 
   proc dsiBuildArray(type eltType) {
-    //
-    // Do I need to do something different here, if privatized?
-    //
     writeln("Building array over: ", downdom);
-    var newarr = downdom.dsiBuildArray(eltType);
+    //
+    // TODO: Is this array getting reclaimed?  Do I need to bump its
+    // reference count or...?
+    //
+    var newarr = _newArray(downdom.dsiBuildArray(eltType))._value;
     return new ArrayReindexViewArr(eltType=eltType, dom=this, arr=newarr);
   }
 
@@ -395,6 +396,8 @@ class ArrayReindexViewArr: BaseArr {
     writeln(here.id, ": *** about to return privatizeData for:");
     this.dsiDisplayRepresentation();
     writeln(here.id, ": *** about to return");
+    writeln(here.id, "arr.pid = ", arr.pid);
+    writeln(here.id, "arr.type = ", typeToString(arr.type));
     return (dom.pid, arr.pid);
   }
 
@@ -405,6 +408,7 @@ class ArrayReindexViewArr: BaseArr {
     writeln(here.id, ": ***** About to show privdom");
     privdom.dsiDisplayRepresentation();
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
+    writeln(here.id, "arr.pid = ", arr.pid);
     writeln(here.id, "arr.type = ", typeToString(arr.type));
     writeln(here.id, ": ***** About to show privarr");
     privarr.dom.dsiDisplayRepresentation();

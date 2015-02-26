@@ -118,12 +118,29 @@ class ArraySliceViewArr: BaseArr {
 }
 
 
+class ArrayReindexViewDist {
+  var sampledom;
+
+  proc newRectangularDom(param rank, type idxType, param stridable) {
+    return new ArrayReindexViewDom(idxType=idxType, sampledom.updom,
+                                   sampledom.downdom, dist=this);
+  }
+}
+
+
 class ArrayReindexViewDom: BaseRectangularDom {
   type idxType;
-  const updom;    // the upward-facing domain that clients will access
+  var updom;    // the upward-facing domain that clients will access
   const downdom;  // the downward-facing domain that implements things
-  const dist = downdom.dist;
   var pid = -1;
+
+  proc dist {
+    return this;
+  }
+
+  proc dsiNewRectangularDom(param rank, type idxType, param stridable) {
+    return new ArrayReindexViewDom(idxType=idxType, updom=updom, downdom=downdom);
+  }
 
   proc rank param {
     return updom.rank;
@@ -140,6 +157,10 @@ class ArrayReindexViewDom: BaseRectangularDom {
   proc dsiLinksDistribution() return dom.dsiLinksDistribution();
   */
 
+  proc dsiSetIndices(x) {
+    updom = {(...x)}._value;
+  }
+
   proc dsiDisplayRepresentation() {
     writeln("{");
     write("  updom: {");
@@ -150,8 +171,8 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 
 
-  proc dsiMyDist() {
-    return downdom.dsiMyDist();
+  proc dsiMyDist(): BaseDist {
+    return nil;
   }
 
   //  proc dist return downdom.dist;
@@ -218,6 +239,14 @@ class ArrayReindexViewDom: BaseRectangularDom {
     return new ArrayReindexViewDom(idxType=updomdims(1).idxType, 
                                    updom={(...updomdims)}._value, 
                                    downdom=privdowndom);
+  }
+
+  proc dsiGetReprivatizeData() return updom.dsiDims();
+  
+  proc dsiReprivatize(other, reprivatizeData) {
+    writeln("Got: ", reprivatizeData);
+    writeln("Other = ", other);
+    updom={(...reprivatizeData)}._value;
   }
 }
 

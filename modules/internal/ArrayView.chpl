@@ -154,11 +154,17 @@ class ArrayReindexViewDom: BaseRectangularDom {
 
   /*
   proc linksDistribution() param return dom.linksDistribution();
-  proc dsiLinksDistribution() return dom.dsiLinksDistribution();
   */
+  proc dsiLinksDistribution() return false;
 
   proc dsiSetIndices(x) {
-    updom = {(...x)}._value;
+    writeln("*****>>>> dsiSetIndices = ", x);
+    var newdom = {(...x)};
+    if !noRefCount then
+      newdom._value.incRefCount();
+    updom = newdom._value;
+    dsiDisplayRepresentation();
+    writeln("*****<<<< dsiSetIndices = ", x);
   }
 
   proc dsiDisplayRepresentation() {
@@ -241,12 +247,29 @@ class ArrayReindexViewDom: BaseRectangularDom {
                                    downdom=privdowndom);
   }
 
-  proc dsiGetReprivatizeData() return updom.dsiDims();
+  proc dsiGetReprivatizeData() {
+    //    compilerError("In dsiGetReprivatizeData");
+    // HACK!  Must remove this ***
+    //    updom = {2..11, 2..11}._value;
+    writeln("********* In GetReprivatizeData *************");
+    dsiDisplayRepresentation();
+    writeln("********* Done ******************************");
+    return updom.dsiDims();
+  }
   
   proc dsiReprivatize(other, reprivatizeData) {
     writeln("Got: ", reprivatizeData);
     writeln("Other = ", other);
     updom={(...reprivatizeData)}._value;
+  }
+
+  proc destroyDist() {
+    writeln("Being asked to destroy self");
+    return 999;  // we never want to destroy ourselves as the dist
+  }
+
+  proc dsiDestroyDistClass() {
+    // no-op;
   }
 }
 

@@ -1599,7 +1599,7 @@ module ChapelArray {
           newdom._value.incRefCount();
           downdom._value.incRefCount();
         }
-        compilerWarning(typeToString(newdom._value.type));
+        //        compilerWarning(typeToString(newdom._value.type));
         newdom.displayRepresentation();
         if (_value.isArrayReindexView()) {
           writeln("7a");

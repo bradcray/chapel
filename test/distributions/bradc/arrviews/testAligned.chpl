@@ -25,9 +25,20 @@ proc foo(X) {
 
 proc bar(X: [2..11, 2..11] int) {
   var B: [X.domain] int;
-  forall b in B {
+  writeln("B is: ", B);
+  B[2,2] = 1;
+  writeln("B is: ", B);
+  on Locales[0] do
+    B[2,2] = 2;
+  writeln("B is: ", B);
+  on Locales[(here.id+1)%numLocales] do
+    B[2,2] = 3;
+  writeln("B is: ", B);
+  for/*all*/ b in B {
     b = here.locale.id;
   }
+  writeln("Past loop");
+  writeln("B is: ", B);
   for ij in X.domain {
     if (X[ij] != B[ij]) {
       writeln("bar() not aligned:\n", X, "\n", B, "\n");
@@ -37,6 +48,7 @@ proc bar(X: [2..11, 2..11] int) {
   writeln("Success!");
 }
 
+/*
 proc baz(X: [2..11] int) {
   var B: [X.domain] int;
   forall b in B {
@@ -50,12 +62,13 @@ proc baz(X: [2..11] int) {
   }
   writeln("Success!");
 }
+*/
 
 forall a in A do
   a = here.locale.id;
 
 
 foo(A[2..9, 2..9]);
-foo(A[9, 3..10]);
+//foo(A[9, 3..10]);
 bar(A);
-baz(A[9, ..]);
+//baz(A[9, ..]);

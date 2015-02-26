@@ -1569,32 +1569,22 @@ module ChapelArray {
       } else {
         // TODO: Optimze the case where d's domain map already matches
         //        const dWithArrsDomMap = _dom.dist.foo();
-        writeln("1");
         //        const dWithArrsDomMap = _dom.dist.newRectangularDom(d.rank, d.idxType, d.stridable);
-        writeln("2");
         //        dWithArrsDomMap.setIndices(d.getIndices());
-        writeln("3");
-        const newdom = new ArrayReindexViewDom(idxType=d.idxType, updom=d, downdom=_dom);
-        writeln("4");
+        const downdom = _dom;
+        const newdom = new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value);
         if (!noRefCount) {
           d._value.incRefCount();
           this._value.incRefCount();
           newdom.incRefCount();
+          downdom._value.incRefCount();
         }
-        writeln("5");
-        writeln(typeToString(this._value.eltType));
-        writeln("6");
-        writeln(newdom);
         if (_value.isArrayReindexView()) {
-        writeln("7a");
-          writeln(this._value.arr);
-          writeln("8");
+          writeln("7a");
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
                                                    dom=newdom, arr=this._value.arr));
         } else {
           writeln("7b");
-          //          writeln(this._value);
-          writeln("8");
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
                                                    dom=newdom, arr=this._value));
         }

@@ -120,10 +120,10 @@ class ArraySliceViewArr: BaseArr {
 
 class ArrayReindexViewDom: BaseRectangularDom {
   type idxType;
-  const updom;
-  const downdom;
-  const dist: DefaultDist;
-  var pid = -1;
+  const updom;    // the upward-facing domain that clients will access
+  const downdom;  // the downward-facing domain that implements things
+  const dist = downdom.dist;
+  //  var pid = -1;
 
   proc rank param {
     return updom.rank;
@@ -138,36 +138,38 @@ class ArrayReindexViewDom: BaseRectangularDom {
   /*
   proc linksDistribution() param return dom.linksDistribution();
   proc dsiLinksDistribution() return dom.dsiLinksDistribution();
+  */
 
   proc dsiMyDist() {
-    return dom.dsiMyDist();
+    return downdom.dsiMyDist();
   }
-  */
+
+  //  proc dist return downdom.dist;
 
   proc dsiBuildArray(type eltType) {
     //
     // Do I need to do something different here, if privatized?
     //
-    var newarr = downdom._value.dsiBuildArray(eltType);
+    var newarr = downdom.dsiBuildArray(eltType);
     return new ArrayReindexViewArr(eltType=eltType, dom=this, arr=newarr);
   }
 
   proc dsiDim(i) {
-    return updom._value.dsiDim(i);
+    return updom.dsiDim(i);
   }
 
   proc dsiMember(i) {
     if (rank == 1) {
-      const pos_i = updom._value.dsiDim(1).indexOrder((...i));
-      const ind_i = downdom._value.dsiDim(1).orderToIndex(pos_i);
-      return downdom._value.dsiMember(i);
+      const pos_i = updom.dsiDim(1).indexOrder((...i));
+      const ind_i = downdom.dsiDim(1).orderToIndex(pos_i);
+      return downdom.dsiMember(i);
     } else {
       var ind_i: rank*idxType;
       for d in 1..rank {
-        const pos_i_d = updom._value.dsiDim(d).indexOrder(i(d));
-        ind_i(d) = downdom._value.dsiDim(d).orderToIndex(pos_i_d);
+        const pos_i_d = updom.dsiDim(d).indexOrder(i(d));
+        ind_i(d) = downdom.dsiDim(d).orderToIndex(pos_i_d);
       }
-      return downdom._value.dsiMember(ind_i);
+      return downdom.dsiMember(ind_i);
     }
   }
 
@@ -187,8 +189,9 @@ class ArrayReindexViewDom: BaseRectangularDom {
       yield i;
   }
 
-  /*
   proc dsiSupportsPrivatization() param
+    return false;
+  /*
     return dom.dsiSupportsPrivatization();
 
   proc dsiGetPrivatizeData() return dom.pid;
@@ -206,7 +209,7 @@ class ArrayReindexViewArr: BaseArr {
   type eltType;
   const dom;
   const arr;
-  var pid = -1;
+  //  var pid = -1;
 
   proc isArrayReindexView() param { return true; }
   proc idxType type return arr.idxType;
@@ -277,6 +280,9 @@ class ArrayReindexViewArr: BaseArr {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
+  proc dsiSupportsPrivatization() param
+    return false;
+
   /*
   proc dsiSupportsPrivatization() param
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
@@ -299,7 +305,7 @@ class ArrayRankchangeViewArr: BaseArr {
   const arr;
   const collapsedDim;
   const idx;
-  var pid = -1;
+  //  var pid = -1;
 
   proc idxType type return arr.idxType;
   proc rank param return dom.rank;

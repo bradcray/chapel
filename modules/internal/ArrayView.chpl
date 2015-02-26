@@ -140,6 +140,16 @@ class ArrayReindexViewDom: BaseRectangularDom {
   proc dsiLinksDistribution() return dom.dsiLinksDistribution();
   */
 
+  proc dsiDisplayRepresentation() {
+    writeln("{");
+    write("  updom: {");
+    updom.dsiDisplayRepresentation();
+    write("  downdom {");
+    downdom.dsiDisplayRepresentation();
+    writeln("}");
+  }
+
+
   proc dsiMyDist() {
     return downdom.dsiMyDist();
   }
@@ -150,6 +160,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
     //
     // Do I need to do something different here, if privatized?
     //
+    writeln("Building array over: ", downdom);
     var newarr = downdom.dsiBuildArray(eltType);
     return new ArrayReindexViewArr(eltType=eltType, dom=this, arr=newarr);
   }
@@ -178,11 +189,13 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 
   inline iter these() {
+    writeln("In domain's these iterator");
     for i in updom do
       yield i;
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
+    writeln("In domain's these leader");
     for followThis in downdom.these(tag) do
       yield followThis;
   }
@@ -201,6 +214,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
   proc dsiPrivatize(privatizeData) {
     const (updomdims, privdowndomID) = privatizeData;
     const privdowndom = chpl_getPrivatizedCopy(downdom.type, privdowndomID);
+    writeln("*** about to return new ArrayReindexViewDom ****");
     return new ArrayReindexViewDom(idxType=updomdims(1).idxType, 
                                    updom={(...updomdims)}._value, 
                                    downdom=privdowndom);

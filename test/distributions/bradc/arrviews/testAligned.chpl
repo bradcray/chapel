@@ -24,10 +24,15 @@ proc foo(X) {
 }
 
 proc bar(X: [2..11, 2..11] int) {
+  X.domain.displayRepresentation();
+  compilerWarning(typeToString(X._value.type));
   forall ij in X.domain {
     writeln(ij, " lives on locale ", here.locale.id);
   }
+  writeln("About to build array");
   var B: [X.domain] int;
+  writeln("Done building array");
+  /*
   writeln("B is: ", B);
   B[2,2] = 1;
   writeln("B is: ", B);
@@ -37,11 +42,14 @@ proc bar(X: [2..11, 2..11] int) {
   on Locales[(here.id+1)%numLocales] do
     B[2,2] = 3;
   writeln("B is: ", B);
-  for/*all*/ b in B {
+  */
+  forall b in B {
     b = here.locale.id;
   }
+  /*
   writeln("Past loop");
   writeln("B is: ", B);
+  */
   for ij in X.domain {
     if (X[ij] != B[ij]) {
       writeln("bar() not aligned:\n", X, "\n", B, "\n");

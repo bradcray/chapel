@@ -1572,21 +1572,23 @@ module ChapelArray {
         //        const dWithArrsDomMap = _dom.dist.newRectangularDom(d.rank, d.idxType, d.stridable);
         //        dWithArrsDomMap.setIndices(d.getIndices());
         const downdom = _dom;
-        const newdom = new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value);
+        const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value));
         if (!noRefCount) {
           d._value.incRefCount();
           this._value.incRefCount();
-          newdom.incRefCount();
+          newdom._value.incRefCount();
           downdom._value.incRefCount();
         }
         if (_value.isArrayReindexView()) {
           writeln("7a");
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
-                                                   dom=newdom, arr=this._value.arr));
+                                                   dom=newdom._value, 
+                                                   arr=this._value.arr));
         } else {
           writeln("7b");
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
-                                                   dom=newdom, arr=this._value));
+                                                   dom=newdom._value, 
+                                                   arr=this._value));
         }
         writeln("6");
       }

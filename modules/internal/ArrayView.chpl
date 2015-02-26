@@ -123,7 +123,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
   const updom;    // the upward-facing domain that clients will access
   const downdom;  // the downward-facing domain that implements things
   const dist = downdom.dist;
-  //  var pid = -1;
+  var pid = -1;
 
   proc rank param {
     return updom.rank;
@@ -152,6 +152,10 @@ class ArrayReindexViewDom: BaseRectangularDom {
     //
     var newarr = downdom.dsiBuildArray(eltType);
     return new ArrayReindexViewArr(eltType=eltType, dom=this, arr=newarr);
+  }
+
+  proc dsiGetIndices() {
+    return updom.dsiGetIndices();
   }
 
   proc dsiDim(i) {
@@ -190,18 +194,17 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 
   proc dsiSupportsPrivatization() param
-    return false;
-  /*
-    return dom.dsiSupportsPrivatization();
+    return downdom.dsiSupportsPrivatization();
 
-  proc dsiGetPrivatizeData() return dom.pid;
+  proc dsiGetPrivatizeData() return (updom.dsiDims(), downdom.pid);
 
   proc dsiPrivatize(privatizeData) {
-    const privdomID = privatizeData;
-    const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
-    return new ArraySliceViewArr(dom=privdom);
+    const (updomdims, privdowndomID) = privatizeData;
+    const privdowndom = chpl_getPrivatizedCopy(downdom.type, privdowndomID);
+    return new ArrayReindexViewDom(idxType=updomdims(1).idxType, 
+                                   updom={(...updomdims)}._value, 
+                                   downdom=privdowndom);
   }
-  */
 }
 
 
@@ -209,7 +212,7 @@ class ArrayReindexViewArr: BaseArr {
   type eltType;
   const dom;
   const arr;
-  //  var pid = -1;
+  var pid = -1;
 
   proc isArrayReindexView() param { return true; }
   proc idxType type return arr.idxType;
@@ -280,12 +283,11 @@ class ArrayReindexViewArr: BaseArr {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
-  proc dsiSupportsPrivatization() param
-    return false;
-
-  /*
-  proc dsiSupportsPrivatization() param
+  proc dsiSupportsPrivatization() param {
+    if (arr.dsiSupportsPrivatization() != dom.dsiSupportsPrivatization()) then
+      compilerWarning("Expected these always to match");
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
+  }
 
   proc dsiGetPrivatizeData() return (dom.pid, arr.pid);
 
@@ -295,7 +297,6 @@ class ArrayReindexViewArr: BaseArr {
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
     return new ArrayReindexViewArr(eltType=eltType, dom=privdom, arr=privarr);
   }
-  */
 }
 
 

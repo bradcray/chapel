@@ -41,6 +41,16 @@ proc bar(X: [2..11, 2..11] int) {
   on Locales[(here.id+1)%numLocales] do
     B[2,2] = 3;
   writeln("B is: ", B);
+  forall ij in B.domain {
+    B[ij] = here.locale.id;
+  }
+  for ij in X.domain {
+    if (X[ij] != B[ij]) {
+      writeln("bar() not aligned:\n", X, "\n", B, "\n");
+      return;
+    }
+  }
+  writeln("Iteration over B.domain works!");
   forall b in B {
     b = here.locale.id;
   }

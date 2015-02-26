@@ -125,9 +125,13 @@ module ChapelArray {
   }
   
   proc _newArray(value) {
-    if _isPrivatized(value) then
+    extern proc printf(x...);
+    
+    printf("%s %s\n", "*** In newArray, value.type is", typeToString(value.type));
+    if _isPrivatized(value) then {
+      printf("%s %s\n", "*** Building privatized version", typeToString(value.type));
       return new _array(_newPrivatizedClass(value), value);
-    else
+    } else
       return new _array(value, value);
   }
   

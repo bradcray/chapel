@@ -20,6 +20,17 @@
 //
 //
 // TODOs:
+//
+// Change setIndices to avoid the var a: b.type style and
+//  just use a dsiClone() instead in order to change var
+//  field back to const in domain.
+//
+// Create a version of testAlign that uses var A: B.type;
+//
+// Make reindex view store updom as a full default rectangular
+//   _domain-wrapped class rather than a class reference in
+//   order to remove bogus reference counting.
+//
 // - review dsi routines in Block -- which am I missing?
 // - rename dsiSlice/Reindex/RankChange to doi
 // - update README.dsi
@@ -216,13 +227,11 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 
   inline iter these() {
-    writeln("In domain's these iterator");
     for i in updom do
       yield i;
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    writeln("In domain's these leader");
     for followThis in downdom.these(tag) do
       yield followThis;
   }
@@ -313,14 +322,15 @@ class ArrayReindexViewArr: BaseArr {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    for followThis in arr.these(tag) do
+    writeln("**** In array reindex view leader");
+    for followThis in dom.these(tag) do
       yield followThis;
   }
 
   inline iter these(param tag: iterKind, followThis) ref
     where tag == iterKind.follower {
-    for i in arr.these(tag, followThis) do
-      yield i;
+    for i in dom.these(tag, followThis) do
+      yield dsiAccess(i);
   }
 
   inline proc dsiAccess(i: integral) ref {
@@ -368,6 +378,8 @@ class ArrayReindexViewArr: BaseArr {
   proc dsiSupportsPrivatization() param {
     if (arr.dsiSupportsPrivatization() != dom.dsiSupportsPrivatization()) then
       compilerWarning("Expected these always to match");
+    writeln("privatized array? ", arr.dsiSupportsPrivatization() && 
+            dom.dsiSupportsPrivatization());
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
   }
 

@@ -24,6 +24,9 @@ proc foo(X) {
 }
 
 proc bar(X: [2..11, 2..11] int) {
+  forall ij in X.domain {
+    writeln(ij, " lives on locale ", here.locale.id);
+  }
   var B: [X.domain] int;
   writeln("B is: ", B);
   B[2,2] = 1;

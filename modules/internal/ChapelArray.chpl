@@ -43,7 +43,7 @@ module ChapelArray {
   proc _newPrivatizedClass(value) {
 
     var n = numPrivateObjects.fetchAdd(1);
-    writeln(">> Going in, n is: ", n);
+    //    writeln(">> Going in, n is: ", n);
 
     var hereID = here.id;
     const privatizeData = value.dsiGetPrivatizeData();
@@ -70,7 +70,7 @@ module ChapelArray {
       }
     }
 
-    writeln(">> Going out, n is: ", n);
+    //    writeln(">> Going out, n is: ", n);
     return n;
   }
 
@@ -125,11 +125,11 @@ module ChapelArray {
   }
   
   proc _newArray(value) {
-    extern proc printf(x...);
+    //    extern proc printf(x...);
     
-    printf("%s %s\n", "*** In newArray, value.type is", typeToString(value.type));
+    //    printf("%s %s\n", "*** In newArray, value.type is", typeToString(value.type));
     if _isPrivatized(value) then {
-      printf("%s %s\n", "*** Building privatized version", typeToString(value.type));
+      //      printf("%s %s\n", "*** Building privatized version", typeToString(value.type));
       return new _array(_newPrivatizedClass(value), value);
     } else
       return new _array(value, value);
@@ -137,12 +137,12 @@ module ChapelArray {
   
   proc _newDomain(value) {
     if _isPrivatized(value) then {
-      writeln("Is privatized");
-      writeln(typeToString(value.type));
+      //      writeln("Is privatized");
+      //      writeln(typeToString(value.type));
       const tmp = _newPrivatizedClass(value);
-      writeln("got my privatized class");
+      //      writeln("got my privatized class");
       const tmp2 = new _domain(tmp, value);
-      writeln("got tmp2");
+      //      writeln("got tmp2");
       return tmp2;
         //      return new _domain(_newPrivatizedClass(value), value);
     } else
@@ -826,7 +826,7 @@ module ChapelArray {
     }
   
     proc buildArray(type eltType) {
-      extern proc printf(x...);
+      //      extern proc printf(x...);
       //      printf("%s", "In build array");
       var x = _value.dsiBuildArray(eltType);
       pragma "dont disable remote value forwarding"
@@ -1588,15 +1588,14 @@ module ChapelArray {
         //        dWithArrsDomMap.setIndices(d.getIndices());
         const downdom = _dom;
         const fakenewdom = new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value);
-        fakenewdom.dsiDisplayRepresentation();
-        writeln("------- calling _newDomain ---------");
-        _newDomain(fakenewdom);
-        writeln("------- calling _newDomain ---------");
+        //        fakenewdom.dsiDisplayRepresentation();
+        //        writeln("------- calling _newDomain ---------");
+        //        writeln("------- calling _newDomain ---------");
         const newdom = _newDomain(fakenewdom);
-        writeln("------- done calling _newDomain ----------");
+        //        writeln("------- done calling _newDomain ----------");
         //        const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value));
-        newdom.displayRepresentation();
-        writeln(newdom._value.pid);
+        //        newdom.displayRepresentation();
+        //        writeln(newdom._value.pid);
         if (!noRefCount) {
           d._value.incRefCount();
           this._value.incRefCount();
@@ -1604,19 +1603,19 @@ module ChapelArray {
           downdom._value.incRefCount();
         }
         //        compilerWarning(typeToString(newdom._value.type));
-        newdom.displayRepresentation();
+        //        newdom.displayRepresentation();
         if (_value.isArrayReindexView()) {
-          writeln("7a");
+          //          writeln("7a");
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
                                                    dom=newdom._value, 
                                                    arr=this._value.arr));
         } else {
-          writeln("7b");
+          //          writeln("7b");
           return _newArray(new ArrayReindexViewArr(eltType=this._value.eltType,
                                                    dom=newdom._value, 
                                                    arr=this._value));
         }
-        writeln("6");
+        //        writeln("6");
       }
     }
   
@@ -2236,10 +2235,10 @@ module ChapelArray {
   }
   
   proc =(ref a: domain, b: domain) {
-    extern proc printf(x...);
-    printf("%s", "In domain, domain assignment\n");
+    //    extern proc printf(x...);
+    //    printf("%s", "In domain, domain assignment\n");
     if !isIrregularDom(a) && !isIrregularDom(b) {
-      printf("%s", "In not irreg case\n");
+      //      printf("%s", "In not irreg case\n");
       for e in a._value._arrs do {
         on e do e.dsiReallocate(b);
       }
@@ -2247,7 +2246,7 @@ module ChapelArray {
       for e in a._value._arrs do {
         on e do e.dsiPostReallocate();
       }
-      printf("%s", "Leaving not irreg case\n");
+      //      printf("%s", "Leaving not irreg case\n");
     } else {
       //
       // BLC: It's tempting to do a clear + add here, but because
@@ -2277,7 +2276,7 @@ module ChapelArray {
         }
       }
     }
-    printf("%s", "Leaving domain-domain assignment\n");
+    //    printf("%s", "Leaving domain-domain assignment\n");
   }
   
   proc =(ref a: domain, b: _tuple) {
@@ -2617,11 +2616,11 @@ module ChapelArray {
   
   pragma "init copy fn"
   proc chpl__initCopy(a: domain) {
-    extern proc printf(x...);
-    printf("%s", "!!! Entering domain initCopy\n");
+    //    extern proc printf(x...);
+    //    printf("%s", "!!! Entering domain initCopy\n");
     var b: a.type;
-    printf("a is: %s\n", typeToString(a._value.type));
-    printf("b is: %s\n", typeToString(b._value.type));
+    //    printf("a is: %s\n", typeToString(a._value.type));
+    //    printf("b is: %s\n", typeToString(b._value.type));
     if isRectangularDom(a) && isRectangularDom(b) {
       b.setIndices(a.getIndices());
     } else {
@@ -2634,7 +2633,7 @@ module ChapelArray {
       for i in a do
         b.add(i);
     }
-    printf("%s", "!!! Leaving domain initCopy\n");
+    //    printf("%s", "!!! Leaving domain initCopy\n");
     return b;
   }
   

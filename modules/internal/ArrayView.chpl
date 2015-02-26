@@ -169,13 +169,13 @@ class ArrayReindexViewDom: BaseRectangularDom {
   proc dsiLinksDistribution() return false;
 
   proc dsiSetIndices(x) {
-    writeln("*****>>>> dsiSetIndices = ", x);
+    //    writeln("*****>>>> dsiSetIndices = ", x);
     var newdom = {(...x)};
     if !noRefCount then
       newdom._value.incRefCount();
     updom = newdom._value;
-    dsiDisplayRepresentation();
-    writeln("*****<<<< dsiSetIndices = ", x);
+    //    dsiDisplayRepresentation();
+    //    writeln("*****<<<< dsiSetIndices = ", x);
   }
 
   proc dsiDisplayRepresentation() {
@@ -195,7 +195,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
   //  proc dist return downdom.dist;
 
   proc dsiBuildArray(type eltType) {
-    writeln("Building array over: ", downdom);
+    //    writeln("Building array over: ", downdom);
     //
     // TODO: Is this array getting reclaimed?  Do I need to bump its
     // reference count or...?
@@ -251,7 +251,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
   proc dsiPrivatize(privatizeData) {
     const (updomdims, privdowndomID) = privatizeData;
     const privdowndom = chpl_getPrivatizedCopy(downdom.type, privdowndomID);
-    writeln("*** about to return new ArrayReindexViewDom ****");
+    //    writeln("*** about to return new ArrayReindexViewDom ****");
     //
     // TODO: Am I going to be in trouble here if the source of the
     // privatization did not store updom as a defaultrectangular
@@ -269,15 +269,15 @@ class ArrayReindexViewDom: BaseRectangularDom {
     //    compilerError("In dsiGetReprivatizeData");
     // HACK!  Must remove this ***
     //    updom = {2..11, 2..11}._value;
-    writeln("********* In GetReprivatizeData *************");
-    dsiDisplayRepresentation();
-    writeln("********* Done ******************************");
+    //    writeln("********* In GetReprivatizeData *************");
+    //    dsiDisplayRepresentation();
+    //    writeln("********* Done ******************************");
     return updom.dsiDims();
   }
   
   proc dsiReprivatize(other, reprivatizeData) {
-    writeln("Got: ", reprivatizeData);
-    writeln("Other = ", other);
+    //    writeln("Got: ", reprivatizeData);
+    //    writeln("Other = ", other);
     //
     // TODO: Am I going to be in trouble here if the source of the
     // privatization did not store updom as a defaultrectangular
@@ -290,7 +290,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 
   proc destroyDist() {
-    writeln("Being asked to destroy self");
+    //    writeln("Being asked to destroy self");
     return 999;  // we never want to destroy ourselves as the dist
   }
 
@@ -323,7 +323,7 @@ class ArrayReindexViewArr: BaseArr {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    writeln("**** In array reindex view leader");
+    //    writeln("**** In array reindex view leader");
     for followThis in dom.these(tag) do
       yield followThis;
   }
@@ -393,26 +393,26 @@ class ArrayReindexViewArr: BaseArr {
   }
 
   proc dsiGetPrivatizeData() { 
-    writeln(here.id, ": *** about to return privatizeData for:");
-    this.dsiDisplayRepresentation();
-    writeln(here.id, ": *** about to return");
-    writeln(here.id, "arr.pid = ", arr.pid);
-    writeln(here.id, "arr.type = ", typeToString(arr.type));
+    //    writeln(here.id, ": *** about to return privatizeData for:");
+    //    this.dsiDisplayRepresentation();
+    //    writeln(here.id, ": *** about to return");
+    //    writeln(here.id, "arr.pid = ", arr.pid);
+    //    writeln(here.id, "arr.type = ", typeToString(arr.type));
     return (dom.pid, arr.pid);
   }
 
   proc dsiPrivatize(privatizeData) {
-    writeln(here.id, ": ***** In dsiPrivatize");
+    //    writeln(here.id, ": ***** In dsiPrivatize");
     const (privdomID, privarrID) = privatizeData;
     const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
-    writeln(here.id, ": ***** About to show privdom");
-    privdom.dsiDisplayRepresentation();
+    //    writeln(here.id, ": ***** About to show privdom");
+    //    privdom.dsiDisplayRepresentation();
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
-    writeln(here.id, "arr.pid = ", arr.pid);
-    writeln(here.id, "arr.type = ", typeToString(arr.type));
-    writeln(here.id, ": ***** About to show privarr");
-    privarr.dom.dsiDisplayRepresentation();
-    writeln(here.id, ": ***** About to return new array");
+    //    writeln(here.id, "arr.pid = ", arr.pid);
+    //    writeln(here.id, "arr.type = ", typeToString(arr.type));
+    //    writeln(here.id, ": ***** About to show privarr");
+    //    privarr.dom.dsiDisplayRepresentation();
+    //    writeln(here.id, ": ***** About to return new array");
     return new ArrayReindexViewArr(eltType=eltType, dom=privdom, arr=privarr);
   }
 }

@@ -242,8 +242,16 @@ class ArrayReindexViewDom: BaseRectangularDom {
     const (updomdims, privdowndomID) = privatizeData;
     const privdowndom = chpl_getPrivatizedCopy(downdom.type, privdowndomID);
     writeln("*** about to return new ArrayReindexViewDom ****");
+    //
+    // TODO: Am I going to be in trouble here if the source of the
+    // privatization did not store updom as a defaultrectangular
+    // itself?  Can I / should I just always store updom that way?
+    //
+    var newdom = {(...updomdims)};
+    if !noRefCount then
+      newdom._value.incRefCount();
     return new ArrayReindexViewDom(idxType=updomdims(1).idxType, 
-                                   updom={(...updomdims)}._value, 
+                                   updom=newdom._value, 
                                    downdom=privdowndom);
   }
 
@@ -260,7 +268,15 @@ class ArrayReindexViewDom: BaseRectangularDom {
   proc dsiReprivatize(other, reprivatizeData) {
     writeln("Got: ", reprivatizeData);
     writeln("Other = ", other);
-    updom={(...reprivatizeData)}._value;
+    //
+    // TODO: Am I going to be in trouble here if the source of the
+    // privatization did not store updom as a defaultrectangular
+    // itself?  Can I / should I just always store updom that way?
+    //
+    var newdom = {(...reprivatizeData)};
+    if !noRefCount then
+      newdom._value.incRefCount();
+    updom=newdom._value;
   }
 
   proc destroyDist() {

@@ -375,20 +375,40 @@ class ArrayReindexViewArr: BaseArr {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
+  proc dsiDisplayRepresentation() {
+    writeln("ArrayReindexViewArr {");
+    write("  dom: {");
+    dom.dsiDisplayRepresentation();
+    write("  arr's dom: {");
+    arr.dom.dsiDisplayRepresentation();
+    writeln("}");
+  }
+  
+
   proc dsiSupportsPrivatization() param {
     if (arr.dsiSupportsPrivatization() != dom.dsiSupportsPrivatization()) then
       compilerWarning("Expected these always to match");
-    writeln("privatized array? ", arr.dsiSupportsPrivatization() && 
-            dom.dsiSupportsPrivatization());
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
   }
 
-  proc dsiGetPrivatizeData() return (dom.pid, arr.pid);
+  proc dsiGetPrivatizeData() { 
+    writeln(here.id, ": *** about to return privatizeData for:");
+    this.dsiDisplayRepresentation();
+    writeln(here.id, ": *** about to return");
+    return (dom.pid, arr.pid);
+  }
 
   proc dsiPrivatize(privatizeData) {
+    writeln(here.id, ": ***** In dsiPrivatize");
     const (privdomID, privarrID) = privatizeData;
     const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
+    writeln(here.id, ": ***** About to show privdom");
+    privdom.dsiDisplayRepresentation();
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
+    writeln(here.id, "arr.type = ", typeToString(arr.type));
+    writeln(here.id, ": ***** About to show privarr");
+    privarr.dom.dsiDisplayRepresentation();
+    writeln(here.id, ": ***** About to return new array");
     return new ArrayReindexViewArr(eltType=eltType, dom=privdom, arr=privarr);
   }
 }

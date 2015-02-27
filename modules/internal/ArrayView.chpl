@@ -220,6 +220,9 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 
   proc dsiMember(i) {
+    //
+    // TODO: Can this simply be updom.dsiMember(i)?
+    //
     if (rank == 1) {
       const pos_i = updom.dsiDim(1).indexOrder((...i));
       const ind_i = downdom.dsiDim(1).orderToIndex(pos_i);
@@ -493,6 +496,8 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
   }
 
   proc dsiMember(i) {
+    return updom.dsiMember(i);
+    /*
     param arrRank = downdom.rank;
     type idxType = updom.idxType;
     var ind = idx;
@@ -504,6 +509,7 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
       }
     }
     return downdom.dsiMember(ind);
+*/
   }
 
   inline iter these() {
@@ -598,7 +604,6 @@ class ArrayRankChangeViewArr: BaseArr {
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
     for followThis in dom.these(tag) do {
-      writeln("Yielding ", followThis);
       yield followThis;
     }
   }

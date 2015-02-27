@@ -1453,12 +1453,15 @@ module ChapelArray {
         //      var d = _dom((...ranges));
         var collapsedDim: rank*bool;
         var idx: rank*idxType;
+        var fullD: rank*ranges(1).type;
         for param i in 1..rank {
           if (isRange(args(i))) {
             collapsedDim(i) = false;
+            fullD(i) = args(i);
           } else {
             collapsedDim(i) = true;
             idx(i) = args(i);
+            fullD(i) = args(i)..args(i);
           }
         }
         /*
@@ -1469,10 +1472,11 @@ module ChapelArray {
         
         //      return this;
 
-        const downdom = _dom;
 
-        var ranges = _getRankChangeRanges(newD.dims());
         var updom = {(...ranges)};
+        var downdom = _dom((...fullD));
+
+        //        compilerError(typeToString(downdom.type));
 
         const newdom = _newDomain(new ArrayRankChangeViewDom(idxType=d.idxType,
                                                              updom=updom._value,

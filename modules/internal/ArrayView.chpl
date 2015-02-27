@@ -21,6 +21,8 @@
 //
 // TODOs:
 //
+// Add standalone iterators
+//
 // Change setIndices to avoid the var a: b.type style and
 //  just use a dsiClone() instead in order to change var
 //  field back to const in domain.
@@ -139,6 +141,9 @@ class ArrayReindexViewDist {
 }
 
 
+//
+// TODO: Rename to DomDist
+//
 class ArrayReindexViewDom: BaseRectangularDom {
   type idxType;
   var updom;    // the upward-facing domain that clients will access
@@ -161,11 +166,10 @@ class ArrayReindexViewDom: BaseRectangularDom {
     return updom.stridable;
   }
 
+  //
+  // TODO: Are both of these really needed?
+  //
   proc linksDistribution() param return false;
-
-  /*
-  proc linksDistribution() param return dom.linksDistribution();
-  */
   proc dsiLinksDistribution() return false;
 
   proc dsiSetIndices(x) {
@@ -188,6 +192,9 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 
 
+  //
+  // TODO: Is BaseDist really needed?
+  //
   proc dsiMyDist(): BaseDist {
     return nil;
   }
@@ -388,7 +395,7 @@ class ArrayReindexViewArr: BaseArr {
 
   proc dsiSupportsPrivatization() param {
     if (arr.dsiSupportsPrivatization() != dom.dsiSupportsPrivatization()) then
-      compilerWarning("Expected these always to match");
+      compilerWarning("Expected arr/dom privatization to always match");
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
   }
 
@@ -418,25 +425,182 @@ class ArrayReindexViewArr: BaseArr {
 }
 
 
-class ArrayRankchangeViewArr: BaseArr {
+class ArrayRankChangeViewDom: BaseRectangularDom {
+  type idxType;
+  //
+  // TODO: Turn back to const
+  //
+  var updom;
+  const downdom;
+  const collapsedDim;
+  const idx;
+  var pid = -1;
+
+  proc dist {
+    return this;
+  }
+
+  proc dsiNewRectangularDom(param rank, type idxType, param stridable) {
+    return new ArrayRankChangeViewDom(idxType=idxType, updom=updom, 
+                                      downdom=downdom,
+                                      collapsedDim=collapsedDim, idx=idx);
+  }
+
+  proc rank param {
+    return updom.rank;
+  }
+
+  proc stridable param {
+    return updom.stridable;
+  }
+
+  proc linksDistribution() param return false;
+  proc dsiLinksDistribution() return false;
+
+  proc dsiSetIndices(x) {
+    var newdom = {(...x)};
+    if !noRefCount then
+      newdom._value.incRefCount();
+    updom = newdom._value;
+  }
+
+  proc dsiDisplayRepresentation() {
+    writeln("ArrayRankChangeViewDom {");
+    write("  updom: {");
+    updom.dsiDisplayRepresentation();
+    write("  downdom {");
+    downdom.dsiDisplayRepresentation();
+    writeln("  collapsedDim: ", collapsedDim);
+    writeln("  idx: ", idx);
+    writeln("}");
+  }
+
+  proc dsiMyDist(): BaseDist {
+    return nil;
+  }
+
+  proc dsiBuildArray(type eltType) {
+    var newarr = _newArray(downdom.dsiBuildArray(eltType))._value;
+    return new ArrayRankChangeViewArr(eltType=eltType, dom=this, arr=newarr, collapsedDim=collapsedDim, idx=idx);
+  }
+
+  proc dsiGetIndices() {
+    return updom.dsiGetIndices();
+  }
+
+  proc dsiDim(i) {
+    return updom.dsiDim(i);
+  }
+
+  proc dsiMember(i) {
+    param arrRank = downdom.rank;
+    type idxType = updom.idxType;
+    var ind = idx;
+    var j = 1;
+    for param d in 1..arrRank {
+      if !collapsedDim(d) {
+        ind(d) = i(j);
+        j += 1;
+      }
+    }
+    return downdom.dsiMember(ind);
+  }
+
+  inline iter these() {
+    for i in updom do
+      yield i;
+  }
+
+  inline iter these(param tag: iterKind) where tag == iterKind.leader {
+    //
+    // STOPPED HERE::  This is wrong...  Need to use updom's indices
+    // (because they're a subset of downdom's) but to downdom's
+    // distribution; suggesting we need a slice of updom against
+    // downdom, but a rank-preserving slice; suggesting this needs
+    // to be done back in ChapelArray.chpl.  :(
+    //
+    param arrRank = downdom.rank;
+    for followThis in downdom.these(tag) {
+      var followThisReally: updom.rank*followThis(1).type;
+      var j = 1;
+      for param d in 1..arrRank {
+        if !collapsedDim(d) {
+          followThisReally(j) = followThis(d);
+          j += 1;
+        }
+      }
+      yield followThisReally;
+    }
+  }
+
+  inline iter these(param tag: iterKind, followThis)
+    where tag == iterKind.follower {
+    for i in updom.these(tag, followThis) do
+      yield i;
+  }
+
+  proc dsiSupportsPrivatization() param
+    return downdom.dsiSupportsPrivatization();
+
+  proc dsiGetPrivatizeData() return (updom.dsiDims(), downdom.pid,
+                                      collapsedDim, idx);
+
+  proc dsiPrivatize(privateData) {
+    const (updomdims, privdowndomID, collapsedDim, idx) = privateData;
+    const privdowndom = chpl_getPrivatizedCopy(downdom.type, privdowndomID);
+    var newdom = {(...updomdims)};
+    if !noRefCount then
+      newdom._value.incRefCount();
+    return new ArrayRankChangeViewDom(idxType=idxType, updom=newdom._value, downdom=privdowndom, collapsedDim=collapsedDim, idx=idx);
+  }
+
+  proc dsiGetReprivatizeData() {
+    return updom.dsiDims();
+  }
+
+  proc dsiReprivatize(other, reprivatizeData) {
+    var newdom = {(...reprivatizeData)};
+    if !noRefCount then
+      newdom._value.incRefCount();
+    updom=newdom._value;
+  }
+
+  proc destroyDist() {
+    return 999;  // we never want to destroy ourselves as the dist
+  }
+
+  proc dsiDestroyDistClass() {
+    // no-op;
+  }
+}
+
+
+class ArrayRankChangeViewArr: BaseArr {
   type eltType;
   const dom;
   const arr;
   const collapsedDim;
   const idx;
-  //  var pid = -1;
+  var pid = -1;
 
   proc idxType type return arr.idxType;
   proc rank param return dom.rank;
 
+  //
+  // For serial/standalone/leader/follower, the arity of the domain
+  // differs from the arity of the arrays, as with the slice array
+  // view.  So we must iterate over the domain, accessing the array.
+  //
   inline iter these() ref {
     for i in dom do
       yield dsiAccess(i);
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    for followThis in dom.these(tag) do
+    for followThis in dom.these(tag) do {
+      writeln("Yielding ", followThis);
       yield followThis;
+    }
   }
 
   inline iter these(param tag: iterKind, followThis) ref
@@ -487,8 +651,22 @@ class ArrayRankchangeViewArr: BaseArr {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
-  proc dsiSupportsPrivatization() param
+  proc dsiDisplayRepresentation() {
+    writeln("ArrayRankChangeViewArr {");
+    write("  dom: ");
+    dom.dsiDisplayRepresentation();
+    write("  arr's dom: ");
+    arr.dom.dsiDisplayRepresentation();
+    writeln("  collapsedDim: ", collapsedDim);
+    writeln("  idx: ", idx);
+    writeln("}");
+  }
+
+  proc dsiSupportsPrivatization() param {
+    if (arr.dsiSupportsPrivatization() != dom.dsiSupportsPrivatization()) then
+      compilerWarning("Expected arr/dom privatization to always match");
     return arr.dsiSupportsPrivatization() && dom.dsiSupportsPrivatization();
+  }
 
   proc dsiGetPrivatizeData() return (dom.pid, arr.pid, collapsedDim, idx);
 
@@ -496,6 +674,6 @@ class ArrayRankchangeViewArr: BaseArr {
     const (privdomID, privarrID, collapsedDim, idx) = privatizeData;
     const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
-    return new ArrayRankChangeViewArr(eltType=eltType, dom=privdom, arr=privarr, collapsedDim, idx);
+    return new ArrayRankChangeViewArr(eltType=eltType, dom=privdom, arr=privarr, collapsedDim=collapsedDim, idx=idx);
   }
 }

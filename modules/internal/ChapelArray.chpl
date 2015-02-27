@@ -1451,11 +1451,6 @@ module ChapelArray {
         return _newArray(a);
       } else {
         //      var d = _dom((...ranges));
-        if !noRefCount {
-          d._value.incRefCount();
-          this._value.incRefCount();
-        }
-
         var collapsedDim: rank*bool;
         var idx: rank*idxType;
         for param i in 1..rank {
@@ -1473,9 +1468,26 @@ module ChapelArray {
         */
         
         //      return this;
+
+        const downdom = _dom;
+
+        var ranges = _getRankChangeRanges(newD.dims());
+        var updom = {(...ranges)};
+
+        const newdom = _newDomain(new ArrayRankChangeViewDom(idxType=d.idxType,
+                                                             updom=updom._value,
+                                                             downdom=downdom._value,
+                                                             collapsedDim=collapsedDim,
+                                                             idx=idx));
+        if !noRefCount {
+          d._value.incRefCount();
+          this._value.incRefCount();
+          newdom._value.incRefCount();
+          downdom._value.incRefCount();
+        }
         
-        return _newArray(new ArrayRankchangeViewArr(eltType=this._value.eltType,
-                                                    dom = d._value, arr=this._value,
+        return _newArray(new ArrayRankChangeViewArr(eltType=this._value.eltType,
+                                                    dom = newdom._value, arr=this._value,
                                                     collapsedDim=collapsedDim, 
                                                     idx=idx));
       }
@@ -1587,11 +1599,10 @@ module ChapelArray {
         //        const dWithArrsDomMap = _dom.dist.newRectangularDom(d.rank, d.idxType, d.stridable);
         //        dWithArrsDomMap.setIndices(d.getIndices());
         const downdom = _dom;
-        const fakenewdom = new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value);
         //        fakenewdom.dsiDisplayRepresentation();
         //        writeln("------- calling _newDomain ---------");
         //        writeln("------- calling _newDomain ---------");
-        const newdom = _newDomain(fakenewdom);
+        const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value));
         //        writeln("------- done calling _newDomain ----------");
         //        const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value));
         //        newdom.displayRepresentation();

@@ -10,6 +10,8 @@ const D = {1..10, 1..10} dmapped Block({1..10, 1..10});
 var A: [D] int;
 
 proc foo(X) {
+  for i in X.domain do
+    writeln(i);
   var B: [X.domain] int;
   forall b in B {
     b = here.locale.id;
@@ -97,6 +99,6 @@ forall a in A do
 
 
 foo(A[2..9, 2..9]);
-//foo(A[9, 3..10]);
+foo(A[9, 3..10]);
 bar(A);
 //baz(A[9, ..]);

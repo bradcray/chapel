@@ -324,14 +324,14 @@ class ArrayReindexViewArr: BaseArr {
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
     //    writeln("**** In array reindex view leader");
-    for followThis in dom.these(tag) do
+    for followThis in arr.these(tag) do
       yield followThis;
   }
 
   inline iter these(param tag: iterKind, followThis) ref
     where tag == iterKind.follower {
-    for i in dom.these(tag, followThis) do
-      yield dsiAccess(i);
+    for a in arr.these(tag, followThis) do
+      yield a;
   }
 
   inline proc dsiAccess(i: integral) ref {

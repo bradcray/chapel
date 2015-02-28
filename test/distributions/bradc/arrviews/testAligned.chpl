@@ -76,9 +76,20 @@ proc bar(X: [2..11, 2..11] int) {
   writeln("Success!");
 }
 
-/*
 proc baz(X: [2..11] int) {
   var B: [X.domain] int;
+  //  writeln(X.domain);
+  //  writeln(B.domain);
+  forall ij in B.domain {
+    B[ij] = here.locale.id;
+  }
+  for ij in X.domain {
+    if (X[ij] != B[ij]) {
+      writeln("baz() not aligned:\n", X, "\n", B, "\n");
+      return;
+    }
+  }
+  //  writeln("Partial success!");
   forall b in B {
     b = here.locale.id;
   }
@@ -90,7 +101,6 @@ proc baz(X: [2..11] int) {
   }
   writeln("Success!");
 }
-*/
 
 forall a in A do
   a = here.locale.id;
@@ -99,4 +109,4 @@ forall a in A do
 foo(A[2..9, 2..9]);
 foo(A[9, 3..10]);
 bar(A);
-//baz(A[9, ..]);
+baz(A[9, ..]);

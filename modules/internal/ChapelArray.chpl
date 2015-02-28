@@ -1457,7 +1457,7 @@ module ChapelArray {
         for param i in 1..rank {
           if (isRange(args(i))) {
             collapsedDim(i) = false;
-            fullD(i) = args(i);
+            fullD(i) = _dom.dim(i)[args(i)];
           } else {
             collapsedDim(i) = true;
             idx(i) = args(i);

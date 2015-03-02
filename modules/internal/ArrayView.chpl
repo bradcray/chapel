@@ -132,16 +132,6 @@ class ArraySliceViewArr: BaseArr {
 }
 
 
-class ArrayReindexViewDist {
-  var sampledom;
-
-  proc newRectangularDom(param rank, type idxType, param stridable) {
-    return new ArrayReindexViewDom(idxType=idxType, sampledom.updom,
-                                   sampledom.downdom, dist=this);
-  }
-}
-
-
 //
 // TODO: Rename to DomDist
 //
@@ -155,9 +145,20 @@ class ArrayReindexViewDom: BaseRectangularDom {
     return this;
   }
 
+  //
+  // TODO: If the following two could use the same name, a dom could be its
+  // own dist more easily
+  //
   proc dsiNewRectangularDom(param rank, type idxType, param stridable) {
     return new ArrayReindexViewDom(idxType=idxType, updom=updom, downdom=downdom);
+
   }
+
+  /*
+  proc dsiBuildRectangularDom(param rank, type idxType, param stridable) {
+    return dsiNewRectangularDom(rank, idxType, stridable);
+  }
+*/
 
   proc rank param {
     return updom.rank;
@@ -447,6 +448,17 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
                                       collapsedDim=collapsedDim, idx=idx);
   }
 
+  /*
+  proc dsiBuildRectangularDom(param rank, type idxType, param stridable,
+                              ranges) {
+    const updom = {(...ranges)};
+    const downdom = downdom.dist.dsiNewRectangularDom(rank,
+    return new ArrayRankChangeViewDom(idxType=idxType, updom=updom, 
+                                      downdom=downdom,
+                                      collapsedDim=collapsedDim, idx=idx);
+  }
+*/
+
   proc rank param {
     return updom.rank;
   }
@@ -458,6 +470,13 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
   proc linksDistribution() param return false;
   proc dsiLinksDistribution() return false;
 
+  //
+  // TODO: I don't think this'll actually work if it's used
+  // for anything other than initialization.  If someone
+  // really re-set the indices for a domain that was created
+  // from this distribution, we'd need to ask for the new
+  // domain all the way down the stack.
+  //
   proc dsiSetIndices(x) {
     var newdom = {(...x)};
     if !noRefCount then

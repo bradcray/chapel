@@ -268,6 +268,14 @@ class ArrayReindexViewDom: BaseRectangularDom {
     return updom.dsiDim(i);
   }
 
+  proc dsiLow return updom.dsiLow;
+  proc dsiHigh return updom.dsiHigh;
+  proc dsiStride return updom.dsiStride;
+
+  proc dsiNumIndices {
+    return updom.dsiNumIndices;
+  }
+
   proc dsiMember(i) {
     //    writeln("Reindex xhecking membership of: ", i);
     return updom.dsiMember(i);
@@ -562,6 +570,14 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
     return updom.dsiDim(i);
   }
 
+  proc dsiLow return updom.dsiLow;
+  proc dsiHigh return updom.dsiHigh;
+  proc dsiStride return updom.dsiStride;
+
+  proc dsiNumIndices {
+    return updom.dsiNumIndices;
+  }
+
   proc dsiMember(i) {
     return updom.dsiMember(i);
   }
@@ -572,7 +588,7 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    writeln("In rank change viewdom leader");
+    //    writeln("In rank change viewdom leader");
     //
     // STOPPED HERE::  This is wrong...  Need to use updom's indices
     // (because they're a subset of downdom's) but to downdom's
@@ -658,7 +674,7 @@ class ArrayRankChangeViewArr: BaseArr {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    writeln("In rank change view arr leader");
+    //    writeln("In rank change view arr leader");
     for followThis in dom.these(tag) do {
       yield followThis;
     }

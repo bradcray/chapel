@@ -79,9 +79,9 @@ class ArraySliceViewArr: BaseArr {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    writeln("In sliceview leader");
+    //    writeln("In sliceview leader");
     for followThis in dom.these(tag) do {
-      writeln("yielding ", followThis);
+      //      writeln("yielding ", followThis);
       yield followThis;
     }
   }
@@ -159,9 +159,9 @@ class ArrayReindexViewDom: BaseRectangularDom {
   
   proc dsiBuildRectangularDom(param rank, type idxType, param stridable, ranges) {
     //    writeln("ranges = ", ranges);
-    writeln("updom = ", updom.dsiDims());
-    writeln("downdom = ", downdom.dsiDims());
-    downdom.dsiDisplayRepresentation();
+    //    writeln("updom = ", updom.dsiDims());
+    //    writeln("downdom = ", downdom.dsiDims());
+    //    downdom.dsiDisplayRepresentation();
     var diff: rank*int;
     var newranges: ranges.type;
     const newupdom = {(...ranges)};
@@ -188,11 +188,11 @@ class ArrayReindexViewDom: BaseRectangularDom {
     }
     var retval = new ArrayReindexViewDom(idxType=idxType, updom=newupdom._value, 
                                          downdom=newdowndom._value);
-    writeln("checking dist: ", retval.downdom.dist);
-    writeln("*** checking forall: ");
-    forall i in newdowndom {
-      writeln("Hello from ", i);
-    }
+    //    writeln("checking dist: ", retval.downdom.dist);
+    //    writeln("*** checking forall: ");
+    //    forall i in newdowndom {
+    //      writeln("Hello from ", i);
+    //    }
     //    retval.dsiDisplayRepresentation();
     return retval;
     //    const newdowndom = downdom.dsiBuildRectangularDom(rank, idxType, stridable);
@@ -279,9 +279,9 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    writeln("In reindexviewdom leader");
+    //    writeln("In reindexviewdom leader");
     for followThis in downdom.these(tag) do {
-      writeln("yielding ", followThis);
+      //      writeln("yielding ", followThis);
       yield followThis;
     }
   }
@@ -372,7 +372,7 @@ class ArrayReindexViewArr: BaseArr {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    writeln("**** In array reindex view leader");
+    //    writeln("**** In array reindex view leader");
     for followThis in arr.these(tag) do
       yield followThis;
   }

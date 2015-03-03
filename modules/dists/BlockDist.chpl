@@ -600,8 +600,8 @@ iter BlockDom.these() {
 }
 
 iter BlockDom.these(param tag: iterKind) where tag == iterKind.leader {
-  writeln("In BlockDom.leader");
-  writeln("dist is: ", dist);
+  //  writeln("In BlockDom.leader");
+  //  writeln("dist is: ", dist);
   const maxTasks = dist.dataParTasksPerLocale;
   const ignoreRunning = dist.dataParIgnoreRunningTasks;
   const minSize = dist.dataParMinGranularity;
@@ -636,7 +636,7 @@ iter BlockDom.these(param tag: iterKind) where tag == iterKind.leader {
     for followThis in tmpBlock._value.these(iterKind.leader, maxTasks,
                                             myIgnoreRunning, minSize,
                                             locOffset) do {
-      writeln("Yielding ", followThis);
+      //      writeln("Yielding ", followThis);
       yield followThis;
     }
   }

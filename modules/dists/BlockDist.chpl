@@ -522,6 +522,19 @@ proc LocBlock.LocBlock(param rank: int,
   }
 }
 
+proc BlockDom.dsiClone() {
+  var newdom = dist.dsiNewRectangularDom(rank=rank, idxType=idxType, stridable=stridable);
+  if !noRefCount then
+    dist.incRefCount();
+  newdom.whole = this.whole;
+  //  var newdom = new BlockDom(rank=rank, idxType=idxType, stridable=stridable, dist=dist, whole=whole);
+  //  newdom.dist = this.dist;
+  //  newdom.whole = this.whole;
+  newdom.setup();
+  return newdom;
+  
+}
+
 proc BlockDom.dsiMyDist() return dist;
 
 proc BlockDom.dsiDisplayRepresentation() {

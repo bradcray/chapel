@@ -2633,12 +2633,17 @@ module ChapelArray {
   proc chpl__initCopy(a: domain) {
     //    extern proc printf(x...);
     //    printf("%s", "!!! Entering domain initCopy\n");
-    var b: a.type;
     //    printf("a is: %s\n", typeToString(a._value.type));
     //    printf("b is: %s\n", typeToString(b._value.type));
-    if isRectangularDom(a) && isRectangularDom(b) {
-      b.setIndices(a.getIndices());
+    if isRectangularDom(a) {
+      pragma "no copy"
+      var b = _newDomain(a._value.dsiClone());
+      if !noRefCount then
+        b._value.incRefCount();
+      //    printf("%s", "!!! Leaving domain initCopy\n");
+      return b;
     } else {
+      var b: a.type;
       // TODO: These should eventually become forall loops, hence the
       // warning
       //
@@ -2647,9 +2652,8 @@ module ChapelArray {
       compilerWarning("whole-domain assignment has been serialized (see note in $CHPL_HOME/STATUS)");
       for i in a do
         b.add(i);
+      return b;
     }
-    //    printf("%s", "!!! Leaving domain initCopy\n");
-    return b;
   }
   
   pragma "init copy fn"

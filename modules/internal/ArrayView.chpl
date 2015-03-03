@@ -137,13 +137,20 @@ class ArraySliceViewArr: BaseArr {
 //
 class ArrayReindexViewDom: BaseRectangularDom {
   type idxType;
-  var updom;    // the upward-facing domain that clients will access
+  const updom;    // the upward-facing domain that clients will access
   const downdom;  // the downward-facing domain that implements things
   var pid = -1;
 
   proc dist {
     return this;
   }
+
+  proc dsiClone() {
+    return new ArrayReindexViewDom(idxType=idxType, updom=updom,
+                                   downdom=downdom);
+                                  
+  }
+
 
   //
   // TODO: If the following two could use the same name, a dom could be its
@@ -175,6 +182,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
   proc dsiLinksDistribution() return false;
 
   proc dsiSetIndices(x) {
+    compilerError("Can't currently set indices on array views");
     //    writeln("*****>>>> dsiSetIndices = ", x);
     var newdom = {(...x)};
     if !noRefCount then
@@ -442,6 +450,12 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
     return this;
   }
 
+  proc dsiClone() {
+    return new ArrayRankChangeViewDom(idxType=idxType, updom=updom,
+                                      downdom=downdom, 
+                                      collapsedDim=collapsedDim, idx=idx);
+  }
+
   proc dsiNewRectangularDom(param rank, type idxType, param stridable) {
     return new ArrayRankChangeViewDom(idxType=idxType, updom=updom, 
                                       downdom=downdom,
@@ -478,6 +492,7 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
   // domain all the way down the stack.
   //
   proc dsiSetIndices(x) {
+    compilerError("Can't currently set indices on array views");
     var newdom = {(...x)};
     if !noRefCount then
       newdom._value.incRefCount();

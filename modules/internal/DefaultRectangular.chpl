@@ -97,6 +97,12 @@ module DefaultRectangular {
       for param i in 1..rank do
         ranges(i) = emptyRange;
     }
+
+    proc dsiClone() {
+      return new DefaultRectangularDom(rank=rank, idxType=idxType,
+                                       stridable=stridable, dist=dist,
+                                       ranges=ranges);
+    }
     
     // function and iterator versions, also for setIndices
     proc dsiGetIndices() return ranges;

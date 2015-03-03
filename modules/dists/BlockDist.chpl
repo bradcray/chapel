@@ -600,10 +600,13 @@ iter BlockDom.these() {
 }
 
 iter BlockDom.these(param tag: iterKind) where tag == iterKind.leader {
+  writeln("In BlockDom.leader");
+  writeln("dist is: ", dist);
   const maxTasks = dist.dataParTasksPerLocale;
   const ignoreRunning = dist.dataParIgnoreRunningTasks;
   const minSize = dist.dataParMinGranularity;
   const wholeLow = whole.low;
+
 
   // If this is the only task running on this locale, we don't want to
   // count it when we try to determine how many tasks to use.  Here we
@@ -632,8 +635,10 @@ iter BlockDom.these(param tag: iterKind) where tag == iterKind.leader {
     // Forward to defaultRectangular
     for followThis in tmpBlock._value.these(iterKind.leader, maxTasks,
                                             myIgnoreRunning, minSize,
-                                            locOffset) do
+                                            locOffset) do {
+      writeln("Yielding ", followThis);
       yield followThis;
+    }
   }
 }
 

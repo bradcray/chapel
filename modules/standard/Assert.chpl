@@ -17,13 +17,13 @@
  * limitations under the License.
  */
 
-proc assert(test: bool) {
+inline proc assert(test: bool) {
   if !test then
     __primitive("chpl_error", "assert failed");
 }
   
   
-proc assert(test: bool, args ...?numArgs) {
+inline proc assert(test: bool, args ...?numArgs) {
   if !test {
     var tmpstring: c_string;
     tmpstring.write((...args));

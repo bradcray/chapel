@@ -79,8 +79,11 @@ class ArraySliceViewArr: BaseArr {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    for followThis in dom.these(tag) do
+    writeln("In sliceview leader");
+    for followThis in dom.these(tag) do {
+      writeln("yielding ", followThis);
       yield followThis;
+    }
   }
 
   inline iter these(param tag: iterKind, followThis) ref
@@ -153,12 +156,48 @@ class ArrayReindexViewDom: BaseRectangularDom {
     return new ArrayReindexViewDom(idxType=idxType, updom=updom, downdom=downdom);
 
   }
-
-  /*
-  proc dsiBuildRectangularDom(param rank, type idxType, param stridable) {
-    return dsiNewRectangularDom(rank, idxType, stridable);
+  
+  proc dsiBuildRectangularDom(param rank, type idxType, param stridable, ranges) {
+    //    writeln("ranges = ", ranges);
+    writeln("updom = ", updom.dsiDims());
+    writeln("downdom = ", downdom.dsiDims());
+    downdom.dsiDisplayRepresentation();
+    var diff: rank*int;
+    var newranges: ranges.type;
+    const newupdom = {(...ranges)};
+    if !noRefCount then
+      newupdom._value.incRefCount();
+    for param i in 1..updom.rank {
+      if (ranges(i).stride != updom.dsiDim(i).stride) {
+        halt("Stride mismatch in ArrayReindexViewDom.dsiBuildRectangularDom()");
+      }
+      newranges(i) = ranges(i).translate(downdom.dsiDim(i).low - updom.dsiDim(i).low);
+    }
+    //    writeln("newranges = ", newranges);
+    //    halt("That's all folks!");
+    const newdowndom = _newDomain(downdom.dsiBuildRectangularDom(rank, idxType, stridable, newranges));
+    if !noRefCount then {
+      newdowndom._value.incRefCount();
+      /*
+      if newdowndom.linksDistribution() then {
+        writeln("*** Links distribution!!!");
+        newdowndom.dist.incRefCount();
+        newdowndom.dist.incRefCount();
+      }
+      */
+    }
+    var retval = new ArrayReindexViewDom(idxType=idxType, updom=newupdom._value, 
+                                         downdom=newdowndom._value);
+    writeln("checking dist: ", retval.downdom.dist);
+    writeln("*** checking forall: ");
+    forall i in newdowndom {
+      writeln("Hello from ", i);
+    }
+    //    retval.dsiDisplayRepresentation();
+    return retval;
+    //    const newdowndom = downdom.dsiBuildRectangularDom(rank, idxType, stridable);
+    //    return dsiNewRectangularDom(rank, idxType, stridable);
   }
-*/
 
   proc rank param {
     return updom.rank;
@@ -240,8 +279,11 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    for followThis in downdom.these(tag) do
+    writeln("In reindexviewdom leader");
+    for followThis in downdom.these(tag) do {
+      writeln("yielding ", followThis);
       yield followThis;
+    }
   }
 
   inline iter these(param tag: iterKind, followThis)
@@ -330,7 +372,7 @@ class ArrayReindexViewArr: BaseArr {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
-    //    writeln("**** In array reindex view leader");
+    writeln("**** In array reindex view leader");
     for followThis in arr.these(tag) do
       yield followThis;
   }
@@ -530,6 +572,7 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
+    writeln("In rank change viewdom leader");
     //
     // STOPPED HERE::  This is wrong...  Need to use updom's indices
     // (because they're a subset of downdom's) but to downdom's
@@ -615,6 +658,7 @@ class ArrayRankChangeViewArr: BaseArr {
   }
 
   inline iter these(param tag: iterKind) where tag == iterKind.leader {
+    writeln("In rank change view arr leader");
     for followThis in dom.these(tag) do {
       yield followThis;
     }

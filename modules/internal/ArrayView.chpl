@@ -176,10 +176,10 @@ class ArrayReindexViewDom: BaseRectangularDom {
     //    writeln("newranges = ", newranges);
     //    halt("That's all folks!");
     const newdowndom = _newDomain(downdom.dsiBuildRectangularDom(rank, idxType, stridable, newranges));
-    if !noRefCount then {
+    if !noRefCount {
       newdowndom._value.incRefCount();
       /*
-      if newdowndom.linksDistribution() then {
+      if newdowndom.linksDistribution() {
         writeln("*** Links distribution!!!");
         newdowndom.dist.incRefCount();
         newdowndom.dist.incRefCount();
@@ -213,6 +213,14 @@ class ArrayReindexViewDom: BaseRectangularDom {
   proc linksDistribution() param return false;
   proc dsiLinksDistribution() return false;
 
+  //
+  // TODO: I don't think this'll actually work if it's used
+  // for anything other than initialization.  If someone
+  // really re-set the indices for a domain that was created
+  // from this distribution, we'd need to ask for the new
+  // domain all the way down the stack, similar to in the
+  // dsiBuildRectangularDom routine.
+  //
   proc dsiSetIndices(x) {
     //    writeln("*****>>>> dsiSetIndices = ", x);
     var newdom = {(...x)};
@@ -498,16 +506,39 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
                                       collapsedDim=collapsedDim, idx=idx);
   }
 
-  /*
   proc dsiBuildRectangularDom(param rank, type idxType, param stridable,
                               ranges) {
-    const updom = {(...ranges)};
-    const downdom = downdom.dist.dsiNewRectangularDom(rank,
-    return new ArrayRankChangeViewDom(idxType=idxType, updom=updom, 
-                                      downdom=downdom,
-                                      collapsedDim=collapsedDim, idx=idx);
+    const newupdom = {(...ranges)};
+    const newranges = downDom.dsiDims();
+
+    var j = 1;
+    for param d in 1..downDom.rank {
+      if !collapsedDim(d) {
+        newranges(d) = ranges(j);
+        j += 1;
+      }
+    }
+    //
+    // TODO: Must somehow preserve downdom's domain map
+    // TODO: Did I do this for the reindex case?
+    //
+    const newdowndom = _newDomain(downdom.dsiBuildRectangularDom(rank, idxType,
+                                                                 stridable,
+                                                                 newranges));
+   
+    if !noRefCount {
+      newupdom._value.incRefCount();
+      newdowndom._value.incRefCount();
+    }
+
+    var retval = new ArrayRankChangeViewDom(idxType=idxType, 
+                                            updom=newupdom._value,
+                                            downdom=newdowndom._value,
+                                            collapsedDim=collapsedDim,
+                                            idx=idx);
+
+    return retval;
   }
-*/
 
   proc rank param {
     return updom.rank;
@@ -525,7 +556,8 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
   // for anything other than initialization.  If someone
   // really re-set the indices for a domain that was created
   // from this distribution, we'd need to ask for the new
-  // domain all the way down the stack.
+  // domain all the way down the stack, similar to in the
+  // dsiBuildRectangularDom routine.
   //
   proc dsiSetIndices(x) {
     var newdom = {(...x)};

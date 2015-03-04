@@ -920,18 +920,6 @@ proc DimensionalArr.dsiLocalSlice((sliceDim1, sliceDim2)) {
   return locAdesc.myStorageArr[r1, r2];
 }
 
-/* The following are using the standalone WrapperDist, currently not provided.
-
-proc DimensionalDist2D.dsiCreateReindexDist(newSpace, oldSpace) {
-  return genericDsiCreateReindexDist(this, this.rank, newSpace, oldSpace);
-}
-
-proc DimensionalDist2D.dsiCreateRankChangeDist(param newRank: int, args) {
-  return genericDsiCreateRankChangeDist(this, newRank, args);
-}
-
-*/
-
 proc DimensionalArr.dsiReallocate(d: domain) {
   // nothing
   // TODO: handle block-cyclic 1d when the stride changes

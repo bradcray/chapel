@@ -60,9 +60,6 @@ module DefaultRectangular {
     proc dsiClone() return this;
   
     proc dsiAssign(other: this.type) { }
-  
-    proc dsiCreateReindexDist(newSpace, oldSpace) return this;
-    proc dsiCreateRankChangeDist(param newRank, args) return this;
   }
 
   /* CURRENTLY UNUSED as I put .value method in ArrayView Dom/Dist classes

@@ -64,6 +64,16 @@ module DefaultRectangular {
     proc dsiCreateReindexDist(newSpace, oldSpace) return this;
     proc dsiCreateRankChangeDist(param newRank, args) return this;
   }
+
+  /* CURRENTLY UNUSED as I put .value method in ArrayView Dom/Dist classes
+  proc chpl_isDefaultDist(x: DefaultDist) param {
+    return true;
+  }
+  
+  proc chpl_isDefaultDist(x) param {
+    return false;
+  }
+  */
   
   //
   // Replicated copies are set up in initOnLocales() during locale

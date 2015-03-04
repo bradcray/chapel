@@ -784,18 +784,21 @@ module ChapelArray {
       var ranges = _getRankChangeRanges(args);
       param newRank = ranges.size, stridable = chpl__anyStridable(ranges);
       var newRanges: newRank*range(idxType=_value.idxType, stridable=stridable);
-      var newDistVal = _value.dist.dsiCreateRankChangeDist(newRank, args);
-      var newDist = _getNewDist(newDistVal);
       var j = 1;
       var makeEmpty = false;
+      var collapsedDim: rank*bool;
+      var idx: rank*idxType;
   
       for param i in 1..rank {
         if !isCollapsedDimension(args(i)) {
           newRanges(j) = dim(i)(args(i));
           j += 1;
+          collapsedDim(i) = false;
         } else {
           if !dim(i).member(args(i)) then
             makeEmpty = true;
+          collapsedDim(i) = true;
+          idx(i)=args(i);
         }
       }
       if makeEmpty {
@@ -803,8 +806,22 @@ module ChapelArray {
           newRanges(i) = 1..0;
         }
       }
-      var d = {(...newRanges)} dmapped newDist;
-      return d;
+
+      const updom = {(...newRanges)};
+
+      if this.dist._value.type == DefaultDist {
+        return updom;
+      } else {
+        if !noRefCount {
+          updom._value.incRefCount();
+          this._value.incRefCount();
+        }
+        return _newDomain(new ArrayRankChangeViewDom(idxType=idxType,
+                                                     updom=updom._value, 
+                                                     downdom=this._value,
+                                                     collapsedDim=collapsedDim,
+                                                     idx=idx));
+      }
     }
   
     // anything that is not covered by the above

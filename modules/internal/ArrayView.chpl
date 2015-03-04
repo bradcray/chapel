@@ -148,6 +148,10 @@ class ArrayReindexViewDom: BaseRectangularDom {
     return this;
   }
 
+  proc _value {
+    return this;
+  }
+
   //
   // TODO: If the following two could use the same name, a dom could be its
   // own dist more easily
@@ -497,6 +501,10 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
   var pid = -1;
 
   proc dist {
+    return this;
+  }
+
+  proc _value {
     return this;
   }
 

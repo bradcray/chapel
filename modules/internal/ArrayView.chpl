@@ -509,10 +509,10 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
   proc dsiBuildRectangularDom(param rank, type idxType, param stridable,
                               ranges) {
     const newupdom = {(...ranges)};
-    const newranges = downDom.dsiDims();
+    const newranges = downdom.dsiDims();
 
     var j = 1;
-    for param d in 1..downDom.rank {
+    for param d in 1..downdom.rank {
       if !collapsedDim(d) {
         newranges(d) = ranges(j);
         j += 1;
@@ -522,7 +522,8 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
     // TODO: Must somehow preserve downdom's domain map
     // TODO: Did I do this for the reindex case?
     //
-    const newdowndom = _newDomain(downdom.dsiBuildRectangularDom(rank, idxType,
+    const newdowndom = _newDomain(downdom.dsiBuildRectangularDom(downdom.rank,
+                                                                 idxType,
                                                                  stridable,
                                                                  newranges));
    

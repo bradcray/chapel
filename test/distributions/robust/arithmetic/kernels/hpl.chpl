@@ -134,10 +134,21 @@ proc LUFactorize(n: indexType, Ab: [1..n, 1..n+1] elemType,
           br = AbD[blk+blkSize.., blk+blkSize..],
           l  = AbD[blk.., blk..#blkSize];
 
+    /*
+    compilerWarning(typeToString(AbD.type));
+    compilerWarning(typeToString(AbD._value.type));
+    compilerWarning(typeToString(l.type));
+    compilerWarning(typeToString(l._value.type));
+    */
+
+
     //
     // Now that we've sliced and diced Ab properly, do the blocked-LU
     // computation:
     //
+    testit(Ab);
+    testit2(l);
+    testit3(piv);
     panelSolve(Ab, l, piv);
     if (tr.numIndices > 0) then
       updateBlockRow(Ab, tl, tr);
@@ -179,7 +190,12 @@ proc LUFactorize(n: indexType, Ab: [1..n, 1..n+1] elemType,
 // locale only stores one copy of each block it requires for all of
 // its rows/columns.
 //
-proc schurComplement(Ab: [1..n, 1..n+1] elemType, ptOp: indexType) {
+
+//
+// TODO: When this is a "reindexed" formal, we need the Array Reindex
+// view to serve as more of a pass-through.
+//
+proc schurComplement(Ab: [/*1..n, 1..n+1*/] elemType, ptOp: indexType) {
   const AbD = Ab.domain;
 
   //
@@ -204,6 +220,14 @@ proc schurComplement(Ab: [1..n, 1..n+1] elemType, ptOp: indexType) {
         replB : [replBD] elemType = Ab[ptOp..#blkSize, ptSol..];
 
   // do local matrix-multiply on a block-by-block basis
+  compilerWarning(typeToString(AbD.type));
+  //
+  // TODO: This seems surprising -- why does this show up as
+  // a ReindexView once it's sliced?  Shouldn't it be a sliced
+  // view?
+  //
+  compilerWarning(typeToString((AbD[ptSol.., ptSol..]).type));
+                  
   forall (row,col) in AbD[ptSol.., ptSol..] by (blkSize, blkSize) {
     //
     // At this point, the dgemms should all be local, so assert that
@@ -240,12 +264,24 @@ proc dgemm(p: indexType,       // number of rows in A
         C[i,j] -= A[i, k] * B[k, j];
 }
 
+proc testit(Ab: [] ?t) {
+  //  compilerWarning("In testit()!");
+}
+
+proc testit2(panel: domain) {
+  //  compilerWarning("In testit2()!");
+}
+
+proc testit3(piv: [] indexType) {
+  //  compilerWarning("In testit3()!");
+}
+
 //
 // do unblocked-LU decomposition within the specified panel, update the
 // pivot vector accordingly
 //
 proc panelSolve(Ab: [] ?t,
-                panel: domain(2, indexType),
+                panel: domain,
                piv: [] indexType) {
   const pnlRows = panel.dim(1),
         pnlCols = panel.dim(2);
@@ -294,7 +330,7 @@ proc panelSolve(Ab: [] ?t,
 // solve a block (tl for top-left) portion of a matrix. This function
 // solves the rows to the right of the block.
 //
-proc updateBlockRow(Ab: [] ?t, tl: domain(2), tr: domain(2)) {
+proc updateBlockRow(Ab: [] ?t, tl: domain, tr: domain) {
   const tlRows = tl.dim(1),
         tlCols = tl.dim(2),
         trRows = tr.dim(1),

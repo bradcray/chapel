@@ -642,17 +642,19 @@ proc BlockDom.dsiIndexOrder(i) {
 // build a new rectangular domain using the given range
 //
 proc BlockDom.dsiBuildRectangularDom(param rank: int, type idxType,
-                                   param stridable: bool,
-                                   ranges: rank*range(idxType,
-                                                      BoundedRangeType.bounded,
-                                                      stridable)) {
+                                     param stridable: bool,
+                                     ranges) {
   if idxType != dist.idxType then
     compilerError("Block domain index type does not match distribution's");
   if rank != dist.rank then
     compilerError("Block domain rank does not match distribution's");
 
+  proc anyStridable(rangeTuple, param i: int = 1) param
+      return if i == rangeTuple.size then rangeTuple(i).stridable
+             else rangeTuple(i).stridable || anyStridable(rangeTuple, i+1);
+
   var dom = new BlockDom(rank=rank, idxType=idxType,
-                         dist=dist, stridable=stridable);
+                         dist=dist, stridable=anyStridable(ranges));
   dom.dsiSetIndices(ranges);
   return dom;
 }

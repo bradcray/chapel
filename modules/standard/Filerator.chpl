@@ -47,8 +47,9 @@ use Sort;
    start with '.'
 */
 
-iter listdir(path: string, hidden=false, dirs=true, files=true, 
+iter listdir(blc_path: string, hidden=false, dirs=true, files=true, 
              listlinks=true): string {
+  writeln("blc_path in listdir is: ", blc_path);
   extern type DIRptr;
   extern type direntptr;
   extern proc opendir(name: c_string): DIRptr;
@@ -63,7 +64,7 @@ iter listdir(path: string, hidden=false, dirs=true, files=true,
 
   var dir: DIRptr;
   var ent: direntptr;
-  dir = opendir(path:c_string);
+  dir = opendir(blc_path:c_string);
   if (!is_c_nil(dir)) {
     ent = readdir(dir);
     while (!is_c_nil(ent)) {
@@ -73,27 +74,30 @@ iter listdir(path: string, hidden=false, dirs=true, files=true,
           //
           // use FileSystem;  // Doesn't work, see comment below
           //
-          const fullpath = path + "/" + filename;
+          const fullblc_path = blc_path + "/" + filename;
           {
             //
             // The use of this compound statement to restrict the
             // impact of the 'use' of FileSystem is unfortunate
             // (compared to placing it in the more logical place
             // above), yet seemingly required at present; otherwise
-            // the 'path' argument gets shadowed by a
+            // the 'blc_path' argument gets shadowed by a
             // (compiler-introduced?) method coming from one of the
             // standard or internal modules.  See
-            // test/modules/bradc/useFileSystemShadowsPath.chpl for
+            // test/modules/bradc/useFileSystemShadowsBlc_Path.chpl for
             // a smaller standalone test exhibiting the issue (or
             // uncomment the 'use' above to see it here).
             //
             use FileSystem;
 
-            if (listlinks || !isLink(fullpath)) {
-              if (dirs && isDir(fullpath)) then
+            if (listlinks || !isLink(fullblc_path)) {
+              if (dirs && isDir(fullblc_path)) then {
+                writeln("yield ", filename);
                 yield filename;
-              else if (files && isFile(fullpath)) then
+              } else if (files && isFile(fullblc_path)) then {
+                writeln("yield ", filename);
                 yield filename;
+              }
             }
           }
         }
@@ -101,8 +105,10 @@ iter listdir(path: string, hidden=false, dirs=true, files=true,
       ent = readdir(dir);
     }
     closedir(dir);
+    writeln("returning");
   } else {
     extern proc perror(s: c_string);
+    writeln(blc_path);
     perror("error in listdir(): ");
   }
 }
@@ -132,11 +138,13 @@ iter listdir(path: string, hidden=false, dirs=true, files=true,
 
 iter walkdirs(path: string=".", topdown=true, depth=max(int), hidden=false, 
               followlinks=false, sort=false): string {
+  writeln(">> walkdirs called with ", path);
 
   if (topdown) then
     yield path;
 
   if (depth) {
+    writeln(">> walkdirs calling listdir with: ", path);
     var subdirs = listdir(path, hidden=hidden, files=false, listlinks=followlinks);
     if (sort) then
       QuickSort(subdirs);

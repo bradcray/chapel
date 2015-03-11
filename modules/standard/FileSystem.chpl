@@ -334,20 +334,25 @@ proc copyTree(out error: syserr, src: string, dest: string, copySymbolically: bo
   if error != ENOERR then return;
   // Create dest
 
-  for filename in listdir(path=src, dirs=false, files=true, listlinks=copySymbolically) {
+  writeln("Calling listdir on ", src);
+  for filename in listdir(blc_path=src, dirs=false, files=true, listlinks=copySymbolically) {
     // Take care of files in src
     var fileDestName = dest + "/" + filename;
     copy(error, filename, fileDestName, metadata=true);
     if (error != ENOERR) then return;
   }
-  for dir in listdir(path=src, dirs=true, files=false, listlinks=copySymbolically) {
+  writeln("Calling listdir on ", src);
+  for dir in listdir(blc_path=src, dirs=true, files=false, listlinks=copySymbolically) {
     // Now go into src's children
     // walkdirs returns path first if topdown=true.  But that's fine
-    for dirname in walkdirs(path=dir, topdown=true, followlinks=copySymbolically) {
-      var srcName = realPath(src + "/" + dirname);
+    const realdest = realPath(dest);
+    here.chdir(src);
+    for dirname in walkdirs(dir, topdown=true, followlinks=copySymbolically) {
+      //      var srcName = realPath(src + "/" + dirname);
+      var srcName = realPath(dirname);
       oldMode = getMode(srcName);
       // Create the directory name by replacing src with dest in dirname
-      var destName = realPath(dest) + "/" + dirname; // TODO: assumes no trailing "/" atm
+      var destName = realdest  + "/" + dirname; // TODO: assumes no trailing "/" atm
       // Make the new directory with the name just created and the same
       // permissions
       writeln(destName);
@@ -355,7 +360,8 @@ proc copyTree(out error: syserr, src: string, dest: string, copySymbolically: bo
       mkdir(error, destName, mode=oldMode);
       if error != ENOERR then return;
       // If an error occurred making this directory, exit immediately.
-      for filename in listdir(path=srcName, dirs=false, files=true, listlinks=copySymbolically) {
+      writeln("Calling listdir on ", srcName);
+      for filename in listdir(blc_path=srcName, dirs=false, files=true, listlinks=copySymbolically) {
         // Copy the src directory's contents.
         var fileDestName = destName + "/" + filename;
         copy(error, filename, fileDestName, metadata=true);
@@ -363,6 +369,7 @@ proc copyTree(out error: syserr, src: string, dest: string, copySymbolically: bo
         // If an error occurred copying this individual file, exit immmediately.
       }
     }
+    here.chdir("..");
   }
 }
 

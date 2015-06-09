@@ -90,8 +90,89 @@ proc isFloatType(type t) param return
 pragma "no instantiation limit"
 proc isVoidType(type t) param return t == void;
 
+proc foobar(b: bool, b2: bool) {
+  writeln("in bool foobar()");
+  return true;
+}
+
+proc foobar(b: int(?w), b2: int(w)) {
+  writeln("in int foobar()");
+  return true;
+}
+
+proc foobar(b: uint(?w), b2: uint(w)) {
+  writeln("in uint foobar()");
+  return true;
+}
+
+proc foobar(b: uint(?w), b2: int(w)) {
+  writeln("in uint/int foobar()");
+  return true;
+}
+
+proc foobar(b: int(?w), b2: uint(w)) {
+  writeln("in int/uint foobar()");
+  return true;
+}
+
+proc foobar(param b: bool, param b2: bool) param {
+  //  compilerWarning("in param bool foobar()");
+  return false;
+}
+
+proc foobar(param b: int(?w), param b2: int(w)) param {
+  //  writeln("in int foobar()");
+  return true;
+}
+
+proc foobar(param b: uint(?w), param b2: uint(w)) param {
+  //  writeln("in uint foobar()");
+  return true;
+}
+
+proc foobar(param b: uint(?w), param b2: int(w)) param {
+  //  writeln("in uint/int foobar()");
+  return true;
+}
+
+proc foobar(param b: int(?w), param b2: uint(w)) param {
+  //  writeln("in int/uint foobar()");
+  return true;
+}
+
+ proc foobar(a: _tuple, b: _tuple) where chpl_TwoHomogTuples(a,b) {
+   writeln("In homog tuple foobar()");
+   return true;
+ }
+
+ proc foobar(x:_tuple, b: _tuple) {
+   writeln("In other tuple foobar()");
+   return true;
+ }
+
+ proc foobar(x: _tuple, y: x(1).type) where isHomogeneousTuple(x) {
+   writeln("In tuple/elt foobar()");
+   return true;
+ }
+
+ proc foobar(x: ?t, y: _tuple) where isHomogeneousTuple(y) && t: (y(1).type) {
+   writeln("In elt/tuple foobar()");
+   return true;
+ }
+
+ proc foobar(a: _array, b: _array) where (a._value.type == b._value.type) && isAssociativeArr(a) {
+   writeln("In associative array foobar()");
+   return true;
+ }
+
+ proc foobar(a: domain, b: domain) where (a.type == b.type) && isAssociativeDom(a) {
+   writeln("In associative domain foobar()");
+   return true;
+ }
+
 pragma "no instantiation limit"
 proc isBoolType(type t) param return
+  (foobar(t == bool, t == bool(8))) ||
   (t == bool) || (t == bool(8)) || (t == bool(16)) || (t == bool(32)) || (t == bool(64));
 
 pragma "no instantiation limit"

@@ -1177,10 +1177,19 @@ static bool canParamCoerce(Type* actualType, Symbol* actualSym, Type* formalType
     // If the actual is an enum, check to see if *all* its values
     // are small enough that they fit into this integer width
     //
+    // BLC: It's not clear to me that this should be in the
+    // canParamcoerce() case (as compared to the canCoerce() case),
+    // since this logic is not specific to a param coercion, but
+    // applies to non-param cases as well?  I.e., it seems to be
+    // reasoning about all values of a param rather than the specific
+    // immediate being passed in.
+    //
     if (EnumType* etype = toEnumType(actualType)) {
       ensureEnumTypeResolved(etype);
-      if (get_width(etype->getIntegerType()) <= get_width(formalType))
+      if (get_width(etype->getIntegerType()) <= get_width(formalType)) {
+	BLC_PRINTF("because of A\n");
         return true;
+      }
     }
 
     //
@@ -1191,14 +1200,17 @@ static bool canParamCoerce(Type* actualType, Symbol* actualSym, Type* formalType
     if (get_width(formalType) < 64) {
       if (VarSymbol* var = toVarSymbol(actualSym))
         if (var->immediate)
-          if (fits_in_int(get_width(formalType), var->immediate))
+          if (fits_in_int(get_width(formalType), var->immediate)) {
+	    BLC_PRINTF("because of B\n");
             return true;
+	  }
 
       if (EnumType* etype = toEnumType(actualType)) {
         ensureEnumTypeResolved(etype);
         if (EnumSymbol* enumsym = toEnumSymbol(actualSym)) {
           if (Immediate* enumval = enumsym->getImmediate()) {
             if (fits_in_int(get_width(formalType), enumval)) {
+	      BLC_PRINTF("because of C\n");
               return true;
             }
           }
@@ -1217,16 +1229,45 @@ static bool canParamCoerce(Type* actualType, Symbol* actualSym, Type* formalType
         if (fits_in_uint(get_width(formalType), var->immediate))
           return true;
 
+    //
+    // If the actual is an enum, check to see if *all* its values
+    // are small enough that they fit into this integer width
+    //
+    // BLC: It's not clear to me that this should be in the
+    // canParamcoerce() case (as compared to the canCoerce() case),
+    // since this logic is not specific to a param coercion, but
+    // applies to non-param cases as well?  I.e., it seems to be
+    // reasoning about all values of a param rather than the specific
+    // immediate being passed in.
+    //
     if (EnumType* etype = toEnumType(actualType)) {
-      BLC_PRINTF( "considering param uint case\n");
       ensureEnumTypeResolved(etype);
-      if (EnumSymbol* enumsym = toEnumSymbol(actualSym)) {
-	if (Immediate* enumval = enumsym->getImmediate()) {
-	  BLC_PRINTF( "calling fits_in_uint with val\n");
-	  if (fits_in_uint(get_width(formalType), enumval, true)) {
-	    return true;
-	  } else {
-	    BLC_PRINTF( "and it didn't\n");
+      if (get_width(etype->getIntegerType()) <= get_width(formalType)) {
+	BLC_PRINTF("because of A\n");
+        return true;
+      }
+    }
+
+    if (get_width(formalType) < 64) {
+      if (VarSymbol* var = toVarSymbol(actualSym))
+        if (var->immediate)
+          if (fits_in_int(get_width(formalType), var->immediate)) {
+	    BLC_PRINTF("because of B\n");
+            return true;
+	  }
+
+      if (EnumType* etype = toEnumType(actualType)) {
+	BLC_PRINTF( "considering param uint case\n");
+	ensureEnumTypeResolved(etype);
+	if (EnumSymbol* enumsym = toEnumSymbol(actualSym)) {
+	  if (Immediate* enumval = enumsym->getImmediate()) {
+	    BLC_PRINTF( "calling fits_in_uint with val\n");
+	    if (fits_in_uint(get_width(formalType), enumval, true)) {
+	      BLC_PRINTF("because of c\n");
+	      return true;
+	    } else {
+	      BLC_PRINTF( "and it didn't\n");
+	    }
 	  }
 	}
       }
@@ -2084,7 +2125,8 @@ static bool considerParamMatches(Type* actualtype,
     return considerParamMatches(dtInt[INT_SIZE_DEFAULT], arg1type, arg2type);
   }
   if (is_enum_type(actualtype) && actualtype != arg1type && actualtype != arg2type) {
-    return considerParamMatches(dtInt[INT_SIZE_DEFAULT], arg1type, arg2type);
+    return considerParamMatches(dtInt[INT_SIZE_DEFAULT], arg1type, arg2type) ||
+      considerParamMatches(dtUInt[INT_SIZE_DEFAULT], arg1type, arg2type);
   }
   if (isSyncType(actualtype) && actualtype != arg1type && actualtype != arg2type) {
     return considerParamMatches(actualtype->getField("base_type")->type,
@@ -3313,6 +3355,7 @@ void resolveNormalCall(CallExpr* call) {
 
     if (explainCallLine && explainCallMatch(call)) {
       USR_PRINT(best->fn, "best candidate is: %s", toString(best->fn));
+      onMyFunction = false;
     }
   }
 

@@ -1002,6 +1002,7 @@ static bool fits_in_int(int width, Immediate* imm) {
 
      Similarly, we may want to consider enabling such param casts for
      int sizes other then default-width.
+  */
 
   else if (imm->const_kind == NUM_KIND_UINT &&
            imm->num_index == INT_SIZE_DEFAULT) {
@@ -1010,7 +1011,7 @@ static bool fits_in_int(int width, Immediate* imm) {
     if (i < 0)
       return false;
     return fits_in_int_helper(width, i);
-  }*/
+  }
 
   return false;
 }
@@ -1262,7 +1263,7 @@ static bool canParamCoerce(Type* actualType, Symbol* actualSym, Type* formalType
 	if (EnumSymbol* enumsym = toEnumSymbol(actualSym)) {
 	  if (Immediate* enumval = enumsym->getImmediate()) {
 	    BLC_PRINTF( "calling fits_in_uint with val\n");
-	    if (fits_in_uint(get_width(formalType), enumval, true)) {
+	    if (fits_in_uint(get_width(formalType), enumval /*, true*/)) {
 	      BLC_PRINTF("because of c\n");
 	      return true;
 	    } else {
@@ -5937,7 +5938,6 @@ postFold(Expr* expr) {
           return result;
         }
       }
-
       if (sym->var->type != dtUnknown && sym->var->type != val->type) {
         CallExpr* cast = new CallExpr("_cast", sym->var, val);
         sym->replace(cast);
@@ -6061,6 +6061,7 @@ resolveExpr(Expr* expr) {
     // Resolve expressions of the form:  <type> ( args )
     // These will be constructor calls (or type constructor calls) that slipped
     // past normalization due to the use of typedefs.
+    /*
     if (SymExpr* se = toSymExpr(call->baseExpr)) {
       if (TypeSymbol* ts = toTypeSymbol(se->var)) {
         if (call->numActuals() == 0 ||
@@ -6070,10 +6071,11 @@ resolveExpr(Expr* expr) {
 
         } else {
           // More needed here ... .
-          INT_FATAL(ts, "not yet implemented.");
+	  //          INT_FATAL(ts, "not yet implemented.");
         }
       }
     }
+    */
 
     callStack.add(call);
 

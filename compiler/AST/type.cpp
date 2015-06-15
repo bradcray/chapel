@@ -483,6 +483,7 @@ void EnumType::sizeAndNormalize() {
 }
 
 PrimitiveType* EnumType::getIntegerType() {
+  integerType = dtInt[INT_SIZE_DEFAULT];
   if( ! integerType ) {
     sizeAndNormalize();
   }

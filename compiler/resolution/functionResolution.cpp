@@ -62,6 +62,14 @@
 #define TRACE_DISAMBIGUATE_BY_MATCH(...)
 #endif
 
+static bool onMyFunction = false;
+
+#define BLC_PRINTF(x) \
+  if (onMyFunction) fprintf(stderr, "%s\n", x)
+
+#define BLC_PRINTF2(x,y)				\
+  if (onMyFunction) fprintf(stderr, x, y)
+
 /** Contextual info used by the disambiguation process.
  *
  * This class wraps information that is used by multiple functions during the
@@ -247,7 +255,7 @@ static bool isInstantiatedField(Symbol* field);
 static Symbol* determineQueriedField(CallExpr* call);
 static void resolveSpecifiedReturnType(FnSymbol* fn);
 static bool fits_in_int(int width, Immediate* imm);
-static bool fits_in_uint(int width, Immediate* imm);
+static bool fits_in_uint(int width, Immediate* imm, bool isEnum=false);
 static bool canInstantiate(Type* actualType, Type* formalType);
 static bool canParamCoerce(Type* actualType, Symbol* actualSym, Type* formalType);
 static bool
@@ -1022,12 +1030,25 @@ static bool fits_in_uint_helper(int width, uint64_t val) {
   }
 }
 
-static bool fits_in_uint(int width, Immediate* imm) {
-  if (imm->const_kind == NUM_KIND_INT && imm->num_index == INT_SIZE_DEFAULT) {
+#include "view.h"
+
+static bool fits_in_uint(int width, Immediate* imm, bool isEnum) {
+  if (imm->const_kind == NUM_KIND_INT && 
+      (imm->num_index == INT_SIZE_DEFAULT || isEnum)) {
     int64_t i = imm->int_value();
+    BLC_PRINTF2( "val is: %lld\n", i);
     if (i < 0)
       return false;
     return fits_in_uint_helper(width, (uint64_t)i);
+  }
+
+  if (imm->const_kind == NUM_KIND_UINT && 
+      (imm->num_index == INT_SIZE_DEFAULT || isEnum)) {
+    uint64_t i = imm->uint_value();
+    BLC_PRINTF2( "val is: %llu\n", i);
+    if (i < 0)
+      return false;
+    return fits_in_uint_helper(width, i);
   }
 
   /* BLC: See comment just above in fits_in_int()...
@@ -1129,6 +1150,7 @@ canInstantiate(Type* actualType, Type* formalType) {
     return true;
   if (actualType->instantiatedFrom && canInstantiate(actualType->instantiatedFrom, formalType))
     return true;
+  BLC_PRINTF( "returning false for canInstantiate\n");
   return false;
 }
 
@@ -1194,6 +1216,22 @@ static bool canParamCoerce(Type* actualType, Symbol* actualSym, Type* formalType
       if (var->immediate)
         if (fits_in_uint(get_width(formalType), var->immediate))
           return true;
+
+    if (EnumType* etype = toEnumType(actualType)) {
+      BLC_PRINTF( "considering param uint case\n");
+      ensureEnumTypeResolved(etype);
+      if (EnumSymbol* enumsym = toEnumSymbol(actualSym)) {
+	if (Immediate* enumval = enumsym->getImmediate()) {
+	  BLC_PRINTF( "calling fits_in_uint with val\n");
+	  if (fits_in_uint(get_width(formalType), enumval, true)) {
+	    return true;
+	  } else {
+	    BLC_PRINTF( "and it didn't\n");
+	  }
+	}
+      }
+    }
+
   }
   return false;
 }
@@ -1205,8 +1243,10 @@ static bool canParamCoerce(Type* actualType, Symbol* actualSym, Type* formalType
 //
 bool
 canCoerce(Type* actualType, Symbol* actualSym, Type* formalType, FnSymbol* fn, bool* promotes) {
-  if (canParamCoerce(actualType, actualSym, formalType))
+  if (canParamCoerce(actualType, actualSym, formalType)) {
+    BLC_PRINTF( "returning true for cancoerce because of canParamCoerce\n");
     return true;
+  }
   if (is_real_type(formalType)) {
     if ((is_int_type(actualType) || is_uint_type(actualType))
         && get_width(formalType) >= 64)
@@ -1252,8 +1292,10 @@ bool
 canDispatch(Type* actualType, Symbol* actualSym, Type* formalType, FnSymbol* fn, bool* promotes, bool paramCoerce) {
   if (promotes)
     *promotes = false;
-  if (actualType == formalType)
+  if (actualType == formalType) {
+    BLC_PRINTF( "can dispatch because types match\n");
     return true;
+  }
   //
   // The following check against FLAG_REF ensures that 'nil' can't be
   // passed to a by-ref argument (for example, an atomic type).  I
@@ -1263,17 +1305,26 @@ canDispatch(Type* actualType, Symbol* actualSym, Type* formalType, FnSymbol* fn,
   // autocopy(x: ref(atomic int)) internally).
   //
   if (actualType == dtNil && isClass(formalType) &&
-      !formalType->symbol->hasFlag(FLAG_REF))
+      !formalType->symbol->hasFlag(FLAG_REF)) {
+    BLC_PRINTF( "can dispatch because of nil class case\n");
     return true;
-  if (actualType->refType == formalType)
+  }
+  if (actualType->refType == formalType) {
+    BLC_PRINTF( "can dispatch because of ref type match case\n");
     return true;
-  if (!paramCoerce && canCoerce(actualType, actualSym, formalType, fn, promotes))
+  }
+  if (!paramCoerce && canCoerce(actualType, actualSym, formalType, fn, promotes)) {
+    BLC_PRINTF( "can dispatch because of can coerce case\n");
     return true;
-  if (paramCoerce && canParamCoerce(actualType, actualSym, formalType))
+  }
+  if (paramCoerce && canParamCoerce(actualType, actualSym, formalType)) {
+    BLC_PRINTF( "can dispatch because of can param coerce case\n");
     return true;
+  }
 
   forv_Vec(Type, parent, actualType->dispatchParents) {
     if (parent == formalType || canDispatch(parent, NULL, formalType, fn, promotes)) {
+      BLC_PRINTF( "can dispatch because of dispatch parents case\n");
       return true;
     }
   }
@@ -1284,9 +1335,11 @@ canDispatch(Type* actualType, Symbol* actualSym, Type* formalType, FnSymbol* fn,
       (canDispatch(actualType->scalarPromotionType, NULL, formalType, fn))) {
     if (promotes)
       *promotes = true;
+    BLC_PRINTF( "can dispatch because of promotes case\n");
     return true;
   }
 
+  BLC_PRINTF( "returning false for can dispatch\n");
   return false;
 }
 
@@ -1697,6 +1750,7 @@ filterConcreteCandidate(Vec<ResolutionCandidate*>& candidates,
                         ResolutionCandidate* currCandidate,
                         CallInfo& info) {
 
+  BLC_PRINTF( "Filtering concrete candidate\n");
   currCandidate->fn = expandVarArgs(currCandidate->fn, info.actuals.n);
 
   if (!currCandidate->fn) return;
@@ -1720,6 +1774,7 @@ filterConcreteCandidate(Vec<ResolutionCandidate*>& candidates,
    */
   resolveFormals(currCandidate->fn);
 
+  BLC_PRINTF( "After resolveFormals\n");
   int coindex = -1;
   for_formals(formal, currCandidate->fn) {
     if (Symbol* actual = currCandidate->alignedActuals.v[++coindex]) {
@@ -1755,6 +1810,7 @@ filterGenericCandidate(Vec<ResolutionCandidate*>& candidates,
   if (!currCandidate->computeAlignment(info)) {
     return;
   }
+  BLC_PRINTF( "Made it past early returns\n");
 
   /*
    * Early rejection of generic functions.
@@ -1768,6 +1824,7 @@ filterGenericCandidate(Vec<ResolutionCandidate*>& candidates,
         }
 
         if (formal->type->symbol->hasFlag(FLAG_GENERIC)) {
+	  BLC_PRINTF( "In flag generic branch\n");
           Type* vt = actual->getValType();
           Type* st = actual->type->scalarPromotionType;
           Type* svt = (vt) ? vt->scalarPromotionType : NULL;
@@ -1780,6 +1837,7 @@ filterGenericCandidate(Vec<ResolutionCandidate*>& candidates,
 
           }
         } else {
+	  BLC_PRINTF( "In can dispatch branch\n");
           if (!canDispatch(actual->type, actual, formal->type, currCandidate->fn, NULL, formal->hasFlag(FLAG_INSTANTIATED_PARAM))) {
             return;
           }
@@ -1788,7 +1846,9 @@ filterGenericCandidate(Vec<ResolutionCandidate*>& candidates,
     }
     ++coindex;
   }
+  BLC_PRINTF( "Made it past another early return\n");
 
+  BLC_PRINTF( "about to compute substitutions\n");
   // Compute the param/type substitutions for generic arguments.
   currCandidate->computeSubstitutions();
 
@@ -1806,6 +1866,8 @@ filterGenericCandidate(Vec<ResolutionCandidate*>& candidates,
     if (currCandidate->fn != NULL) {
       filterCandidate(candidates, currCandidate, info);
     }
+  } else {
+    BLC_PRINTF( "didn't end up with any candidates\n");
   }
 }
 
@@ -1826,9 +1888,11 @@ filterCandidate(Vec<ResolutionCandidate*>& candidates,
                 CallInfo& info) {
 
   if (currCandidate->fn->hasFlag(FLAG_GENERIC)) {
+    BLC_PRINTF( "About to filter generic candidate\n");
     filterGenericCandidate(candidates, currCandidate, info);
 
   } else {
+    BLC_PRINTF( "About to filter concrete candidate\n");
     filterConcreteCandidate(candidates, currCandidate, info);
   }
 }
@@ -3099,14 +3163,20 @@ gatherCandidates(Vec<ResolutionCandidate*>& candidates,
         ((explainCallLine && explainCallMatch(info.call)) ||
          info.call->id == explainCallID))
     {
+      onMyFunction = true;
       USR_PRINT(visibleFn, "Considering function: %s", toString(visibleFn));
     }
 
+    BLC_PRINTF( "About to filter candidates\n");
     filterCandidate(candidates, visibleFn, info);
+    BLC_PRINTF( "Done filtering candidates\n");
   }
 
   // Return if we got a successful match with user-defined functions.
   if (candidates.n) {
+    if (fExplainVerbose) {
+      BLC_PRINTF("No candidates found");
+    }
     return;
   }
 
@@ -3126,7 +3196,8 @@ gatherCandidates(Vec<ResolutionCandidate*>& candidates,
         ((explainCallLine && explainCallMatch(info.call)) ||
          info.call->id == explainCallID))
     {
-      USR_PRINT(visibleFn, "Considering function: %s", toString(visibleFn));
+      USR_PRINT(visibleFn, "Considering compiler-defined function: %s", 
+		toString(visibleFn));
     }
 
     filterCandidate(candidates, visibleFn, info);
@@ -5319,8 +5390,6 @@ preFold(Expr* expr) {
 
 static void foldEnumOp(int op, EnumSymbol *e1, EnumSymbol *e2, Immediate *imm) {
   int64_t val1 = -1, val2 = -1, count = 0;
-  // ^^^ This is an assumption that "long" on the compiler host is at
-  // least as big as "int" on the target.  This is not guaranteed to be true.
   EnumType *type1, *type2;
 
   type1 = toEnumType(e1->type);

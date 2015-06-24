@@ -1360,6 +1360,11 @@ canDispatch(Type* actualType, Symbol* actualSym, Type* formalType, FnSymbol* fn,
     BLC_PRINTF( "can dispatch because of ref type match case\n");
     return true;
   }
+  if (paramCoerce) {
+    BLC_PRINTF("param coerce is true\n");
+  } else {
+    BLC_PRINTF("param coerce is false\n");
+  }
   if (!paramCoerce && canCoerce(actualType, actualSym, formalType, fn, promotes)) {
     BLC_PRINTF( "can dispatch because of can coerce case\n");
     return true;
@@ -2076,13 +2081,32 @@ static bool paramWorks(Symbol* actual, Type* formalType) {
   }
   if (imm) {
     if (is_int_type(formalType)) {
+      if (fits_in_int(get_width(formalType), imm)) {
+	BLC_PRINTF("int/fits case");
+	return true;
+      } else {
+	BLC_PRINTF("int/!fits case");
+	return false;
+      }
+      /*
       return fits_in_int(get_width(formalType), imm);
+      */
     }
     if (is_uint_type(formalType)) {
+      if (fits_in_uint(get_width(formalType), imm)) {
+	BLC_PRINTF("uint/fits case");
+	return true;
+      } else {
+	BLC_PRINTF("uint/!fits case");
+	return false;
+      }
+      /*
       return fits_in_uint(get_width(formalType), imm);
+      */
     }
   }
 
+  BLC_PRINTF("in fall-through case");
   return false;
 }
 
@@ -2131,8 +2155,9 @@ static bool considerParamMatches(Type* actualtype,
     return considerParamMatches(dtInt[INT_SIZE_DEFAULT], arg1type, arg2type);
   }
   if (is_enum_type(actualtype) && actualtype != arg1type && actualtype != arg2type) {
-    return considerParamMatches(dtInt[INT_SIZE_DEFAULT], arg1type, arg2type) ||
-      considerParamMatches(dtUInt[INT_SIZE_DEFAULT], arg1type, arg2type);
+    return considerParamMatches(dtInt[INT_SIZE_DEFAULT], arg1type, arg2type);
+    // ||
+    //      considerParamMatches(dtUInt[INT_SIZE_DEFAULT], arg1type, arg2type);
   }
   if (isSyncType(actualtype) && actualtype != arg1type && actualtype != arg2type) {
     return considerParamMatches(actualtype->getField("base_type")->type,

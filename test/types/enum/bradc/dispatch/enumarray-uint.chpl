@@ -20,5 +20,6 @@ proc foo(x: uint(64), y: uint(64)) {
 }
 
 if (foo(c[0].c, color.white)) {
+  // If you believe these should behave more like ints; currently, they don't
   writeln("Got correct version!");
 }

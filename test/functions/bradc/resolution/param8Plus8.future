@@ -1,0 +1,20 @@
+semantic: Is it appropriate for params to default to tightest match?
+
+If a param int has a bunch of options available to it, it will pick
+the default int(64) version.  If an int(64) version is not available,
+it will pick the smallest integer that fits.  In this case, it means
+that calling plus(127,127) calls the 8-bit version, causing
+wraparound, potentially confusingly.  The .good file shows what would
+happen if it called the 32-bit version which would lose less precision
+and may be the better default choice for that reason if the user
+doesn't specify by giving types to things.
+
+I'm not positive that this is right, but I think the current behavior
+could be surprising.
+
+This also has implications for enums where, if a default-int version
+is not available, it will similarly choose the smallest match
+possible.  In the case of multiple uint overloads, this means it
+may choose uint(8) over uint(64) which seems surprising.  Consider,
+for example, the output of the int8or32orDefault and int8vs16vsDefault
+in dispatchenums-uint.chpl.

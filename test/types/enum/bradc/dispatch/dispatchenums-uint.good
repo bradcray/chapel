@@ -1,5 +1,5 @@
-In uint uint8or32orDefault
-In uint uint8or32orDefault
+In uint(32) uint8or32orDefault
+In uint(32) uint8or32orDefault
 
 In uint(8) param uint8vs32
 In uint(32) param uint8vs32
@@ -28,11 +28,11 @@ In uint(16) uint8vs16
 In param uint(16) uint8vs16
 In param uint(8) uint8vs16
 
-In param uint uint8vs16vsDefault
-In param uint uint8vs16vsDefault
-In param uint uint8vs16vsDefault
-In uint uint8vs16vsDefault
-In uint uint8vs16vsDefault
-In param uint uint8vs16vsDefault
-In param uint uint8vs16vsDefault
+In param uint(8) uint8vs16vsDefault
+In param uint(8) uint8vs16vsDefault
+In param uint(16) uint8vs16vsDefault
+In uint(16) uint8vs16vsDefault
+In uint(16) uint8vs16vsDefault
+In param uint(16) uint8vs16vsDefault
+In param uint(8) uint8vs16vsDefault
 

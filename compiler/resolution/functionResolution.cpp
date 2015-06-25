@@ -1037,7 +1037,7 @@ static bool fits_in_uint(int width, Immediate* imm, bool isEnum) {
   if (imm->const_kind == NUM_KIND_INT && 
       (imm->num_index == INT_SIZE_DEFAULT || isEnum)) {
     int64_t i = imm->int_value();
-    BLC_PRINTF2( "val is: %lld\n", i);
+    //    BLC_PRINTF2( "val is: %lld\n", i);
     if (i < 0)
       return false;
     return fits_in_uint_helper(width, (uint64_t)i);
@@ -1046,7 +1046,7 @@ static bool fits_in_uint(int width, Immediate* imm, bool isEnum) {
   if (imm->const_kind == NUM_KIND_UINT && 
       (imm->num_index == INT_SIZE_DEFAULT || isEnum)) {
     uint64_t i = imm->uint_value();
-    BLC_PRINTF2( "val is: %llu\n", i);
+    //    BLC_PRINTF2( "val is: %llu\n", i);
     if (i < 0)
       return false;
     return fits_in_uint_helper(width, i);

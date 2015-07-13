@@ -21,6 +21,7 @@
 //
 
 module ChapelBase {
+  // These two are called by compiler-generated code.
   extern proc chpl_config_has_value(name:c_string, module_name:c_string): bool;
   extern proc chpl_config_get_value(name:c_string, module_name:c_string): c_string;
 
@@ -417,8 +418,14 @@ module ChapelBase {
   inline proc *(param a: int(?w), param b: int(w)) param return __primitive("*", a, b);
   inline proc *(param a: uint(?w), param b: uint(w)) param return __primitive("*", a, b);
   
-  inline proc /(param a: int(?w), param b: int(w)) param return __primitive("/", a, b);
-  inline proc /(param a: uint(?w), param b: uint(w)) param return __primitive("/", a, b);
+  inline proc /(param a: int(?w), param b: int(w)) param {
+    if b == 0 then compilerError("param divide by zero");
+    return __primitive("/", a, b);
+  }
+  inline proc /(param a: uint(?w), param b: uint(w)) param {
+    if b == 0 then compilerError("param divide by zero");
+    return __primitive("/", a, b);
+  }
   
   //
   // % on primitive types
@@ -999,10 +1006,6 @@ module ChapelBase {
     compilerError("illegal assignment of type to value");
   }
   
-  pragma "ref"
-  pragma "init copy fn"
-  inline proc chpl__initCopy(r: _ref) return chpl__initCopy(__primitive("deref", r));
-  
   pragma "init copy fn"
   inline proc chpl__initCopy(x: _tuple) { 
     // body inserted during generic instantiation
@@ -1054,11 +1057,6 @@ module ChapelBase {
   pragma "donor fn"
   pragma "auto copy fn"
   inline proc chpl__autoCopy(x) return chpl__initCopy(x);
-  
-  pragma "ref" 
-  pragma "donor fn"
-  pragma "auto copy fn"
-  inline proc chpl__autoCopy(r: _ref) ref return r;
   
   inline proc chpl__maybeAutoDestroyed(x: numeric) param return false;
   inline proc chpl__maybeAutoDestroyed(x: enumerated) param return false;
@@ -1317,7 +1315,14 @@ module ChapelBase {
   inline proc /(a: int(64), b: uint(64)) { _throwOpError("/"); }
   
   // non-param/param and param/non-param
+  // The int version is only defined so we can catch the divide by zero error
+  // at compile time
+  inline proc /(a: int(64), param b: int(64)) {
+    if b == 0 then compilerError("param divide by zero");
+    return __primitive("/", a, b);
+  }
   inline proc /(a: uint(64), param b: uint(64)) {
+    if b == 0 then compilerError("param divide by zero");
     return __primitive("/", a, b);
   }
   inline proc /(param a: uint(64), b: uint(64)) {
@@ -1488,5 +1493,64 @@ module ChapelBase {
   extern const QIO_TUPLE_FORMAT_CHPL:int;
   extern const QIO_TUPLE_FORMAT_SPACE:int;
   extern const QIO_TUPLE_FORMAT_JSON:int;
+
+  // What follows are the type _defaultOf methods, used to initialize types
+  // Booleans
+  pragma "no doc"
+  inline proc _defaultOf(type t) param where (isBoolType(t)) return false:t;
+
+  // ints, reals, imags, complexes
+  pragma "no doc"
+  inline proc _defaultOf(type t) param where (isIntegralType(t)) return 0:t;
+  // TODO: In order to make _defaultOf param for reals and imags we had to split
+  // the cases into their default size and a non-param case.  It is hoped that
+  // in the future, floating point numbers may be castable whilst param.  In that
+  // world, we can again shrink these calls into the size-ignorant case.
+  pragma "no doc"
+  inline proc _defaultOf(type t) param where t == real return 0.0;
+  pragma "no doc"
+  inline proc _defaultOf(type t) where (isRealType(t) && t != real) return 0.0:t;
+  pragma "no doc"
+  inline proc _defaultOf(type t) param where t == imag return 0.0i;
+  pragma "no doc"
+  inline proc _defaultOf(type t) where (isImagType(t) && t != imag) return 0.0i:t;
+  // Also, complexes cannot yet be parametized
+  pragma "no doc"
+  inline proc _defaultOf(type t): t where (isComplexType(t)) {
+    var ret:t = noinit;
+    param floatwidth = numBits(t)/2;
+    ret.re = 0.0:real(floatwidth);
+    ret.im = 0.0:real(floatwidth);
+    return ret;
+  }
+
+  // Enums
+  pragma "no doc"
+  inline proc _defaultOf(type t) param where (isEnumType(t)) {
+    return chpl_enum_first(t);
+  }
+
+  // Classes
+  pragma "no doc"
+  inline proc _defaultOf(type t) where (isClassType(t)) return nil:t;
+
+  // Various types whose default value is known
+  pragma "no doc"
+  inline proc _defaultOf(type t) param where t: void return _void;
+  pragma "no doc"
+  inline proc _defaultOf(type t) where t: opaque return _nullOpaque;
+  pragma "no doc"
+  inline proc _defaultOf(type t) where t: chpl_taskID_t return chpl_nullTaskID;
+  pragma "no doc"
+  inline proc _defaultOf(type t) where t: _sync_aux_t return _nullSyncVarAuxFields;
+  pragma "no doc"
+  inline proc _defaultOf(type t) where t == _task_list return _nullTaskList;
+
+  pragma "no doc"
+  inline proc _defaultOf(type t) where t: _ddata
+    return __primitive("cast", t, nil);
+
+  // There used to be a catch-all _defaultOf that return nil:t, but that
+  // was the nexus of several tricky resolution bugs.
 
 }

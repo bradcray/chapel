@@ -45,6 +45,7 @@
 %{
 
 #include "bison-chapel.h"
+#include "docsDriver.h"
 #include "parser.h"
 
 #include <cstdio>
@@ -95,7 +96,17 @@ exponent         [Ee][\+\-]?{digit}+
 floatLiteral1    {digit}*"."{digit}+({exponent})?
 floatLiteral2    {digit}+"."{exponent}
 floatLiteral3    {digit}+{exponent}
-floatLiteral     {floatLiteral1}|{floatLiteral2}|{floatLiteral3}
+
+/* hex float literals, have decimal exponents indicating the power of 2 */
+hexDecExponent   [Pp][\+\-]?{digit}+
+floatLiteral4    0[xX]{hexDigit}*"."{hexDigit}+({hexDecExponent})?
+floatLiteral5    0[xX]{hexDigit}+"."{hexDecExponent}
+floatLiteral6    0[xX]{hexDigit}+{hexDecExponent}
+
+decFloatLiteral  {floatLiteral1}|{floatLiteral2}|{floatLiteral3}
+hexFloatLiteral  {floatLiteral4}|{floatLiteral5}|{floatLiteral6}
+
+floatLiteral     {decFloatLiteral}|{hexFloatLiteral}
 
 %s               externmode
 
@@ -140,10 +151,11 @@ on               return processToken(yyscanner, TON);
 otherwise        return processToken(yyscanner, TOTHERWISE);
 out              return processToken(yyscanner, TOUT);
 param            return processToken(yyscanner, TPARAM);
-zip              return processToken(yyscanner, TZIP);
 pragma           return processToken(yyscanner, TPRAGMA);
 __primitive      return processToken(yyscanner, TPRIMITIVE);
+private          return processToken(yyscanner, TPRIVATE);
 proc             return processToken(yyscanner, TPROC);
+public           return processToken(yyscanner, TPUBLIC);
 record           return processToken(yyscanner, TRECORD);
 reduce           return processToken(yyscanner, TREDUCE);
 ref              return processToken(yyscanner, TREF);
@@ -165,6 +177,7 @@ where            return processToken(yyscanner, TWHERE);
 while            return processToken(yyscanner, TWHILE);
 with             return processToken(yyscanner, TWITH);
 yield            return processToken(yyscanner, TYIELD);
+zip              return processToken(yyscanner, TZIP);
 
 "_"              return processToken(yyscanner, TUNDERSCORE);
 
@@ -249,7 +262,7 @@ yield            return processToken(yyscanner, TYIELD);
 
 \n               return processNewline(yyscanner);
 
-[ \t\r]          processWhitespace(yyscanner);
+[ \t\r\f]        processWhitespace(yyscanner);
 .                processInvalidToken(yyscanner);
 
 %%
@@ -312,6 +325,7 @@ static int  processIdentifier(yyscan_t scanner) {
 
 static int processToken(yyscan_t scanner, int t) {
   YYSTYPE* yyLval = yyget_lval(scanner);
+  size_t   remain = sizeof(captureString) - 1;
 
   countToken(yyget_text(scanner));
 
@@ -319,11 +333,15 @@ static int processToken(yyscan_t scanner, int t) {
 
   if (captureTokens) {
     if (t == TASSIGN ||
-        t == TDOTDOTDOT)
-      strcat(captureString, " ");
+        t == TDOTDOTDOT) {
+      strncat(captureString, " ",                 remain);
+      remain = remain - 1;
+    }
 
-    if (t != TLCBR)
-      strcat(captureString, yyget_text(scanner));
+    if (t != TLCBR) {
+      strncat(captureString, yyget_text(scanner), remain);
+      remain = remain - strlen(yyget_text(scanner));
+    }
 
     if (t == TCOMMA  ||
         t == TPARAM  ||
@@ -336,8 +354,10 @@ static int processToken(yyscan_t scanner, int t) {
         t == TREF    ||
         t == TCOLON  ||
         t == TASSIGN ||
-        t == TRSBR)
-      strcat(captureString, " ");
+        t == TRSBR) {
+      strncat(captureString, " ",                 remain);
+      remain = remain - 1;
+    }
   }
 
   // If the stack has a value then we must be in externmode.
@@ -361,14 +381,21 @@ static int processStringLiteral(yyscan_t scanner, const char* q) {
   const char* yyText = yyget_text(scanner);
   YYSTYPE*    yyLval = yyget_lval(scanner);
 
-  yyLval->pch = eatStringLiteral(scanner, q);
+  yyLval->pch = astr(eatStringLiteral(scanner, q));
 
   countToken(astr(q, yyLval->pch, q));
 
   if (captureTokens) {
-    strcat(captureString, yyText);
-    strcat(captureString, yyLval->pch);
-    strcat(captureString, yyText);
+    size_t remain = sizeof(captureString) - 1;
+
+    strncat(captureString, yyText,      remain);
+    remain = remain - strlen(yyText);
+
+    strncat(captureString, yyLval->pch, remain);
+    remain = remain - strlen(yyLval->pch);
+
+    strncat(captureString, yyText,      remain);
+    remain = remain - strlen(yyText);
   }
 
   return STRINGLITERAL;
@@ -434,7 +461,7 @@ static int processExtern(yyscan_t scanner) {
   countToken(yyText);
 
   if (captureTokens) {
-    strcat(captureString, yyText);
+    strncat(captureString, yyText, sizeof(captureString) - 1);
   }
 
   // Push a state to record that "extern" has been seen
@@ -460,7 +487,7 @@ static int processExternCode(yyscan_t scanner) {
   countToken(astr(yyLval->pch));
 
   if (captureTokens) {
-    strcat(captureString, yyLval->pch);
+    strncat(captureString, yyLval->pch, sizeof(captureString) - 1);
   }
 
   return EXTERNCODE;
@@ -663,6 +690,10 @@ static int processBlockComment(yyscan_t scanner) {
   YYSTYPE*    yyLval       = yyget_lval(scanner);
   YYLTYPE*    yyLloc       = yyget_lloc(scanner);
 
+  int nestedStartLine = -1;
+  int startLine = chplLineno;
+  const char* startFilename = yyfilename;
+
   int         len          = strlen(fDocsCommentLabel);
   int         labelIndex   = (len >= 2) ? 2 : 0;
 
@@ -708,9 +739,17 @@ static int processBlockComment(yyscan_t scanner) {
 
     } else if (lastc == '/' && c == '*') { // start nested
       depth++;
+      // keep track of the start of the last nested comment
+      nestedStartLine = chplLineno;
     } else if (c == 0) {
       ParserContext context(scanner);
 
+      fprintf(stderr, "%s:%d: unterminated comment started here\n",
+              startFilename, startLine);
+      if( nestedStartLine >= 0 ) {
+        fprintf(stderr, "%s:%d: nested comment started here\n",
+                startFilename, nestedStartLine);
+      }
       yyerror(yyLloc, &context, "EOF in comment");
     }
   }
@@ -747,6 +786,9 @@ static int processBlockComment(yyscan_t scanner) {
     }
 
     yyLval->pch = astr(wholeComment.c_str());
+
+  } else {
+    yyLval->pch = NULL;
   }
 
   countMultiLineComment(stringBuffer);

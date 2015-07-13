@@ -22,6 +22,12 @@
 
 #include "LoopStmt.h"
 
+// A ForLoop represents the for-statement language construct as described in
+// the specification (see "The For Loop" section in the chapter on "Statements").
+// The buildForLoop() method transforms the elements of the for-statement
+// parser production into its internal representation.
+// ForLoop objects are also used to represent coforall-statements and zippered
+// iteration.
 class ForLoop : public LoopStmt
 {
   //
@@ -56,6 +62,7 @@ public:
   virtual Expr*          getNextExpr(Expr* expr);
 
   virtual bool           isForLoop()                                  const;
+  virtual bool           isCoforallLoop()                             const;
 
   virtual bool           deadBlockCleanup();
 

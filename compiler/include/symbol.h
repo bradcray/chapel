@@ -26,6 +26,7 @@
 #include "type.h"
 
 #include <bitset>
+#include <iostream>
 #include <vector>
 
 //
@@ -198,6 +199,7 @@ public:
   virtual bool       isConstValWillNotChange()                 const;
   virtual bool       isImmediate()                             const;
   virtual bool       isParameter()                             const;
+  virtual bool       isType()                                  const;
 
   const char* doc;
 
@@ -206,6 +208,15 @@ public:
   void codegenDef();
   // global vars are different ...
   void codegenGlobalDef();
+
+  virtual void printDocs(std::ostream *file, unsigned int tabs);
+
+  void makeField();
+
+private:
+
+  virtual std::string docsDirective();
+  bool isField;
 };
 
 /******************************** | *********************************
@@ -288,6 +299,8 @@ class TypeSymbol : public Symbol {
   // This function is used to code generate the LLVM TBAA metadata
   // after all of the types have been defined.
   void codegenMetadata();
+
+  const char* doc;
 };
 
 /******************************** | *********************************
@@ -308,7 +321,8 @@ class FnSymbol : public Symbol {
   BlockStmt* body;
   IntentTag thisTag;
   RetTag retTag;
-  IteratorInfo* iteratorInfo;
+  IteratorInfo* iteratorInfo; // Attached only to iterators, specifically to
+                              // original (user) iterators before lowering.
   Symbol* _this;
   Symbol* _outer;
   FnSymbol *instantiatedFrom;
@@ -383,6 +397,12 @@ class FnSymbol : public Symbol {
   bool            isMethod()                                   const;
   bool            isPrimaryMethod()                            const;
   bool            isSecondaryMethod()                          const;
+  bool            isIterator()                                 const;
+
+  virtual void printDocs(std::ostream *file, unsigned int tabs);
+
+private:
+  virtual std::string docsDirective();
 };
 
 /******************************** | *********************************
@@ -443,6 +463,8 @@ public:
   void                 moduleUseAdd(ModuleSymbol* module);
   void                 moduleUseRemove(ModuleSymbol* module);
 
+  bool                 isVisible(BaseAST* scope) const;
+
   ModTag               modTag;
 
   BlockStmt*           block;
@@ -456,9 +478,15 @@ public:
   // LLVM uses this for extern C blocks.
   ExternBlockInfo*     extern_info;
 
+  virtual void         printDocs(std::ostream *file, unsigned int tabs);
+          void         addPrefixToName(std::string prefix);
+          std::string  docsName();
+
 private:
   void                 getTopLevelConfigOrVariables(Vec<VarSymbol *> *contain, Expr *expr, bool config);
 
+  // Used when documenting submodules.
+  std::string          moduleNamePrefix;
 };
 
 /******************************** | *********************************
@@ -495,15 +523,21 @@ VarSymbol *new_IntSymbol(int64_t b, IF1_int_type size=INT_SIZE_64);
 VarSymbol *new_UIntSymbol(uint64_t b, IF1_int_type size=INT_SIZE_64);
 
 // Creates a new real literal with the given value and bit-width.
-// n is used for the cname of the new symbol,
-// but only if the value has not already been cached.
-VarSymbol *new_RealSymbol(const char *n, long double b,
+// n should be a string argument containing a Chapel decimal or hexadecimal
+// floating point literal. It will be copied and the floating point
+// value will be computed. The resulting symbol will have a cname
+// equal to a fixed-up n, or to an n previously passed to this
+// function that has the same value.
+VarSymbol *new_RealSymbol(const char *n,
                           IF1_float_type size=FLOAT_SIZE_64);
 
 // Creates a new imaginary literal with the given value and bit-width.
-// n is used for the cname of the new symbol,
-// but only if the value has not already been cached.
-VarSymbol *new_ImagSymbol(const char *n, long double b,
+// n should be a string argument containing a Chapel decimal or hexadecimal
+// floating point literal. It will be copied and the floating point
+// value will be computed. The resulting symbol will have a cname
+// equal to a fixed-up n, or to an n previously passed to this
+// function that has the same value.
+VarSymbol *new_ImagSymbol(const char *n,
                           IF1_float_type size=FLOAT_SIZE_64);
 
 // Creates a new complex literal with the given value and bit-width.
@@ -557,6 +591,7 @@ extern VarSymbol *gTrue;
 extern VarSymbol *gFalse;
 extern VarSymbol *gTryToken; // try token for conditional function resolution
 extern VarSymbol *gBoundsChecking;
+extern VarSymbol *gCastChecking;
 extern VarSymbol *gPrivatization;
 extern VarSymbol *gLocal;
 extern VarSymbol *gNodeID;

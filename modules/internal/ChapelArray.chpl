@@ -38,7 +38,7 @@ module ChapelArray {
 
   pragma "privatized class"
   proc _isPrivatized(value) param
-    return !_local & ((_privatization & value.dsiSupportsPrivatization()) | value.dsiRequiresPrivatization());
+    return !_local && ((_privatization && value.dsiSupportsPrivatization()) || value.dsiRequiresPrivatization());
 
   proc _newPrivatizedClass(value) {
 
@@ -908,6 +908,7 @@ module ChapelArray {
       return member(i);
     }
 
+    pragma "reference to const when const this"
     proc newAlias() {
       var x = _value;
       return _newDomain(x);
@@ -1566,6 +1567,7 @@ module ChapelArray {
     proc numElements return _value.dom.dsiNumIndices;
     proc size return numElements;
   
+    pragma "reference to const when const this"
     proc newAlias() {
       var x = _value;
       return _newArray(x);
@@ -2479,6 +2481,17 @@ module ChapelArray {
       // default initalizer is a forall expr. E.g. arrayInClassRecord.chpl.
       return;
 
+    if a._value == b._value {
+      // Do nothing for A = A but we could generate a warning here
+      // since it is probably unintended. We need this check here in order
+      // to avoid memcpy(x,x) which happens inside doiBulkTransfer.
+      return;
+    }
+
+    if a.size == 0 && b.size == 0 then
+      // Do nothing for zero-length assignments
+      return;
+
     if boundsChecking then
       checkArrayShapesUponAssignment(a, b);
   
@@ -2717,5 +2730,5 @@ module ChapelArray {
     D = {1..i-1};
     return A;
   }
-  
+
 }

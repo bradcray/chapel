@@ -414,6 +414,10 @@ Inherits 'gasnet*' and 'fifo'
 Reviewed 2015-05-20
 =============================
 
+GASNET_QUIET not set, so gasnet auto-detecting ibv and warning
+--------------------------------------------------------------
+** all **
+
 
 === sporadic failures below ===
 
@@ -484,6 +488,11 @@ Reviewed 2015-05-19
 ==============================
 
 === sporadic failures below ===
+
+sporadic cannot find '' on linker line
+--------------------------------------
+[Error matching compiler output for link/sungeun/static_dynamic (compopts: 4)] (2015-07-17..)
+[Error matching compiler output for link/sungeun/static_dynamic (compopts: 5)] (2015-07-17..)
 
 sporadic test prints timeout rather than completing
 ---------------------------------------------------
@@ -823,13 +832,6 @@ sporadic fasta-printf output mismatch
 
 
 
-================================
-perf.xc.local.pgi
-Inherits 'perf.xc.*' and '*pgi*'
-Reviewed 2015-05-20
-================================
-
-
 ****************************************************************************
 *                          Secondary platforms                             *
 ****************************************************************************
@@ -875,6 +877,9 @@ sporadic execution timeout (lydia)
              2015-06-17..2015-06-21, 2015-06-23..2015-06-25,
              2015-06-27..2015-06-29, 2015-07-02..2015-07-05, 2015-07-08,
              2015-07-11..2015-07-14)
+[Error: Timed out executing program performance/compiler/bradc/cg-sparse-timecomp]
+  (cygwin32: 2015-05-21..)
+  (cygwin64: 2015-07-16..)
 
 
 ===========================
@@ -892,10 +897,8 @@ calculation incorrect (2015-07-14 -- first run in awhile, ???)
 --------------------------------------------------------------
 [Error matching program output for users/aroonsharma/covariance]
 
-errors/timeouts due to sync freeing? (2015-05-21, lydia)
---------------------------------------------------------
-[Error matching program output for parallel/forall/vass/ri-3-stress]
-[Error: Timed out executing program performance/compiler/bradc/cg-sparse-timecomp]
+timeouts due to sync freeing? (2015-05-21, lydia)
+-------------------------------------------------
 [Error: Timed out executing program studies/cholesky/jglewis/version2/standard_cholesky/test_standard_cholesky]
 [Error: Timed out executing program studies/sort/radix]
 [Error: Timed out executing program users/jglewis/cholesky_version_1/test_cholesky]
@@ -903,8 +906,6 @@ errors/timeouts due to sync freeing? (2015-05-21, lydia)
 execution timeouts (2015-07-15 -- first run in awhile, ???)
 -----------------------------------------------------------
 [Error: Timed out executing program studies/cholesky/jglewis/test_cholesky]
-[Error: Timed out executing program studies/cholesky/jglewis/test_dataflow_cholesky]
-[Error: Timed out executing program studies/cholesky/jglewis/version2/elemental/block_distribution/test_elemental_cholesky_block]
 [Error: Timed out executing program studies/cholesky/jglewis/version2/elemental/unsymmetric_indices/test_elemental_cholesky_unsymmetric_ranges]
 [Error: Timed out executing program studies/cholesky/jglewis/version2/performance/test_cholesky_performance]
 
@@ -915,16 +916,17 @@ sporadic segfault
 [Error matching program output for release/examples/primers/fileIO] (2015-07-01)
 [Error matching program output for parallel/forall/vass/ri-3-stress] (2015-07-15)
 
+sporadic execution timeouts
+---------------------------
+[Error: Timed out executing program studies/cholesky/jglewis/test_dataflow_cholesky] (2015-07-15)
+[Error: Timed out executing program studies/cholesky/jglewis/version2/elemental/block_distribution/test_elemental_cholesky_block] (2015-07-15)
+
+
 ================================
 cygwin64
 Inherits 'cygwin*' and 'linux64'
 Reviewed 2015-05-19
 ================================
-
-execution timeouts (2015-07-16 -- first run in awhile, ???)
------------------------------------------------------------
-[Error: Timed out executing program npb/is/diten/is]
-[Error: Timed out executing program parallel/forall/vass/ri-3-stress]
 
 === sporadic failures below ===
 
@@ -933,6 +935,16 @@ sporadic pthread_cond_init() failure
 [Error matching program output for studies/cholesky/jglewis/version2/performance/test_cholesky_performance]
   (2015-02-25..2015-03-04, 2015-03-07, 2015-03-11, 2015-03-29, 2015-04-05, 
    2015-05-05..2015-05-06, 2015-05-15..2015-05-16, 2015-05-18..2015-06-01)
+
+sporadic execution timeouts (2015-07-16 -- first run in awhile, ???)
+--------------------------------------------------------------------
+[Error: Timed out executing program npb/is/diten/is] (2015-07-15)
+[Error: Timed out executing program parallel/forall/vass/ri-3-stress] (2015-07-15)
+
+sporadic no output (2015-07-16)
+-------------------------------
+[Error matching program output for users/jglewis/cholesky_version_1/test_cholesky] (2015-07-16..)
+
 
 
 

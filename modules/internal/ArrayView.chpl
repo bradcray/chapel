@@ -517,7 +517,7 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
   proc dsiBuildRectangularDom(param rank, type idxType, param stridable,
                               ranges) {
     const newupdom = {(...ranges)};
-    const newranges = downdom.dsiDims();
+    var newranges = downdom.dsiDims();
 
     var j = 1;
     for param d in 1..downdom.rank {

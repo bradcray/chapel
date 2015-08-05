@@ -313,12 +313,13 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 
   proc dsiSupportsPrivatization() param
-    return downdom.dsiSupportsPrivatization();
+    return updom.dsiSupportsPrivatization() && downdom.dsiSupportsPrivatization();
 
-  proc dsiGetPrivatizeData() return (updom.dsiDims(), downdom.pid);
+  proc dsiGetPrivatizeData() return (updom.pid, downdom.pid);
 
   proc dsiPrivatize(privatizeData) {
-    const (updomdims, privdowndomID) = privatizeData;
+    const (privupdomID, privdowndomID) = privatizeData;
+    const privupdom = chpl_getPrivatizedCopy(updom.type, privupdomID);
     const privdowndom = chpl_getPrivatizedCopy(downdom.type, privdowndomID);
     //    writeln("*** about to return new ArrayReindexViewDom ****");
     //
@@ -326,11 +327,12 @@ class ArrayReindexViewDom: BaseRectangularDom {
     // privatization did not store updom as a defaultrectangular
     // itself?  Can I / should I just always store updom that way?
     //
-    var newdom = {(...updomdims)};
-    if !noRefCount then
-      newdom._value.incRefCount();
-    return new ArrayReindexViewDom(idxType=updomdims(1).idxType, 
-                                   updom=newdom._value, 
+    // ANSWER: Yes, it is getting me into trouble because I get a type
+    // mismatch.  So should I always store a default rectangular, or
+    // should I be sure to store the dmapped thing that was passed in?
+    //
+    return new ArrayReindexViewDom(idxType=updom.idxType, 
+                                   updom=privupdom, 
                                    downdom=privdowndom);
   }
 
@@ -368,6 +370,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
   }
 }
 
+// stop searching for updom here
 
 class ArrayReindexViewArr: BaseArr {
   type eltType;

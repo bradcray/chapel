@@ -53,7 +53,10 @@ module ChapelArray {
     proc _newPrivatizedClassHelp(parentValue, originalValue, n, hereID, privatizeData) {
       var newValue = originalValue;
       if hereID != here.id {
-        newValue = parentValue.dsiPrivatize(privatizeData);
+        //        compilerWarning(typeToString(parentValue.type));
+        const tmp = parentValue.dsiPrivatize(privatizeData);
+        //        compilerWarning(typeToString(tmp.type));
+        newValue = tmp;
         __primitive("chpl_newPrivatizedClass", newValue, n);
         newValue.pid = n;
       } else {

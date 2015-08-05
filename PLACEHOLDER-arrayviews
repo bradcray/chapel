@@ -1,0 +1,10 @@
+* updom used to store a defaultRectangular
+  - this is why lulesh-simple broke
+* but really, it should store the domain being used to do the reindexing -- e.g., if
+  I reindex with a block-distributed domain, that should be the upward-looking view
+  for the user I think.
+* trouble is in setIndices, which currently stores a default rectangular -- see the
+  comment on it about how this should really be implemented.
+  - Q: what should the domain of a reindexed array behave like if the up and down domains
+    have different distributions?
+  - Q: should we stop doing reindexing on array argument passing?

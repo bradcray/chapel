@@ -1625,7 +1625,10 @@ module ChapelArray {
         //        fakenewdom.dsiDisplayRepresentation();
         //        writeln("------- calling _newDomain ---------");
         //        writeln("------- calling _newDomain ---------");
-        const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value));
+        const newupdom = {(...d.dims())};
+        if ~noRefCount then
+          newupdom._value.incRefCount();
+        const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=newupdom._value, downdom=downdom._value));
         //        writeln("------- done calling _newDomain ----------");
         //        const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value));
         //        newdom.displayRepresentation();

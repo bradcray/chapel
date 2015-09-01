@@ -710,7 +710,7 @@ module ChapelArray {
         on _value {
           var cnt = _value.destroyDom();
           if cnt == 0 then
-            delete _value;
+            ;            //            delete _value;
         }
       }
      }
@@ -1352,7 +1352,7 @@ module ChapelArray {
           var cnt = _value.destroyArr();
           if cnt == 0 then {
             chpl_decRefCountsForDomainsInArrayEltTypes(_value.eltType);
-            delete _value;
+            //            delete _value;
           }
         }
       }
@@ -1629,6 +1629,7 @@ module ChapelArray {
         if ~noRefCount then
           newupdom._value.incRefCount();
         writeln("In creating new ArrayReindexViewDom, downdom is: ", downdom);
+        downdom._value.dsiDisplayRepresentation();
         const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=newupdom._value, downdom=downdom._value));
         //        writeln("------- done calling _newDomain ----------");
         //        const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value));

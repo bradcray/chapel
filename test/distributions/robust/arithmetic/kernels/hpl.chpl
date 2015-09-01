@@ -220,13 +220,13 @@ proc schurComplement(Ab: [/*1..n, 1..n+1*/] elemType, ptOp: indexType) {
         replB : [replBD] elemType = Ab[ptOp..#blkSize, ptSol..];
 
   // do local matrix-multiply on a block-by-block basis
-  compilerWarning(typeToString(AbD.type));
+  //  compilerWarning(typeToString(AbD.type));
   //
   // TODO: This seems surprising -- why does this show up as
   // a ReindexView once it's sliced?  Shouldn't it be a sliced
   // view?
   //
-  compilerWarning(typeToString((AbD[ptSol.., ptSol..]).type));
+  //  compilerWarning(typeToString((AbD[ptSol.., ptSol..]).type));
                   
   forall (row,col) in AbD[ptSol.., ptSol..] by (blkSize, blkSize) {
     //

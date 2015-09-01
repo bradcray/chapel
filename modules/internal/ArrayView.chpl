@@ -176,16 +176,19 @@ class ArrayReindexViewDom: BaseRectangularDom {
         writeln("In dimension ", i, ", updom range is: ", updom.dsiDim(i), " while ranges(i).stride is: ", ranges(i));
         writeln("Downdom range is: ", downdom.dsiDim(i));
         writeln("Lows are: ", (downdom.dsiDim(i).low, updom.dsiDim(i).low));
-        writeln("Naively, this would result in: ", ranges(i).translate(downdom.dsiDim(i).low - updom.dsiDim(i).low));
         warning("Stride mismatch in ArrayReindexViewDom.dsiBuildRectangularDom()");
       }
       newranges(i) = ranges(i).translate(downdom.dsiDim(i).low - updom.dsiDim(i).low);
+      if (ranges(i).stride != updom.dsiDim(i).stride) {
+        writeln("Assigned to newranges anyway and got: ", newranges(i));
+      }
     }
     //    writeln("newranges = ", newranges);
     //    halt("That's all folks!");
     const newdowndom = _newDomain(downdom.dsiBuildRectangularDom(rank, idxType, stridable, newranges));
     if !noRefCount {
       newdowndom._value.incRefCount();
+      newupdom._value.incRefCount();
       /*
       if newdowndom.linksDistribution() {
         writeln("*** Links distribution!!!");
@@ -412,15 +415,16 @@ class ArrayReindexViewArr: BaseArr {
   }
 
   inline proc dsiAccess(i) ref {
-    //    writeln("Reindex incoming index: ", i);
+    writeln("Reindex incoming index: ", i);
     //    dom.dsiDisplayRepresentation();
+    //    arr.dsiDisplayRepresentation();
     if boundsChecking then
       if !dom.dsiMember(i) then
         halt("array index out of bounds: ", i);
     if (dom.rank == 1) {
       const pos_i = dom.dsiDim(1).indexOrder((...i));
       const ind_i = arr.dom.dsiDim(1).orderToIndex(pos_i);
-      //      writeln("Reindex outgoing index: ", ind_i);
+      writeln("Reindex outgoing index: ", ind_i);
       return arr.dsiAccess(ind_i);
     } else {
       var ind_i: dom.rank*dom.idxType;
@@ -428,7 +432,7 @@ class ArrayReindexViewArr: BaseArr {
         const pos_i_d = dom.dsiDim(d).indexOrder(i(d));
         ind_i(d) = arr.dom.dsiDim(d).orderToIndex(pos_i_d);
       }
-      //      writeln("Reindex outgoing index: ", ind_i);
+      writeln("Reindex outgoing index: ", ind_i);
       return arr.dsiAccess(ind_i);
     }
   }
@@ -591,6 +595,7 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
     updom.dsiDisplayRepresentation();
     write("  downdom {");
     downdom.dsiDisplayRepresentation();
+    writeln("About to display collapsed Dim");
     writeln("  collapsedDim: ", collapsedDim);
     writeln("  idx: ", idx);
     writeln("}");

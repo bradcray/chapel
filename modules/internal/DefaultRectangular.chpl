@@ -1058,7 +1058,7 @@ module DefaultRectangular {
           if d.numIndices > 0 then
             shiftedData = copy.shiftedData;
         //numelm = copy.numelm;
-        delete copy;
+        //        delete copy;
         }
       } else {
         halt("illegal reallocation");

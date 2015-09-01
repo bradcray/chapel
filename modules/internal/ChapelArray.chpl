@@ -1628,6 +1628,7 @@ module ChapelArray {
         const newupdom = {(...d.dims())};
         if ~noRefCount then
           newupdom._value.incRefCount();
+        writeln("In creating new ArrayReindexViewDom, downdom is: ", downdom);
         const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=newupdom._value, downdom=downdom._value));
         //        writeln("------- done calling _newDomain ----------");
         //        const newdom = _newDomain(new ArrayReindexViewDom(idxType=d.idxType, updom=d._value, downdom=downdom._value));

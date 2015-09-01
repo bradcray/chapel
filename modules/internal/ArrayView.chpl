@@ -173,7 +173,11 @@ class ArrayReindexViewDom: BaseRectangularDom {
       newupdom._value.incRefCount();
     for param i in 1..updom.rank {
       if (ranges(i).stride != updom.dsiDim(i).stride) {
-        halt("Stride mismatch in ArrayReindexViewDom.dsiBuildRectangularDom()");
+        writeln("In dimension ", i, ", updom range is: ", updom.dsiDim(i), " while ranges(i).stride is: ", ranges(i));
+        writeln("Downdom range is: ", downdom.dsiDim(i));
+        writeln("Lows are: ", (downdom.dsiDim(i).low, updom.dsiDim(i).low));
+        writeln("Naively, this would result in: ", ranges(i).translate(downdom.dsiDim(i).low - updom.dsiDim(i).low));
+        warning("Stride mismatch in ArrayReindexViewDom.dsiBuildRectangularDom()");
       }
       newranges(i) = ranges(i).translate(downdom.dsiDim(i).low - updom.dsiDim(i).low);
     }
@@ -517,13 +521,15 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
   proc dsiBuildRectangularDom(param rank, type idxType, param stridable,
                               ranges) {
     const newupdom = {(...ranges)};
-    var newranges = downdom.dsiDims();
+    var newranges: downdom.rank*range(idxType=idxType, stridable=stridable); // = downdom.dsiDims();
 
     var j = 1;
     for param d in 1..downdom.rank {
       if !collapsedDim(d) {
         newranges(d) = ranges(j);
         j += 1;
+      } else {
+        newranges(d) = downdom.dsiDim(d);
       }
     }
     //

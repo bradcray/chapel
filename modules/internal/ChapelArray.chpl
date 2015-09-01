@@ -710,7 +710,7 @@ module ChapelArray {
         on _value {
           var cnt = _value.destroyDom();
           if cnt == 0 then
-            ;            //            delete _value;
+            delete _value;
         }
       }
      }
@@ -1352,7 +1352,7 @@ module ChapelArray {
           var cnt = _value.destroyArr();
           if cnt == 0 then {
             chpl_decRefCountsForDomainsInArrayEltTypes(_value.eltType);
-            //            delete _value;
+            //          delete _value;
           }
         }
       }

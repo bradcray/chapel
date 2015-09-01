@@ -415,7 +415,7 @@ class ArrayReindexViewArr: BaseArr {
   }
 
   inline proc dsiAccess(i) ref {
-    writeln("Reindex incoming index: ", i);
+    //    writeln("Reindex incoming index: ", i);
     //    dom.dsiDisplayRepresentation();
     //    arr.dsiDisplayRepresentation();
     if boundsChecking then
@@ -432,7 +432,7 @@ class ArrayReindexViewArr: BaseArr {
         const pos_i_d = dom.dsiDim(d).indexOrder(i(d));
         ind_i(d) = arr.dom.dsiDim(d).orderToIndex(pos_i_d);
       }
-      writeln("Reindex outgoing index: ", ind_i);
+      //      writeln("Reindex outgoing index: ", ind_i);
       return arr.dsiAccess(ind_i);
     }
   }

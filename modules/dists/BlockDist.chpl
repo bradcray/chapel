@@ -281,7 +281,7 @@ proc Block.Block(boundingBox: domain,
 proc Block.dsiAssign(other: this.type) {
   coforall locid in targetLocDom do
     on targetLocales(locid) do
-      ;//      delete locDist(locid);
+      delete locDist(locid);
   boundingBox = other.boundingBox;
   targetLocDom = other.targetLocDom;
   targetLocales = other.targetLocales;
@@ -306,7 +306,7 @@ proc Block.dsiClone() {
 proc Block.dsiDestroyDistClass() {
   coforall ld in locDist do {
     on ld do
-      ;//      delete ld;
+      delete ld;
   }
 }
 
@@ -687,8 +687,8 @@ proc BlockArr.setupRADOpt() {
     on dom.dist.targetLocales(localeIdx) {
       const myLocArr = locArr(localeIdx);
       if myLocArr.locRAD != nil {
-        //        delete myLocArr.locRAD;
-        //        myLocArr.locRAD = nil;
+        delete myLocArr.locRAD;
+        myLocArr.locRAD = nil;
       }
       if disableBlockLazyRAD {
         myLocArr.locRAD = new LocRADCache(eltType, rank, idxType, dom.dist.targetLocDom);
@@ -1358,7 +1358,7 @@ proc BlockArr.doiBulkTransferToDR(Barg)
         
         slice.doiBulkTransferStride(A.locArr[j].myElems[(...r2)]._value);
         
-        //        delete slice;
+        delete slice;
       }
     }
 }
@@ -1403,7 +1403,7 @@ proc BlockArr.doiBulkTransferFromDR(Barg)
         slice.adjustBlkOffStrForNewDomain(d._value, slice);
         
         A.locArr[j].myElems[(...r2)]._value.doiBulkTransferStride(slice);
-        //        delete slice;
+        delete slice;
       }
     }
 }

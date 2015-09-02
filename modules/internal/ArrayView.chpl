@@ -172,16 +172,16 @@ class ArrayReindexViewDom: BaseRectangularDom {
     if !noRefCount then
       newupdom._value.incRefCount();
     for param i in 1..updom.rank {
-      if (ranges(i).stride != updom.dsiDim(i).stride) {
-        writeln("In dimension ", i, ", updom range is: ", updom.dsiDim(i), " while ranges(i).stride is: ", ranges(i));
-        writeln("Downdom range is: ", downdom.dsiDim(i));
-        writeln("Lows are: ", (downdom.dsiDim(i).low, updom.dsiDim(i).low));
-        warning("Stride mismatch in ArrayReindexViewDom.dsiBuildRectangularDom()");
-      }
+      //      if (ranges(i).stride != updom.dsiDim(i).stride) {
+        //        writeln("In dimension ", i, ", updom range is: ", updom.dsiDim(i), " while ranges(i).stride is: ", ranges(i));
+        //        writeln("Downdom range is: ", downdom.dsiDim(i));
+        //        writeln("Lows are: ", (downdom.dsiDim(i).low, updom.dsiDim(i).low));
+      //        warning("Stride mismatch in ArrayReindexViewDom.dsiBuildRectangularDom()");
+      //      }
       newranges(i) = ranges(i).translate(downdom.dsiDim(i).low - updom.dsiDim(i).low);
-      if (ranges(i).stride != updom.dsiDim(i).stride) {
-        writeln("Assigned to newranges anyway and got: ", newranges(i));
-      }
+      //      if (ranges(i).stride != updom.dsiDim(i).stride) {
+        //        writeln("Assigned to newranges anyway and got: ", newranges(i));
+      //      }
     }
     //    writeln("newranges = ", newranges);
     //    halt("That's all folks!");
@@ -424,7 +424,7 @@ class ArrayReindexViewArr: BaseArr {
     if (dom.rank == 1) {
       const pos_i = dom.dsiDim(1).indexOrder((...i));
       const ind_i = arr.dom.dsiDim(1).orderToIndex(pos_i);
-      writeln("Reindex outgoing index: ", ind_i);
+      //      writeln("Reindex outgoing index: ", ind_i);
       return arr.dsiAccess(ind_i);
     } else {
       var ind_i: dom.rank*dom.idxType;

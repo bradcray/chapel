@@ -450,7 +450,7 @@ proc computeBlock(a,b,c) {
 proc printConfiguration() {
   writeln("scaling mode = ", mode);
   writelnPotentialPowerOfTwo("total keys = ", totalKeys);
-  writelnPotentialPowerOfTwo("keys per locale = ", keysPerBucket);
+  writelnPotentialPowerOfTwo("keys per bucket = ", keysPerBucket);
   writelnPotentialPowerOfTwo("maxKeyVal = ", maxKeyVal);
   writelnPotentialPowerOfTwo("bucketWidth = ", bucketWidth);
   writeln("numTrials = ", numTrials);

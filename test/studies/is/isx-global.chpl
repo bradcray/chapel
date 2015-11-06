@@ -193,12 +193,19 @@ proc bucketSort(time = false, verify = false) {
     var keysPerBucket: [LocBucketSpace] safeCountType;
     var myKeys = keys.localSlice[bucket2KeyInds[b]];
 
+    //
+    // TODO: Note the nested "express all parallelism" style.  Do we like?
+    //
     forall key in myKeys {
       const bucketIndex = key / bucketWidth;
       keysPerBucket[bucketIndex].add(1);
     }
     if (debug) then
       writeln("bucket ", b, " (on locale ", here.id, ") has key count of: ", keysPerBucket);
+
+    var sendOffsets: [LocBucketSpace] int = + scan keysPerBucket.read();
+    sendOffsets -= keysPerBucket.read();
+    if debug then writeln("bucket ", b, " (on locale ", here.id, ") has send offsets of: ", sendOffsets);
   }
   /*
   var keysPerBucket: [BucketSpace] [LocBucketSpace] safeCountType;

@@ -60,6 +60,9 @@ module DefaultRectangular {
     proc dsiClone() return this;
   
     proc dsiAssign(other: this.type) { }
+
+    proc dsiEqualDMaps(d:DefaultDist) param return true;
+    proc dsiEqualDMaps(d) param return false;
   }
 
   /* CURRENTLY UNUSED as I put .value method in ArrayView Dom/Dist classes
@@ -826,6 +829,11 @@ module DefaultRectangular {
 
     inline proc initShiftedData() {
       if earlyShiftData && !stridable {
+        // Lydia note 11/04/15: a question was raised as to whether this
+        // check on dsiNumIndices added any value.  Performance results
+        // from removing this line seemed inconclusive, which may indicate
+        // that the check is not necessary, but it seemed like unnecessary
+        // work for something with no immediate reward.
         if dom.dsiNumIndices > 0 {
           if isIntType(idxType) then
             shiftedData = _ddata_shift(eltType, data, origin-factoredOffs);
@@ -1055,6 +1063,11 @@ module DefaultRectangular {
         // has not yet been updated (this is called from within the
         // = function for domains.
         if earlyShiftData && !d._value.stridable then
+          // Lydia note 11/04/15: a question was raised as to whether this
+          // check on numIndices added any value.  Performance results
+          // from removing this line seemed inconclusive, which may indicate
+          // that the check is not necessary, but it seemed like unnecessary
+          // work for something with no immediate reward.
           if d.numIndices > 0 then
             shiftedData = copy.shiftedData;
         //numelm = copy.numelm;
@@ -1078,6 +1091,11 @@ module DefaultRectangular {
       rad.factoredOffs = factoredOffs;
       rad.data = data;
       if earlyShiftData && !stridable then
+        // Lydia note 11/04/15: a question was raised as to whether this
+        // check on dsiNumIndices added any value.  Performance results
+        // from removing this check seemed inconclusive, which may indicate
+        // that the check is not necessary, but it seemed like unnecessary
+        // work for something with no immediate reward.
         if dom.dsiNumIndices > 0 then rad.shiftedData = shiftedData;
       return rad;
     }

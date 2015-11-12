@@ -214,21 +214,13 @@ module ChapelBase {
   //
   // assignment on primitive types
   //
-  pragma "trivial assignment"
   inline proc =(ref a: bool, b: bool) { __primitive("=", a, b); }
-  pragma "trivial assignment"
   inline proc =(ref a: bool(?w), b: bool) { __primitive("=", a, b); }
-  pragma "trivial assignment"
   inline proc =(ref a: int(?w), b: int(w)) { __primitive("=", a, b); }
-  pragma "trivial assignment"
   inline proc =(ref a: uint(?w), b: uint(w)) { __primitive("=", a, b); }
-  pragma "trivial assignment"
   inline proc =(ref a: real(?w), b: real(w)) { __primitive("=", a, b); }
-  pragma "trivial assignment"
   inline proc =(ref a: imag(?w), b: imag(w)) { __primitive("=", a, b); }
-  pragma "trivial assignment"
   inline proc =(ref a: complex(?w), b: complex(w)) { __primitive("=", a, b); }
-  pragma "trivial assignment"
   inline proc =(ref a:opaque, b:opaque) {__primitive("=", a, b); }
 
   inline proc =(ref a, b: a.type) where isClassType(a.type)
@@ -826,12 +818,14 @@ module ChapelBase {
   //
   
   config param useAtomicTaskCnt =  CHPL_NETWORK_ATOMICS!="none";
-  type taskCntType = if useAtomicTaskCnt then atomic int
-                                         else int;
+
+  pragma "end count"
   pragma "no default functions"
   class _EndCount {
-    var i: atomic int,
-        taskCnt: taskCntType,
+    type iType;
+    type taskType;
+    var i: iType,
+        taskCnt: taskType,
         taskList: _task_list = _defaultOf(_task_list);
   }
   
@@ -839,10 +833,25 @@ module ChapelBase {
   // statement needed, because the task should be running on the same
   // locale as the sync/cofall/cobegin was initiated on and thus the
   // same locale on which the object is allocated.
+  //
+  // TODO: 'taskCnt' can sometimes be local even if 'i' has to be remote.
+  // It is currently believed that only a remote-begin will want a network
+  // atomic 'taskCnt'. There should be a separate argument to control the type
+  // of 'taskCnt'.
   pragma "dont disable remote value forwarding"
-  inline proc _endCountAlloc() {
-    return new _EndCount();
+  inline proc _endCountAlloc(param forceLocalTypes : bool) {
+    type taskCntType = if !forceLocalTypes && useAtomicTaskCnt then atomic int
+                                           else int;
+    if forceLocalTypes {
+      return new _EndCount(chpl__processorAtomicType(int), taskCntType);
+    } else {
+      return new _EndCount(chpl__atomicType(int), taskCntType);
+    }
   }
+
+  // Compiler looks for this variable to determine the return type of
+  // the "get end count" primitive.
+  type _remoteEndCountType = _endCountAlloc(false).type;
   
   // This function is called once by the initiating task.  As above, no
   // on statement needed.
@@ -857,7 +866,7 @@ module ChapelBase {
   pragma "dont disable remote value forwarding"
   pragma "no remote memory fence"
   proc _upEndCount(e: _EndCount, param countRunningTasks=true) {
-    if useAtomicTaskCnt {
+    if isAtomic(e.taskCnt) {
       e.i.add(1, memory_order_release);
       e.taskCnt.add(1, memory_order_release);
     } else {
@@ -899,7 +908,7 @@ module ChapelBase {
     e.i.waitFor(0, memory_order_acquire);
 
     if countRunningTasks {
-      const taskDec = if useAtomicTaskCnt then e.taskCnt.read() else e.taskCnt;
+      const taskDec = if isAtomic(e.taskCnt) then e.taskCnt.read() else e.taskCnt;
       // taskDec-1 to adjust for the task that was waiting for others to finish
       here.runningTaskCntSub(taskDec-1);  // increment is in _upEndCount()
     } else {
@@ -967,7 +976,7 @@ module ChapelBase {
 
   inline proc _cast(type t, x) where t:object && x:t
     return __primitive("cast", t, x);
-  
+
   inline proc _cast(type t, x) where t:object && x:_nilType
     return __primitive("cast", t, x);
   
@@ -1061,12 +1070,13 @@ module ChapelBase {
     pragma "no auto destroy" var x: t;
     return x;
   }
-  
+
   pragma "init copy fn"
   inline proc chpl__initCopy(type t) {
     compilerError("illegal assignment of type to value");
   }
   
+  pragma "compiler generated"
   pragma "init copy fn"
   inline proc chpl__initCopy(x: _tuple) { 
     // body inserted during generic instantiation
@@ -1102,6 +1112,7 @@ module ChapelBase {
   }
   
 
+  pragma "compiler generated"
   pragma "donor fn"
   pragma "auto copy fn"
   inline proc chpl__autoCopy(x: _tuple) {
@@ -1115,6 +1126,7 @@ module ChapelBase {
     return ir;
   }
   
+  pragma "compiler generated"
   pragma "donor fn"
   pragma "auto copy fn"
   inline proc chpl__autoCopy(x) return chpl__initCopy(x);
@@ -1124,8 +1136,13 @@ module ChapelBase {
   inline proc chpl__maybeAutoDestroyed(x: object) param return false;
   inline proc chpl__maybeAutoDestroyed(x) param return true;
 
+  pragma "compiler generated"
   inline proc chpl__autoDestroy(x: object) { }
+
+  pragma "compiler generated"
   inline proc chpl__autoDestroy(type t)  { }
+
+  pragma "compiler generated"
   inline proc chpl__autoDestroy(x: ?t) {
     __primitive("call destructor", x);
   }
@@ -1148,6 +1165,9 @@ module ChapelBase {
     __primitive("call destructor", x);
   }
   
+  // = for c_void_ptr
+  inline proc =(ref a: c_void_ptr, b: c_void_ptr) { __primitive("=", a, b); }
+
   // Type functions for representing function types
   inline proc func() type { return __primitive("create fn type", void); }
   inline proc func(type rettype) type { return __primitive("create fn type", rettype); }

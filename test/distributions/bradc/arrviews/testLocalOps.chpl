@@ -50,5 +50,5 @@ proc baz(X: [2..11] real) {
 
 foo(A[2..9, 2..9]);
 foo(A[9, 3..10]);
-bar(A);
-baz(A[9, ..]);
+bar(A.reindex({2..11, 2..11}));
+baz(A[9, ..].reindex({2..11}));

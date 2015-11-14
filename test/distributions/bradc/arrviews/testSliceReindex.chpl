@@ -16,7 +16,7 @@ writeln("A is: ", A);
 foo(A[2..n-1]);
 writeln("A is: ", A);
 
-bar(A);
+bar(A.reindex({4..n+3}));
 
 proc foo(Arr) {
   for a in Arr do

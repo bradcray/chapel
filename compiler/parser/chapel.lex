@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -318,6 +318,13 @@ int processNewline(yyscan_t scanner) {
 *                                                                           *
 ************************************* | ************************************/
 
+void stringBufferInit() {
+  if (stringBuffer == NULL) {
+    stringBuffer  = (char*) malloc(1024);
+    stringBuffer[0] = '\0';
+  }
+}
+
 static int  processIdentifier(yyscan_t scanner) {
   YYSTYPE* yyLval = yyget_lval(scanner);
   int      retval = processToken(scanner, TIDENT);
@@ -424,6 +431,10 @@ static char* eatStringLiteral(yyscan_t scanner, const char* startChar) {
         addCharString('\\');
       }
 
+      // \ escape ? to avoid C trigraphs
+      if (c == '?')
+        addCharString('\\');
+
       addCharString(c);
     }
 
@@ -433,6 +444,12 @@ static char* eatStringLiteral(yyscan_t scanner, const char* startChar) {
       if (c == '\n') {
         processNewline(scanner);
         addCharString('n');
+      } else if (c == 'u' || c == 'U') {
+        ParserContext context(scanner);
+        yyerror(yyLloc, &context, "universal character name not yet supported in string literal");
+      } else if ('0' <= c && c <= '7' ) {
+        ParserContext context(scanner);
+        yyerror(yyLloc, &context, "octal escape not supported in string literal");
       } else if (c != 0) {
         addCharString(c);
       }

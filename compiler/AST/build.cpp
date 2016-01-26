@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -134,11 +134,6 @@ static void addPragmaFlags(Symbol* sym, Vec<const char*>* pragmas) {
           USR_WARN(fn, "function's return type is not a value type.  Ignoring.");
         }
         fn->retTag = RET_TYPE;
-      } else if (flag == FLAG_DEFAULT_STRING_VALUE) {
-        INT_ASSERT(dtString->defaultValue==NULL);
-        INT_ASSERT(toVarSymbol(sym));
-        sym->type = dtString;
-        dtString->defaultValue = sym;
       }
     }
   }
@@ -187,29 +182,13 @@ static const char* toImmediateString(Expr* expr) {
 }
 
 
-static Expr* convertStringLiteral(Expr *e) {
-  if (toImmediateString(e) != NULL) {
-    return new CallExpr("toString", e);
-  } else {
-    return e;
-  }
-}
-
-static void convertStringLiteralArgList(CallExpr* call) {
-  // Automatically convert string literals into Chapel strings
-  for (int i = 1; i <= call->numActuals(); i++) {
-    call->argList.insertAtTail(convertStringLiteral(call->argList.head->remove()));
-  }
-}
-
 CallExpr* buildOneTuple(Expr* elem) {
-  return new CallExpr("_build_tuple", convertStringLiteral(elem));
+  return new CallExpr("_build_tuple", elem);
 }
 
 CallExpr* buildTuple(CallExpr* call) {
   // The call is expected to be a PRIM_ACTUALS_LIST.
   INT_ASSERT(call->isPrimitive(PRIM_ACTUALS_LIST));
-  convertStringLiteralArgList(call);
   return new CallExpr("_build_tuple", call);
 }
 
@@ -434,22 +413,7 @@ BlockStmt* buildUseStmt(CallExpr* args) {
   //
   for_actuals(expr, args) {
     Expr* useArg = expr->remove();
-    //
-    // 'use' statements no longer accept string literals, but let's
-    // let it slide for one release to ease transition to the
-    // 'require' statement.  Generate a warning and process it as
-    // though the user had typed 'require'.  This check can be removed
-    // after the 1.12 release.
-    //
-    if (const char* str = toImmediateString(useArg)) {
-      USR_WARN(useArg, "'use' no longer accepts string literals == use 'require' instead");
-      processStringInRequireStmt(str);
-    } else {
-      //
-      // Otherwise, handle it in the traditional way
-      //
-      list = buildUseList(useArg, list);
-    }
+    list = buildUseList(useArg, list);
   }
 
   //
@@ -1629,7 +1593,6 @@ CallExpr* buildReduceExpr(Expr* opExpr, Expr* dataExpr, bool zippered) {
   leadBlock->insertAtTail("{TYPE 'move'(%S, iteratorIndex(%S))}", leadIdx, leadIter);
   leadBlock->insertAtTail(leadBody);
   leadBlock->insertAtTail("_freeIterator(%S)", leadIter);
-  serialBlock->insertAtHead("compilerWarning('reduce has been serialized (see note in $CHPL_HOME/STATUS)')");
 
   fn->insertAtTail(new CondStmt(new SymExpr(gTryToken), leadBlock, serialBlock));
 
@@ -1771,6 +1734,21 @@ buildClassDefExpr(const char* name,
                   Flag        isExtern,
                   const char* docs) {
   AggregateType* ct = toAggregateType(type);
+  // Hook the string type in the modules
+  // We have to do this here so we can reason about dtString as soon as
+  // possible in the compiler. gatherWellKnownTypes runs too late to be of use
+  // to us.
+  if (strcmp("string", name) == 0) {
+    *dtString = *ct;
+    // These fields get overwritten with `ct` by the assignment. These fields are
+    // set to `this` by the AggregateType constructor so they should still be
+    // `dtString`. Fix them back up.
+    dtString->fields.parent = dtString;
+    dtString->inherits.parent = dtString;
+    gAggregateTypes.remove(gAggregateTypes.index(ct));
+    delete ct;
+    ct = dtString;
+  }
   INT_ASSERT(ct);
   TypeSymbol* ts = new TypeSymbol(name, ct);
   DefExpr* def = new DefExpr(ts);
@@ -2027,15 +2005,31 @@ buildFunctionFormal(FnSymbol* fn, DefExpr* def) {
 BlockStmt* buildLocalStmt(Expr* stmt) {
   BlockStmt* block = buildChapelStmt();
 
-  if (fLocal) {
+  if (!requireWideReferences()) {
     block->insertAtTail(stmt);
     return block;
   }
 
-  BlockStmt* localBlock = new BlockStmt(stmt);
-  localBlock->blockInfoSet(new CallExpr(PRIM_BLOCK_LOCAL));
-  block->insertAtTail(localBlock);
-  return block;
+  BlockStmt* body = toBlockStmt(stmt);
+
+  //
+  // detect on-statement directly inside local statement
+  //
+  BlockStmt* onBlock = findStmtWithTag(PRIM_BLOCK_ON, body);
+
+  if (onBlock) {
+    CallExpr* call = toCallExpr(onBlock->blockInfoGet());
+
+    // first argument of a primitive on is a param bool that distinguishes
+    // between a local-on and a regular on-statement.
+    call->argList.head->replace(new SymExpr(gTrue));
+    return body;
+  } else {
+    BlockStmt* localBlock = new BlockStmt(stmt);
+    localBlock->blockInfoSet(new CallExpr(PRIM_BLOCK_LOCAL));
+    block->insertAtTail(localBlock);
+    return block;
+  }
 }
 
 
@@ -2096,7 +2090,7 @@ buildOnStmt(Expr* expr, Expr* stmt) {
     Symbol* tmp = newTemp();
     body->insertAtHead(new CallExpr(PRIM_MOVE, tmp, onExpr));
     body->insertAtHead(new DefExpr(tmp));
-    beginBlock->blockInfoSet(new CallExpr(PRIM_BLOCK_BEGIN_ON, tmp));
+    beginBlock->blockInfoSet(new CallExpr(PRIM_BLOCK_BEGIN_ON, gFalse, tmp));
     // If there are beginBlock->byrefVars, they will be preserved.
     return body;
   } else {
@@ -2106,7 +2100,7 @@ buildOnStmt(Expr* expr, Expr* stmt) {
     block->insertAtTail(new DefExpr(tmp));
     block->insertAtTail(new CallExpr(PRIM_MOVE, tmp, onExpr));
     BlockStmt* onBlock = new BlockStmt(stmt);
-    onBlock->blockInfoSet(new CallExpr(PRIM_BLOCK_ON, tmp));
+    onBlock->blockInfoSet(new CallExpr(PRIM_BLOCK_ON, gFalse, tmp));
     block->insertAtTail(onBlock);
     return block;
   }

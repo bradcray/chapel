@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
  * The entirety of this work is licensed under the Apache License,
@@ -741,22 +741,19 @@ module DefaultRectangular {
         if !dom.stridable {
           // Ideally we would like to be able to do something like
           // "for i in first..last by step". However, right now that would
-          // results in a strided iterator which isn't as optimized. It also
-          // introduces another range creation which in tight loops is
-          // unfortunately expensive. Ideally we don't want to be using C for
-          // loops outside of ChapelRange. However, since most other array data
-          // types are implemented in terms of DefaultRectangular, we think
-          // that this will serve as a second base case rather than the
-          // beginning of every iterator invoking a primitive C for loop
-          var i: idxType;
+          // result in a strided iterator which isn't as optimized. It would
+          // also add a range constructor, which in tight loops is pretty
+          // expensive. Instead we use a direct range iterator that is
+          // optimized for positively strided ranges. It should be just as fast
+          // as directly using a "c for loop", but it contains code check for
+          // overflow and invalid strides as well as the ability to use a less
+          // optimized iteration method if users are concerned about range
+          // overflow.
           const first = getDataIndex(dom.dsiLow);
           const second = getDataIndex(dom.dsiLow+1);
           const step = (second-first);
           const last = first + (dom.dsiNumIndices-1) * step;
-          while __primitive("C for loop",
-                            __primitive( "=", i, first),
-                            __primitive("<=", i, last),
-                            __primitive("+=", i, step)) {
+          for i in chpl_direct_pos_stride_range_iter(first, last, step) {
             yield theData(i);
           }
 
@@ -922,8 +919,13 @@ module DefaultRectangular {
   
     inline proc dsiAccess(ind : rank*idxType) ref {
       if boundsChecking then
-        if !dom.dsiMember(ind) then
-          halt("array index out of bounds: ", ind);
+        if !dom.dsiMember(ind) {
+          // Note -- because of module load order dependency issues,
+          // the multiple-arguments implementation of halt cannot
+          // be called at this point. So we call a special routine
+          // that does the right thing here.
+          halt("array index out of bounds: " + _stringify_index(ind));
+        }
       var dataInd = getDataIndex(ind);
       //assert(dataInd >= 0);
       //assert(numelm >= 0); // ensure it has been initialized
@@ -1118,14 +1120,14 @@ module DefaultRectangular {
     f <~> new ioLiteral("}");
   }
   
-  proc DefaultRectangularDom.dsiSerialWrite(f: Writer) { this.dsiSerialReadWrite(f); }
-  proc DefaultRectangularDom.dsiSerialRead(f: Reader) { this.dsiSerialReadWrite(f); }
+  proc DefaultRectangularDom.dsiSerialWrite(f) { this.dsiSerialReadWrite(f); }
+  proc DefaultRectangularDom.dsiSerialRead(f) { this.dsiSerialReadWrite(f); }
 
   proc DefaultRectangularArr.dsiSerialReadWrite(f /*: Reader or Writer*/) {
     chpl_rectArrayReadWriteHelper(f, this);
   }
 
-  proc DefaultRectangularArr.dsiSerialWrite(f: Writer) {
+  proc DefaultRectangularArr.dsiSerialWrite(f) {
     var isNative = f.styleElement(QIO_STYLE_ELEMENT_IS_NATIVE_BYTE_ORDER): bool;
 
     if _isSimpleIoType(this.eltType) && f.binary() &&
@@ -1147,7 +1149,7 @@ module DefaultRectangular {
     }
   }
 
-  proc DefaultRectangularArr.dsiSerialRead(f: Reader) {
+  proc DefaultRectangularArr.dsiSerialRead(f) {
     var isNative = f.styleElement(QIO_STYLE_ELEMENT_IS_NATIVE_BYTE_ORDER): bool;
 
     if _isSimpleIoType(this.eltType) && f.binary() &&
@@ -1242,7 +1244,7 @@ module DefaultRectangular {
       const dest = this.theData;
       const src = B._value.theData;
       if dest != src {
-        __primitive("chpl_comm_get",
+        __primitive("chpl_comm_array_get",
                   __primitive("array_get", dest, getDataIndex(Alo)),
                   B._value.data.locale.id,
                   __primitive("array_get", src, B._value.getDataIndex(Blo)),
@@ -1253,7 +1255,7 @@ module DefaultRectangular {
         writeln("\tlocal put() to ", this.locale.id);
       const dest = this.theData;
       const src = B._value.theData;
-      __primitive("chpl_comm_put",
+      __primitive("chpl_comm_array_put",
                   __primitive("array_get", src, B._value.getDataIndex(Blo)),
                   this.data.locale.id,
                   __primitive("array_get", dest, getDataIndex(Alo)),
@@ -1263,7 +1265,7 @@ module DefaultRectangular {
         writeln("\tremote get() on ", here.id, " from ", B.locale.id);
       const dest = this.theData;
       const src = B._value.theData;
-      __primitive("chpl_comm_get",
+      __primitive("chpl_comm_array_get",
                   __primitive("array_get", dest, getDataIndex(Alo)),
                   B._value.data.locale.id,
                   __primitive("array_get", src, B._value.getDataIndex(Blo)),

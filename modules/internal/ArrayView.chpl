@@ -117,7 +117,7 @@ class ArraySliceViewArr: BaseArr {
     arr.doiBulkTransferToDR(B);
   }
 
-  proc dsiSerialWrite(f: Writer) {
+  proc dsiSerialWrite(f) {
     chpl_rectArrayReadWriteHelper(f, arr, dom);
   }
 
@@ -242,7 +242,7 @@ class ArrayReindexViewDom: BaseRectangularDom {
     //    writeln("*****<<<< dsiSetIndices = ", x);
   }
 
-  proc dsiSerialWrite(f: Writer) {
+  proc dsiSerialWrite(f) {
     updom.dsiSerialWrite(f);
   }
 
@@ -451,7 +451,7 @@ class ArrayReindexViewArr: BaseArr {
   }
   */
 
-  proc dsiSerialWrite(f: Writer) {
+  proc dsiSerialWrite(f) {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 
@@ -585,7 +585,7 @@ class ArrayRankChangeViewDom: BaseRectangularDom {
     updom = newdom._value;
   }
 
-  proc dsiSerialWrite(f: Writer) {
+  proc dsiSerialWrite(f) {
     updom.dsiSerialWrite(f);
   }
 
@@ -776,7 +776,7 @@ class ArrayRankChangeViewArr: BaseArr {
   }
   */
 
-  proc dsiSerialWrite(f: Writer) {
+  proc dsiSerialWrite(f) {
     chpl_rectArrayReadWriteHelper(f, this, dom);
   }
 

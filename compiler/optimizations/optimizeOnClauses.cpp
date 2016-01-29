@@ -30,9 +30,10 @@
 #include "expr.h"
 #include "stmt.h"
 #include "passes.h"
+#include "view.h"
 
 /* Print lots of debugging messages when DEBUG is defined */
-#ifdef DEBUG
+#ifndef DEBUG
   #define DEBUG_PRINTF(...) printf(__VA_ARGS__)
 #else
   #define DEBUG_PRINTF(...)
@@ -342,7 +343,14 @@ inLocalBlock(CallExpr *call) {
 }
 
 static bool
-markFastSafeFn(FnSymbol *fn, int recurse, Vec<FnSymbol*> *visited) {
+markFastSafeFn(FnSymbol *fn, int recurse, Vec<FnSymbol*> *visited, bool print) {
+  //  list_view(fn);
+  printf("\n\n");
+  for (int i=0; i<recurse; i++) {
+    printf("*");
+  }
+  printf(" %s\n", fn->name);
+
   if (fn->hasFlag(FLAG_FAST_ON))
     return true;
 
@@ -351,11 +359,16 @@ markFastSafeFn(FnSymbol *fn, int recurse, Vec<FnSymbol*> *visited) {
 
   if (fn->hasFlag(FLAG_EXTERN)) {
     // consider a pragma to indicate that it would be "fast"
+    if (print)
+      DEBUG_PRINTF("(found extern flag)\n");
     return false;
   }
 
-  if (fn->hasFlag(FLAG_NON_BLOCKING))
+  if (fn->hasFlag(FLAG_NON_BLOCKING)) {
+    if (print)
+      DEBUG_PRINTF("(found non-blocking flag)\n");
     return false;
+  }
 
   visited->add_exclusive(fn);
 
@@ -364,11 +377,13 @@ markFastSafeFn(FnSymbol *fn, int recurse, Vec<FnSymbol*> *visited) {
   collectCallExprs(fn, calls);
 
   for_vector(CallExpr, call, calls) {
-    DEBUG_PRINTF("\tcall %p (id=%d): ", call, call->id);
+    if (print)
+      DEBUG_PRINTF("\tcall %p (id=%d): ", call, call->id);
     bool isLocal = fn->hasFlag(FLAG_LOCAL_FN) || inLocalBlock(call);
 
     if (!call->primitive) {
-      DEBUG_PRINTF("(non-primitive CALL)\n");
+      if (print)
+        DEBUG_PRINTF("(non-primitive CALL)\n");
       if ((recurse>0) && call->isResolved()) {
         if (call->isResolved()->hasFlag(FLAG_ON_BLOCK)) {
           visited->add_exclusive(call->isResolved());
@@ -378,32 +393,41 @@ markFastSafeFn(FnSymbol *fn, int recurse, Vec<FnSymbol*> *visited) {
           return false;
         }
         if (!visited->in(call->isResolved())) {
-          DEBUG_PRINTF("%d: recurse %p (block=%p, id=%d)\n", recurse-1,
-                       call->isResolved(), call->isResolved()->body,
-                       call->isResolved()->id);
-          DEBUG_PRINTF("\tlength=%d\n", call->isResolved()->body->length());
-          if (!markFastSafeFn(call->isResolved(), recurse-1, visited)) {
-            DEBUG_PRINTF("%d: recurse FAILED (id=%d).\n", recurse-1, call->id);
+          if (print)
+            DEBUG_PRINTF("%d: recurse %p (block=%p, id=%d)\n", recurse-1,
+                         call->isResolved(), call->isResolved()->body,
+                         call->isResolved()->id);
+          if (print)
+            DEBUG_PRINTF("\tlength=%d\n", call->isResolved()->body->length());
+          if (!markFastSafeFn(call->isResolved(), recurse-1, visited, print)) {
+            if (print)
+              DEBUG_PRINTF("%d: recurse FAILED (id=%d).\n", recurse-1, call->id);
             return false;
           }
         } else {
-          DEBUG_PRINTF("%d: recurse ALREADY VISITED %p (id=%d)\n", recurse-1,
-                       call->isResolved(), call->isResolved()->id);
-          DEBUG_PRINTF("\tlength=%d\n", call->isResolved()->body->length());
+          if (print)
+            DEBUG_PRINTF("%d: recurse ALREADY VISITED %p (id=%d)\n", recurse-1,
+                         call->isResolved(), call->isResolved()->id);
+          if (print)
+            DEBUG_PRINTF("\tlength=%d\n", call->isResolved()->body->length());
         }
-        DEBUG_PRINTF("%d: recurse DONE.\n", recurse-1);
+        if (print)
+          DEBUG_PRINTF("%d: recurse DONE.\n", recurse-1);
       } else {
         // No function calls allowed
-        DEBUG_PRINTF("%d: recurse FAILED (%s, id=%d).\n", recurse-1,
-                     recurse == 1 ? "too deep" : "function not resolved",
-                     call->id);
+        if (print)
+          DEBUG_PRINTF("%d: recurse FAILED (%s, id=%d).\n", recurse-1,
+                       recurse == 1 ? "too deep" : "function not resolved",
+                       call->id);
         return false;
       }
     } else if (isFastPrimitive(call, isLocal)) {
-      DEBUG_PRINTF(" (FAST primitive CALL)\n");
+      if (print)
+        DEBUG_PRINTF(" (FAST primitive CALL)\n");
     } else {
-      DEBUG_PRINTF("%d: FAILED (non-FAST primitive CALL: %s, id=%d)\n",
-                   recurse-1, call->primitive->name, call->id);
+      if (print)
+        DEBUG_PRINTF("%d: FAILED (non-FAST primitive CALL: %s, id=%d)\n",
+                     recurse-1, call->primitive->name, call->id);
       return false;
     }
   }
@@ -428,15 +452,19 @@ optimizeOnClauses(void) {
     DEBUG_PRINTF("\tlength=%d\n", fn->body->length());
     Vec<FnSymbol*> visited;
 
-    if (markFastSafeFn(fn, optimize_on_clause_limit, &visited)) {
+
+    ModuleSymbol* mod = toModuleSymbol(fn->defPoint->parentSymbol);
+    INT_ASSERT(mod);
+
+    if (markFastSafeFn(fn, optimize_on_clause_limit, &visited, 
+                       mod->modTag == MOD_USER)) {
       DEBUG_PRINTF("\t[CANDIDATE FOR FAST FORK]\n");
       fn->addFlag(FLAG_FAST_ON);
 
       if (fReportOptimizedOn) {
         ModuleSymbol *mod = toModuleSymbol(fn->defPoint->parentSymbol);
         INT_ASSERT(mod);
-        if (developer ||
-            ((mod->modTag != MOD_INTERNAL) && (mod->modTag != MOD_STANDARD))) {
+        if (developer || mod->modTag == MOD_USER) {
           printf("Optimized on clause (%s) in module %s (%s:%d)\n",
                  fn->cname, mod->name, fn->fname(), fn->linenum());
         }

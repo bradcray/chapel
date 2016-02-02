@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -80,7 +80,6 @@ Symbol *gTimer = NULL;
 Symbol *gTaskID = NULL;
 Symbol *gSyncVarAuxFields = NULL;
 Symbol *gSingleVarAuxFields = NULL;
-Symbol *gTaskList = NULL;
 
 VarSymbol *gTrue = NULL;
 VarSymbol *gFalse = NULL;
@@ -94,8 +93,6 @@ VarSymbol *gModuleInitIndentLevel = NULL;
 FnSymbol *gPrintModuleInitFn = NULL;
 FnSymbol* gChplHereAlloc = NULL;
 FnSymbol* gChplHereFree = NULL;
-Symbol *gCLine = NULL;
-Symbol *gCFile = NULL;
 
 std::map<FnSymbol*,int> ftableMap;
 Vec<FnSymbol*> ftableVec;
@@ -701,7 +698,11 @@ GenRet VarSymbol::codegen() {
                   (name, info->builder->getInt8PtrTy()));
         globalValue->setConstant(true);
         globalValue->setInitializer(llvm::cast<llvm::Constant>(
-              info->builder->CreateConstInBoundsGEP2_32(constString, 0, 0)));
+              info->builder->CreateConstInBoundsGEP2_32(
+#if HAVE_LLVM_VER >= 37
+                NULL,
+#endif
+                constString, 0, 0)));
         ret.val = globalValue;
         ret.isLVPtr = GEN_PTR;
       } else {
@@ -858,7 +859,11 @@ void VarSymbol::codegenDef() {
           llvm::GlobalVariable *globalString =
             llvm::cast<llvm::GlobalVariable>(constString);
           globalValue->setInitializer(llvm::cast<llvm::Constant>(
-                info->builder->CreateConstInBoundsGEP2_32(globalString, 0, 0)));
+                info->builder->CreateConstInBoundsGEP2_32(
+#if HAVE_LLVM_VER >= 37
+                  NULL,
+#endif
+                  globalString, 0, 0)));
         } else {
           llvm::GlobalVariable *globalString =
             new llvm::GlobalVariable(
@@ -871,7 +876,11 @@ void VarSymbol::codegenDef() {
           globalString->setInitializer(llvm::Constant::getNullValue(
                 llvm::IntegerType::getInt8Ty(info->module->getContext())));
           globalValue->setInitializer(llvm::cast<llvm::Constant>(
-                info->builder->CreateConstInBoundsGEP1_32(globalString, 0)));
+                info->builder->CreateConstInBoundsGEP1_32(
+#if HAVE_LLVM_VER >= 37
+                  NULL,
+#endif
+                  globalString, 0)));
         }
       } else {
         globalValue->setInitializer(llvm::cast<llvm::Constant>(
@@ -2832,7 +2841,7 @@ void ModuleSymbol::addDefaultUses() {
     SET_LINENO(this);
 
     modRef = new UnresolvedSymExpr("ChapelStandard");
-    block->insertAtHead(new CallExpr(PRIM_USE, modRef));
+    block->insertAtHead(new UseStmt(modRef));
 
   // We don't currently have a good way to fetch the root module by name.
   // Insert it directly rather than by name
@@ -2842,7 +2851,7 @@ void ModuleSymbol::addDefaultUses() {
     block->moduleUseAdd(rootModule);
 
     UnresolvedSymExpr* modRef = new UnresolvedSymExpr("ChapelStringLiterals");
-    block->insertAtHead(new CallExpr(PRIM_USE, modRef));
+    block->insertAtHead(new UseStmt(modRef));
   }
 }
 
@@ -2978,6 +2987,7 @@ std::string unescapeString(const char* const str) {
       continue;
     }
 
+    // handle \ ecapes
     nextChar = str[pos++];
     switch(nextChar) {
       case '\'':
@@ -3082,6 +3092,7 @@ VarSymbol *new_StringSymbol(const char *str) {
   s->addFlag(FLAG_NO_AUTO_DESTROY);
   s->addFlag(FLAG_CONST);
   s->addFlag(FLAG_LOCALE_PRIVATE);
+  s->addFlag(FLAG_CHAPEL_STRING_LITERAL);
 
   DefExpr* stringLitDef = new DefExpr(s);
   // DefExpr(s) always goes into the module scope to make it a global

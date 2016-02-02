@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -677,7 +677,7 @@ static void build_enum_cast_function(EnumType* et) {
     CondStmt* otherwise =
       new CondStmt(new CallExpr(PRIM_WHEN),
                    new BlockStmt(new CallExpr("halt",
-                                 new_CStringSymbol(errorString))));
+                                 new_StringSymbol(errorString))));
     whenstmts->insertAtTail(otherwise);
     fn->insertAtTail(buildSelectStmt(new SymExpr(arg2), whenstmts));
   }
@@ -705,15 +705,21 @@ static void build_enum_cast_function(EnumType* et) {
              new CallExpr("==", arg2, new_StringSymbol(constant->sym->name)),
              new CallExpr(PRIM_RETURN, constant->sym),
              cond);
+    cond = new CondStmt(
+             new CallExpr("==", arg2,
+                          new_StringSymbol(
+                            astr(et->symbol->name, ".", constant->sym->name))),
+             new CallExpr(PRIM_RETURN, constant->sym),
+             cond);
   }
 
   fn->insertAtTail(cond);
 
   fn->insertAtTail(new CallExpr("halt",
-                                new_CStringSymbol("illegal conversion of string \\\""),
+                                new_StringSymbol("illegal conversion of string \\\""),
                                 arg2,
-                                new_CStringSymbol("\\\" to "),
-                                new_CStringSymbol(et->symbol->name)));
+                                new_StringSymbol("\\\" to "),
+                                new_StringSymbol(et->symbol->name)));
 
   fn->insertAtTail(new CallExpr(PRIM_RETURN,
                                 toDefExpr(et->constants.first())->sym));
@@ -1157,11 +1163,11 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
   // We'll make a writeThis and a readThis if neither exist.
   // If only one exists, we leave just one (as some types
   // can be written but not read, for example).
-  if (function_exists("writeThis", 3, dtMethodToken, ct, dtWriter)) {
+  if (function_exists("writeThis", 3, dtMethodToken, ct, dtAny)) {
     hasWriteThis = true;
     makeReadThisAndWriteThis = false;
   }
-  if (function_exists("readThis", 3, dtMethodToken, ct, dtReader)) {
+  if (function_exists("readThis", 3, dtMethodToken, ct, dtAny)) {
     hasReadThis = true;
     makeReadThisAndWriteThis = false;
   }
@@ -1174,7 +1180,8 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
     fn->cname = astr("_auto_", ct->symbol->name, "_write");
     fn->_this = new ArgSymbol(INTENT_BLANK, "this", ct);
     fn->_this->addFlag(FLAG_ARG_THIS);
-    ArgSymbol* fileArg = new ArgSymbol(INTENT_BLANK, "f", dtWriter);
+    ArgSymbol* fileArg = new ArgSymbol(INTENT_BLANK, "f", dtAny);
+    fileArg->addFlag(FLAG_MARKED_GENERIC);
     fn->insertFormalAtTail(new ArgSymbol(INTENT_BLANK, "_mt", dtMethodToken));
     fn->addFlag(FLAG_METHOD);
     fn->insertFormalAtTail(fn->_this);
@@ -1184,7 +1191,7 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
     if( hasReadWriteThis ) {
       fn->insertAtTail(new CallExpr(buildDotExpr(fn->_this, "readWriteThis"), fileArg));
     } else {
-      fn->insertAtTail(new CallExpr(buildDotExpr(fileArg, "writeThisDefaultImpl"), fn->_this));
+      fn->insertAtTail(new CallExpr("writeThisDefaultImpl", fileArg, fn->_this));
     }
 
     DefExpr* def = new DefExpr(fn);
@@ -1202,7 +1209,8 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
     fn->cname = astr("_auto_", ct->symbol->name, "_read");
     fn->_this = new ArgSymbol(INTENT_BLANK, "this", ct);
     fn->_this->addFlag(FLAG_ARG_THIS);
-    ArgSymbol* fileArg = new ArgSymbol(INTENT_BLANK, "f", dtReader);
+    ArgSymbol* fileArg = new ArgSymbol(INTENT_BLANK, "f", dtAny);
+    fileArg->addFlag(FLAG_MARKED_GENERIC);
     fn->insertFormalAtTail(new ArgSymbol(INTENT_BLANK, "_mt", dtMethodToken));
     fn->addFlag(FLAG_METHOD);
     fn->insertFormalAtTail(fn->_this);
@@ -1212,7 +1220,7 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
     if( hasReadWriteThis ) {
       fn->insertAtTail(new CallExpr(buildDotExpr(fn->_this, "readWriteThis"), fileArg));
     } else {
-      fn->insertAtTail(new CallExpr(buildDotExpr(fileArg, "readThisDefaultImpl"), fn->_this));
+      fn->insertAtTail(new CallExpr("readThisDefaultImpl", fileArg, fn->_this));
     }
 
     DefExpr* def = new DefExpr(fn);

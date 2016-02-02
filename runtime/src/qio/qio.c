@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
  * The entirety of this work is licensed under the Apache License,
@@ -79,8 +79,13 @@
 #endif
 #endif
 
+// A few global variables that control which I/O strategy is used.
+// See choose_io_method.
+
+// We don't want to use mmap to work with files that are too small
+// because operating on such files would use a lot of extra memory
+// when rounding up to 4k pages.
 ssize_t qio_too_small_for_default_mmap = 16*1024;
-ssize_t qio_too_large_for_default_mmap = 64*1024*((size_t)1024*1024);
 ssize_t qio_mmap_chunk_iobufs = 128; // mmap 128 iobufs at a time (8M)
 
 // Future - possibly set this based on ulimit?
@@ -567,8 +572,6 @@ qio_hint_t choose_io_method(qio_file_t* file, qio_hint_t hints, qio_hint_t defau
             // default case
             if( qio_allow_default_mmap && (!writing) &&
                 qio_too_small_for_default_mmap <= file_size &&
-                file_size < SSIZE_MAX &&
-                file_size < qio_too_large_for_default_mmap &&
                 (qbytes_iobuf_size & 4095) == 0) {
               // not writing, not too small, not too big, iobuf size multiple of 4k.
               method = QIO_METHOD_MMAP;
@@ -2325,6 +2328,9 @@ qioerr _buffered_read_atleast(qio_channel_t* ch, int64_t amt)
     left -= num_read;
     qbuffer_iter_advance(&ch->buf, &read_start, num_read);
 
+    // Ignore interrupted system call, just keep reading.
+    if( err && qio_err_to_int(err) == EINTR ) err = 0;
+
     if( err ) break;
   }
 
@@ -2429,6 +2435,7 @@ void _qio_buffered_advance_cached(qio_channel_t* ch)
     // before a read or a write, we'll recompute it in a jiffy.
     ch->cached_cur = NULL;
     ch->cached_end = NULL;
+    ch->cached_start = NULL;
   }
 
   _qio_channel_set_error_unlocked(ch, err);
@@ -2549,8 +2556,12 @@ qioerr _qio_buffered_behind(qio_channel_t* ch, int flushall)
           break;
         // no default to get warnings when new methods are added
       }
-      if( err ) goto error;
       qbuffer_iter_advance(&ch->buf, &write_start, num_written);
+
+      // Ignore interrupted system call, just keep writing.
+      if( err && qio_err_to_int(err) == EINTR ) err = 0;
+
+      if( err ) goto error;
     }
   } else {
     // just pretend like we wrote it; in fact we just deallocate
@@ -4057,6 +4068,8 @@ int64_t qio_channel_style_element(qio_channel_t* ch, int64_t element)
             ch->style.byteorder == QIO_NATIVE) ? 1 : 0;
   }
 #endif // __BYTE_ORDER
+  if( element == QIO_STYLE_ELEMENT_SKIP_UNKNOWN_FIELDS )
+    return ch->style.skip_unknown_fields;
   return 0;
 }
 

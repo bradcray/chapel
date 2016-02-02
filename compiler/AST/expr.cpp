@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -29,6 +29,7 @@
 #include "codegen.h"
 #include "ForLoop.h"
 #include "genret.h"
+#include "insertLineNumbers.h"
 #include "misc.h"
 #include "passes.h"
 #include "stmt.h"
@@ -818,7 +819,7 @@ GenRet codegenWideAddr(GenRet locale, GenRet raddr, Type* wideType = NULL)
 
   if( raddr.chplType && !wideType ) {
     INT_ASSERT(raddr.isLVPtr != GEN_WIDE_PTR);
-    Type* refType;
+    Type* refType = NULL;
     if( raddr.isLVPtr == GEN_VAL ) {
       // Then we should have a ref or a class.
       INT_ASSERT(raddr.chplType == dtNil ||
@@ -852,8 +853,16 @@ GenRet codegenWideAddr(GenRet locale, GenRet raddr, Type* wideType = NULL)
       info->cStatements.push_back(addrAssign);
     } else {
 #ifdef HAVE_LLVM
-      llvm::Value* adr = info->builder->CreateStructGEP(ret.val, WIDE_GEP_ADDR);
-      llvm::Value* loc = info->builder->CreateStructGEP(ret.val, WIDE_GEP_LOC);
+      llvm::Value* adr = info->builder->CreateStructGEP(
+#if HAVE_LLVM_VER >= 37
+          NULL,
+#endif
+          ret.val, WIDE_GEP_ADDR);
+      llvm::Value* loc = info->builder->CreateStructGEP(
+#if HAVE_LLVM_VER >= 37
+          NULL,
+#endif
+          ret.val, WIDE_GEP_LOC);
 
       // cast address if needed. This is necessary for building a wide
       // NULL pointer since NULL is actually an i8*.
@@ -886,7 +895,12 @@ GenRet codegenWideAddr(GenRet locale, GenRet raddr, Type* wideType = NULL)
       // we are supposed to have since null has type void*.
       llvm::Value* locAddr = raddr.val;
       locAddr = info->builder->CreatePointerCast(locAddr, locAddrType);
+#if HAVE_LLVM_VER >= 37
+      ret.val = info->builder->CreateCall(fn, {locale.val, locAddr});
+#else
       ret.val = info->builder->CreateCall2(fn, locale.val, locAddr);
+#endif
+
 #endif
     } else {
       // Packed wide pointers.
@@ -1174,6 +1188,17 @@ static GenRet codegenWideThingField(GenRet ws, int field)
              field == WIDE_GEP_ADDR ||
              field == WIDE_GEP_SIZE );
 
+  if( field == WIDE_GEP_SIZE ) {
+    ret.chplType = SIZE_TYPE;
+  } else if( field == WIDE_GEP_LOC ) {
+    ret.chplType = LOCALE_ID_TYPE;
+  } else if( field == WIDE_GEP_ADDR ) {
+    // get the local reference type
+    // this will probably be overwritten by the caller,
+    // but it is used below in the LLVM code.
+    ret.chplType = getRefTypesForWideThing(ws, NULL);
+  }
+
   const char* fname = wide_fields[field];
 
   if( info->cfile ) {
@@ -1191,19 +1216,17 @@ static GenRet codegenWideThingField(GenRet ws, int field)
 #ifdef HAVE_LLVM
     if (ws.val->getType()->isPointerTy()){
       ret.isLVPtr = GEN_PTR;
-      ret.val = info->builder->CreateConstInBoundsGEP2_32(ws.val, 0, field);
+      ret.val = info->builder->CreateConstInBoundsGEP2_32(
+#if HAVE_LLVM_VER >= 37
+                                          NULL,
+#endif
+                                          ws.val, 0, field);
     } else {
       ret.isLVPtr = GEN_VAL;
       ret.val = info->builder->CreateExtractValue(ws.val, field);
     }
     assert(ret.val);
 #endif
-  }
-
-  if( field == WIDE_GEP_SIZE ) {
-    ret.chplType = SIZE_TYPE;
-  } else if( field == WIDE_GEP_LOC ) {
-    ret.chplType = LOCALE_ID_TYPE;
   }
 
   return ret;
@@ -1293,7 +1316,9 @@ static GenRet codegenRnode(GenRet wide){
 
   if( widePointersStruct ) {
     ret = codegenCallExpr("chpl_nodeFromLocaleID",
-                          codegenAddrOf(codegenValuePtr(codegenWideThingField(wide,WIDE_GEP_LOC))), codegenZero(), codegenNullPointer());
+                          codegenAddrOf(codegenValuePtr(
+                              codegenWideThingField(wide, WIDE_GEP_LOC))),
+                          codegenZero(), codegenZero());
   } else {
     if( fLLVMWideOpt ) {
 #ifdef HAVE_LLVM
@@ -1475,11 +1500,17 @@ GenRet codegenFieldPtr(
 
     AggregateType *cBaseType = toAggregateType(baseType);
 
+    // We need the LLVM type of the field we're getting
+    INT_ASSERT(ret.chplType);
+    GenRet retType = ret.chplType;
+
     if( isUnion(ct) && !special ) {
       // Get a pointer to the union data then cast it to the right type
       ret.val = info->builder->CreateConstInBoundsGEP2_32(
+#if HAVE_LLVM_VER >= 37
+          NULL,
+#endif
           baseValue, 0, cBaseType->getMemberGEP("_u"));
-      GenRet retType = ret.chplType;
       llvm::PointerType* ty =
         llvm::PointerType::get(retType.type,
                                baseValue->getType()->getPointerAddressSpace());
@@ -1489,6 +1520,9 @@ GenRet codegenFieldPtr(
     } else {
       // Normally, we just use a GEP.
       ret.val = info->builder->CreateConstInBoundsGEP2_32(
+#if HAVE_LLVM_VER >= 37
+          NULL,
+#endif
           baseValue, 0, cBaseType->getMemberGEP(c_field_name));
     }
 #endif
@@ -2000,8 +2034,13 @@ GenRet codegenAdd(GenRet a, GenRet b)
     if( av.chplType ) a_signed = is_signed(av.chplType);
     if( bv.chplType ) b_signed = is_signed(bv.chplType);
 
-    // Handle pointer arithmetic ( e.g. int8* + int64)
-    if(av.val->getType()->isPointerTy() || bv.val->getType()->isPointerTy()) {
+    if (av.chplType == dtComplex[COMPLEX_SIZE_64]) {
+      ret = codegenCallExpr("complexAdd64", av, bv);
+    } else if (av.chplType == dtComplex[COMPLEX_SIZE_128]) {
+      ret = codegenCallExpr("complexAdd128", av, bv);
+    } else if(av.val->getType()->isPointerTy() ||
+              bv.val->getType()->isPointerTy()) {
+      // Handle pointer arithmetic ( e.g. int8* + int64)
       // We must have one integer and one pointer, not two pointers.
       GenRet *ptr = NULL;
       GenRet *i = NULL;
@@ -2046,7 +2085,11 @@ GenRet codegenSub(GenRet a, GenRet b)
     if( av.chplType ) a_signed = is_signed(av.chplType);
     if( bv.chplType ) b_signed = is_signed(bv.chplType);
 
-    if(av.val->getType()->isPointerTy()) {
+    if (av.chplType == dtComplex[COMPLEX_SIZE_64]) {
+      ret = codegenCallExpr("complexSubtract64", av, bv);
+    } else if (av.chplType == dtComplex[COMPLEX_SIZE_128]) {
+      ret = codegenCallExpr("complexSubtract128", av, bv);
+    } else if(av.val->getType()->isPointerTy()) {
       // Handle pointer arithmetic by calling codegenAdd
       // with a negative value.
       INT_ASSERT(bv.val->getType()->isIntegerTy());
@@ -2079,7 +2122,11 @@ GenRet codegenNeg(GenRet a)
   else {
 #ifdef HAVE_LLVM
     llvm::Value *value = av.val;
-    if(value->getType()->isFPOrFPVectorTy()) {
+    if (av.chplType == dtComplex[COMPLEX_SIZE_64]) {
+      ret = codegenCallExpr("complexUnaryMinus64", av);
+    } else if (av.chplType == dtComplex[COMPLEX_SIZE_128]) {
+      ret = codegenCallExpr("complexUnaryMinus128", av);
+    } else if(value->getType()->isFPOrFPVectorTy()) {
       ret.val = info->builder->CreateFNeg(value);
     } else {
       ret.val = info->builder->CreateNeg(value);
@@ -2105,14 +2152,20 @@ GenRet codegenMul(GenRet a, GenRet b)
     bool b_signed = false;
     if( av.chplType ) a_signed = is_signed(av.chplType);
     if( bv.chplType ) b_signed = is_signed(bv.chplType);
-    PromotedPair values =
-      convertValuesToLarger(av.val, bv.val, a_signed, b_signed);
-    if(values.a->getType()->isFPOrFPVectorTy()) {
-      ret.val = info->builder->CreateFMul(values.a, values.b);
+    if (av.chplType == dtComplex[COMPLEX_SIZE_64]) {
+      ret = codegenCallExpr("complexMultiply64", av, bv);
+    } else if (av.chplType == dtComplex[COMPLEX_SIZE_128]) {
+      ret = codegenCallExpr("complexMultiply128", av, bv);
     } else {
-      ret.val = info->builder->CreateMul(values.a, values.b);
+      PromotedPair values =
+        convertValuesToLarger(av.val, bv.val, a_signed, b_signed);
+      if(values.a->getType()->isFPOrFPVectorTy()) {
+        ret.val = info->builder->CreateFMul(values.a, values.b);
+      } else {
+        ret.val = info->builder->CreateMul(values.a, values.b);
+      }
+      ret.isUnsigned = !values.isSigned;
     }
-    ret.isUnsigned = !values.isSigned;
 #endif
   }
   return ret;
@@ -2129,17 +2182,23 @@ GenRet codegenDiv(GenRet a, GenRet b)
   if( info->cfile ) ret.c = "(" + av.c + " / " + bv.c + ")";
   else {
 #ifdef HAVE_LLVM
-    PromotedPair values =
-      convertValuesToLarger(av.val, bv.val, 
-                            is_signed(av.chplType), 
-                            is_signed(bv.chplType));
-    if(values.a->getType()->isFPOrFPVectorTy()) {
-      ret.val = info->builder->CreateFDiv(values.a, values.b);
+    if (av.chplType == dtComplex[COMPLEX_SIZE_64]) {
+      ret = codegenCallExpr("complexDivide64", av, bv);
+    } else if (av.chplType == dtComplex[COMPLEX_SIZE_128]) {
+      ret = codegenCallExpr("complexDivide128", av, bv);
     } else {
-      if(!values.isSigned) {
-        ret.val = info->builder->CreateUDiv(values.a, values.b);
+      PromotedPair values =
+        convertValuesToLarger(av.val, bv.val, 
+                              is_signed(av.chplType), 
+                              is_signed(bv.chplType));
+      if(values.a->getType()->isFPOrFPVectorTy()) {
+        ret.val = info->builder->CreateFDiv(values.a, values.b);
       } else {
-        ret.val = info->builder->CreateSDiv(values.a, values.b);
+        if(!values.isSigned) {
+          ret.val = info->builder->CreateUDiv(values.a, values.b);
+        } else {
+          ret.val = info->builder->CreateSDiv(values.a, values.b);
+        }
       }
     }
 #endif
@@ -3369,7 +3428,7 @@ void codegenAssign(GenRet to_ptr, GenRet from)
                       codegenRaddr(from),
                       codegenSizeof(type),
                       genTypeStructureIndex(type->symbol),
-                      info->lineno, info->filename );
+                      info->lineno, gFilenameLookupCache[info->filename] );
         }
       }
     } else { // PUT
@@ -3391,7 +3450,7 @@ void codegenAssign(GenRet to_ptr, GenRet from)
                       codegenRaddr(to_ptr),
                       codegenSizeof(type),
                       genTypeStructureIndex(type->symbol),
-                      info->lineno, info->filename);
+                      info->lineno, gFilenameLookupCache[info->filename]);
         }
       }
     }
@@ -3663,9 +3722,67 @@ CallExpr::insertAtTail(BaseAST* ast) {
 }
 
 
-FnSymbol* CallExpr::isResolved(void) {
-  SymExpr* base = toSymExpr(baseExpr);
-  return base ? toFnSymbol(base->var) : NULL;
+bool CallExpr::isEmpty() const {
+  return primitive == NULL && baseExpr == NULL;
+}
+
+
+// MDN 2016/01/29: This will become a predicate
+FnSymbol* CallExpr::isResolved() const {
+  return resolvedFunction();
+}
+
+
+FnSymbol* CallExpr::resolvedFunction() const {
+  FnSymbol* retval = NULL;
+
+  // A PRIM-OP
+  if (primitive != NULL) {
+    INT_ASSERT(baseExpr  == NULL);
+
+  // A Chapel call
+  } else if (baseExpr != NULL) {
+    if (isUnresolvedSymExpr(baseExpr) == true) {
+
+    } else if (SymExpr* base = toSymExpr(baseExpr)) {
+      if (FnSymbol* fn = toFnSymbol(base->var)) {
+        retval = fn;
+
+      // Probably an array index
+      } else if (isArgSymbol(base->var)  == true ||
+                 isVarSymbol(base->var)  == true) {
+
+      // A type specifier
+      } else if (isTypeSymbol(base->var) == true) {
+
+      } else {
+        INT_ASSERT(false);
+      }
+
+    } else if (CallExpr* subCall = toCallExpr(baseExpr)) {
+      // Confirm that this is a partial call
+      INT_ASSERT(subCall->partialTag == true);
+
+    } else {
+      INT_ASSERT(false);
+    }
+
+  // The CallExpr has been purged during resolve
+  } else {
+    INT_ASSERT(false);
+  }
+
+  return retval;
+}
+
+
+FnSymbol* CallExpr::theFnSymbol() const {
+  FnSymbol* retval = NULL;
+
+  if (SymExpr* base = toSymExpr(baseExpr))
+    retval = toFnSymbol(base->var);
+
+  return retval;
 }
 
 
@@ -3710,14 +3827,16 @@ Type* CallExpr::typeInfo(void) {
 }
 
 void CallExpr::prettyPrint(std::ostream *o) {
-  if (isResolved()) {
-    if (isResolved()->hasFlag(FLAG_BEGIN_BLOCK))
+  if (FnSymbol* fn = theFnSymbol()) {
+    if      (fn->hasFlag(FLAG_BEGIN_BLOCK))
       *o << "begin";
-    else if (isResolved()->hasFlag(FLAG_ON_BLOCK))
+    else if (fn->hasFlag(FLAG_ON_BLOCK))
       *o << "on";
   }
-  bool array = false;
+
+  bool array   = false;
   bool unusual = false;
+
   if (baseExpr != NULL) {
     if (UnresolvedSymExpr *expr = toUnresolvedSymExpr(baseExpr)) {
       if (strcmp(expr->unresolved, "*") == 0){
@@ -3726,9 +3845,10 @@ void CallExpr::prettyPrint(std::ostream *o) {
         *o << "*(";
         argList.last()->prettyPrint(o);
         *o << ")";
-      } else if (strcmp(expr->unresolved, "chpl_build_bounded_range") == 0 ||
-                 strcmp(expr->unresolved, "chpl_build_partially_bounded_range") == 0 ||
-                 strcmp(expr->unresolved, "chpl_build_unbounded_range") == 0) {
+      } else if (strcmp(expr->unresolved, "chpl_build_bounded_range") == 0) {
+        // Note that this code path is only used by chpldoc to create function
+        // return signatures and the only place a range will show up is in a
+        // fully specified array, in which case the range must be fully bounded
         argList.first()->prettyPrint(o);
         *o << "..";
         argList.last()->prettyPrint(o);
@@ -3947,6 +4067,9 @@ GenRet CallExpr::codegen() {
     }
     case PRIM_ARRAY_ALLOC:
     {
+      // get(1): return symbol
+      // get(2): element type
+      // get(3): number of elements
       GenRet dst = get(1);
       GenRet alloced;
       INT_ASSERT(dst.isLVPtr);
@@ -4835,7 +4958,8 @@ GenRet CallExpr::codegen() {
       GenRet ptr = get(1);
       if (get(1)->typeInfo()->symbol->hasFlag(FLAG_WIDE_CLASS))
         ptr = codegenRaddr(ptr);
-      codegenCall("chpl_check_nil", ptr, info->lineno, info->filename); 
+      codegenCall("chpl_check_nil", ptr, info->lineno,
+                  gFilenameLookupCache[info->filename]);
       break; }
     case PRIM_LOCAL_CHECK:
     {
@@ -4998,21 +5122,6 @@ GenRet CallExpr::codegen() {
       ret = codegenCallExpr("chpl_single_isFull",
                             val_ptr, aux);
       break; 
-    }
-    case PRIM_PROCESS_TASK_LIST: {
-      GenRet taskListPtr = codegenFieldPtr(get(1), "taskList");
-      codegenCall("chpl_taskListProcess", codegenValue(taskListPtr), get(2), get(3));
-      break;
-    }
-    case PRIM_EXECUTE_TASKS_IN_LIST:
-      codegenCall("chpl_taskListExecute", get(1), get(2), get(3));
-      break;
-    case PRIM_FREE_TASK_LIST:
-    {
-      if (fNoMemoryFrees)
-        break;
-      codegenCall("chpl_taskListFree", get(1), get(2), get(3));
-      break;
     }
     case PRIM_GET_SERIAL:
       ret = codegenCallExpr("chpl_task_getSerial");
@@ -5517,7 +5626,6 @@ GenRet CallExpr::codegen() {
       ret = codegenCallExpr(fngen, args, fn, true);
       break;
     }
-    case PRIM_FIND_FILENAME_IDX:
     case PRIM_LOOKUP_FILENAME:
       ret = codegenBasicPrimitiveExpr(this);
       break;
@@ -5576,7 +5684,7 @@ GenRet CallExpr::codegen() {
     args[3] = taskList;
     args[4] = codegenValue(taskListNode);
     args[5] = fn->linenum();
-    args[6] = fn->fname();
+    args[6] = new_IntSymbol(gFilenameLookupCache[fn->fname()], INT_SIZE_32);
 
     genComment(fn->cname, true);
     codegenCall(genFnName, args);
@@ -5603,7 +5711,7 @@ GenRet CallExpr::codegen() {
     args[2] = get(2);
     args[3] = get(3);
     args[4] = fn->linenum();
-    args[5] = fn->fname();
+    args[5] = new_IntSymbol(gFilenameLookupCache[fn->fname()], INT_SIZE_32);
 
     genComment(fn->cname, true);
     codegenCall(fname, args);

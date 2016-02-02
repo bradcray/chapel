@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
  * The entirety of this work is licensed under the Apache License,
@@ -59,6 +59,7 @@ _real32* complex64GetRealRef(_complex64* cplx) {
 _real32* complex64GetImagRef(_complex64* cplx) {
   return ((_real32*)cplx) + 1;
 }
+
 
 int64_t real2int( _real64 f) {
   // need to use a union here rather than a pointer cast to avoid gcc

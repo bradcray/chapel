@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -314,7 +314,7 @@ gatherCandidates(Vec<ResolutionCandidate*>& candidates,
                  Vec<FnSymbol*>& visibleFns,
                  CallInfo& info);
 
-static void resolveNormalCall(CallExpr* call);
+static FnSymbol* resolveNormalCall(CallExpr* call, bool checkonly=false);
 static void lvalueCheck(CallExpr* call);
 static void resolveTupleAndExpand(CallExpr* call);
 static void resolveTupleExpand(CallExpr* call);
@@ -404,6 +404,7 @@ static void removeMootFields();
 static void expandInitFieldPrims();
 static void fixTypeNames(AggregateType* ct);
 static void setScalarPromotionType(AggregateType* ct);
+static bool functionUsesSetter(FnSymbol* fn);
 
 bool ResolutionCandidate::computeAlignment(CallInfo& info) {
   if (alignedActuals.n != 0) alignedActuals.clear();
@@ -558,7 +559,8 @@ FnSymbol* getAutoDestroy(Type* t) {
 
 
 const char* toString(Type* type) {
-  return type->getValType()->symbol->name;
+  if( type ) return type->getValType()->symbol->name;
+  return "null type";
 }
 
 
@@ -1149,12 +1151,15 @@ isLegalLvalueActualArg(ArgSymbol* formal, Expr* actual) {
 // At present, params cannot be passed to 'const ref'.
 static bool
 isLegalConstRefActualArg(ArgSymbol* formal, Expr* actual) {
+  bool retval = true;
+
   if (SymExpr* se = toSymExpr(actual))
-    if (se->var->isParameter())
-      if (okToConvertFormalToRefType(formal->type))
-        return false;
-  // Perhaps more checks are needed.
-  return true;
+    if (se->var->isParameter()                   ==  true &&
+        okToConvertFormalToRefType(formal->type) ==  true &&
+        isString(se->var)                        == false)
+      retval = false;
+
+  return retval;
 }
 
 
@@ -1263,6 +1268,8 @@ static bool canParamCoerce(Type* actualType, Symbol* actualSym, Type* formalType
 // returns true iff dispatching the actualType to the formalType
 // results in a coercion.
 //
+// fn is the function being called usually but in resolveReturnType it
+// is the function we're finding return types for.
 bool
 canCoerce(Type* actualType, Symbol* actualSym, Type* formalType, FnSymbol* fn, bool* promotes) {
   if (canParamCoerce(actualType, actualSym, formalType))
@@ -1295,8 +1302,6 @@ canCoerce(Type* actualType, Symbol* actualSym, Type* formalType, FnSymbol* fn, b
   }
   if (actualType->symbol->hasFlag(FLAG_REF))
     return canDispatch(actualType->getValType(), NULL, formalType, fn, promotes);
-  if (formalType == dtString && actualType == dtStringC)
-    return true;
   if (formalType == dtString && actualType == dtStringCopy)
     return true;
   if (formalType == dtStringC && actualType == dtStringCopy)
@@ -1308,6 +1313,7 @@ canCoerce(Type* actualType, Symbol* actualSym, Type* formalType, FnSymbol* fn, b
 // Returns true iff the actualType can dispatch to the formalType.
 // The function symbol is used to avoid scalar promotion on =.
 // param is set if the actual is a parameter (compile-time constant).
+// fn is the function being called
 bool
 canDispatch(Type* actualType, Symbol* actualSym, Type* formalType, FnSymbol* fn, bool* promotes, bool paramCoerce) {
   if (promotes)
@@ -1541,26 +1547,37 @@ computeGenericSubs(SymbolMap &subs,
  * varargs tuple.
  */
 static void
-handleSymExprInExpandVarArgs(FnSymbol* workingFn, ArgSymbol* formal, SymExpr* sym) {
+handleSymExprInExpandVarArgs(FnSymbol*  workingFn,
+                             ArgSymbol* formal,
+                             SymExpr*   sym) {
   workingFn->addFlag(FLAG_EXPANDED_VARARGS);
 
   // Handle specified number of variable arguments.
-  if (VarSymbol* n_var = toVarSymbol(sym->var)) {
-    if (n_var->type == dtInt[INT_SIZE_DEFAULT] && n_var->immediate) {
-      int n = n_var->immediate->int_value();
-      CallExpr* tupleCall = new CallExpr((formal->hasFlag(FLAG_TYPE_VARIABLE)) ?
-                                         "_type_construct__tuple" : "_construct__tuple");
-      for (int i = 0; i < n; i++) {
-        DefExpr* new_arg_def = formal->defPoint->copy();
-        ArgSymbol* new_formal = toArgSymbol(new_arg_def->sym);
-        new_formal->variableExpr = NULL;
-        tupleCall->insertAtTail(new SymExpr(new_formal));
-        new_formal->name = astr("_e", istr(i), "_", formal->name);
-        new_formal->cname = astr("_e", istr(i), "_", formal->cname);
-        formal->defPoint->insertBefore(new_arg_def);
-      }
+  if (VarSymbol* nVar = toVarSymbol(sym->var)) {
+    if (nVar->type == dtInt[INT_SIZE_DEFAULT] && nVar->immediate) {
+      VarSymbol* var       = new VarSymbol(formal->name);
+      int        n         = nVar->immediate->int_value();
+      CallExpr*  tupleCall = NULL;
 
-      VarSymbol* var = new VarSymbol(formal->name);
+      if (formal->hasFlag(FLAG_TYPE_VARIABLE) == true)
+        tupleCall = new CallExpr("_type_construct__tuple");
+      else
+        tupleCall = new CallExpr("_construct__tuple");
+
+      tupleCall->insertAtTail(new_IntSymbol(n));
+
+      for (int i = 0; i < n; i++) {
+        DefExpr*   newArgDef = formal->defPoint->copy();
+        ArgSymbol* newFormal = toArgSymbol(newArgDef->sym);
+
+        newFormal->variableExpr = NULL;
+        newFormal->name         = astr("_e", istr(i), "_", formal->name);
+        newFormal->cname        = astr("_e", istr(i), "_", formal->cname);
+
+        tupleCall->insertAtTail(new SymExpr(newFormal));
+
+        formal->defPoint->insertBefore(newArgDef);
+      }
 
       // Replace mappings to the old formal with mappings to the new variable.
       if (workingFn->hasFlag(FLAG_PARTIAL_COPY)) {
@@ -1579,20 +1596,83 @@ handleSymExprInExpandVarArgs(FnSymbol* workingFn, ArgSymbol* formal, SymExpr* sy
       }
 
       if (formal->intent == INTENT_OUT || formal->intent == INTENT_INOUT) {
-        int i = 1;
+        int i = 0;
+
         for_actuals(actual, tupleCall) {
-          VarSymbol* tmp = newTemp("_varargs_tmp_");
-          workingFn->insertBeforeReturnAfterLabel(new DefExpr(tmp));
-          workingFn->insertBeforeReturnAfterLabel(new CallExpr(PRIM_MOVE, tmp, new CallExpr(var, new_IntSymbol(i))));
-          workingFn->insertBeforeReturnAfterLabel(new CallExpr("=", actual->copy(), tmp));
+          // Skip the tuple count
+          if (i > 0) {
+            VarSymbol* tmp    = newTemp("_varargs_tmp_");
+
+            CallExpr*  elem   = new CallExpr(var, new_IntSymbol(i));
+            CallExpr*  move   = new CallExpr(PRIM_MOVE, tmp,            elem);
+
+            CallExpr*  assign = new CallExpr("=",       actual->copy(), tmp);
+
+            workingFn->insertBeforeReturnAfterLabel(new DefExpr(tmp));
+            workingFn->insertBeforeReturnAfterLabel(move);
+            workingFn->insertBeforeReturnAfterLabel(assign);
+          }
+
           i++;
         }
       }
 
-      tupleCall->insertAtHead(new_IntSymbol(n));
-      workingFn->insertAtHead(new CallExpr(PRIM_MOVE, var, tupleCall));
-      workingFn->insertAtHead(new DefExpr(var));
-      formal->defPoint->remove();
+      // MDN 2016/02/01. Enable special handling for strings with blank intent
+
+      // If the original formal is a string with blank intent then the
+      // new formals appear to be strings with blank intent.  However
+      // the resolver is about to update these to be const ref intent.
+      //
+      // Currently this will cause the tuple to appear to be a tuple
+      // ref(String) which is not supported.
+      //
+      // Insert local copies that can be used for the tuple
+
+      if (isString(formal->type) && formal->intent == INTENT_BLANK) {
+        DefExpr* varDefn = new DefExpr(var);
+        Expr*    tail    = NULL;
+
+        // Insert the new locals
+        for (int i = 0; i < n; i++) {
+          const char* localName = astr("_e", istr(i + n), "_", formal->name);
+          VarSymbol*  local     = newTemp(localName, formal->type);
+          DefExpr*    defn      = new DefExpr(local);
+
+          if (tail == NULL)
+            workingFn->insertAtHead(defn);
+          else
+            tail->insertAfter(defn);
+
+          tail = defn;
+        }
+
+        // Insert the definition for the tuple
+        tail->insertAfter(varDefn);
+        tail = varDefn;
+
+        // Insert the copies from the blank-intent strings to the locals
+        // Update the arguments to the tuple call
+        for (int i = 1; i <= n; i++) {
+          DefExpr*  localDefn = toDefExpr(workingFn->body->body.get(i));
+          Symbol*   local     = localDefn->sym;
+          SymExpr*  localExpr = new SymExpr(local);
+
+          SymExpr*  tupleArg  = toSymExpr(tupleCall->get(i + 1));
+          SymExpr*  copyArg   = tupleArg->copy();
+
+          CallExpr* moveExpr  = new CallExpr(PRIM_MOVE, localExpr, copyArg);
+
+          tupleArg->var = local;
+
+          tail->insertAfter(moveExpr);
+          tail = moveExpr;
+        }
+
+        tail->insertAfter(new CallExpr(PRIM_MOVE, var, tupleCall));
+      } else {
+        workingFn->insertAtHead(new CallExpr(PRIM_MOVE, var, tupleCall));
+        workingFn->insertAtHead(new DefExpr(var));
+      }
 
       if (workingFn->hasFlag(FLAG_PARTIAL_COPY)) {
         // If this is a partial copy, store the mapping for substitution later.
@@ -1603,16 +1683,20 @@ handleSymExprInExpandVarArgs(FnSymbol* workingFn, ArgSymbol* formal, SymExpr* sy
       }
 
       if (workingFn->where) {
-        VarSymbol* var = new VarSymbol(formal->name);
+        VarSymbol* var  = new VarSymbol(formal->name);
+        CallExpr*  move = new CallExpr(PRIM_MOVE, var, tupleCall->copy());
 
         if (formal->hasFlag(FLAG_TYPE_VARIABLE)) {
           var->addFlag(FLAG_TYPE_VARIABLE);
         }
 
-        workingFn->where->insertAtHead(new CallExpr(PRIM_MOVE, var, tupleCall->copy()));
+        workingFn->where->insertAtHead(move);
         workingFn->where->insertAtHead(new DefExpr(var));
+
         subSymbol(workingFn->where, formal, var);
       }
+
+      formal->defPoint->remove();
     }
   }
 }
@@ -1969,7 +2053,9 @@ isMoreVisibleInternal(BlockStmt* block, FnSymbol* fn1, FnSymbol* fn2,
   //
   if (block && block->modUses) {
     for_actuals(expr, block->modUses) {
-      SymExpr* se = toSymExpr(expr);
+      UseStmt* use = toUseStmt(expr);
+      INT_ASSERT(use);
+      SymExpr* se = toSymExpr(use->mod);
       INT_ASSERT(se);
       ModuleSymbol* mod = toModuleSymbol(se->var);
       INT_ASSERT(mod);
@@ -2471,6 +2557,8 @@ static void
 printResolutionErrorUnresolved(
                      Vec<FnSymbol*>& visibleFns,
                      CallInfo* info) {
+  if( ! info ) INT_FATAL("CallInfo is NULL");
+  if( ! info->call ) INT_FATAL("call is NULL");
   CallExpr* call = userCall(info->call);
 
   if( developer ) {
@@ -2631,6 +2719,8 @@ static void issueCompilerError(CallExpr* call) {
     INT_ASSERT(var && var->immediate && var->immediate->const_kind == CONST_KIND_STRING);
     str = astr(str, var->immediate->v_string);
   }
+  // collapse newlines and other escape sequences before printing
+  str = astr(unescapeString(str).c_str());
   if (call->isPrimitive(PRIM_ERROR)) {
     USR_FATAL(from, "%s", str);
   } else {
@@ -2796,7 +2886,12 @@ getVisibleFunctions(BlockStmt* block,
 
   if (block->modUses) {
     for_actuals(expr, block->modUses) {
-      SymExpr* se = toSymExpr(expr);
+      UseStmt* use = toUseStmt(expr);
+      INT_ASSERT(use);
+      if (use->skipSymbolSearch(name)) {
+        continue;
+      }
+      SymExpr* se = toSymExpr(use->mod);
       INT_ASSERT(se);
       ModuleSymbol* mod = toModuleSymbol(se->var);
       INT_ASSERT(mod);
@@ -3033,6 +3128,7 @@ static void handleTaskIntentArgs(CallExpr* call, FnSymbol* taskFn,
 }
 
 
+// Resolves a param or type expression
 static Expr*
 resolve_type_expr(Expr* expr) {
   Expr* result = NULL;
@@ -3415,7 +3511,16 @@ resolveCall(CallExpr* call)
 }
 
 
-void resolveNormalCall(CallExpr* call) {
+FnSymbol* tryResolveCall(CallExpr* call) {
+  return resolveNormalCall(call, true);
+}
+
+// if checkonly is provided, don't print any errors; just check
+// to see if the particular function could be resolved.
+// returns the result of resolving - or NULL if we couldn't do it.
+// If checkonly is set, NULL can be returned - otherwise that would
+// be a fatal error.
+FnSymbol* resolveNormalCall(CallExpr* call, bool checkonly) {
 
   if( call->id == breakOnResolveID ) {
     printf("breaking on call:\n");
@@ -3425,7 +3530,10 @@ void resolveNormalCall(CallExpr* call) {
 
   resolveDefaultGenericType(call);
 
-  CallInfo info(call);
+  CallInfo info(call, checkonly);
+
+  // Return early if creating the call info would have been an error.
+  if( checkonly && info.badcall ) return NULL;
 
   Vec<FnSymbol*> visibleFns; // visible functions
 
@@ -3500,6 +3608,7 @@ void resolveNormalCall(CallExpr* call) {
      * Finish instantiating the body.  This is a noop if the function wasn't
      * partially instantiated.
      */
+
     instantiateBody(best->fn);
 
     if (explainCallLine && explainCallMatch(call)) {
@@ -3512,27 +3621,36 @@ void resolveNormalCall(CallExpr* call) {
   if (call->partialTag && (!best || !best->fn ||
                            !best->fn->hasFlag(FLAG_NO_PARENS))) {
     if (best != NULL) {
-      delete best;
+      // MPF 2016-0106 - this appears to be dead code
+      // at least in a full single-locale test run.
+
+      // best is deleted below with the other candidates
       best = NULL;
     }
   } else if (!best) {
     if (tryStack.n) {
-      tryFailure = true;
-      return;
+      // MPF -- doesn't this leak memory for the ResolutionCandidates?
+      if( ! checkonly ) tryFailure = true;
+      return NULL;
 
     } else {
-      if (candidates.n > 0) {
-        Vec<FnSymbol*> candidateFns;
-        forv_Vec(ResolutionCandidate*, candidate, candidates) {
-          candidateFns.add(candidate->fn);
-        }
+      // if we're just checking, don't print errors
+      if( ! checkonly ) {
 
-        printResolutionErrorAmbiguous(candidateFns, &info);
-      } else {
-        printResolutionErrorUnresolved(visibleFns, &info);
+        if (candidates.n > 0) {
+          Vec<FnSymbol*> candidateFns;
+          forv_Vec(ResolutionCandidate*, candidate, candidates) {
+            candidateFns.add(candidate->fn);
+          }
+
+          printResolutionErrorAmbiguous(candidateFns, &info);
+        } else {
+          printResolutionErrorUnresolved(visibleFns, &info);
+        }
       }
     }
   } else {
+    INT_ASSERT(best->fn);
     best->fn = defaultWrap(best->fn, &best->alignedFormals, &info);
     reorderActuals(best->fn, &best->alignedFormals, &info);
     coerceActuals(best->fn, &info);
@@ -3547,48 +3665,55 @@ void resolveNormalCall(CallExpr* call) {
 
   if (call->partialTag) {
     if (!resolvedFn) {
-      return;
+      return NULL;
     }
     call->partialTag = false;
   }
 
-  if (resolvedFn &&
-      !strcmp("=", resolvedFn->name) &&
-      isRecord(resolvedFn->getFormal(1)->type) &&
-      resolvedFn->getFormal(2)->type == dtNil) {
-    USR_FATAL(userCall(call), "type mismatch in assignment from nil to %s",
-              toString(resolvedFn->getFormal(1)->type));
+
+  if( ! checkonly ) {
+    if (resolvedFn &&
+        !strcmp("=", resolvedFn->name) &&
+        isRecord(resolvedFn->getFormal(1)->type) &&
+        resolvedFn->getFormal(2)->type == dtNil) {
+      USR_FATAL(userCall(call), "type mismatch in assignment from nil to %s",
+                toString(resolvedFn->getFormal(1)->type));
+    }
+
+    if (!resolvedFn) {
+      INT_FATAL(call, "unable to resolve call");
+    }
   }
 
-  if (!resolvedFn) {
-    INT_FATAL(call, "unable to resolve call");
-  }
-
-  if (call->parentSymbol) {
+  if (resolvedFn && call->parentSymbol) {
     SET_LINENO(call);
     call->baseExpr->replace(new SymExpr(resolvedFn));
   }
 
-  if (resolvedFn->hasFlag(FLAG_MODIFIES_CONST_FIELDS))
-    // Not allowed if it is not called directly from a constructor.
-    if (!isInConstructorLikeFunction(call) ||
-        !getBaseSymForConstCheck(call)->hasFlag(FLAG_ARG_THIS)
-        )
-      USR_FATAL_CONT(call, "illegal call to %s() - it modifies 'const' fields of 'this', therefore it can be invoked only directly from a constructor on the object being constructed", resolvedFn->name);
+  if( ! checkonly ) {
+    if (resolvedFn->hasFlag(FLAG_MODIFIES_CONST_FIELDS))
+      // Not allowed if it is not called directly from a constructor.
+      if (!isInConstructorLikeFunction(call) ||
+          !getBaseSymForConstCheck(call)->hasFlag(FLAG_ARG_THIS)
+          )
+        USR_FATAL_CONT(call, "illegal call to %s() - it modifies 'const' fields of 'this', therefore it can be invoked only directly from a constructor on the object being constructed", resolvedFn->name);
 
-  lvalueCheck(call);
-  checkForStoringIntoTuple(call, resolvedFn);
+    lvalueCheck(call);
+    checkForStoringIntoTuple(call, resolvedFn);
 
-  if (const char* str = innerCompilerWarningMap.get(resolvedFn)) {
-    reissueCompilerWarning(str, 2);
-    if (callStack.n >= 2)
-      if (FnSymbol* fn = toFnSymbol(callStack.v[callStack.n-2]->isResolved()))
-        outerCompilerWarningMap.put(fn, str);
+    if (const char* str = innerCompilerWarningMap.get(resolvedFn)) {
+      reissueCompilerWarning(str, 2);
+      if (callStack.n >= 2)
+        if (FnSymbol* fn = toFnSymbol(callStack.v[callStack.n-2]->isResolved()))
+          outerCompilerWarningMap.put(fn, str);
+    }
+
+    if (const char* str = outerCompilerWarningMap.get(resolvedFn)) {
+      reissueCompilerWarning(str, 1);
+    }
   }
 
-  if (const char* str = outerCompilerWarningMap.get(resolvedFn)) {
-    reissueCompilerWarning(str, 1);
-  }
+  return resolvedFn;
 }
 
 
@@ -4312,13 +4437,17 @@ static Expr* dropUnnecessaryCast(CallExpr* call) {
 
   if (SymExpr* sym = toSymExpr(call->get(2))) {
     if (LcnSymbol* var = toLcnSymbol(sym->var)) {
-      if (SymExpr* sym = toSymExpr(call->get(1))) {
-        Type* oldType = var->type;
-        Type* newType = sym->var->type;
+      // Casts of type variables are always required
+      // eg. foo.type:string
+      if (!var->hasFlag(FLAG_TYPE_VARIABLE)) {
+        if (SymExpr* sym = toSymExpr(call->get(1))) {
+          Type* oldType = var->type->getValType();
+          Type* newType = sym->var->type->getValType();
 
-        if (newType == oldType) {
-          result = new SymExpr(var);
-          call->replace(result);
+          if (newType == oldType) {
+            result = new SymExpr(var);
+            call->replace(result);
+          }
         }
       }
     } else if (EnumSymbol* e = toEnumSymbol(sym->var)) {
@@ -4714,11 +4843,14 @@ usesOuterVars(FnSymbol* fn, Vec<FnSymbol*> &seen) {
   return false;
 }
 
+// This function returns true for user fields, including
+// const, param, and type fields.
+// It returns false for compiler-introduced fields like
+// super and outer.
 static bool
 isNormalField(Symbol* field)
 {
   if( field->hasFlag(FLAG_IMPLICIT_ALIAS_FIELD) ) return false;
-  if( field->hasFlag(FLAG_TYPE_VARIABLE) ) return false;
   if( field->hasFlag(FLAG_SUPER_CLASS) ) return false;
   // TODO -- this will break user fields named outer!
   if( 0 == strcmp("outer", field->name)) return false;
@@ -5180,7 +5312,7 @@ preFold(Expr* expr) {
 
       // Check if string is in envMap, and replace result with mapped value
       if (envMap.find(envKey) != envMap.end()) {
-        result = new SymExpr(new_CStringSymbol(envMap[envKey]));
+        result = new SymExpr(new_StringSymbol(envMap[envKey]));
         call->replace(result);
       } else {
         USR_FATAL(call, "primitive string does not match any environment variable");
@@ -5518,11 +5650,13 @@ preFold(Expr* expr) {
       if (!name) {
         // In this case, we ran out of fields without finding the number
         // specified.  This is the user's error.
-        USR_FATAL(call, "'%d' is not a valid field number", fieldnum);
+        USR_FATAL(call, "'%d' is not a valid field number for %s", fieldnum,
+            toString(classtype));
       }
-      result = new SymExpr(new_CStringSymbol(name));
+      result = new SymExpr(new_StringSymbol(name));
       call->replace(result);
     } else if (call->isPrimitive(PRIM_FIELD_VALUE_BY_NUM)) {
+      // if call->get(1) is a reference type, dereference it
       AggregateType* classtype = toAggregateType(call->get(1)->typeInfo());
       INT_ASSERT( classtype != NULL );
       classtype = toAggregateType(classtype->getValType());
@@ -5534,19 +5668,26 @@ preFold(Expr* expr) {
 
       int fieldnum = var->immediate->int_value();
       int fieldcount = 0;
+      const char* name = NULL;
 
       for_fields(field, classtype) {
         if( ! isNormalField(field) ) continue;
 
         fieldcount++;
         if (fieldcount == fieldnum) {
-          result = new CallExpr(PRIM_GET_MEMBER, call->get(1)->copy(),
-                                new_CStringSymbol(field->name));
+          name = field->name;
           break;
         }
       }
+      if (!name) {
+        USR_FATAL(call, "'%d' is not a valid field number for %s", fieldnum,
+                  toString(classtype));
+      }
+      result = new CallExpr(PRIM_GET_MEMBER, call->get(1)->copy(),
+                            new_CStringSymbol(name));
       call->replace(result);
     } else if (call->isPrimitive(PRIM_FIELD_ID_BY_NUM)) {
+      /* this is really for unions */
       AggregateType* classtype = toAggregateType(call->get(1)->typeInfo());
       INT_ASSERT( classtype != NULL );
       classtype = toAggregateType(classtype->getValType());
@@ -5568,8 +5709,8 @@ preFold(Expr* expr) {
         }
       }
       call->replace(result);
-    } else if (call->isPrimitive(PRIM_FIELD_VALUE_BY_NAME)) {
-      AggregateType* classtype = toAggregateType(call->get(1)->typeInfo());
+    } else if (call->isPrimitive(PRIM_FIELD_NAME_TO_NUM)) {
+      AggregateType* classtype = toAggregateType(toSymExpr(call->get(1))->var->type);
       INT_ASSERT( classtype != NULL );
       classtype = toAggregateType(classtype->getValType());
       INT_ASSERT( classtype != NULL );
@@ -5585,16 +5726,82 @@ preFold(Expr* expr) {
 
       const char* fieldname = imm->v_string;
       int fieldcount = 0;
+      int num = 0;  // return 0 if the field is not found.
       for_fields(field, classtype) {
         if( ! isNormalField(field) ) continue;
 
         fieldcount++;
         if ( 0 == strcmp(field->name,  fieldname) ) {
-          result = new CallExpr(PRIM_GET_MEMBER, call->get(1)->copy(),
-                                new_CStringSymbol(field->name));
+          num = fieldcount;
           break;
         }
       }
+      result = new SymExpr(new_IntSymbol(num));
+
+      call->replace(result);
+    } else if (call->isPrimitive(PRIM_CALL_RESOLVES) ||
+               call->isPrimitive(PRIM_METHOD_CALL_RESOLVES)) {
+      Expr* fnName = NULL;
+      Expr* callThis = NULL;
+
+      // this would be easier if we had a non-normalized AST!
+      // That is, if this call could contain a whole expression subtree.
+      int first_arg;
+      if( call->isPrimitive(PRIM_METHOD_CALL_RESOLVES) ) {
+        // get(1) should be a receiver
+        // get(2) should be a string function name.
+        callThis = call->get(1);
+        fnName = call->get(2);
+        first_arg = 3;
+      } else {
+        // get(1) should be a string function name.
+        fnName = call->get(1);
+        first_arg = 2;
+      }
+      VarSymbol* var = toVarSymbol(toSymExpr(fnName)->var);
+      INT_ASSERT( var != NULL );
+      // the rest are arguments.
+      Immediate* imm = var->immediate;
+      // fail horribly if immediate is not a string .
+      if (!imm)
+        INT_FATAL(call, "proc name required");
+      if (imm->const_kind != CONST_KIND_STRING)
+        INT_FATAL(call, "proc name must be a string");
+
+      const char* name = imm->v_string;
+
+      // temporarily add a call to try resolving.
+      CallExpr* tryCall = NULL;
+      if( call->isPrimitive(PRIM_METHOD_CALL_RESOLVES) ) {
+        tryCall = new CallExpr(new UnresolvedSymExpr(name),
+                               gMethodToken,
+                               callThis->copy());
+      } else {
+        tryCall = new CallExpr(name);
+      }
+
+      // Add our new call to the AST temporarily.
+      call->getStmtExpr()->insertAfter(tryCall);
+
+      // copy actual args into tryCall.
+      int i = 1;
+      for_actuals(actual, call) {
+        if( i >= first_arg ) { // skip fn name, maybe method receiver
+          tryCall->insertAtTail(actual->copy());
+        }
+        i++;
+      }
+
+      // Try to resolve it.
+      if( tryResolveCall(tryCall) ) {
+        result = new SymExpr(gTrue);
+      } else {
+        result = new SymExpr(gFalse);
+      }
+
+      // remove the call from the AST
+      tryCall->remove();
+
       call->replace(result);
     } else if (call->isPrimitive(PRIM_ENUM_MIN_BITS) || call->isPrimitive(PRIM_ENUM_IS_SIGNED)) {
       EnumType* et = toEnumType(toSymExpr(call->get(1))->var->type);
@@ -6009,10 +6216,11 @@ postFold(Expr* expr) {
       const char* memberName = get_string(call->get(2));
       Symbol* sym = baseType->getField(memberName);
       SymExpr* left = toSymExpr(call->get(1));
+      VarSymbol* varSym = toVarSymbol(sym);
       if (left && left->var->hasFlag(FLAG_TYPE_VARIABLE)) {
         result = new SymExpr(sym->type->symbol);
         call->replace(result);
-      } else if (sym->isParameter()) {
+      } else if (sym->isParameter() || (varSym && varSym->isType())) {
         Vec<Symbol*> keys;
         baseType->substitutions.get_keys(keys);
         forv_Vec(Symbol, key, keys) {
@@ -6162,8 +6370,6 @@ postFold(Expr* expr) {
                call->isPrimitive(PRIM_SINGLE_READFF) ||
                call->isPrimitive(PRIM_SINGLE_READXX) ||
                call->isPrimitive(PRIM_SINGLE_IS_FULL) ||
-               call->isPrimitive(PRIM_EXECUTE_TASKS_IN_LIST) ||
-               call->isPrimitive(PRIM_FREE_TASK_LIST) ||
                (call->primitive &&
                 (!strncmp("_fscan", call->primitive->name, 6) ||
                  !strcmp("_readToEndOfLine", call->primitive->name) ||
@@ -6440,10 +6646,15 @@ replaceSetterArgWithTrue(BaseAST* ast, FnSymbol* fn) {
   if (SymExpr* se = toSymExpr(ast)) {
     if (se->var == fn->setter->sym) {
       se->var = gTrue;
+
+      // This variation relies on the setter param directly
+      fn->addFlag(FLAG_FN_REF_USES_SETTER);
+
       if (fn->isIterator())
         USR_WARN(fn, "setter argument is not supported in iterators");
     }
   }
+
   AST_CHILDREN_CALL(ast, replaceSetterArgWithTrue, fn);
 }
 
@@ -6768,6 +6979,7 @@ resolveFns(FnSymbol* fn) {
     stashPristineCopyOfLeaderIter(fn, /*ignore_isResolved:*/ true);
   }
 
+  // Does this function return by ref-intent?
   if (fn->retTag == RET_REF) {
     buildValueFunction(fn);
   }
@@ -6775,6 +6987,15 @@ resolveFns(FnSymbol* fn) {
   insertFormalTemps(fn);
 
   resolveBlockStmt(fn->body);
+
+  // Does this function return by ref-intent?
+  if (fn->retTag == RET_REF) {
+    // Determine if it might rely on the setter param recursively
+    if (fn->hasFlag(FLAG_FN_REF_USES_SETTER) == false &&
+        functionUsesSetter(fn)               == true) {
+      fn->addFlag(FLAG_FN_REF_USES_SETTER);
+    }
+  }
 
   if (tryFailure) {
     fn->removeFlag(FLAG_RESOLVED);
@@ -6940,9 +7161,31 @@ isVirtualChild(FnSymbol* child, FnSymbol* parent) {
 }
 
 
+/*
+
+-----------
+addToVirtualMaps, addAllToVirtualMaps, buildVirtualMaps
+
+buildVirtualMaps invokes addAllToVirtualMaps on each method 'fn' declared in
+each class.  Only non-generic classes and instantiations of generic classes are
+considered.
+
+addAllToVirtualMaps invokes addToVirtualMaps on each (transitive) dispatch
+child for that class, passing that same method 'fn'.
+
+addToVirtualMaps adds to the virtual maps all methods
+in that dispatch child that could override the above 'fn'.
+-----------
+*/
+
+
+// addToVirtualMaps itself goes through each method in ct and if
+// that method could override pfn, adds it to the virtual maps
 static void
 addToVirtualMaps(FnSymbol* pfn, AggregateType* ct) {
   forv_Vec(FnSymbol, cfn, ct->methods) {
+    // checking that subtype method is not a generic instantiation
+    //  (we will instantiate again)
     if (cfn && !cfn->instantiatedFrom && possible_signature_match(pfn, cfn)) {
       Vec<Type*> types;
       if (ct->symbol->hasFlag(FLAG_GENERIC))
@@ -6953,6 +7196,7 @@ addToVirtualMaps(FnSymbol* pfn, AggregateType* ct) {
       forv_Vec(Type, type, types) {
         SymbolMap subs;
         if (ct->symbol->hasFlag(FLAG_GENERIC))
+          // instantiateSignature handles subs from formal to a type
           subs.put(cfn->getFormal(2), type->symbol);
         for (int i = 3; i <= cfn->numFormals(); i++) {
           ArgSymbol* arg = cfn->getFormal(i);
@@ -7061,6 +7305,7 @@ addToVirtualMaps(FnSymbol* pfn, AggregateType* ct) {
 }
 
 
+// Add overrides of fn to virtual maps down the inheritance heirarchy
 static void
 addAllToVirtualMaps(FnSymbol* fn, AggregateType* ct) {
   forv_Vec(Type, t, ct->dispatchChildren) {
@@ -7070,7 +7315,9 @@ addAllToVirtualMaps(FnSymbol* fn, AggregateType* ct) {
          ct->defaultTypeConstructor->isResolved()))
       addToVirtualMaps(fn, ct);
 
+    // if sub-class is not a generic instantiation
     if (!ct->instantiatedFrom)
+      // add to maps transitively
       addAllToVirtualMaps(fn, ct);
   }
 }
@@ -7099,7 +7346,10 @@ buildVirtualMaps() {
     if (fn->numFormals() > 1 && fn->getFormal(1)->type == dtMethodToken) {
       // Only methods go in the virtual function table.
       if (AggregateType* pt = toAggregateType(fn->getFormal(2)->type)) {
+
         if (isClass(pt) && !pt->symbol->hasFlag(FLAG_GENERIC)) {
+          // MPF - note the check for generic seemed to originate
+          // in SVN revision 7103
           addAllToVirtualMaps(fn, pt);
         }
       }
@@ -7108,6 +7358,8 @@ buildVirtualMaps() {
 }
 
 
+// if exclusive=true, check for fn already existing in the virtual method
+// table and do not add it a second time if it is already present.
 static void
 addVirtualMethodTableEntry(Type* type, FnSymbol* fn, bool exclusive /*= false*/) {
   Vec<FnSymbol*>* fns = virtualMethodTable.get(type);
@@ -7212,13 +7464,15 @@ computeStandardModuleSet() {
   while (ModuleSymbol* mod = stack.pop()) {
     if (mod->block->modUses) {
       for_actuals(expr, mod->block->modUses) {
-        SymExpr* se = toSymExpr(expr);
-        INT_ASSERT(se);
-        ModuleSymbol* use = toModuleSymbol(se->var);
+        UseStmt* use = toUseStmt(expr);
         INT_ASSERT(use);
-        if (!standardModuleSet.set_in(use->block)) {
-          stack.add(use);
-          standardModuleSet.set_add(use->block);
+        SymExpr* se = toSymExpr(use->mod);
+        INT_ASSERT(se);
+        ModuleSymbol* mod = toModuleSymbol(se->var);
+        INT_ASSERT(mod);
+        if (!standardModuleSet.set_in(mod->block)) {
+          stack.add(mod);
+          standardModuleSet.set_add(mod->block);
         }
       }
     }
@@ -7410,6 +7664,35 @@ static void resolveEnumTypes() {
   }
 }
 
+// removes entries in virtualChildrenMap that are not in virtualMethodTable.
+// such entries could not be called and should be dead-code eliminated.
+static void filterVirtualChildren()
+{
+  std::set<FnSymbol*> fns_in_vmt;
+  typedef MapElem<Type*,Vec<FnSymbol*>*> VmtMapElem;
+  typedef MapElem<FnSymbol*,Vec<FnSymbol*>*> ChildMapElem;
+  form_Map(VmtMapElem, el,  virtualMethodTable) {
+    if (el->value) {
+      forv_Vec(FnSymbol, fn, *el->value) {
+        fns_in_vmt.insert(fn);
+      }
+    }
+  }
+  form_Map(ChildMapElem, el, virtualChildrenMap) {
+    if (el->value) {
+      Vec<FnSymbol*>* oldV = el->value;
+      Vec<FnSymbol*>* newV = new Vec<FnSymbol*>();
+      forv_Vec(FnSymbol, fn, *oldV) {
+        if (fns_in_vmt.count(fn)) {
+          newV->add(fn);
+        }
+      }
+      el->value = newV;
+      delete oldV;
+    }
+  }
+}
+
 static void resolveDynamicDispatches() {
   inDynamicDispatchResolution = true;
   int num_types;
@@ -7448,6 +7731,8 @@ static void resolveDynamicDispatches() {
   forv_Vec(Type, ct, ctq) {
     if (Vec<FnSymbol*>* parentFns = virtualMethodTable.get(ct)) {
       forv_Vec(FnSymbol, pfn, *parentFns) {
+        // Each subtype can contribute only one function to the
+        // virtual method table.
         Vec<Type*> childSet;
         if (Vec<FnSymbol*>* childFns = virtualChildrenMap.get(pfn)) {
           forv_Vec(FnSymbol, cfn, *childFns) {
@@ -7474,6 +7759,8 @@ static void resolveDynamicDispatches() {
     }
   }
 
+  // reverse the entries in the virtual method table
+  // populate the virtualMethodMap
   for (int i = 0; i < virtualMethodTable.n; i++) {
     if (virtualMethodTable.v[i].key) {
       virtualMethodTable.v[i].value->reverse();
@@ -7482,6 +7769,14 @@ static void resolveDynamicDispatches() {
       }
     }
   }
+
+  // remove entries in virtualChildrenMap that are not in
+  // virtualMethodTable. When a parent has a generic method and
+  // a subclass has a specific one, the virtualChildrenMap might
+  // get multilpe entries while the logic above with childSet
+  // ensures that the virtualMethodTable only has one entry.
+  filterVirtualChildren();
+
   inDynamicDispatchResolution = false;
 
   if (fPrintDispatch) {
@@ -7490,8 +7785,32 @@ static void resolveDynamicDispatches() {
       if (Type* t = virtualMethodTable.v[i].key) {
         printf("  %s\n", toString(t));
         for (int j = 0; j < virtualMethodTable.v[i].value->n; j++) {
-          printf("    %s\n", toString(virtualMethodTable.v[i].value->v[j]));
+          FnSymbol* fn = virtualMethodTable.v[i].value->v[j];
+          printf("    %s", toString(fn));
+          if (developer) {
+            int index = virtualMethodMap.get(fn);
+            printf(" index %i", index);
+            if ( fn->getFormal(2)->typeInfo() == t ) {
+              // print dispatch children if the function is
+              // the method in type t (and not, say, the version in
+              // some parent class e.g. object).
+              Vec<FnSymbol*>* childFns = virtualChildrenMap.get(fn);
+              if (childFns) {
+                printf(" %i children:\n", childFns->n);
+                for (int k = 0; k < childFns->n; k++) {
+                  FnSymbol* childFn = childFns->v[k];
+                  printf("      %s\n", toString(childFn));
+                }
+              }
+              if( childFns == NULL || childFns->n == 0 ) printf("\n");
+            } else {
+              printf(" inherited\n");
+            }
+          }
+          printf("\n");
         }
+        if (developer)
+          printf("\n");
       }
     }
   }
@@ -8777,4 +9096,26 @@ setScalarPromotionType(AggregateType* ct) {
     if (!strcmp(field->name, "_promotionType"))
       ct->scalarPromotionType = field->type;
   }
+}
+
+//
+// Does this function call a ref-return function that relies on the
+// setter param?  By induction this handles the general recursive case.
+//
+static bool functionUsesSetter(FnSymbol* fn) {
+  std::vector<CallExpr*> calls;
+  bool                   retval = false;
+
+  collectCallExprs(fn, calls);
+
+  for (size_t i = 0; i < calls.size() && retval == false; i++) {
+    CallExpr* call = calls[i];
+
+    if (FnSymbol* calledFn = call->isResolved()) {
+      if (calledFn->hasFlag(FLAG_FN_REF_USES_SETTER))
+        retval = true;
+    }
+  }
+
+  return retval;
 }

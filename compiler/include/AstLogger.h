@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -19,6 +19,9 @@
 
 #ifndef _AST_LOGGER_H_
 #define _AST_LOGGER_H_
+
+#include <cstdio>
+#include <vector>
 
 #include "AstVisitor.h"
 
@@ -78,6 +81,8 @@ public:
   //
   // The sub-classes of Stmt
   //
+  virtual void   visitUseStmt     (UseStmt*           node);
+
   virtual bool   enterBlockStmt   (BlockStmt*         node);
   virtual void   exitBlockStmt    (BlockStmt*         node);
 
@@ -103,6 +108,9 @@ public:
 
   virtual bool   enterGotoStmt    (GotoStmt*          node);
   virtual void   exitGotoStmt     (GotoStmt*          node);
+
+ protected:
+  void outputVector (FILE* mFP, std::vector<const char *> vec);
 };
 
 #endif

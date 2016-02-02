@@ -1,4 +1,4 @@
-# Copyright 2004-2015 Cray Inc.
+# Copyright 2004-2016 Cray Inc.
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -64,7 +64,6 @@ $(SYS_CTYPES_MODULE_DOC): $(MAKE_SYS_BASIC_TYPES)
 	mkdir -p $(@D)
 	cd $(@D) && $(MAKE_SYS_BASIC_TYPES) --doc $(@F)
 
-sys-ctypes-docs: $(SYS_CTYPES_MODULE_DOC)
 
 MODULES_TO_DOCUMENT = \
 	standard/AdvancedIters.chpl \
@@ -89,6 +88,7 @@ MODULES_TO_DOCUMENT = \
 	standard/Norm.chpl \
 	standard/Path.chpl \
 	standard/Random.chpl \
+	standard/Reflection.chpl \
 	standard/Regexp.chpl \
 	standard/Search.chpl \
 	standard/Sort.chpl \
@@ -125,8 +125,7 @@ INTERNAL_MODULES_TO_DOCUMENT =                \
 
 documentation: $(SYS_CTYPES_MODULE_DOC)
 	export CHPLDOC_AUTHOR='Cray Inc' && \
-	$(CHPLDOC) --save-sphinx ${MODULE_SPHINX} --no-html $(MODULES_TO_DOCUMENT) \
-	$(DISTS_TO_DOCUMENT) $(INTERNAL_MODULES_TO_DOCUMENT)
+	$(CHPLDOC) --save-sphinx ${MODULE_SPHINX} --no-html $(MODULES_TO_DOCUMENT) $(DISTS_TO_DOCUMENT) $(INTERNAL_MODULES_TO_DOCUMENT)
 	./internal/fixInternalDocs.sh ${MODULE_SPHINX}
 	./dists/fixDistDocs.perl      ${MODULE_SPHINX}
 	cp -rf ${MODULE_SPHINX}/source/modules/standard ${DOC_SPHINX}/source/modules/

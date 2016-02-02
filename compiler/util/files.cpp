@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -29,7 +29,6 @@
 
 #include "beautify.h"
 #include "driver.h"
-#include "docsDriver.h"
 #include "misc.h"
 #include "mysystem.h"
 #include "stringutil.h"
@@ -50,8 +49,8 @@
 char               executableFilename[FILENAME_MAX + 1] = "a.out";
 char               saveCDir[FILENAME_MAX + 1]           = "";
 
-char               ccflags[256]                         = "";
-char               ldflags[256]                         = "";
+std::string ccflags;
+std::string ldflags;
 
 int                numLibFlags                          = 0;
 const char**       libFlag                              = NULL;
@@ -603,7 +602,7 @@ void codegen_makefile(fileinfo* mainfile, const char** tmpbinname, bool skip_com
   forv_Vec(const char*, dirName, incDirs) {
     fprintf(makefile.fptr, " -I%s", dirName);
   }
-  fprintf(makefile.fptr, " %s\n", ccflags);
+  fprintf(makefile.fptr, " %s\n", ccflags.c_str());
 
   fprintf(makefile.fptr, "COMP_GEN_LFLAGS =");
   if (!fLibraryCompile) {
@@ -617,7 +616,7 @@ void codegen_makefile(fileinfo* mainfile, const char** tmpbinname, bool skip_com
     else
       fprintf(makefile.fptr, " $(LIB_STATIC_FLAG)" );
   }
-  fprintf(makefile.fptr, " %s\n", ldflags);
+  fprintf(makefile.fptr, " %s\n", ldflags.c_str());
 
   fprintf(makefile.fptr, "TAGS_COMMAND = ");
   if (developer && saveCDir[0] && !printCppLineno) {
@@ -753,15 +752,9 @@ void setupModulePaths() {
                       CHPL_COMM));
   intModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/internal"));
 
-  if (fDocs) {
-    // We use a special sysCTypes when running with chpldoc to gloss over
-    // machine differences
-    stdModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/standard/gen/doc"));
-  } else {
-    stdModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/standard/gen/",
-                        CHPL_TARGET_PLATFORM,
-                        "-", CHPL_TARGET_COMPILER));
-  }
+  stdModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/standard/gen/",
+                      CHPL_TARGET_PLATFORM,
+                      "-", CHPL_TARGET_COMPILER));
 
   stdModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/standard"));
   stdModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/layouts"));

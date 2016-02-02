@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -203,7 +203,14 @@ class CallExpr : public Expr {
   void            insertAtHead(BaseAST* ast);
   void            insertAtTail(BaseAST* ast);
 
-  FnSymbol*       isResolved();
+  // True if the callExpr has been emptied (aka dead)
+  bool            isEmpty()                                              const;
+
+  FnSymbol*       isResolved()                                           const;
+  FnSymbol*       resolvedFunction()                                     const;
+
+  FnSymbol*       theFnSymbol()                                          const;
+
   bool            isNamed(const char*);
 
   int             numActuals();

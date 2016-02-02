@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2015 Cray Inc.
+ * Copyright 2004-2016 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -18,6 +18,7 @@
  */
 
 #include "AstLogger.h"
+#include "stlUtil.h"
 
 
 
@@ -109,6 +110,9 @@ void AstLogger::visitSymExpr(SymExpr* node) {
 void AstLogger::visitUsymExpr(UnresolvedSymExpr* node) {
 }
 
+void AstLogger::visitUseStmt(UseStmt* node) {
+}
+
 bool AstLogger::enterBlockStmt(BlockStmt* node) {
   return true;
 }
@@ -166,4 +170,16 @@ bool AstLogger::enterGotoStmt(GotoStmt* node) {
 }
 
 void AstLogger::exitGotoStmt(GotoStmt* node) {
+}
+
+void AstLogger::outputVector(FILE* mFP, std::vector<const char *> vec) {
+  bool first = true;
+  for_vector(const char, str, vec) {
+    if (first) {
+      first = false;
+    } else {
+      fprintf(mFP, ", ");
+    }
+    fprintf(mFP, "%s", str);
+  }
 }

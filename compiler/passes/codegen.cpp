@@ -1165,6 +1165,36 @@ static void codegen_header() {
   }
 }
 
+
+//
+// Generate exported things to a special exported header file
+//
+static void codegen_export_header() {
+  //  GenInfo* info = gGenInfo;
+  //  FILE* expfile = info->cfile;
+  std::vector<FnSymbol*> functions;
+
+  //
+  // collect functions and apply canonical sort
+  //
+  forv_Vec(FnSymbol, fn, gFnSymbols) {
+    if (fn->hasFlag(FLAG_EXPORT)) {
+      viewFlags(fn);
+      functions.push_back(fn);
+    }
+  }
+  std::sort(functions.begin(), functions.end(), compareSymbol2);
+
+  genComment("Function Prototypes");
+  for_vector(FnSymbol, fnSymbol, functions) {
+    if (fnSymbol->hasFlag(FLAG_EXPORT)) {
+      fnSymbol->codegenPrototype();
+    }
+  }
+}
+
+
+
 // Sometimes we have to define a type while code generating.
 // When that happens, we need to add a little bit to the header...
 // This is only needed for C (since in LLVM we must add
@@ -1343,6 +1373,7 @@ void codegen(void) {
   SET_LINENO(rootModule);
 
   fileinfo hdrfile  = { NULL, NULL, NULL };
+  fileinfo expfile  = { NULL, NULL, NULL };
   fileinfo mainfile = { NULL, NULL, NULL };
 
   GenInfo* info     = gGenInfo;
@@ -1358,6 +1389,7 @@ void codegen(void) {
 #endif
   } else {
     openCFile(&hdrfile,  "chpl__header", "h");
+    openCFile(&expfile,  "chpl__export", "h");
     openCFile(&mainfile, "_main",        "c");
 
     fprintf(mainfile.fptr, "#include \"chpl__header.h\"\n");
@@ -1368,6 +1400,9 @@ void codegen(void) {
   // This dumps the generated sources into the build directory.
   info->cfile = hdrfile.fptr;
   codegen_header();
+
+  info->cfile = expfile.fptr;
+  codegen_export_header();
 
   info->cfile = mainfile.fptr;
   codegen_config();
@@ -1448,6 +1483,7 @@ void codegen(void) {
     codegen_header_addons();
 
     closeCFile(&hdrfile);
+    closeCFile(&expfile);
     closeCFile(&mainfile);
   }
 

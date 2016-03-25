@@ -20,7 +20,7 @@ Highlights
     (see http://chapel.cray.com/docs/1.13/modules/internal/String.html)
 * language feature highlights:
   - added support for filtering and renaming symbols in module 'use's
-    (see 'Using Modules' in the Chapel Language Specification)
+    (see 'The Use Statement' in the Chapel Language Specification)
   - added support for min/max reduce intents and reduce intents on coforalls
     (see http://chapel.cray.com/docs/1.13/technotes/reduceIntents.html)
   - significantly improved memory management and reduced leaks for record types
@@ -86,7 +86,7 @@ Configuration Changes
 Syntactic/Naming Changes
 ------------------------
 * added new keywords, 'as', 'except', and 'only', for filtering module 'use's
-  (see "Using Modules" in the Chapel language specification)
+  (see 'The Use Statement' in the Chapel language specification)
 * replaced 'locale.numCores' with a richer interface 'locale.numPUs()'
   (see http://chapel.cray.com/docs/1.13/modules/internal/ChapelLocale.html)
 * replaced the 'Writer' and 'Reader' types in favor of unifying on 'channel's
@@ -107,10 +107,10 @@ New Features
   (see http://chapel.cray.com/docs/1.13/modules/internal/String.html)
 * added support for filtering module 'use' statements with 'only' and 'except'
   (e.g., 'use M only foo;' or '... except foo;' to restrict to / exclude 'foo')
-  (see 'Using Modules' in spec)
+  (see 'The Use Statement' in the Chapel language specification)
 * added support for renaming 'use'd module symbols
   (e.g., 'use M only foo as M_foo;' causes 'foo' to be referred to as 'M_foo')
-  (see 'Using Modules' in the spec)
+  (see 'The Use Statement' in the Chapel language specification)
 * added the ability to 'use' an enumerated type
   (e.g., "...mycolor.green..." can now be written "use mycolor;  ...green...")
 * added support for casting types to strings and deprecated typeToString()

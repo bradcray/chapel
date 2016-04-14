@@ -1035,56 +1035,64 @@ module DefaultRectangular {
       return alias;
     }
 
+    proc chpl_dsiReallocHelp(d: domain) {
+      if d.rank != this.rank then
+        compilerError("rank mismatch in dsiReallocate()");
+      var copy = new DefaultRectangularArr(eltType=eltType, rank=d.rank,
+                                           idxType=idxType,
+                                           stridable=d._value.stridable,
+                                           dom=d._value);
+      //
+      // TODO: Making this for into a forall ought to accelerate
+      // dsiReallocate() calls, yet doing so breaks due to uint/int
+      // interaction issues today.  Deserves more of a look...
+      // Does our standalone parallel iterator not have the same
+      // type flexibility as the serial iterator?
+      //
+      for i in d[(...dom.ranges)] do
+        copy.dsiAccess(i) = dsiAccess(i);
+      off = copy.off;
+      blk = copy.blk;
+      str = copy.str;
+      origin = copy.origin;
+      factoredOffs = copy.factoredOffs;
+      dsiDestroyData();
+      data = copy.data;
+      // We can't call initShiftedData here because the new domain
+      // has not yet been updated (this is called from within the
+      // = function for domains.
+      if earlyShiftData && !d._value.stridable then
+        // Lydia note 11/04/15: a question was raised as to whether this
+        // check on numIndices added any value.  Performance results
+        // from removing this line seemed inconclusive, which may indicate
+        // that the check is not necessary, but it seemed like unnecessary
+        // work for something with no immediate reward.
+        if d.numIndices > 0 then
+          shiftedData = copy.shiftedData;
+      //numelm = copy.numelm;
+      delete copy;
+    }
+
     proc dsiReallocate(d: domain) {
       on this {
-      //
-      // If both d and dom are default rectangular, this is pretty
-      // easy...
-      //
-      if (d._value.type == dom.type) {
-        var copy = new DefaultRectangularArr(eltType=eltType, rank=rank,
-                                             idxType=idxType,
-                                             stridable=d._value.stridable,
-                                             dom=d._value);
-        //
-        // TODO: Making this for into a forall ought to accelerate
-        // dsiReallocate() calls, yet doing so breaks due to uint/int
-        // interaction issues today.  Deserves more of a look...
-        // Does our standalone parallel iterator not have the same
-        // type flexibility as the serial iterator?
-        //
-        for i in d[(...dom.ranges)] do
-          copy.dsiAccess(i) = dsiAccess(i);
-        off = copy.off;
-        blk = copy.blk;
-        str = copy.str;
-        origin = copy.origin;
-        factoredOffs = copy.factoredOffs;
-        dsiDestroyData();
-        data = copy.data;
-        // We can't call initShiftedData here because the new domain
-        // has not yet been updated (this is called from within the
-        // = function for domains.
-        if earlyShiftData && !d._value.stridable then
-          // Lydia note 11/04/15: a question was raised as to whether this
-          // check on numIndices added any value.  Performance results
-          // from removing this line seemed inconclusive, which may indicate
-          // that the check is not necessary, but it seemed like unnecessary
-          // work for something with no immediate reward.
-          if d.numIndices > 0 then
-            shiftedData = copy.shiftedData;
-        //numelm = copy.numelm;
-        delete copy;
-      } else {
-        //
-        // In this case, dom is DefaultRectangular, but d is not.  We
-        // permit assignments between distributed domains and non-,
-        // interpreting it as just the assignment of the index sets.
-        // So for the purposes of this reallocation, just create a
-        // temporary DefaultRectangular domain and use it above.
-        //
-        dsiReallocate({(...d.getIndices())});
-      }
+        if (d._value.type == dom.type) {
+          //
+          // If both d and dom are default rectangular, this is pretty
+          // easy...
+          //
+          chpl_dsiReallocHelp(d);
+        } else {
+          //
+          // In this case, dom is DefaultRectangular, but d is not.  We
+          // permit assignments between distributed domains and non-,
+          // interpreting it as just the assignment of the index sets.
+          // So for the purposes of this reallocation, just create a
+          // temporary DefaultRectangular domain and use it above.
+          //
+          if d.rank != this.rank then
+            compilerError("rank mismatch in dsiReallocate() part 2");
+          chpl_dsiReallocHelp({(...d.getIndices())});
+        }
       }
     }
   

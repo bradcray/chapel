@@ -2658,7 +2658,13 @@ module ChapelArray {
   proc =(ref a: domain, b: domain) {
     if !isIrregularDom(a) && !isIrregularDom(b) {
       for e in a._value._arrs do {
-        on e do e.dsiReallocate(b);
+        if e.isDefaultRectangular() {
+          if b._value.isDefaultRectangular() {
+            on e do e.dsiReallocate(b);
+          } else {
+            on e do e.dsiReallocate({(...b.getIndices())});
+          }
+        }
       }
       a.setIndices(b.getIndices());
       for e in a._value._arrs do {

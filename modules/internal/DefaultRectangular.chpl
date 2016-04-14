@@ -1036,72 +1036,40 @@ module DefaultRectangular {
       return alias;
     }
 
-    proc dsiReallocate(d: domain) {
+    proc dsiReallocate(d: domain(rank, idxType)) {
+      var copy = new DefaultRectangularArr(eltType=eltType, rank=rank,
+                                           idxType=idxType,
+                                           stridable=d._value.stridable,
+                                           dom=d._value);
       //
-      // The following two tests seem like they should be unnecessary;
-      // this routine should only be called with domains of matching
-      // rank and idxType and we are reasonably sure that this always
-      // happens in practice.  Yet dynamic method resolution is
-      // somehow invoking this in a way where they do not match,
-      // making other things blow up (which is also why the halt()s
-      // can't be turned into compilerError()s... it always triggers).
-      // This deserves a deeper look, but the lack of this is breaking
-      // newer clang builds with c warnings on, so I'm adding this for
-      // the time being.
+      // TODO: Making this for into a forall ought to accelerate
+      // dsiReallocate() calls, yet doing so breaks due to uint/int
+      // interaction issues today.  Deserves more of a look...
+      // Does our standalone parallel iterator not have the same
+      // type flexibility as the serial iterator?
       //
-      if (d.rank != dom.rank) then
-        halt("internal error: dsiReallocate() rank mismatch");
-      else if (d.idxType != dom.idxType) then
-        halt("internal error: dsiReallocate() idxType mismatch");
-      else on this {
-      //
-      // If d is default rectangular, like dom, this is pretty easy...
-      //
-      if (d._value.isDefaultRectangular()) {
-        var copy = new DefaultRectangularArr(eltType=eltType, rank=rank,
-                                             idxType=idxType,
-                                             stridable=d._value.stridable,
-                                             dom=d._value);
-        //
-        // TODO: Making this for into a forall ought to accelerate
-        // dsiReallocate() calls, yet doing so breaks due to uint/int
-        // interaction issues today.  Deserves more of a look...
-        // Does our standalone parallel iterator not have the same
-        // type flexibility as the serial iterator?
-        //
-        for i in d[(...dom.ranges)] do
-          copy.dsiAccess(i) = dsiAccess(i);
-        off = copy.off;
-        blk = copy.blk;
-        str = copy.str;
-        origin = copy.origin;
-        factoredOffs = copy.factoredOffs;
-        dsiDestroyData();
-        data = copy.data;
-        // We can't call initShiftedData here because the new domain
-        // has not yet been updated (this is called from within the
-        // = function for domains.
-        if earlyShiftData && !d._value.stridable then
-          // Lydia note 11/04/15: a question was raised as to whether this
-          // check on numIndices added any value.  Performance results
-          // from removing this line seemed inconclusive, which may indicate
-          // that the check is not necessary, but it seemed like unnecessary
-          // work for something with no immediate reward.
-          if d.numIndices > 0 then
-            shiftedData = copy.shiftedData;
-        //numelm = copy.numelm;
-        delete copy;
-      } else {
-        //
-        // In this case, dom is DefaultRectangular, but d is not.  We
-        // permit assignments between distributed domains and non-,
-        // interpreting it as just the assignment of the index sets.
-        // So for the purposes of this reallocation, just create a
-        // temporary DefaultRectangular domain and use it above.
-        //
-        dsiReallocate({(...d.getIndices())});
-      }
-      }
+      for i in d[(...dom.ranges)] do
+        copy.dsiAccess(i) = dsiAccess(i);
+      off = copy.off;
+      blk = copy.blk;
+      str = copy.str;
+      origin = copy.origin;
+      factoredOffs = copy.factoredOffs;
+      dsiDestroyData();
+      data = copy.data;
+      // We can't call initShiftedData here because the new domain
+      // has not yet been updated (this is called from within the
+      // = function for domains.
+      if earlyShiftData && !d._value.stridable then
+        // Lydia note 11/04/15: a question was raised as to whether this
+        // check on numIndices added any value.  Performance results
+        // from removing this line seemed inconclusive, which may indicate
+        // that the check is not necessary, but it seemed like unnecessary
+        // work for something with no immediate reward.
+        if d.numIndices > 0 then
+          shiftedData = copy.shiftedData;
+      //numelm = copy.numelm;
+      delete copy;
     }
   
     proc dsiLocalSlice(ranges) {

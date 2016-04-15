@@ -1036,7 +1036,7 @@ module DefaultRectangular {
       return alias;
     }
 
-    proc dsiReallocate(d: domain(rank, idxType)) {
+    proc dsiReallocate(d: domain) {
       var copy = new DefaultRectangularArr(eltType=eltType, rank=rank,
                                            idxType=idxType,
                                            stridable=d._value.stridable,

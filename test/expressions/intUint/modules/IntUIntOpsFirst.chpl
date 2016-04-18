@@ -1,17 +1,17 @@
 module IntUIntOpsFirst {
   config param safeCast = true;
 
-  proc +(x: int, y: uint) {
+  proc +(x: int(?w), y: uint(w)) {
     if safeCast then
-      return x + y.safeCast(int);
+      return x + y.safeCast(int(w));
     else
-      return x + y:int;
+      return x + y:int(w);
   }
 
-  proc +(x: uint, y: int) {
+  proc +(x: uint(?w), y: int(w)) {
     if safeCast then
-      return x + y.safeCast(uint);
+      return x + y.safeCast(uint(w));
     else
-      return x + y:uint;
+      return x + y:uint(w);
   }
 }

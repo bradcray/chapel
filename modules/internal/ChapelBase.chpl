@@ -25,6 +25,7 @@ module ChapelBase {
   // These two are called by compiler-generated code.
   extern proc chpl_config_has_value(name:c_string, module_name:c_string): bool;
   extern proc chpl_config_get_value(name:c_string, module_name:c_string): c_string;
+  extern proc chpl_config_dump_values(): bool;
 
   // Is the cache for remote data enabled at compile time?
   config param CHPL_CACHE_REMOTE: bool = false;

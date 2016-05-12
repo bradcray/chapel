@@ -32,6 +32,7 @@
 #include "stringutil.h"
 #include "symbol.h"
 #include "TransformLogicalShortCircuit.h"
+#include "view.h"
 
 #include <cctype>
 #include <set>
@@ -1206,14 +1207,36 @@ static void init_config_var(VarSymbol* var,
                               new_CStringSymbol(var->name),
                               module_name));
 
-  stmt->insertAfter(
+  list_view(var);
+  printf("%s\n", var->defPoint->parentSymbol->name);
+  ModuleSymbol* parentMod = toModuleSymbol(var->defPoint->parentSymbol->defPoint->parentSymbol);
+  assert(parentMod != NULL);
+  //
+  // Only dump user configs.  Maybe this simply makes sense.  But it's also
+  // hard to dump internal ones due to circular references in internal
+  // modules.
+  //
+  if (parentMod->modTag == MOD_USER) {
+    stmt->insertAfter(new CondStmt(new CallExpr("chpl_config_dump_values"),
+                                   new CallExpr("writeln",
+                                                buildStringLiteral(var->name),
+                                                buildStringLiteral("="),
+                                                constTemp),
+                                   NULL));
+  }
+
+  CondStmt* condSetStmt = 
         new CondStmt(new CallExpr("!",
                                   new CallExpr("chpl_config_has_value",
                                                new_CStringSymbol(var->name),
                                                module_name)),
                      noop,
-                     new CallExpr(PRIM_MOVE, constTemp, strToValExpr)));
+                     new CallExpr(PRIM_MOVE, constTemp, strToValExpr));
 
+  stmt->insertAfter(condSetStmt);
+
+  list_view(stmt->parentExpr);
+  
   stmt = noop; // insert regular definition code in then block
 }
 

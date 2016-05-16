@@ -17,6 +17,17 @@ param bitsPerElt = 8;              // # of bits to store per array element
 type eltType = uint(bitsPerElt);   // element type used to store the image
 
 
+config param homegrown = false;
+
+record mycomplex {
+  var re: real;
+  var im: real;
+}
+
+proc complexType() type {
+  if homegrown then return mycomplex; else return complex;
+}
+
 proc main() {
   const ydim = 0..#n,                          // the image's y dimension
         xdim = 0..#divceilpos(n, bitsPerElt);  // the compacted x dimension
@@ -33,10 +44,10 @@ proc main() {
 
         //        const C = 2.0*(x + y*1.0i)/n - (1.5 + 1.0i);
         //        const C = (2.0*x/n - 1.5,2.0*y/n - 1.0): complex;
-        var C: complex;
+        var C: complexType();
         C.re = 2.0*x/n - 1.5;
         C.im = 2.0*y/n - 1.0;
-        var Z, T: complex;
+        var Z, T: complexType();
 
         for 1..maxIter {                       // for the max # of iterations
           if (T.re + T.im > limit) then        // if we haven't converged

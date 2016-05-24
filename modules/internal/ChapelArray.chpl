@@ -1002,6 +1002,14 @@ module ChapelArray {
     }
 
     pragma "no doc"
+    iter dimIter(param d, ind, param tag: iterKind)
+    where tag == iterKind.standalone {
+      compilerWarning("In standalone dimIter");
+      for i in _value.dimIter(d, ind, tag) do
+        yield i;
+    }
+
+    pragma "no doc"
     proc buildArray(type eltType) {
       var x = _value.dsiBuildArray(eltType);
       pragma "dont disable remote value forwarding"

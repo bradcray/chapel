@@ -337,10 +337,21 @@ class CSRDom: BaseSparseDom {
   }
 
   iter dimIter(param d, ind) {
+    compilerWarning("In serial dimIter");
     if (d != 2) {
       compilerError("dimIter(1, ...) not supported on CSR domains");
     }
     for i in rowStart[ind]..rowStop[ind] do
+      yield colIdx[i];
+  }
+
+  iter dimIter(param d, ind, param tag: iterKind)
+    where tag == iterKind.standalone {
+    compilerWarning("In parallel dimIter");
+    if (d != 2) {
+      compilerError("dimIter(1, ...) not supported on CSR domains");
+    }
+    forall i in rowStart[ind]..rowStop[ind] do
       yield colIdx[i];
   }
 }

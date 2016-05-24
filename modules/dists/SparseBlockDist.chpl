@@ -402,6 +402,8 @@ class LocSparseBlockArr {
   }
 }
 
+proc SparseBlockDom.dsiDim(d: int) return whole.dim(d);
+
 /*
 
 Some old code that might be useful to draw from as this
@@ -416,8 +418,6 @@ proc SparseBlockDom.dsiDisplayRepresentation() {
   for tli in dist.targetLocDom do
     writeln("locDoms[", tli, "].mySparseBlock = ", locDoms[tli].mySparseBlock);
 }
-
-proc SparseBlockDom.dsiDim(d: int) return whole.dim(d);
 
 
 //

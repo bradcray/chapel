@@ -4,16 +4,16 @@
    contributed by Hannah Hemmaplardh, Lydia Duncan, and Brad Chamberlain
 */
 
-config const n = 600,                // number of meetings   (must be >= 0)
-             popSize1 = 3,           // size of population 1 (must be > 1)
-             popSize2 = 10;          // size of population 2 (must be > 1)
+config const n = 600,              // number of meetings (must be >= 0)
+             popSize1 = 3,         // size of population 1 (must be > 1)
+             popSize2 = 10;        // size of population 2 (must be > 1)
 
-enum Color {blue=0, red, yellow};    // the chameneos colors
-use Color;                           // permit unqualified naming of them
+enum Color {blue=0, red, yellow};  // the chameneos colors
+use Color;                         // permit unqualified references to them
 
 
 //
-// Print the color equations and simulate the two population sizes
+// Print the color equations and simulate the two population sizes.
 //
 proc main() {
   printColorEquations();
@@ -24,14 +24,14 @@ proc main() {
 
 
 //
-// Print the results of getNewColor() for all color pairs
+// Print the results of getNewColor() for all color pairs.
 //
 proc printColorEquations() {
   const colors = (blue, red, yellow);
 
-  for color1 in colors do
-    for color2 in colors do
-      writeln(color1, " + ", color2, " -> ", getNewColor(color1, color2));
+  for c1 in colors do
+    for c2 in colors do
+      writeln(c1, " + ", c2, " -> ", getNewColor(c1, c2));
   writeln();
 }
 
@@ -51,25 +51,25 @@ proc simulate(numChameneos) {
 
 
 //
-// Special colors to use for a chameneos population of size 10
+// special colors to use for a chameneos population of size 10
 //
 const colors10 = [blue, red, yellow, red, yellow, blue, red, yellow, red, blue];
 
 //
-// A population of chameneos
+// a chameneos population
 //
 record Population {
-  const size = 0;                    // the size of the population
+  const size = 0;   // the size of the population
 
   //
-  // An array of chameneos objects representing the population
+  // an array of chameneos objects representing the population
   //
   var chameneos = [i in 1..size]
                     new Chameneos(i, if size == 10 then colors10[i]
                                                    else ((i-1)%3): Color);
 
   //
-  // Print the colors of the current population
+  // Print the colors of the current population.
   //
   proc printColors() {
     for c in chameneos do
@@ -79,7 +79,7 @@ record Population {
 
   //
   // Hold meetings among the population by creating a shared meeting
-  // place, and then creating a task per chameneos to have meetings.
+  // place, and then creating per-chameneos tasks to have meetings.
   //
   proc holdMeetings(numMeetings) {
     const place = new MeetingPlace(numMeetings);
@@ -107,10 +107,11 @@ record Population {
   }
 
   //
-  // Delete the chameneos objects
+  // Delete the chameneos objects.
   //
   proc ~Population {
-    for c in chameneos do delete c;
+    for c in chameneos do
+      delete c;
   }
 }
 
@@ -126,16 +127,16 @@ class Chameneos {
   var meetingCompleted: atomic bool;   // used to coordinate meeting endings
 
   //
-  // Hold meetings in a given 'place' with other 'chameneos' as long
+  // Have meetings in a given 'place' with other 'chameneos' as long
   // as more meetings remain by reading the current state and then
   // attempting to optimistically replace it with new state that would
-  // indicate that you're a participant.
+  // indicate that we're a participant.
   //
   proc haveMeetings(place, chameneos) {
     do {
       const (currentState, meetingsLeft, peerID) = place.getInfo();
 
-      if (meetingsLeft) {
+      if meetingsLeft {
         //
         // We are the first to arrive if the state had no peer ID
         //
@@ -146,17 +147,17 @@ class Chameneos {
         // participant:
         // - If we're the first to arrive, leave the number of
         //   meetings unchanged and store our ID
-        // - Otherwise, decrement the number of meetings and reset
-        //   the ID to zero.
+        // - Otherwise, we're the second to arrive, so decrement 
+        //   the number of meetings and reset the ID to zero.
         //
-        if (place.attemptToStore(currentState,
-                                 meetingsLeft - !firstToArrive,
-                                 if firstToArrive then id else 0)) {
+        if place.attemptToStore(currentState,
+                                meetingsLeft - !firstToArrive,
+                                if firstToArrive then id else 0) {
           //
           // If we were successful and the first to arrive, wait
           // for the meeting to end; otherwise, run the meeting.
           //
-          if (firstToArrive) then
+          if firstToArrive then
             waitForMeetingToEnd();
           else
             meetWith(chameneos[peerID]);
@@ -176,9 +177,11 @@ class Chameneos {
 
   //
   // Meet with a 'peer' chameneos by computing our shared new color,
-  // storing it, and incrementing our number of meetings.  Signal to
-  // the peer that the meeting is complete.  If the peer was us,
-  // update our 'meetingsWithSelf' count.
+  // storing it, and incrementing the number of meetings for each
+  // chameneos.  Signal to the peer that the meeting is complete.  If
+  // the peer was us, update our 'meetingsWithSelf' count.  Set the
+  // peer free as quickly as possible so it can go on to meet with
+  // others.
   //
   proc meetWith(peer) {
     const newColor = getNewColor(color, peer.color);
@@ -195,9 +198,8 @@ class Chameneos {
 
 
 //
-// Return the complement of two colors; if the two colors are the same
-// value, the color stays the same; otherwise, it becomes the third
-// color.
+// Return the complement of two colors: If the colors are the same,
+// that's the result; otherwise, it's the third color.
 //
 inline proc getNewColor(myColor, otherColor) {
   select myColor {
@@ -217,7 +219,7 @@ inline proc getNewColor(myColor, otherColor) {
       return (if otherColor == blue then yellow else blue);
 
     otherwise {
-       return (if otherColor == blue then red else blue);
+      return (if otherColor == blue then red else blue);
     }
   }
 }
@@ -239,9 +241,8 @@ class MeetingPlace {
   //
   var state: atomic int;
 
-
   //
-  // Set the number of meetings that should take place
+  // Initialize the number of meetings that should take place
   //
   proc MeetingPlace(numMeetings) {
     state.write(numMeetings << bitsPerChameneosID);
@@ -264,7 +265,8 @@ class MeetingPlace {
   //
   // Given a previous state value, a number of meetings, and a
   // chameneos ID, compute a new state value and attempt to
-  // replace the old one with it, returning 'true' if 'successful.
+  // replace the old one with it (using an atomic compare-exchange),
+  // returning 'true' if 'successful.
   //
   proc attemptToStore(prevState, numMeetings, chameneosID) {
     const newState = (numMeetings << bitsPerChameneosID) | chameneosID;
@@ -274,7 +276,7 @@ class MeetingPlace {
 
 
 //
-// the base-10 digits as an enum, for the purposes of simple casting and I/O
+// the base-10 digits as an enum to support I/O and casting trivially
 //
 enum digit {zero=0, one, two, three, four, five, six, seven, eight, nine};
 

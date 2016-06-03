@@ -43,6 +43,31 @@ The following are a list of planned improvements to Chapel and/or our
 implementations that would benefit the codes:
 
 
+chameneosredux.chpl
+-------------------
+o add user-level support for an enum iterator and replace array in
+  printColorEquations() with it
+
+o add support for otherwise...do to parser and use for getNewColor()
+
+o once we map to C11 atomics, can performance be improved via
+  different memory orders?
+
+o add support for compiler analysis that switch statements on enums
+  cover all cases in order to be able to replace 'otherwise' with
+  'when yellow' and not get a compiler error.
+
+o add support for a param enum.size query (not sure we'd actually use
+  this, though...)
+
+o would we want to have a digiterator in the standard library?  An
+  iterator that yields digits for a number?  (in base b)?
+
+o should the language support local enums?  It seems to break casting
+  at present (maybe a point-of-instantiation issue?  or where default
+  functions are inserted?)
+
+
 mandelbrot.chpl
 ---------------
 o extend the dynamic() iterators for ranges to support domains and

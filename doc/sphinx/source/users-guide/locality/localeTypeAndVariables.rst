@@ -1,9 +1,9 @@
-:title: Users Guide: Locale Type and Variables
+:title: Users Guide: The **locale** Type and Variables
 
 .. default-domain:: chpl
 
-Locale Type and Variables
-=========================
+The **locale** Type and Variables
+=================================
 
 The Chapel language has a locale type and a number of built-in
 variables that permit a programmer to refer to, and reason about, the
@@ -37,12 +37,13 @@ The variable *numLocales* is a built-in integer constant indicating
 the number of locales on which the program is running.  For example,
 when run on four locales, the following program:
 
-.. literalinclude:: ../../../../../test/release/examples/users-guide/locality/numLocalesVar.chpl
+.. literalinclude:: examples/users-guide/locality/numLocalesVar.chpl
+  :caption:
   :language: chapel
 
 would generate:
 
-.. literalinclude:: ../../../../../test/release/examples/users-guide/locality/numLocalesVar.good
+.. literalinclude:: examples/users-guide/locality/numLocalesVar.good
   :language: text
 
 
@@ -60,12 +61,13 @@ array.  This is demonstrated by the following program which first
 prints the *LocaleSpace* domain and then iterates over it, showing
 that the ID of each value in *Locales* corresponds to its index:
 
-.. literalinclude:: ../../../../../test/release/examples/users-guide/locality/localesDomArr.chpl
+.. literalinclude:: examples/users-guide/locality/localesDomArr.chpl
+  :caption:
   :language: chapel
 
 Running on four locales, its output is:
 
-.. literalinclude:: ../../../../../test/release/examples/users-guide/locality/localesDomArr.good
+.. literalinclude:: examples/users-guide/locality/localesDomArr.good
   :language: text
 
 
@@ -82,10 +84,11 @@ As an example, the following program demonstrates that Chapel programs
 begin their execution on locale 0:
 
 
-.. literalinclude:: ../../../../../test/release/examples/users-guide/locality/here-id.chpl
+.. literalinclude:: examples/users-guide/locality/here-id.chpl
+  :caption:
   :language: chapel
 
 Running it on any number of locales generates:
 
-.. literalinclude:: ../../../../../test/release/examples/users-guide/locality/here-id.good
+.. literalinclude:: examples/users-guide/locality/here-id.good
   :language: text

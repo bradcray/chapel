@@ -1072,7 +1072,7 @@ proc CyclicArr.doiBulkTransferToDR(Barg)
         const sa = chpl__tuplify(B.dom.dsiStride); //return a tuple
         
         //r2 is the domain to refer the elements of A in locale j
-        //r1 is the domain to refer the correspondig elements of B
+        //r1 is the domain to refer the corresponding elements of B
         var r1,r2: rank * range(idxType = el,stridable = true);
         r2=inters.dims();
         //In the case that the number of elements in dimension t for r1 and r2
@@ -1151,11 +1151,28 @@ proc CyclicArr.doiBulkTransferFromDR(Barg)
 proc CyclicArr.dsiTargetLocales() {
   return dom.dist.targetLocs;
 }
+proc CyclicDom.dsiTargetLocales() {
+  return dist.targetLocs;
+}
+proc Cyclic.dsiTargetLocales() {
+  return targetLocs;
+}
 
 // Cyclic subdomains are represented as a single domain
 
 proc CyclicArr.dsiHasSingleLocalSubdomain() param return true;
+proc CyclicDom.dsiHasSingleLocalSubdomain() param return true;
 
 proc CyclicArr.dsiLocalSubdomain() {
   return myLocArr.locDom.myBlock;
+}
+proc CyclicDom.dsiLocalSubdomain() {
+  // TODO -- could be replaced by a privatized myLocDom in CyclicDom
+  // as it is with CyclicArr
+  var myLocDom:LocCyclicDom(rank, idxType, stridable) = nil;
+  for (loc, locDom) in zip(dist.targetLocs, locDoms) {
+    if loc == here then
+      myLocDom = locDom;
+  }
+  return myLocDom.myBlock;
 }

@@ -87,14 +87,14 @@ void ensureDirExists(const char* dirname, const char* explanation) {
 }
 
 
-static void removeSpacesFromString(char* str)
+static void removeSpacesBackslashesFromString(char* str)
 {
   char* src = str;
   char* dst = str;
   while (*src != '\0')
   {
     *dst = *src++;
-    if (*dst != ' ')
+    if (*dst != ' ' && *dst != '\\')
         dst++;
   }
   *dst = '\0';
@@ -141,7 +141,7 @@ const char* makeTempDir(const char* dirPrefix) {
     userid = passwdinfo->pw_name;
   }
   char* myuserid = strdup(userid);
-  removeSpacesFromString(myuserid);
+  removeSpacesBackslashesFromString(myuserid);
 
   const char* tmpDir = astr(tmpdirprefix, myuserid, mypidstr, tmpdirsuffix);
   ensureDirExists(tmpDir, "making temporary directory");
@@ -272,22 +272,21 @@ void openCFile(fileinfo* fi, const char* name, const char* ext) {
     fi->filename = astr(name);
 
   fi->pathname = genIntermediateFilename(fi->filename);
-  fi->fptr = fopen(fi->pathname, "w");
-}
-
-void appendCFile(fileinfo* fi, const char* name, const char* ext) {
-  if (ext)
-    fi->filename = astr(name, ".", ext);
-  else
-    fi->filename = astr(name);
-
-  fi->pathname = genIntermediateFilename(fi->filename);
-  fi->fptr     = fopen(fi->pathname, "a+");
+  openfile(fi, "w");
 }
 
 void closeCFile(fileinfo* fi, bool beautifyIt) {
   fclose(fi->fptr);
-  if (beautifyIt && saveCDir[0])
+  //
+  // We should beautify if (1) we were asked to and (2) either (a) we
+  // were asked to save the C code or (b) we're debugging and were
+  // asked to codegen cpp #line information.
+  //
+  // TODO: With some refactoring, we could simply do the #line part of
+  // beautify without also improving indentation and such which could
+  // save some time.
+  //
+  if (beautifyIt && (saveCDir[0] || (debugCCode && printCppLineno)))
     beautify(fi);
 }
 
@@ -734,10 +733,10 @@ void setupModulePaths() {
   const char* modulesRoot = 0;
 
   if (fMinimalModules == true)
-    modulesRoot = "modules-minimal";
+    modulesRoot = "modules/minimal";
 
   else if (fUseIPE == true)
-    modulesRoot = "modules-ipe";
+    modulesRoot = "modules/ipe";
 
   else
     modulesRoot = "modules";
@@ -757,6 +756,7 @@ void setupModulePaths() {
                       "-", CHPL_TARGET_COMPILER));
 
   stdModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/standard"));
+  stdModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/packages"));
   stdModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/layouts"));
   stdModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/dists"));
   stdModPath.add(astr(CHPL_HOME, "/", modulesRoot, "/dists/dims"));

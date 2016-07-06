@@ -135,7 +135,7 @@ static PassInfo sPassList[] = {
                                 // _distribution records
   RUN(removeEmptyRecords),      // remove empty records
   RUN(localizeGlobals),         // pull out global constants from loop runs
-  RUN(loopInvariantCodeMotion), // move loop invarient code above loop runs
+  RUN(loopInvariantCodeMotion), // move loop invariant code above loop runs
   RUN(prune2),                  // prune AST of dead functions and types again
 
   RUN(returnStarTuplesByRefArgs),
@@ -167,6 +167,11 @@ void runPasses(PhaseTracker& tracker, bool isChpldoc) {
     USR_STOP(); // quit if fatal errors were encountered in pass
 
     currentPassNo++;
+
+    // Break early if this is a parse-only run
+    if (fParseOnly ==  true && strcmp(sPassList[i].name, "checkParsed") == 0) {
+      break;
+    }
 
     // Break early if this is a chpl doc run
     if (isChpldoc == true && strcmp(sPassList[i].name, "docs") == 0) {

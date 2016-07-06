@@ -81,6 +81,10 @@ class AbstractJob(object):
     # argument name for specifying number of cpus (i.e. mppdepth)
     num_cpus_resource = None
 
+    # redirect_output decides whether we redirect output directly to the output
+    # file or whether we let the launcher and queueing system do it.
+    redirect_output = None
+
     def __init__(self, test_command, reservation_args):
         """Initialize new job runner.
 
@@ -104,15 +108,15 @@ class AbstractJob(object):
                               ['test_command', 'num_locales', 'walltime', 'hostlist']))
         return '{0}({1})'.format(cls_name, attrs)
 
-    @property
-    def full_test_command(self):
+    def full_test_command(self, output_file):
         """Returns instance's test_command prefixed with command to change to
         testing_dir. This is required to support both PBSPro and moab flavors
         of PBS. Whereas moab provides a -d argument when calling qsub, both
-        support the $PBS_O_WORKDIR argument.
+        support the $PBS_O_WORKDIR argument. This also adds stdout/stderr
+        redirection directly to the output file to avoid using a spool file.
 
         :rtype: list
-        :returns: command to run in qsub with changedir call
+        :returns: command to run in qsub with changedir call and redirection
         """
         full_test_command = ['cd', '$PBS_O_WORKDIR', '&&']
 
@@ -127,6 +131,8 @@ class AbstractJob(object):
             full_test_command += ['test', '-f', self.test_command[0], '&&']
 
         full_test_command.extend(self.test_command)
+        if self.redirect_output:
+            full_test_command.extend(['&>{0}'.format(output_file)])
         return full_test_command
 
     @property
@@ -176,30 +182,23 @@ class AbstractJob(object):
         logging.info('Job name is: {0}'.format(job_name))
         return job_name
 
-    target_arch = chpl_arch.get('target')
     @property
-    def knc(self):
-        """Returns True when testing KNC (Xeon Phi).
+    def select_suffix(self):
+        """Returns suffix for select expression based instance attributes.
+
+        :rtype: str
+        :returns: select expression suffix, or empty string
+        """
+        return ''
+
+    @property
+    def knl(self):
+        """Returns True when testing KNL (Xeon Phi).
 
         :rtype: bool
-        :returns: True when testing KNC
+        :returns: True when testing KNL
         """
-        return self.target_arch == 'knc'
-
-    def work_around_knc_module_bug(self):
-        """Hack to unload the knc module before calling qsub in order to work
-        around a module bug. Note that this unloading of knc here is why the
-        above 'knc' method doesn't just return `chpl_arch.get('target') == knc`
-        but instead caches the value since unloading knc module means chpl_arch
-        will no longer return 'knc'
-        """
-        if self.knc:
-	    unload_knc_proc = subprocess.Popen(
-                ['modulecmd', 'python', 'unload', 'craype-intel-knc'],
-                stdout=subprocess.PIPE
-            )
-	    stdout, stderr = unload_knc_proc.communicate()
-	    exec stdout
+        return chpl_arch.get('target') == 'mic-knl'
 
     def _qsub_command_base(self, output_file):
         """Returns base qsub command, without any resource listing.
@@ -210,8 +209,9 @@ class AbstractJob(object):
         :rtype: list
         :returns: qsub command as list of strings
         """
-        submit_command =  [self.submit_bin, '-V', '-N', self.job_name,
-                           '-j', 'oe', '-o', output_file]
+        submit_command =  [self.submit_bin, '-V', '-N', self.job_name]
+        if not self.redirect_output:
+            submit_command.extend(['-j', 'oe', '-o', output_file])
         if self.walltime is not None:
             submit_command.append('-l')
             submit_command.append('walltime={0}'.format(self.walltime))
@@ -232,8 +232,8 @@ class AbstractJob(object):
 
         if self.num_locales >= 0:
             submit_command.append('-l')
-            submit_command.append('{0}={1}'.format(
-                self.num_nodes_resource, self.num_locales))
+            submit_command.append('{0}={1}{2}'.format(
+                self.num_nodes_resource, self.num_locales, self.select_suffix))
         if self.hostlist is not None:
             submit_command.append('-l')
             submit_command.append('{0}={1}'.format(
@@ -440,8 +440,6 @@ class AbstractJob(object):
         if self.submit_bin != 'qsub':
             raise RuntimeError('_launch_qsub called for non-pbs job type!')
 
-        self.work_around_knc_module_bug()
-
         logging.info(
             'Starting {0} job "{1}" on {2} nodes with walltime {3} '
             'and output file: {4}'.format(
@@ -458,7 +456,7 @@ class AbstractJob(object):
             env=os.environ.copy()
         )
 
-        test_command_str = ' '.join(self.full_test_command)
+        test_command_str = ' '.join(self.full_test_command(output_file))
         logging.debug('Communicating with {0} subprocess. Sending test command on stdin: {1}'.format(
             self.submit_bin, test_command_str))
         stdout, stderr = submit_proc.communicate(input=test_command_str)
@@ -690,6 +688,7 @@ class MoabJob(AbstractJob):
     hostlist_resource = 'hostlist'
     num_nodes_resource = 'nodes'
     num_cpus_resource = None
+    redirect_output = True
 
     @classmethod
     def status(cls, job_id):
@@ -737,6 +736,7 @@ class PbsProJob(AbstractJob):
     hostlist_resource = 'mppnodes'
     num_nodes_resource = 'mppwidth'
     num_cpus_resource = 'ncpus'
+    redirect_output = False
 
     @property
     def job_name(self):
@@ -753,17 +753,12 @@ class PbsProJob(AbstractJob):
 
     @property
     def select_suffix(self):
-        """Returns suffix for select expression based instance attributes. For example,
-        if self.knc is True, returns `:accelerator_model=Xeon_Phi` so reservation will
-        target KNC nodes. Returns empty string when self.knc is False.
+        """Returns suffix for select expression based instance attributes.
 
         :rtype: str
         :returns: select expression suffix, or empty string
         """
-        if self.knc:
-            return ':accelerator_model=Xeon_Phi'
-        else:
-            return ''
+        return ''
 
     @classmethod
     def status(cls, job_id):
@@ -835,11 +830,8 @@ class PbsProJob(AbstractJob):
         elif num_locales > 0:
             select_stmt = select_pattern.format(num_locales)
 
-            # Do not set ncpus for knc. If running on knc, cpus are not needed
-            # on the system. Someday support for heterogeneous applications may
-            # exist, in which case ncpus will need to be set. For now, assume
-            # program will be launched onto knc only.
-            if self.num_cpus_resource is not None and not self.knc:
+            # Do not set ncpus for knl.
+            if self.num_cpus_resource is not None and not self.knl:
                 select_stmt += ':{0}={1}'.format(
                     self.num_cpus_resource, self.num_cpus)
 

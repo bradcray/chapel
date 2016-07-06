@@ -61,8 +61,16 @@ static int err_print;
 static int err_ignore;
 static FnSymbol* err_fn = NULL;
 
-bool forceWidePtrs() {
-  return !strcmp(CHPL_LOCALE_MODEL, "numa");
+//
+// Chances are that all non-flat locale models will require wide
+// pointers.  Ultimately, we'd like to have such decisions be made by
+// param fields/methods within the locale models themselves, but that
+// would require a fairly large refactoring, so for now, we
+// special-case 'flat' with the expectation that most other locale
+// models will not be flat.
+//
+static bool forceWidePtrs() {
+  return (strcmp(CHPL_LOCALE_MODEL, "flat") != 0);
 }
 
 bool forceWidePtrsForLocal() {
@@ -192,7 +200,7 @@ printErrorHeader(BaseAST* ast) {
           fprintf(stderr, "%s:%d: In ",
                   cleanFilename(err_fn), err_fn->linenum());
           if (!strncmp(err_fn->name, "_construct_", 11)) {
-            fprintf(stderr, "constructor '%s':\n", err_fn->name+11);
+            fprintf(stderr, "initializer '%s':\n", err_fn->name+11);
           } else {
             fprintf(stderr, "%s '%s':\n",
                     (err_fn->isIterator() ? "iterator" : "function"),

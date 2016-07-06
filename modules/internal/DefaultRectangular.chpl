@@ -121,10 +121,6 @@ module DefaultRectangular {
     proc dsiGetIndices() return ranges;
   
     proc dsiSetIndices(x) {
-      if ranges.size != x.size then
-        compilerError("rank mismatch in domain assignment");
-      if ranges(1).idxType != x(1).idxType then
-        compilerError("index type mismatch in domain assignment");
       ranges = x;
     }
 
@@ -274,7 +270,7 @@ module DefaultRectangular {
         // Make sure we don't use more sublocales than the numbers of
         // tasksPerLocale requested
         const numSublocTasks = min(numSublocs, dptpl);
-        // For serial tasks, we will only have a singel chunk
+        // For serial tasks, we will only have a single chunk
         const (numChunks, parDim) = if __primitive("task_get_serial") then
                                     (1, -1) else
                                     _computeChunkStuff(numSublocTasks,
@@ -301,7 +297,7 @@ module DefaultRectangular {
           }
         } else {
           coforall chunk in 0..#numChunks { // make sure coforall on can trigger
-            on here.getChild(chunk) {
+            local on here.getChild(chunk) {
               if debugDataParNuma {
                 if chunk!=chpl_getSubloc() then
                   writeln("*** ERROR: ON WRONG SUBLOC (should be "+chunk+
@@ -482,7 +478,7 @@ module DefaultRectangular {
     proc dsiDim(d : int)
       return ranges(d);
   
-    // optional, is this necesary? probably not now that
+    // optional, is this necessary? probably not now that
     // homogeneous tuples are implemented as C vectors.
     proc dsiDim(param d : int)
       return ranges(d);
@@ -690,6 +686,13 @@ module DefaultRectangular {
     pragma "local field"
     var shiftedData : _ddata(eltType);
     var noinit_data: bool = false;
+
+    // 'dataAllocRange' is used by the array-vector operations (e.g. push_back,
+    // pop_back, insert, remove) to allow growing or shrinking the data
+    // buffer in a doubling/halving style.  If it is used, it will be the
+    // actual size of the 'data' buffer, while 'dom' represents the size of
+    // the user-level array.
+    var dataAllocRange: range(idxType);
     //var numelm: int = -1; // for correctness checking
   
     // end class definition here, then defined secondary methods below
@@ -858,6 +861,9 @@ module DefaultRectangular {
       var size = blk(1) * dom.dsiDim(1).length;
       data = _ddata_allocate(eltType, size);
       initShiftedData();
+      if rank == 1 && !stridable then
+        dataAllocRange = dom.dsiDim(1);
+
     }
   
     inline proc getDataIndex(ind: idxType ...1) where rank == 1
@@ -913,10 +919,21 @@ module DefaultRectangular {
       }
     }
   
-    // only need second version because wrapper record can pass a 1-tuple
-    inline proc dsiAccess(ind: idxType ...1) ref where rank == 1
+    // only need second version (ind : rank*idxType)
+    // because wrapper record can pass a 1-tuple
+    inline proc dsiAccess(ind: idxType ...1) ref
+    where rank == 1
       return dsiAccess(ind);
-  
+
+    inline proc dsiAccess(ind: idxType ...1)
+    where rank == 1 && !shouldReturnRvalueByConstRef(eltType)
+      return dsiAccess(ind);
+
+    inline proc dsiAccess(ind: idxType ...1) const ref
+    where rank == 1 && shouldReturnRvalueByConstRef(eltType)
+      return dsiAccess(ind);
+
+
     inline proc dsiAccess(ind : rank*idxType) ref {
       if boundsChecking then
         if !dom.dsiMember(ind) {
@@ -927,18 +944,43 @@ module DefaultRectangular {
           halt("array index out of bounds: " + _stringify_index(ind));
         }
       var dataInd = getDataIndex(ind);
-      //assert(dataInd >= 0);
-      //assert(numelm >= 0); // ensure it has been initialized
-      //assert(dataInd: uint(64) < numelm: uint(64));
       return theData(dataInd);
     }
-  
-    inline proc dsiLocalAccess(i) ref {
-      return dsiAccess(i);
+
+    inline proc dsiAccess(ind : rank*idxType)
+    where !shouldReturnRvalueByConstRef(eltType) {
+      if boundsChecking then
+        if !dom.dsiMember(ind) {
+          halt("array index out of bounds: " + _stringify_index(ind));
+        }
+      var dataInd = getDataIndex(ind);
+      return theData(dataInd);
     }
 
     proc dsiCanReindex(d) param return true;
   
+    inline proc dsiAccess(ind : rank*idxType) const ref
+    where shouldReturnRvalueByConstRef(eltType) {
+      if boundsChecking then
+        if !dom.dsiMember(ind) {
+          halt("array index out of bounds: " + _stringify_index(ind));
+        }
+      var dataInd = getDataIndex(ind);
+      return theData(dataInd);
+    }
+
+
+    inline proc dsiLocalAccess(i) ref
+      return dsiAccess(i);
+
+    inline proc dsiLocalAccess(i)
+    where !shouldReturnRvalueByConstRef(eltType)
+      return dsiAccess(i);
+
+    inline proc dsiLocalAccess(i) const ref
+    where shouldReturnRvalueByConstRef(eltType)
+      return dsiAccess(i);
+
     proc dsiReindex(d: DefaultRectangularDom) {
       var alias : DefaultRectangularArr(eltType=eltType, rank=d.rank,
                                         idxType=d.idxType,
@@ -1044,7 +1086,7 @@ module DefaultRectangular {
       }
       return alias;
     }
-  
+
     proc dsiReallocate(d: domain) {
       if (d._value.type == dom.type) {
         on this {
@@ -1143,7 +1185,9 @@ module DefaultRectangular {
       if boundsChecking then
         assert((len:uint*elemSize:uint) <= max(ssize_t):uint,
                "length of array to write is greater than ssize_t can hold");
-      f.writeBytes(data, len:ssize_t*elemSize:ssize_t);
+      const src = this.theData;
+      const idx = getDataIndex(this.dom.dsiLow);
+      f.writeBytes(_ddata_shift(eltType, src, idx), len:ssize_t*elemSize:ssize_t);
     } else {
       this.dsiSerialReadWrite(f);
     }
@@ -1168,12 +1212,10 @@ module DefaultRectangular {
     }
   }
 
-  // This is very conservative.  For example, it will return false for
-  // 1-d array aliases that are shifted from the aliased array.
+  // This is very conservative.
   proc DefaultRectangularArr.isDataContiguous() {
     if debugDefaultDistBulkTransfer then
       writeln("isDataContiguous(): origin=", origin, " off=", off, " blk=", blk);
-    if origin != 0 then return false;
   
     for param dim in 1..rank do
       if off(dim)!= dom.dsiDim(dim).first then return false;
@@ -1234,42 +1276,27 @@ module DefaultRectangular {
               " Alo=", Alo, ", Blo=", Blo,
               ", len=", len, ", elemSize=", elemSize);
     }
+
+    const Adata = _ddata_shift(eltType, this.theData, getDataIndex(Alo));
+    const Bdata = _ddata_shift(eltType, B._value.theData, B._value.getDataIndex(Blo));
+
+    if Adata == Bdata then return;
   
     // NOTE: This does not work with --heterogeneous, but heterogeneous
     // compilation does not work right now.  The calls to chpl_comm_get
     // and chpl_comm_put should be changed once that is fixed.
-    if this.data.locale.id==here.id {
+    if Adata.locale.id==here.id {
       if debugDefaultDistBulkTransfer then //See bug in test/optimizations/bulkcomm/alberto/rafatest2.chpl
         writeln("\tlocal get() from ", B._value.locale.id);
-      const dest = this.theData;
-      const src = B._value.theData;
-      if dest != src {
-        __primitive("chpl_comm_array_get",
-                  __primitive("array_get", dest, getDataIndex(Alo)),
-                  B._value.data.locale.id,
-                  __primitive("array_get", src, B._value.getDataIndex(Blo)),
-                  len);
-      }
-    } else if B._value.data.locale.id==here.id {
+      __primitive("chpl_comm_array_get", Adata[0], Bdata.locale.id, Bdata[0], len);
+    } else if Bdata.locale.id==here.id {
       if debugDefaultDistBulkTransfer then
         writeln("\tlocal put() to ", this.locale.id);
-      const dest = this.theData;
-      const src = B._value.theData;
-      __primitive("chpl_comm_array_put",
-                  __primitive("array_get", src, B._value.getDataIndex(Blo)),
-                  this.data.locale.id,
-                  __primitive("array_get", dest, getDataIndex(Alo)),
-                  len);
-    } else on this.data.locale {
+      __primitive("chpl_comm_array_put", Bdata[0], Adata.locale.id, Adata[0], len); 
+    } else on Adata.locale {
       if debugDefaultDistBulkTransfer then
         writeln("\tremote get() on ", here.id, " from ", B.locale.id);
-      const dest = this.theData;
-      const src = B._value.theData;
-      __primitive("chpl_comm_array_get",
-                  __primitive("array_get", dest, getDataIndex(Alo)),
-                  B._value.data.locale.id,
-                  __primitive("array_get", src, B._value.getDataIndex(Blo)),
-                  len);
+      __primitive("chpl_comm_array_get", Adata[0], Bdata.locale.id, Bdata[0], len);
     }
   }
   
@@ -1277,8 +1304,8 @@ module DefaultRectangular {
   Data needed to use strided copy of data:
     + Stridelevels: the number of stride level (not really the number of dimensions because:
        - Stridelevels < rank if we can aggregate several dimensions due to they are consecutive 
-           -- for exameple, whole rows --
-       - Stridelevels == rank if there is a "by X" whith X>1 in the range description for 
+           -- for example, whole rows --
+       - Stridelevels == rank if there is a "by X" with X>1 in the range description for
            the rightmost dimension)
     + srcCount: slice size in each dimension for the source array. srcCount[0] should be the number of bytes of contiguous data in the rightmost dimension.
     + dstCount: slice size in each dimension for the destination array. dstCount[0] should be the number of bytes of contiguous data in the rightmost dimension.
@@ -1338,7 +1365,7 @@ module DefaultRectangular {
     //  stridelevels =1
     //  srcCount = (1,50) //In B you read 1 element 50 times
     //  (srcStride=(2) = distance between 1 element and the next one)
-    //  dstCount = (5,10) //In A you write a chunk of 5 elments 10
+    //  dstCount = (5,10) //In A you write a chunk of 5 elements 10
     //  times (dstStride=(10) distance between 1 chunk and the next one)
     
     
@@ -1368,9 +1395,9 @@ module DefaultRectangular {
     var dstStride, srcStride: [1..rank] size_t;
     /*When the source and destination arrays have different sizes 
       (example: A[1..10,1..10] and B[1..20,1..20]), the count arrays obtained are different,
-      so we have to calculate the minimun count array */
+      so we have to calculate the minimum count array */
     //Note that we use equal function equal instead of dstCount==srcCount due to the latter fails
-    //The same for the array assigment (using assing function instead of srcCount=dstCount)
+    //The same for the array assignment (using assign function instead of srcCount=dstCount)
     
     if !bulkCommEqual(dstCount, srcCount, rank+1) //For different size arrays
     {
@@ -1468,7 +1495,7 @@ module DefaultRectangular {
       const dest = A.data;
       const src = B.data;
   
-      //We are in a locale that doesn't store neither A nor B so we need to copy the auxiliarry
+      //We are in a locale that doesn't store neither A nor B so we need to copy the auxiliary
       //arrays to the locale that hosts A. This should translate into some more gets...
       const countAux=count.safeCast(size_t);
       const srcstrides=srcStride.safeCast(size_t);
@@ -1504,8 +1531,8 @@ module DefaultRectangular {
   /* This function returns stridelevels for the default rectangular array.
     + Stridelevels: the number of stride level (not really the number of dimensions because:
        - Stridelevels < rank if we can aggregate several dimensions due to they are consecutive 
-           -- for exameple, whole rows --
-       - Stridelevels == rank if there is a "by X" whith X>1 in the range description for 
+           -- for example, whole rows --
+       - Stridelevels == rank if there is a "by X" with X>1 in the range description for
            the rightmost dimension)*/
   proc DefaultRectangularArr.computeBulkStrideLevels(rankcomp):int(32) where rank == 1
   {//To understand the blk(1)==1 condition,
@@ -1518,7 +1545,7 @@ module DefaultRectangular {
   //Case 1:  
   //  var A: [1..4,1..4,1..4] real; A[1..4,3..4,1..4 by 2] 
   // --> In dimension 3 there is stride, because the elements are not
-  //     consecutives, so stridelevels +=1
+  //     consecutive, so stridelevels +=1
   //More in test/optimizations/bulkcomm/alberto/2dDRtoBDTest.chpl (example 8)
   
   //Case 2:
@@ -1593,7 +1620,7 @@ module DefaultRectangular {
   //    var A: [1..4,1..4,1..4] real; A[1..4,4..4,1..4 by 3] 
   //      --> There is only 1 element in dimension 2, so it's possible to 
   //        join to dimension 1, and the value of count[3] will be the number 
-  //        of elements in dimension 2 x number of elements in dimesion 1 (1 x 4).
+  //        of elements in dimension 2 x number of elements in dimension 1 (1 x 4).
   //More in test/optimizations/bulkcomms/alberto/3dAgTestStride.chpl (example 6 and 7)
   proc DefaultRectangularArr.computeBulkCount(stridelevels:int(32), rankcomp, aux = false):(rank+1)*size_t where rank >1
   {
@@ -1716,7 +1743,7 @@ module DefaultRectangular {
   
   /* This function checks if the stride in dimension 'x' is the same as the distance
   between the last element in dimension 'x' and  the first in dimension 'x-1'.
-  If the distances are equal, we can aggregate these two dimmensions. 
+  If the distances are equal, we can aggregate these two dimensions.
   Example: 
   array A, the domain is D=[1..6, 1..6, 1..6]
   Let's A[1..6 by 2, 1..6, 1..6 by 2], then, checkStrideDistance(3) returns true, 

@@ -147,13 +147,20 @@ void chpl_vdebug_start (const char *fileroot, double now) {
   chpl_vdebug = 1;
 }
 
-// Record>  VdbMark: time.sec user.time system.time nodeID taskID
+// Record>  End: time.sec user.time system.time nodeID taskID
+//
+// Should be the last record in the file.
 
 void chpl_vdebug_stop (void) {
   struct rusage ru;  
   struct timeval tv;
   chpl_taskID_t stopTask = chpl_task_getId();
 
+  // First, shutdown VisualDebug
+  chpl_vdebug = 0;
+  uninstall_callbacks();
+
+  // Now log the stop
   if (chpl_vdebug_fd >= 0) {
     (void) gettimeofday (&tv, NULL);
     if ( getrusage (RUSAGE_SELF, &ru) < 0) {
@@ -170,8 +177,6 @@ void chpl_vdebug_stop (void) {
                   chpl_nodeID, (int) stopTask);
     close (chpl_vdebug_fd);
   }
-  chpl_vdebug = 0;
-  uninstall_callbacks();
 }
 
 // Record>  VdbMark: time.sec nodeId taskId
@@ -300,7 +305,7 @@ void chpl_vdebug_log_put(void* addr, c_nodeid_t node, void* raddr,
 // Record>  get: time.sec dstNodeId srcNodeId commTaskId addr raddr elemsize 
 //               typeIndex length lineNumber fileName
 //
-// Note:  dstNodeId is for the node makeing the request
+// Note:  dstNodeId is for the node making the request
 
 void chpl_vdebug_log_get(void* addr, c_nodeid_t node, void* raddr,
                          size_t size, int32_t typeIndex,
@@ -340,7 +345,7 @@ void  chpl_vdebug_log_put_strd(void* dstaddr, void* dststrides, c_nodeid_t dstno
 // Record>  st_get: time.sec dstNodeId srcNodeId commTaskId addr raddr elemsize 
 //                  typeIndex length lineNumber fileName
 //
-// Note:  dstNode is node makeing request for get
+// Note:  dstNode is node making request for get
 
 void chpl_vdebug_log_get_strd(void* dstaddr, void* dststrides, c_nodeid_t srcnode_id,
                               void* srcaddr, void* srcstrides, void* count,
@@ -391,7 +396,7 @@ void  chpl_vdebug_log_fork_nb(c_nodeid_t node, c_sublocid_t subloc,
   }
 }
 
-// Record>  fork_nb: time.sec nodeId forkNodeId subLoc funcId arg argSize forkTaskId
+// Record>  f_fork: time.sec nodeId forkNodeId subLoc funcId arg argSize forkTaskId
 
 void chpl_vdebug_log_fast_fork(c_nodeid_t node, c_sublocid_t subloc,
                                chpl_fn_int_t fid, void *arg, int32_t arg_size) {

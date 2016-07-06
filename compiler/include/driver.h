@@ -98,6 +98,7 @@ extern const char* CHPL_REGEXP;
 extern const char* CHPL_WIDE_POINTERS;
 extern const char* CHPL_LLVM;
 extern const char* CHPL_AUX_FILESYS;
+extern const char* CHPL_UNWIND;
 
 extern bool  printPasses;
 extern FILE* printPassesFile;
@@ -115,6 +116,7 @@ extern char fExplainInstantiation[256];
 /// If true, then print additional (disambiguation) information about
 /// resolution.
 extern bool fExplainVerbose;
+extern bool fParseOnly;
 extern bool fPrintCallStackOnError;
 extern bool fPrintIDonError;
 extern bool fPrintModuleResolution;
@@ -191,7 +193,7 @@ extern char compileVersion[64];
 extern bool fMinimalModules;
 
 // Set to true if we want to use the experimental
-// Interactive Programming Environmment (IPE) mode.
+// Interactive Programming Environment (IPE) mode.
 extern bool fUseIPE;
 
 #endif

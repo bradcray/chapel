@@ -302,7 +302,8 @@ genVirtualMethodTable(Vec<TypeSymbol*>& types) {
             fprintf(hdrfile, "(chpl_fn_p)NULL");
             n++;
           }
-          comma = true;
+          if (maxVMT > 0)
+            comma = true;
         }
       }
     }
@@ -406,6 +407,51 @@ static void genFilenameTable() {
 #endif
   }
   genGlobalInt32(sizeName, gFilenameLookup.size());
+}
+
+//
+// This adds the Chapel symbol table to the config file
+// Our symbol table is formed by two 1-D arrays with 2 elements
+// per entry:
+//
+// chpl_funSymTable     = cname, Chapel name
+// chpl_filenumSymTable = Chapel file name index, Chapel line number
+//
+static void genUnwindSymbolTable(){
+  GenInfo *info = gGenInfo;
+  Vec<FnSymbol*> symbols;
+
+  //If CHPL_UNWIND is none we don't want any symbols in our tables
+  if(strcmp(CHPL_UNWIND, "none") != 0){
+    // Gets only user symbols
+    forv_Vec(FnSymbol, fn, gFnSymbols) {
+      if(strncmp(fn->cname, "chpl_", 5)) {
+        symbols.add(fn);
+      }
+    }
+  }
+
+  //TODO: Could have a native LLVM version, instead of relying on C to LLVM
+  if( info->cfile ) {
+    FILE* hdrfile = info->cfile;
+
+    // Generate the cname, Chapel name table
+    fprintf(hdrfile,"\nc_string chpl_funSymTable[] = {\n");
+    forv_Vec(FnSymbol, fn, symbols) {
+      fprintf(hdrfile," \"%s\", \"%s\",\n", fn->cname, fn->name);
+    }
+    fprintf(hdrfile," \"\", \"\" };\n");
+
+    // Generate the filename index, linenum table
+    fprintf(hdrfile,"\n\nint chpl_filenumSymTable[] = {\n");
+    forv_Vec(FnSymbol, fn, symbols) {
+      fprintf(hdrfile," %d, %d,\n",
+        getFilenameLookupPosition(fn->fname()), fn->linenum());
+    }
+    fprintf(hdrfile," 0, 0};\n");
+  }
+
+  genGlobalInt32("chpl_sizeSymTable", symbols.n * 2);
 }
 
 static int
@@ -624,6 +670,9 @@ static void codegen_header_compilation_config() {
     genComment("Filename Lookup Table");
     genFilenameTable();
 
+    genComment("Unwind symbol tables");
+    genUnwindSymbolTable();
+
     closeCFile(&cfgfile);
 
     gGenInfo->cfile = save_cfile;
@@ -644,7 +693,7 @@ static void protectNameFromC(Symbol* sym) {
   //
   // For now, we only rename our user and standard symbols.  Internal
   // modules symbols should arguably similarly be protected, to ensure
-  // that we haven't inadvertantly used a name that some user library
+  // that we haven't inadvertently used a name that some user library
   // will; most file-level symbols should be protected by 'chpl_' or
   // somesuch, but of course local symbols may not be, and can cause
   // conflicts (at present, a local variable named 'socket' would).
@@ -704,7 +753,7 @@ static void protectNameFromC(Symbol* sym) {
   //
   // Can we free this given how we create names?  free() doesn't like
   // const char*, I don't want to just cast it away, and I'm not
-  // certain we can assume it isn't aliased to someting else, like
+  // certain we can assume it isn't aliased to something else, like
   // sym->name...  In other cases, we seem to leak old names as
   // well... :P
   //
@@ -1352,7 +1401,7 @@ void codegen(void) {
   if( llvmCodegen ) {
 #ifdef HAVE_LLVM
     if( fHeterogeneous )
-      INT_FATAL("fHeretogeneous not yet supported with LLVM");
+      INT_FATAL("fHeterogeneous not yet supported with LLVM");
 
     prepareCodegenLLVM();
 #endif

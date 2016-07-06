@@ -39,6 +39,7 @@
 #include "stmt.h"
 #include "stringutil.h"
 #include "type.h"
+#include "resolution.h"
 
 #include "AstToText.h"
 #include "AstVisitor.h"
@@ -80,7 +81,6 @@ Symbol *gTimer = NULL;
 Symbol *gTaskID = NULL;
 Symbol *gSyncVarAuxFields = NULL;
 Symbol *gSingleVarAuxFields = NULL;
-Symbol *gTaskList = NULL;
 
 VarSymbol *gTrue = NULL;
 VarSymbol *gFalse = NULL;
@@ -94,6 +94,7 @@ VarSymbol *gModuleInitIndentLevel = NULL;
 FnSymbol *gPrintModuleInitFn = NULL;
 FnSymbol* gChplHereAlloc = NULL;
 FnSymbol* gChplHereFree = NULL;
+FnSymbol* gChplDoDirectExecuteOn = NULL;
 
 std::map<FnSymbol*,int> ftableMap;
 Vec<FnSymbol*> ftableVec;
@@ -232,6 +233,10 @@ bool Symbol::isImmediate() const {
 
 bool isString(Symbol* symbol) {
   return isString(symbol->type);
+}
+
+bool isUserDefinedRecord(Symbol* symbol) {
+  return isUserDefinedRecord(symbol->type);
 }
 
 /******************************** | *********************************
@@ -540,7 +545,7 @@ llvm::Value* codegenImmediateLLVM(Immediate* i)
       // with C escapes - that is newline is 2 chars \ n
       // so we have to convert to a sequence of bytes
       // for LLVM (the C backend can just print it out).
-      std::string newString = unescapeString(i->v_string);
+      std::string newString = unescapeString(i->v_string, NULL);
       ret = info->builder->CreateGlobalString(newString);
       break;
   }
@@ -565,7 +570,27 @@ GenRet VarSymbol::codegen() {
         ret.c += immediate->v_string;
         ret.c += '"';
       } else if (immediate->const_kind == NUM_KIND_BOOL) {
-        ret.c =  immediate->bool_value() ? "true" : "false";
+        std::string bstring = (immediate->bool_value())?"true":"false";
+        const char* castString = "(";
+        switch (immediate->num_index) {
+        case BOOL_SIZE_1:
+        case BOOL_SIZE_SYS:
+        case BOOL_SIZE_8:
+          castString = "UINT8(";
+          break;
+        case BOOL_SIZE_16:
+          castString = "UINT16(";
+          break;
+        case BOOL_SIZE_32:
+          castString = "UINT32(";
+          break;
+        case BOOL_SIZE_64:
+          castString = "UINT64(";
+          break;
+        default:
+          INT_FATAL("Unexpected immediate->num_index: %d\n", immediate->num_index);
+        }
+        ret.c = castString + bstring + ")";
       } else if (immediate->const_kind == NUM_KIND_INT) {
         int64_t iconst = immediate->int_value();
         if (iconst == (1ll<<63)) {
@@ -1028,13 +1053,30 @@ bool ArgSymbol::requiresCPtr(void) {
 
 
 bool ArgSymbol::isConstant() const {
-  if (intent == INTENT_CONST_IN || intent == INTENT_CONST_REF) {
-    return true;
+  bool retval = false;
+
+  switch (intent) {
+  case INTENT_BLANK:
+    retval = type->isDefaultIntentConst();
+    break;
+
+  case INTENT_CONST_IN:
+  case INTENT_CONST_REF:
+    retval = true;
+    break;
+
+  // Noakes: 2016/06/14
+  // It seems odd to me that this case depends on the type
+  case INTENT_CONST:
+    retval = type->isDefaultIntentConst();
+    break;
+
+  default:
+    retval = false;
+    break;
   }
-  return (intent == INTENT_BLANK || intent == INTENT_CONST) &&
-    !isReferenceType(type) &&
-    !isSyncType(type) &&
-    !isRecordWrappedType(type) /* array, domain, distribution */;
+
+  return retval;
 }
 
 bool ArgSymbol::isConstValWillNotChange() const {
@@ -1058,11 +1100,12 @@ bool ArgSymbol::isVisible(BaseAST* scope) const {
 
 const char* retTagDescrString(RetTag retTag) {
   switch (retTag) {
-    case RET_VALUE: return "value";
-    case RET_REF:   return "ref";
-    case RET_PARAM: return "param";
-    case RET_TYPE:  return "type";
-    default:        return "<unknown RetTag>";
+    case RET_VALUE:     return "value";
+    case RET_REF:       return "ref";
+    case RET_CONST_REF: return "const ref";
+    case RET_PARAM:     return "param";
+    case RET_TYPE:      return "type";
+    default:            return "<unknown RetTag>";
   }
 }
 
@@ -1080,7 +1123,7 @@ const char* modTagDescrString(ModTag modTag) {
 // describes this argument's intent (for use in an English sentence)
 const char* ArgSymbol::intentDescrString(void) {
   switch (intent) {
-    case INTENT_BLANK: return "blank intent";
+    case INTENT_BLANK: return "default intent";
     case INTENT_IN: return "'in'";
     case INTENT_INOUT: return "'inout'";
     case INTENT_OUT: return "'out'";
@@ -1099,7 +1142,7 @@ const char* ArgSymbol::intentDescrString(void) {
 // describes the given intent (for use in an English sentence)
 const char* intentDescrString(IntentTag intent) {
   switch (intent) {
-    case INTENT_BLANK:     return "blank intent";
+    case INTENT_BLANK:     return "default intent";
     case INTENT_IN:        return "'in' intent";
     case INTENT_INOUT:     return "'inout' intent";
     case INTENT_OUT:       return "'out' intent";
@@ -1424,7 +1467,6 @@ void TypeSymbol::accept(AstVisitor* visitor) {
 FnSymbol::FnSymbol(const char* initName) :
   Symbol(E_FnSymbol, initName),
   formals(),
-  setter(NULL),
   retType(dtUnknown),
   where(NULL),
   retExprType(NULL),
@@ -1443,6 +1485,7 @@ FnSymbol::FnSymbol(const char* initName) :
   codegenUniqueNum(1),
   doc(NULL),
   partialCopySource(NULL),
+  varargOldFormal(NULL),
   retSymbol(NULL)
 {
   substitutions.clear();
@@ -1495,7 +1538,6 @@ FnSymbol::copyInner(SymbolMap* map) {
   FnSymbol* copy = this->copyInnerCore(map);
 
   // Copy members that weren't set by copyInnerCore.
-  copy->setter      = COPY_INT(this->setter);
   copy->where       = COPY_INT(this->where);
   copy->body        = COPY_INT(this->body);
   copy->retExprType = COPY_INT(this->retExprType);
@@ -1525,7 +1567,6 @@ FnSymbol::copyInnerCore(SymbolMap* map) {
   }
 
   // Copy members that are needed by both copyInner and partialCopy.
-  newFn->partialCopySource  = this;
   newFn->astloc             = this->astloc;
   newFn->retType            = this->retType;
   newFn->thisTag            = this->thisTag;
@@ -1553,6 +1594,7 @@ FnSymbol::copyInnerCore(SymbolMap* map) {
  */
 FnSymbol* FnSymbol::partialCopy(SymbolMap* map) {
   FnSymbol* newFn = this->copyInnerCore(map);
+  newFn->partialCopySource  = this;
 
   if (this->_this == NULL) {
     // Case 1: No _this pointer.
@@ -1654,8 +1696,6 @@ void FnSymbol::finalizeCopy(void) {
     // Retrieve our old/new symbol map from the partial copy process.
     SymbolMap* map = &(this->partialCopyMap);
 
-    this->setter = COPY_INT(this->partialCopySource->setter);
-
     /*
      * When we reach this point we will be in one of three scenarios:
      *  1) The function's body is empty and needs to be copied over from the
@@ -1669,29 +1709,20 @@ void FnSymbol::finalizeCopy(void) {
     if (this->hasFlag(FLAG_EXPANDED_VARARGS)) {
       // Alias the old body and make a new copy of the body from the source.
       BlockStmt* varArgNodes = this->body;
-      this->body             = COPY_INT(this->partialCopySource->body);
+      this->body->replace( COPY_INT(this->partialCopySource->body) );
 
       /*
        * Iterate over the statements that have been added to the function body
        * and add them to the new body.
        */
       for_alist_backward(node, varArgNodes->body) {
-        remove_help(node, false);
-        node->list = NULL;
-        this->body->insertAtHead(node);
+        this->body->insertAtHead(node->remove());
       }
-
-      // Clean up blocks that aren't going to be used any more.
-      gBlockStmts.remove(gBlockStmts.index(varArgNodes));
-      delete varArgNodes;
 
       this->removeFlag(FLAG_EXPANDED_VARARGS);
 
     } else if (this->body->body.length == 0) {
-      gBlockStmts.remove(gBlockStmts.index(this->body));
-      delete this->body;
-
-      this->body = COPY_INT(this->partialCopySource->body);
+      this->body->replace( COPY_INT(this->partialCopySource->body) );
     }
 
     Symbol* replacementThis = map->get(this->partialCopySource->_this);
@@ -1757,6 +1788,15 @@ void FnSymbol::finalizeCopy(void) {
      */
     update_symbols(this, map);
 
+    // Replace vararg formal if appropriate.
+    if (this->varargOldFormal) {
+      substituteVarargTupleRefs(this->body, this->varargNewFormals.size(),
+                                this->varargOldFormal, this->varargNewFormals);
+      // Done, clean up.
+      this->varargOldFormal = NULL;
+      this->varargNewFormals.clear();
+    }
+
     // Clean up book keeping information.
     this->partialCopyMap.clear();
     this->partialCopySource = NULL;
@@ -1770,8 +1810,6 @@ void FnSymbol::replaceChild(BaseAST* old_ast, BaseAST* new_ast) {
     body = toBlockStmt(new_ast);
   } else if (old_ast == where) {
     where = toBlockStmt(new_ast);
-  } else if (old_ast == setter) {
-    setter = toDefExpr(new_ast);
   } else if (old_ast == retExprType) {
     retExprType = toBlockStmt(new_ast);
   } else {
@@ -2195,54 +2233,31 @@ FnSymbol::insertBeforeReturnAfterLabel(Expr* ast) {
   ret->insertBefore(ast);
 }
 
-
-// Inserts the given ast ahead of the _downEndCount call at the end of this
-// function, if present.  Otherwise, inserts it ahead of the return.
-void
-FnSymbol::insertBeforeDownEndCount(Expr* ast) {
-  CallExpr* ret = toCallExpr(body->body.last());
-
-  if (!ret || !ret->isPrimitive(PRIM_RETURN))
-    INT_FATAL(this, "function is not normal");
-
-  Expr* prev = ret->prev;
-
-  while (isBlockStmt(prev))
-    prev = toBlockStmt(prev)->body.last();
-
-  CallExpr* last = toCallExpr(prev);
-
-  if (last               &&
-      last->isResolved() &&
-      strcmp(last->isResolved()->name, "_downEndCount") == 0) {
-    last->insertBefore(ast);
-
-  } else {
-    // No _downEndCount() call, so insert the ast before the return.
-    ret->insertBefore(ast);
-  }
-}
-
-
 void
 FnSymbol::insertFormalAtHead(BaseAST* ast) {
+  Expr* toInsert = NULL;
   if (ArgSymbol* arg = toArgSymbol(ast))
-    formals.insertAtHead(new DefExpr(arg));
+    toInsert = new DefExpr(arg);
   else if (DefExpr* def = toDefExpr(ast))
-    formals.insertAtHead(def);
+    toInsert = def;
   else
     INT_FATAL(ast, "Bad argument to FnSymbol::insertFormalAtHead");
+  formals.insertAtHead(toInsert);
+  parent_insert_help(this, toInsert);
 }
 
 
 void
 FnSymbol::insertFormalAtTail(BaseAST* ast) {
+  Expr* toInsert = NULL;
   if (ArgSymbol* arg = toArgSymbol(ast))
-    formals.insertAtTail(new DefExpr(arg));
+    toInsert = new DefExpr(arg);
   else if (DefExpr* def = toDefExpr(ast))
-    formals.insertAtTail(def);
+    toInsert = def;
   else
     INT_FATAL(ast, "Bad argument to FnSymbol::insertFormalAtTail");
+  formals.insertAtTail(toInsert);
+  parent_insert_help(this, toInsert);
 }
 
 
@@ -2327,9 +2342,6 @@ void FnSymbol::accept(AstVisitor* visitor) {
       next_ast->accept(visitor);
     }
 
-    if (setter)
-      setter->accept(visitor);
-
     if (body)
       body->accept(visitor);
 
@@ -2367,6 +2379,10 @@ bool FnSymbol::isIterator() const {
   return hasFlag(FLAG_ITERATOR_FN);
 }
 
+// This function returns by ref or const ref
+bool FnSymbol::returnsRefOrConstRef() const {
+  return (retTag == RET_REF || retTag == RET_CONST_REF);
+}
 
 std::string FnSymbol::docsDirective() {
   if (fDocsTextOnly) {
@@ -2418,6 +2434,9 @@ void FnSymbol::printDocs(std::ostream *file, unsigned int tabs) {
   switch (this->retTag) {
   case RET_REF:
     *file << " ref";
+    break;
+  case RET_CONST_REF:
+    *file << " const ref";
     break;
   case RET_PARAM:
     *file << " param";
@@ -2509,8 +2528,7 @@ ModuleSymbol::ModuleSymbol(const char* iName,
     initFn(NULL),
     filename(NULL),
     doc(NULL),
-    extern_info(NULL),
-    moduleNamePrefix("")
+    extern_info(NULL)
 {
 
   block->parentSymbol = this;
@@ -2568,8 +2586,7 @@ void ModuleSymbol::codegenDef() {
     if (DefExpr* def = toDefExpr(expr))
       if (FnSymbol* fn = toFnSymbol(def->sym)) {
         // Ignore external and prototype functions.
-        if (fn->hasFlag(FLAG_EXTERN) ||
-            fn->hasFlag(FLAG_FUNCTION_PROTOTYPE))
+        if (fn->hasFlag(FLAG_EXTERN))
           continue;
 
         fns.push_back(fn);
@@ -2632,7 +2649,7 @@ Vec<AggregateType*> ModuleSymbol::getTopLevelClasses() {
 }
 
 
-void ModuleSymbol::printDocs(std::ostream *file, unsigned int tabs) {
+void ModuleSymbol::printDocs(std::ostream *file, unsigned int tabs, std::string parentName) {
   if (this->noDocGen()) {
     return;
   }
@@ -2665,6 +2682,25 @@ void ModuleSymbol::printDocs(std::ostream *file, unsigned int tabs) {
     *file << std::endl;
   }
 
+  if (!fDocsTextOnly) {
+    *file << "**Usage**" << std::endl << std::endl;
+    *file << ".. code-block:: chapel" << std::endl << std::endl;
+  } else {
+    *file << std::endl;
+    *file << "Usage:" << std::endl;
+  }
+  this->printTabs(file, tabs + 1);
+  *file << "use ";
+  if (parentName != "") {
+    *file << parentName << ".";
+  }
+  *file << name << ";" << std::endl << std::endl;
+
+  // If we had submodules, be sure to link to them
+  if (hasTopLevelModule()) {
+    this->printTableOfContents(file);
+  }
+
   if (this->doc != NULL) {
     // Only print tabs for text only mode. The .rst prefers not to have the
     // tabs for module level comments and leading whitespace removed.
@@ -2684,8 +2720,22 @@ void ModuleSymbol::printDocs(std::ostream *file, unsigned int tabs) {
 /*
  * Append 'prefix' to existing module name prefix.
  */
-void ModuleSymbol::addPrefixToName(std::string prefix) {
-  this->moduleNamePrefix += prefix;
+void ModuleSymbol::printTableOfContents(std::ostream *file) {
+  int tabs = 1;
+  if (!fDocsTextOnly) {
+    *file << "**Submodules**" << std::endl << std::endl;
+
+    *file << ".. toctree::" << std::endl;
+    this->printTabs(file, tabs);
+    *file << ":maxdepth: 1" << std::endl;
+    this->printTabs(file, tabs);
+    *file << ":glob:" << std::endl << std::endl;
+    this->printTabs(file, tabs);
+    *file << name << "/*" << std::endl << std::endl;
+  } else {
+    *file << "Submodules for this module are located in the " << name;
+    *file << "/ directory" << std::endl << std::endl;
+  }
 }
 
 
@@ -2693,7 +2743,7 @@ void ModuleSymbol::addPrefixToName(std::string prefix) {
  * Returns name of module, including any prefixes that have been set.
  */
 std::string ModuleSymbol::docsName() {
-  return this->moduleNamePrefix + this->name;
+  return this->name;
 }
 
 
@@ -2768,8 +2818,7 @@ Vec<FnSymbol*> ModuleSymbol::getTopLevelFunctions(bool includeExterns) {
       if (FnSymbol* fn = toFnSymbol(def->sym)) {
         // Ignore external and prototype functions.
         if (includeExterns == false &&
-            (fn->hasFlag(FLAG_EXTERN) ||
-             fn->hasFlag(FLAG_FUNCTION_PROTOTYPE))) {
+            fn->hasFlag(FLAG_EXTERN)) {
           continue;
         }
 
@@ -2786,8 +2835,7 @@ Vec<FnSymbol*> ModuleSymbol::getTopLevelFunctions(bool includeExterns) {
             if (DefExpr* def2 = toDefExpr(expr2)) {
               if (FnSymbol* fn2 = toFnSymbol(def2->sym)) {
                 if (includeExterns == false &&
-                    (fn2->hasFlag(FLAG_EXTERN) ||
-                     fn2->hasFlag(FLAG_FUNCTION_PROTOTYPE))) {
+                    fn2->hasFlag(FLAG_EXTERN)) {
                   continue;
                 }
 
@@ -2817,6 +2865,20 @@ Vec<ModuleSymbol*> ModuleSymbol::getTopLevelModules() {
   return mods;
 }
 
+// Intended for documentation purposes only, please don't use otherwise.
+bool ModuleSymbol::hasTopLevelModule() {
+  for_alist(expr, block->body) {
+    if (DefExpr* def = toDefExpr(expr)) {
+      if (ModuleSymbol* mod = toModuleSymbol(def->sym)) {
+        if (mod->defPoint->parentExpr == block && !mod->noDocGen()) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 void ModuleSymbol::replaceChild(BaseAST* old_ast, BaseAST* new_ast) {
   if (old_ast == block) {
     block = toBlockStmt(new_ast);
@@ -2837,12 +2899,21 @@ void ModuleSymbol::accept(AstVisitor* visitor) {
 
 void ModuleSymbol::addDefaultUses() {
   if (modTag != MOD_INTERNAL) {
-    UnresolvedSymExpr* modRef = 0;
+    ModuleSymbol* parentModule = toModuleSymbol(this->defPoint->parentSymbol);
+    assert (parentModule != NULL);
 
-    SET_LINENO(this);
+    //
+    // Don't insert 'use ChapelStandard' for nested user modules.
+    // They should get their ChapelStandard symbols from their parent.
+    //
+    if (parentModule->modTag != MOD_USER) {
+      //      printf("Inserting use of ChapelStandard into %s\n", name);
 
-    modRef = new UnresolvedSymExpr("ChapelStandard");
-    block->insertAtHead(new CallExpr(PRIM_USE, modRef));
+      SET_LINENO(this);
+
+      UnresolvedSymExpr* modRef = new UnresolvedSymExpr("ChapelStandard");
+      block->insertAtHead(new UseStmt(modRef));
+    }
 
   // We don't currently have a good way to fetch the root module by name.
   // Insert it directly rather than by name
@@ -2852,7 +2923,7 @@ void ModuleSymbol::addDefaultUses() {
     block->moduleUseAdd(rootModule);
 
     UnresolvedSymExpr* modRef = new UnresolvedSymExpr("ChapelStringLiterals");
-    block->insertAtHead(new CallExpr(PRIM_USE, modRef));
+    block->insertAtHead(new UseStmt(modRef));
   }
 }
 
@@ -2869,7 +2940,7 @@ void ModuleSymbol::addDefaultUses() {
 // Fortunately there are currently no tests that expose this fallacy so
 // long at ChapelStandard always appears first in the list
 void ModuleSymbol::moduleUseAdd(ModuleSymbol* mod) {
-  if (modUseList.index(mod) < 0) {
+  if (mod != this && modUseList.index(mod) < 0) {
     if (mod == standardModule) {
       modUseList.insert(0, mod);
     } else {
@@ -2977,7 +3048,7 @@ void LabelSymbol::accept(AstVisitor* visitor) {
 *                                                                   *
 ********************************* | ********************************/
 
-std::string unescapeString(const char* const str) {
+std::string unescapeString(const char* const str, BaseAST *astForError) {
   std::string newString = "";
   char nextChar;
   int pos = 0;
@@ -2988,7 +3059,7 @@ std::string unescapeString(const char* const str) {
       continue;
     }
 
-    // handle \ ecapes
+    // handle \ escapes
     nextChar = str[pos++];
     switch(nextChar) {
       case '\'':
@@ -3030,7 +3101,7 @@ std::string unescapeString(const char* const str) {
         }
         break;
       default:
-        INT_FATAL("Unknown C string escape");
+        USR_FATAL(astForError, "Unexpected string escape: '\\%c'",  nextChar);
         break;
     }
   }
@@ -3042,14 +3113,25 @@ HashMap<Immediate *, ImmHashFns, VarSymbol *> uniqueConstantsHash;
 HashMap<Immediate *, ImmHashFns, VarSymbol *> stringLiteralsHash;
 FnSymbol* initStringLiterals = NULL;
 
+void createInitStringLiterals() {
+  SET_LINENO(stringLiteralModule);
+  initStringLiterals = new FnSymbol("chpl__initStringLiterals");
+  // We need to initialize strings literals on every locale, so we make this an
+  // exported function that will be called in the runtime
+  initStringLiterals->addFlag(FLAG_EXPORT);
+  initStringLiterals->addFlag(FLAG_LOCAL_ARGS);
+  initStringLiterals->retType = dtVoid;
+  initStringLiterals->insertAtTail(new CallExpr(PRIM_RETURN, gVoid));
+  stringLiteralModule->block->insertAtTail(new DefExpr(initStringLiterals));
+}
+
 // Note that string immediate values are stored
 // with C escapes - that is newline is 2 chars \ n
 // so this function expects a string that could be in "" in C
 VarSymbol *new_StringSymbol(const char *str) {
-  SET_LINENO(stringLiteralModule);
 
   // Hash the string and return an existing symbol if found.
-  // Aka. uniqify all string literals
+  // Aka. uniquify all string literals
   Immediate imm;
   imm.const_kind = CONST_KIND_STRING;
   imm.string_kind = STRING_KIND_STRING;
@@ -3080,7 +3162,7 @@ VarSymbol *new_StringSymbol(const char *str) {
       castTemp,
       new CallExpr("_cast", cptrTemp, new_CStringSymbol(str)));
 
-  int strLength = unescapeString(str).length();
+  int strLength = unescapeString(str, castCall).length();
 
   CallExpr *ctor = new CallExpr("_construct_string",
       castTemp,
@@ -3101,16 +3183,8 @@ VarSymbol *new_StringSymbol(const char *str) {
 
   CallExpr* ctorCall = new CallExpr(PRIM_MOVE, new SymExpr(s), ctor);
 
-  // We need to initalize strings literals on every locale, so we make this an
-  // exported function that will be called in the runtime
-  if (initStringLiterals == NULL) {
-    initStringLiterals = new FnSymbol("chpl__initStringLiterals");
-    initStringLiterals->addFlag(FLAG_EXPORT);
-    initStringLiterals->addFlag(FLAG_LOCAL_ARGS);
-    initStringLiterals->retType = dtVoid;
-    initStringLiterals->insertAtTail(new CallExpr(PRIM_RETURN, gVoid));
-    stringLiteralModule->block->insertAtTail(new DefExpr(initStringLiterals));
-  }
+  if (initStringLiterals == NULL)
+    createInitStringLiterals();
 
   initStringLiterals->insertBeforeReturn(new DefExpr(cptrTemp));
   initStringLiterals->insertBeforeReturn(cptrCall);
@@ -3320,7 +3394,7 @@ immediate_type(Immediate *imm) {
       } else if (imm->string_kind == STRING_KIND_C_STRING) {
         return dtStringC;
       } else {
-        INT_FATAL("unhandled string immedate type");
+        INT_FATAL("unhandled string immediate type");
         break;
       }
     }
@@ -3382,16 +3456,6 @@ FlagSet getRecordWrappedFlags(Symbol* s) {
     mask.set(FLAG_ARRAY);
     mask.set(FLAG_DOMAIN);
     mask.set(FLAG_DISTRIBUTION);
-  }
-
-  return s->flags & mask;
-}
-
-FlagSet getSyncFlags(Symbol* s) {
-  static FlagSet mask;
-  if (mask.none()) {
-    mask.set(FLAG_SYNC);
-    mask.set(FLAG_SINGLE);
   }
 
   return s->flags & mask;

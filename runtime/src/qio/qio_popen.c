@@ -28,10 +28,13 @@
 
 #include "qio_popen.h"
 
+#include <sys/select.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <spawn.h>
+
+#include <pthread.h>
 
 // We need to be able to call malloc, free, etc.
 #include "chpl-mem-no-warning-macros.h"
@@ -147,7 +150,7 @@ static qioerr setup_actions(
     -1 -> use the existing stdin/stdout
     -2 -> close the file descriptor
     -3 -> create a pipe and return the parent's end
-    >0 -> use this file discriptor
+    >0 -> use this file descriptor
    When this function returns, any file descriptors with a negative
    value indicating a pipe should be created (-3)
    will have their value replaced with the new pipe file descriptor.
@@ -155,7 +158,8 @@ static qioerr setup_actions(
    executable == NULL or "" -> search the path for argv[0]
 
  */
-qioerr qio_openproc(const char** argv,
+static
+qioerr qio_do_openproc(const char** argv,
                     const char** envp,
                     const char* executable,
                     int* stdin_fd,
@@ -319,6 +323,73 @@ error:
   return err;
 }
 
+struct openproc_args_s {
+  const char** argv;
+  const char** envp;
+  const char* executable;
+  int* stdin_fd;
+  int* stdout_fd;
+  int* stderr_fd;
+  int64_t* pid_out;
+  qioerr err;
+};
+
+static
+void* qio_openproc_wrapper(void* arg)
+{
+  struct openproc_args_s* s = (struct openproc_args_s*) arg;
+  s->err = qio_do_openproc(s->argv, s->envp, s->executable,
+                           s->stdin_fd, s->stdout_fd, s->stderr_fd,
+                           s->pid_out);
+  return NULL;
+}
+
+qioerr qio_openproc(const char** argv,
+                    const char** envp,
+                    const char* executable,
+                    int* stdin_fd,
+                    int* stdout_fd,
+                    int* stderr_fd,
+                    int64_t *pid_out)
+{
+  // runs qio_do_openproc in a pthread in order
+  // to avoid issues where a Chapel task is allocated
+  // from memory with MAP_SHARED.
+  //
+  // If such a thread is the thread running fork(),
+  // after the fork() occurs, there will be 2 threads
+  // sharing the same stack.
+  //
+  // If it mattered, we could do this extra step
+  // only for configurations where the Chapel heap
+  // has this problem (GASNet with SEGMENT=fast,large
+  // and possibly others).
+
+  int rc;
+  pthread_t thread;
+  struct openproc_args_s s;
+
+  s.argv = argv;
+  s.envp = envp;
+  s.executable = executable;
+  s.stdin_fd = stdin_fd;
+  s.stdout_fd = stdout_fd;
+  s.stderr_fd = stderr_fd;
+  s.pid_out = pid_out;
+  s.err = 0;
+
+  rc = pthread_create(&thread, NULL, qio_openproc_wrapper, &s);
+  if (rc)
+    QIO_RETURN_CONSTANT_ERROR(EAGAIN, "failed pthread_create in qio_openproc");
+
+  rc = pthread_join(thread, NULL);
+  if (rc)
+    QIO_RETURN_CONSTANT_ERROR(EAGAIN, "failed pthread_join in qio_openproc");
+
+  return s.err;
+}
+
+
 // waitpid
 qioerr qio_waitpid(int64_t pid,
                    int blocking, int* done, int* exitcode)
@@ -330,20 +401,25 @@ qioerr qio_waitpid(int64_t pid,
   if( ! blocking ) flags |= WNOHANG;
 
   got = waitpid((pid_t) pid, &status, flags);
+
+  // Check for error
   if( got == -1 ) {
     return qio_int_to_err(errno);
   }
-
-  if( WIFEXITED(status) ) {
-    *exitcode = WEXITSTATUS(status);
-    if( WIFSIGNALED(status) ) {
-      *exitcode = - WSTOPSIG(status);
+  // Only update (done, exitcode) if waitpid() returned for the desired pid
+  else if ( got == pid ) {
+    if( WIFEXITED(status) ) {
+      *exitcode = WEXITSTATUS(status);
+      *done = 1;
     }
-    *done = 1;
+    else if( WIFSIGNALED(status) ) {
+      *exitcode = -WTERMSIG(status);
+      *done = 1;
+    }
   }
+
   return 0;
 }
-
 
 // commit input, sending any data to the subprocess.
 // once input is sent, close input channel and file.
@@ -378,15 +454,25 @@ qioerr qio_proc_communicate(
 
   if( threadsafe ) {
     // lock all three channels.
+    // but unlock them immediately and set them to NULL
+    // if they are already closed.
     if( input ) {
       err = qio_lock(&input->lock);
       if( err ) return err;
+      if( qio_channel_isclosed(false, input) ) {
+        qio_unlock(&input->lock);
+        input = NULL;
+      }
     }
     if( output ) {
       err = qio_lock(&output->lock);
       if( err ) {
         if( input ) qio_unlock(&input->lock);
         return err;
+      }
+      if( qio_channel_isclosed(false, output) ) {
+        qio_unlock(&output->lock);
+        output = NULL;
       }
     }
     if( error ) {
@@ -395,6 +481,10 @@ qioerr qio_proc_communicate(
         if( input ) qio_unlock(&input->lock);
         if( output ) qio_unlock(&output->lock);
         return err;
+      }
+      if( qio_channel_isclosed(false, error) ) {
+        qio_unlock(&error->lock);
+        error = NULL;
       }
     }
   }
@@ -575,3 +665,14 @@ qioerr qio_proc_communicate(
   return err;
 }
 
+// Send a signal to the specified pid
+qioerr qio_send_signal(int64_t pid, int sig)
+{
+  qioerr err = 0;
+
+  int rc = kill(pid, sig);
+  if (rc == -1)
+    err = qio_mkerror_errno();
+
+  return err;
+}

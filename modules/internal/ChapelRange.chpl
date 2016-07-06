@@ -208,25 +208,30 @@ module ChapelRange {
 
   // Range builders for fully bounded ranges
   proc chpl_build_bounded_range(low: int(?w), high: int(w))
-    return new range(idxType = int(w), _low = low, _high = high);
+    return new range(int(w), _low=low, _high=high);
   proc chpl_build_bounded_range(low: uint(?w), high: uint(w))
-    return new range(uint(w), _low = low, _high = high);
+    return new range(uint(w), _low=low, _high=high);
   proc chpl_build_bounded_range(low, high) {
-    compilerError("Bounds of '..' must be integers of compatible types, when specified.");
+    compilerError("Bounds of 'low..high' must be integers of compatible types.");
   }
 
-  // Range builders for partially bounded ranges
-  proc chpl_build_partially_bounded_range(param bt: BoundedRangeType, bound: int(?w))
-    return new range(int(w), bt, false, bound, bound);
-  proc chpl_build_partially_bounded_range(param bt: BoundedRangeType, bound: uint(?w))
-    return new range(uint(w), bt, false, bound, bound);
-  proc chpl_build_partially_bounded_range(param bt: BoundedRangeType, bound) {
-    compilerError("Bounds of '..' must be integers of compatible types, when specified.");
+  // Range builders for low bounded ranges
+  proc chpl_build_low_bounded_range(low: integral)
+    return new range(low.type, BoundedRangeType.boundedLow, _low=low);
+  proc chpl_build_low_bounded_range(low) {
+    compilerError("Bound of 'low..' must be an integer");
+  }
+
+  // Range builders for high bounded ranges
+  proc chpl_build_high_bounded_range(high: integral)
+    return new range(high.type, BoundedRangeType.boundedHigh, _high=high);
+  proc chpl_build_high_bounded_range(high) {
+    compilerError("Bound of '..high' must be an integer.");
   }
 
   // Range builder for unbounded ranges
-  proc chpl_build_unbounded_range(param bt: BoundedRangeType)
-    return new range(int, bt);
+  proc chpl_build_unbounded_range()
+    return new range(int, BoundedRangeType.boundedNone);
   
   
   //################################################################################
@@ -509,7 +514,58 @@ module ChapelRange {
   proc ident(r1: range(?), r2: range(?)) param
     return false;
   
-  
+  //////////////////////////////////////////////////////////////////////////////////
+  // Range Casts
+  //
+/* Cast a range to another range type. If the old type is stridable and the
+   new type is not stridable, ensure at runtime that the old stride was 1.
+ */
+pragma "no doc"
+proc range.safeCast(type t) where isRangeType(t) {
+  var tmp: t;
+
+  if tmp.boundedType != this.boundedType {
+    compilerError("cannot cast range from ",
+                  this.boundedType:string, " to ", tmp.boundedType:string);
+  }
+
+  if tmp.stridable {
+    tmp._stride = this.stride;
+  } else if this.stride != 1 {
+    halt("illegal safeCast from non-unit stride range to unstridable range");
+  }
+
+  tmp._low = this.low.safeCast(tmp.idxType);
+  tmp._high = this.high.safeCast(tmp.idxType);
+  tmp._alignment = this.alignment.safeCast(tmp.idxType);
+  tmp._aligned = this.aligned;
+  return tmp;
+}
+
+/* Cast a range to a new range type.  If the old type was stridable and the
+   new type is not stridable, then force the new stride to be 1.
+ */
+pragma "no doc"
+proc _cast(type t, r: range(?)) where isRangeType(t) {
+  var tmp: t;
+
+  if tmp.boundedType != r.boundedType {
+    compilerError("cannot cast range from ",
+                  r.boundedType:string, " to ", tmp.boundedType:string);
+  }
+
+  if tmp.stridable {
+    tmp._stride = r.stride;
+  }
+
+  tmp._low = r.low: tmp.idxType;
+  tmp._high = r.high: tmp.idxType;
+  tmp._alignment = r.alignment: tmp.idxType;
+  tmp._aligned = r.aligned;
+  return tmp;
+}
+
+
   //////////////////////////////////////////////////////////////////////////////////
   // Bounds checking
   //
@@ -778,11 +834,7 @@ module ChapelRange {
     // of assignment does not disable the POD optimization.
     // Although provided explicitly, this function is effectively trivial,
     // since it performs what is effectively a bit-wise copy.
-    // It effectively labels the function as trivial, even though this is not
-    // precisely true.  In the case of an assignment from a stridable to non-
-    // stridable range, there is a run-time check which will be missed when the
-    // optimization is applied.  The rest of the routine is trivial in the
-    // sense that it performs the equivalent of a bit-wise copy.
+    //
     // The POD optimization currently removes initCopy, autoCopy and destructor
     // calls whose arguments are of plain-old-data type.  Future applications
     // of this optimization may also remove assignment calls.
@@ -803,11 +855,10 @@ module ChapelRange {
   {
     if r1.boundedType != r2.boundedType then
       compilerError("type mismatch in assignment of ranges with different boundedType parameters");
-  
+
     if !s1 && s2 then
-      if r2._stride != 1 then
-        halt("non-stridable range assigned non-unit stride");
-  
+      compilerError("type mismatch in assignment of ranges with different stridable parameters"); 
+
     r1._low = r2._low;
     r1._high = r2._high;
     r1._stride = r2._stride;
@@ -911,6 +962,13 @@ module ChapelRange {
     return new range(i, b, true,  lw, hh, st, alt, ald);
   }
 
+  /*
+   * The following procedure is effectively equivalent to:
+   *
+  inline proc chpl_by(r, step) { ... }
+   *
+   * because the parser renames the routine since 'by' is a keyword.
+   */
   inline proc by(r, step) {
     if !isRange(r) then
       compilerError("the first argument of the 'by' operator is not a range");
@@ -918,6 +976,13 @@ module ChapelRange {
     return chpl_by_help(r, step);
   }
   
+  /*
+   * The following procedure is effectively equivalent to:
+   *
+  inline proc chpl_by(r: range(?), param step) { ... }
+   *
+   * because the parser renames the routine since 'by' is a keyword.
+   */
   // We want to warn the user at compiler time if they had an invalid param
   // stride rather than waiting until runtime.
   inline proc by(r : range(?), param step) {
@@ -926,7 +991,14 @@ module ChapelRange {
   }
   
   
-  // This is the syntax processing routine for the "align" keyword.
+  /*
+   * The following procedure is effectively equivalent to:
+   *
+  inline proc chpl_align(r: range(?i, ?b, ?s), algn: i) { ... }
+   *
+   * because the parser renames the routine since 'align' is a keyword.
+   */
+  // This is the definition of the 'align' operator for ranges.
   // It produces a new range with the specified alignment.
   // By definition, alignment is relative to the low bound of the range.
   pragma "no doc"
@@ -938,6 +1010,14 @@ module ChapelRange {
                      r._low, r._high, r.stride, algn, true);
   }
 
+  
+  /*
+   * The following procedure is effectively equivalent to:
+   *
+  inline proc chpl_align(r: range(?i, ?b, ?s), algn) { ... }
+   *
+   * because the parser renames the routine since 'align' is a keyword.
+   */
   pragma "no doc"
   inline proc align(r : range(?i, ?b, ?s), algn) {
     compilerError("can't align a range with idxType ", i:string, 
@@ -1028,12 +1108,83 @@ module ChapelRange {
   
       newStride = if this.stride > 0 then lcm else -lcm;
     }
+
+    //
+    // These are mixed int/uint min/max functions that return a value
+    // matching the first argument's type.  They are written knowing
+    // that they will be called in an intersection context and set
+    // this variable if the intersection will be guaranteed to be
+    // empty (e.g., if all values of one range are outside of the
+    // expressible range of the other.
+    //
+    var emptyIntersection: bool;
+
+    proc min(x: int, y: uint) {
+      if (y > max(int)) {
+        return x;
+      }
+
+      //
+      // otherwise, we can safely cast y to int and take the normal
+      // min()
+      //
+      return min(x, y: int);
+    }
+
+    proc min(x: uint, y: int) {
+      //
+      // if the high uint bound is bigger than int can represent,
+      // this slice is guaranteed to be empty.
+      //
+      //
+      // if the smallest value is negative, the low bound of this
+      // slice will be the uint value.
+      //
+      if (y < 0) {
+        emptyIntersection = true;
+        return x;
+      }
+
+      //
+      // otherwise, we can safely cast y to uint and take the normal
+      // min()
+      //
+      return min(x, y: uint);
+    }
+
+    //
+    // These two cases are the dual of the above
+    //
+    proc max(x: int, y: uint) {
+      if (y > max(int)) {
+        emptyIntersection = true;
+        return x;
+      }
+
+      return max(x, y: int);
+    }
   
+    proc max(x: uint, y: int) {
+      if (y < 0) {
+        return x;
+      }
+
+      return max(x, y: uint);
+    }
+
+    emptyIntersection = false;
+    var newlo = max(lo1, lo2):idxType;
+    var newhi = min(hi1, hi2):idxType;
+    if (emptyIntersection) {
+      newlo = 1;
+      newhi = 0;
+    }
+
     var result = new range(idxType,
                            computeBoundedType(this, other),
                            this.stridable | other.stridable,
-                           max(lo1, lo2):idxType,
-                           min(hi1, hi2):idxType,
+                           newlo,
+                           newhi,
                            newStride,
                            0,
                            !ambig && (this._aligned || other._aligned));
@@ -1570,7 +1721,7 @@ module ChapelRange {
         yield (0..len-1,);
       } else {
         coforall chunk in 0..#numChunks {
-          on here.getChild(chunk) {
+          local on here.getChild(chunk) {
             if debugDataParNuma {
               if chunk!=chpl_getSubloc() then
                 writeln("*** ERROR: ON WRONG SUBLOC (should be "+chunk+

@@ -63,7 +63,9 @@ tags
 /doc/sphinx/source/modules/dists
 /doc/sphinx/source/modules/layouts
 /doc/sphinx/source/modules/internal
+/doc/sphinx/source/modules/packages
 /doc/sphinx/source/language/*.pdf
+/doc/sphinx/source/tools/chpldoc/man.rst
 !/doc/sphinx/source/index.rst
 !/doc/sphinx/source/technotes/index.rst
 !/doc/sphinx/source/platforms/index.rst
@@ -378,6 +380,8 @@ tags
 /test/runtime/kbrady/goodAllocSize.good
 /test/runtime/sungeun/chpl-env-gen.h
 /test/runtime/sungeun/chpl-env-gen.test.gen.c
+/test/runtime/panzone/stacktrace.good
+/test/runtime/panzone/fact-stacktrace.good
 
 test/separate_compilation/jturner/libclassextern2.so.a
 test/separate_compilation/jturner/libfcfunc.so.a
@@ -387,6 +391,8 @@ test/separate_compilation/jturner/libsimplefloat.so.a
 test/separate_compilation/jturner/libsubclass.so.a
 
 /test/studies/590o/alexco/*.txt
+/test/studies/IMSuite/leader_elect_lcr/outputleader_elect_lcr_*.txt
+/test/studies/IMSuite/vertexColor/outputvertexColoring*.txt
 /test/studies/amr/**/_output
 /test/studies/amr/**/*.tmp.save
 /test/studies/dijkstra/RtsGraph_out.txt

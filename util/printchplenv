@@ -76,6 +76,9 @@ def print_mode(mode='list'):
     timers = chpl_timers.get()
     print_var('CHPL_TIMERS', timers, mode, 'tmr', ('runtime', 'launcher'))
 
+    unwind = chpl_unwind.get()
+    print_var('CHPL_UNWIND', unwind, mode, 'unwind', ('runtime', 'launcher'))
+
     target_mem = chpl_mem.get('target')
     if mode == 'make':
         host_mem = chpl_mem.get('host')
@@ -131,12 +134,6 @@ def print_mode(mode='list'):
 
         link_args_3p = []
 
-        print_var('  CHPL_DLMALLOC_UNIQ_CFG_PATH',
-                  chpl_3p_dlmalloc_configs.get_uniq_cfg_path(),
-                  mode, filters=('runtime',))
-        if target_mem == 'dlmalloc':
-            link_args_3p.extend(chpl_3p_dlmalloc_configs.get_link_args())
-
         print_var('  CHPL_GMP_UNIQ_CFG_PATH',
                   chpl_3p_gmp_configs.get_uniq_cfg_path(),
                   mode, filters=('runtime',))
@@ -153,6 +150,11 @@ def print_mode(mode='list'):
                   mode, filters=('runtime',))
         if target_mem == 'jemalloc':
             link_args_3p.extend(chpl_3p_jemalloc_configs.get_link_args())
+
+        print_var('  CHPL_LIBUNWIND_UNIQ_CFG_PATH',
+                  chpl_3p_libunwind_configs.get_uniq_cfg_path(),
+                  mode, filters=('runtime',))
+        link_args_3p.extend(chpl_3p_libunwind_configs.get_link_args(unwind))
 
         print_var('  CHPL_MASSIVETHREADS_UNIQ_CFG_PATH',
                   chpl_3p_massivethreads_configs.get_uniq_cfg_path(),
@@ -171,12 +173,6 @@ def print_mode(mode='list'):
                   mode, filters=('runtime',))
         if regexp == 're2':
             link_args_3p.extend(chpl_3p_re2_configs.get_link_args())
-
-        print_var('  CHPL_TCMALLOC_UNIQ_CFG_PATH',
-                  chpl_3p_tcmalloc_configs.get_uniq_cfg_path(),
-                  mode, filters=('runtime',))
-        if target_mem == 'tcmalloc':
-            link_args_3p.extend(chpl_3p_tcmalloc_configs.get_link_args())
 
         link_args_3p_dedup=[]
         for arg in reversed(link_args_3p):

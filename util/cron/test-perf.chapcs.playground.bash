@@ -9,8 +9,13 @@ source $CWD/common-perf.bash
 
 export CHPL_NIGHTLY_TEST_CONFIG_NAME="perf.chapcs.playground"
 
-perf_args="-performance-description noSlice -performance-configs default:v,noSlice:v -sync-dir-suffix noSlice"
-perf_args="${perf_args} -performance -numtrials 5 -startdate 01/18/16"
-perf_args="${perf_args} -compopts -sassertNoSlicing"
+# Test performance of jemalloc's decay-based purging
 
-$CWD/nightly -cron ${nightly_args} ${perf_args}
+export CHPL_JEMALLOC_MORE_CFG_OPTIONS="--disable-stats --disable-fill --disable-valgrind"
+SHORT_NAME=minimal-jemalloc
+START_DATE=06/03/16
+
+
+perf_args="-performance-description $SHORT_NAME -performance-configs default:v,$SHORT_NAME:v -sync-dir-suffix $SHORT_NAME"
+perf_args="${perf_args} -numtrials 5 -startdate $START_DATE"
+$CWD/nightly -cron ${perf_args} ${nightly_args}

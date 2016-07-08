@@ -36,7 +36,6 @@ Initializing Modules:
     MemTracking
     ChapelUtil
     ChapelDynDispHack
-    Assert
     CommDiagnostics
    printModuleInitOrder
     moduleInitTest

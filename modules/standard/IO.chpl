@@ -6392,16 +6392,16 @@ proc format(fmt:string, args ...?k):string {
   :returns: the resulting string
 
  */
-proc string.format(args ...?k, out error:syserr):string {
+proc string_ascii.format(args ...?k, out error:syserr):string {
   return chpl_do_format(this, (...args), error);
 }
 
 // documented in the error= version
 pragma "no doc"
-proc string.format(args ...?k):string {
+proc string_ascii.format(args ...?k):string {
   var err:syserr = ENOERR;
   var ret = chpl_do_format(this, (...args), error=err);
-  if err then ioerror(err, "in string.format");
+  if err then ioerror(err, "in string_ascii.format");
   return ret;
 }
 

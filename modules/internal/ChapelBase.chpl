@@ -195,7 +195,7 @@ module ChapelBase {
   inline proc +(a: complex(?w)) return a;
 
   inline proc -(a: int(?w)) return __primitive("u-", a);
-  inline proc -(a: uint(64)) { compilerError("illegal use of '-' on operand of type ", a.type:string); }
+  inline proc -(a: uint(64)) { compilerError("illegal use of '-' on operand of type ", a.type:string_ascii); }
   inline proc -(a: real(?w)) return __primitive("u-", a);
   inline proc -(a: imag(?w)) return __primitive("u-", a);
   inline proc -(a: complex(?w)) return __primitive("u-", a);
@@ -206,7 +206,7 @@ module ChapelBase {
   inline proc -(param a: int(?w)) param return __primitive("u-", a);
   inline proc -(param a: uint(?w)) param {
     if (a:int(w) < 0) then
-      compilerError("illegal use of '-' on operand of type ", a.type:string);
+      compilerError("illegal use of '-' on operand of type ", a.type:string_ascii);
     else
       return -(a:int(w));
   }
@@ -489,11 +489,11 @@ module ChapelBase {
   inline proc _cond_test(param x: integral) param return x != 0:x.type;
 
   inline proc _cond_test(x) {
-    compilerError("type '", x.type:string, "' used in if or while condition");
+    compilerError("type '", x.type:string_ascii, "' used in if or while condition");
   }
 
   inline proc _cond_test(x: _iteratorRecord) {
-    compilerError("iterator or promoted expression ", x.type:string, " used in if or while condition");
+    compilerError("iterator or promoted expression ", x.type:string_ascii, " used in if or while condition");
   }
 
   proc _cond_invalid(x: object) param return false;
@@ -846,7 +846,7 @@ module ChapelBase {
   }
 
   pragma "command line setting"
-  proc _command_line_cast(param s: c_string, type t, x) return _cast(t, x:string);
+  proc _command_line_cast(param s: c_string, type t, x) return _cast(t, x:string_ascii);
 
 
   //

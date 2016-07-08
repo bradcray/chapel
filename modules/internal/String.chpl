@@ -99,6 +99,10 @@ module String {
 
   private config param debugStrings = false;
 
+  proc string type {
+    return string_ascii;
+  }
+  
   //
   // String Implementation
   //
@@ -107,7 +111,7 @@ module String {
   // in when possible.
   pragma "ignore noinit"
   pragma "no default functions" // avoid the default (read|write)This routines
-  record string {
+  record string_ascii {
     pragma "no doc"
     var len: int = 0; // length of string in bytes
     pragma "no doc"
@@ -129,7 +133,7 @@ module String {
       ensure that the underlying buffer is not freed while being used as part
       of a shallow copy.
      */
-    proc string(s: string, owned: bool = true) {
+    proc string_ascii(s: string_ascii, owned: bool = true) {
       const sRemote = s.locale_id != chpl_nodeID;
       const sLen = s.len;
       this.owned = owned;
@@ -165,7 +169,7 @@ module String {
       the user to ensure that the underlying buffer is not freed if the
       `c_string` is not copied in.
      */
-    proc string(cs: c_string, owned: bool = true, needToCopy:  bool = true) {
+    proc string_ascii(cs: c_string, owned: bool = true, needToCopy:  bool = true) {
       this.owned = owned;
       const cs_len = cs.length;
       this.reinitString(cs:bufferType, cs_len, cs_len+1, needToCopy);
@@ -182,14 +186,14 @@ module String {
       underlying buffer is not freed if the `c_string` is not copied in.
      */
     // This constructor can cause a leak if owned = false and needToCopy = true
-    proc string(buff: bufferType, length: int, size: int,
+    proc string_ascii(buff: bufferType, length: int, size: int,
                 owned: bool = true, needToCopy: bool = true) {
       this.owned = owned;
       this.reinitString(buff, length, size, needToCopy);
     }
 
     pragma "no doc"
-    proc ref ~string() {
+    proc ref ~string_ascii() {
       if owned && !this.isEmptyString() {
         on __primitive("chpl_on_locale_num",
                        chpl_buildLocaleID(this.locale_id, c_sublocid_any)) {
@@ -253,11 +257,11 @@ module String {
        :returns: A shallow copy if the :record:`string` is already on the
                  current locale, otherwise a deep copy is performed.
     */
-    inline proc localize() : string {
+    inline proc localize() : string_ascii {
       if _local || this.locale_id == chpl_nodeID {
-        return new string(this, owned=false);
+        return new string_ascii(this, owned=false);
       } else {
-        const x:string = this; // assignment makes it local
+        const x:string_ascii = this; // assignment makes it local
         return x;
       }
     }
@@ -299,7 +303,7 @@ module String {
 
     pragma "no doc"
     inline proc param c_str() param : c_string {
-      inline proc _cast(type t, x) where t:c_string && x.type:string {
+      inline proc _cast(type t, x) where t:c_string && x.type:string_ascii {
         return __primitive("cast", t, x);
       }
       return this:c_string; // folded out in resolution
@@ -324,7 +328,7 @@ module String {
         c
         d
      */
-    iter these() : string {
+    iter these() : string_ascii {
       for i in 1..this.len {
         // This is pretty painful from a performance perspective right now,
         // allocates w/ every yield
@@ -338,11 +342,11 @@ module String {
       :returns: A string with the character at the specified index from
                 `1..string.length`
      */
-    proc this(i: int) : string {
+    proc this(i: int) : string_ascii {
       if boundsChecking && (i <= 0 || i > this.len)
         then halt("index out of bounds of string");
 
-      var ret: string;
+      var ret: string_ascii;
       const newSize = chpl_here_good_alloc_size(2);
       ret._size = max(chpl_string_min_alloc_size, newSize);
       ret.len = 1;
@@ -393,8 +397,8 @@ module String {
                 the length of `r` is zero, an empty string is returned.
      */
     // TODO: I wasn't very good about caching variables locally in this one.
-    proc this(r: range(?)) : string {
-      var ret: string;
+    proc this(r: range(?)) : string_ascii {
+      var ret: string_ascii;
       if this.isEmptyString() then return ret;
 
       const r2 = this._getView(r);
@@ -465,7 +469,7 @@ module String {
     // multiple needles. Probably wouldn't be worth the overhead for small
     // needles though
     pragma "no doc"
-    inline proc _startsEndsWith(needles: string ..., param fromLeft: bool) : bool {
+    inline proc _startsEndsWith(needles: string_ascii ..., param fromLeft: bool) : bool {
       var ret: bool = false;
       on __primitive("chpl_on_locale_num",
                      chpl_buildLocaleID(this.locale_id, c_sublocid_any)) {
@@ -476,7 +480,7 @@ module String {
           }
           if needle.len > this.len then continue;
 
-          const localNeedle: string = needle.localize();
+          const localNeedle: string_ascii = needle.localize();
 
           const needleR = 0:int..#localNeedle.len;
           if fromLeft {
@@ -501,7 +505,7 @@ module String {
       :returns: * `true`  -- when the string begins with one or more of the `needles`
                 * `false` -- otherwise
      */
-    proc startsWith(needles: string ...) : bool {
+    proc startsWith(needles: string_ascii ...) : bool {
       return _startsEndsWith((...needles), fromLeft=true);
     }
 
@@ -511,7 +515,7 @@ module String {
       :returns: * `true`  -- when the string ends with one or more of the `needles`
                 * `false` -- otherwise
      */
-    proc endsWith(needles: string ...) : bool {
+    proc endsWith(needles: string_ascii ...) : bool {
       return _startsEndsWith((...needles), fromLeft=false);
     }
 
@@ -521,7 +525,7 @@ module String {
     //      (Boyer-Moore-Horspool|any thing other than brute force)
     //
     pragma "no doc"
-    inline proc _search_helper(needle: string, region: range(?),
+    inline proc _search_helper(needle: string_ascii, region: range(?),
                                param count: bool, param fromLeft: bool = true) {
       // needle.len is <= than this.len, so go to the home locale
       var ret: int = 0;
@@ -556,7 +560,7 @@ module String {
 
         if localRet == -1 {
           localRet = 0;
-          const localNeedle: string = needle.localize();
+          const localNeedle: string_ascii = needle.localize();
 
           // i *is not* an index into anything, it is the order of the element
           // of view we are searching from.
@@ -596,7 +600,7 @@ module String {
                 string, or 0 if the `needle` is not in the string.
      */
     // TODO: better name than region?
-    proc find(needle: string, region: range(?) = 1..) : int {
+    proc find(needle: string_ascii, region: range(?) = 1..) : int {
       return _search_helper(needle, region, count=false);
     }
 
@@ -609,7 +613,7 @@ module String {
       :returns: the index of the first occurrence from the right of `needle`
                 within a string, or 0 if the `needle` is not in the string.
      */
-    proc rfind(needle: string, region: range(?) = 1..) : int {
+    proc rfind(needle: string_ascii, region: range(?) = 1..) : int {
       return _search_helper(needle, region, count=false, fromLeft=false);
     }
 
@@ -621,7 +625,7 @@ module String {
 
       :returns: the number of times `needle` occurs in the string
      */
-    proc count(needle: string, region: range(?) = 1..) : int {
+    proc count(needle: string_ascii, region: range(?) = 1..) : int {
       return _search_helper(needle, region, count=true);
     }
 
@@ -636,12 +640,12 @@ module String {
      */
     // TODO: not ideal - count and single allocation probably faster
     //                 - can special case on replacement|needle.length (0, 1)
-    proc replace(needle: string, replacement: string, count: int = -1) : string {
-      var result: string = this;
+    proc replace(needle: string_ascii, replacement: string_ascii, count: int = -1) : string_ascii {
+      var result: string_ascii = this;
       var found: int = 0;
       var startIdx: int = 1;
-      const localNeedle: string = needle.localize();
-      const localReplacement: string = replacement.localize();
+      const localNeedle: string_ascii = needle.localize();
+      const localReplacement: string_ascii = replacement.localize();
 
       while (count < 0) || (found < count) {
         const idx = result.find(localNeedle, startIdx..);
@@ -667,10 +671,10 @@ module String {
                                           `sep` occurs multiple times in a row.
      */
     // TODO: specifying return type leads to un-inited string?
-    iter split(sep: string, maxsplit: int = -1, ignoreEmpty: bool = false) /* : string */ {
+    iter split(sep: string_ascii, maxsplit: int = -1, ignoreEmpty: bool = false) /* : string_ascii */ {
       if !(maxsplit == 0 && ignoreEmpty && this.isEmptyString()) {
-        const localThis: string = this.localize();
-        const localSep: string = sep.localize();
+        const localThis: string_ascii = this.localize();
+        const localSep: string_ascii = sep.localize();
 
         // really should be <, but we need to avoid returns and extra yields so
         // the iterator gets inlined
@@ -680,7 +684,7 @@ module String {
         var start: int = 1;
         var done: bool = false;
         while !done  {
-          var chunk: string;
+          var chunk: string_ascii;
           var end: int;
 
           if (maxsplit == 0) {
@@ -720,12 +724,12 @@ module String {
     // note: to improve performance, this code collapses several cases into a
     //       single yield statement, which makes it confusing to read
     // TODO: specifying return type leads to un-inited string?
-    iter split(maxsplit: int = -1) /* : string */ {
+    iter split(maxsplit: int = -1) /* : string_ascii */ {
       if !this.isEmptyString() {
-        const localThis: string = this.localize();
+        const localThis: string_ascii = this.localize();
         var done : bool = false;
         var yieldChunk : bool = false;
-        var chunk : string;
+        var chunk : string_ascii;
 
         var noSplits : bool = maxsplit == 0;
         var limitSplits : bool = maxsplit > 0;
@@ -794,7 +798,7 @@ module String {
           writeln(x); // prints: "a|10|d"
      */
 
-    proc join(const ref S: string ...) : string {
+    proc join(const ref S: string_ascii ...) : string_ascii {
       return _join(S);
     }
 
@@ -806,7 +810,7 @@ module String {
           var x = "|".join("a","10","d");
           writeln(x); // prints: "a|10|d"
      */
-    proc join(const ref S) : string where isTuple(S) {
+    proc join(const ref S) : string_ascii where isTuple(S) {
       if !isHomogeneousTuple(S) || !isString(S[1]) then
         compilerError("join() on tuples only handles homogeneous tuples of strings");
       return _join(S);
@@ -820,11 +824,11 @@ module String {
           var x = "|".join(["a","10","d"]);
           writeln(x); // prints: "a|10|d"
      */
-    proc join(const ref S: [] string) : string {
+    proc join(const ref S: [] string) : string_ascii {
       return _join(S);
     }
 
-    proc _join(const ref S) : string where isTuple(S) || isArray(S) {
+    proc _join(const ref S) : string_ascii where isTuple(S) || isArray(S) {
       if S.size == 1 {
         // TODO: ensures copy, clean up when no longer needed
         var ret = S[S.domain.low];
@@ -833,7 +837,7 @@ module String {
         var joinedSize: int = this.len * (S.size - 1);
         for s in S do joinedSize += s.length;
 
-        var joined: string;
+        var joined: string_ascii;
         joined.len = joinedSize;
         const allocSize = chpl_here_good_alloc_size(joined.len + 1);
         joined._size = allocSize;
@@ -878,12 +882,12 @@ module String {
                 removed, including `leading` and `trailing` occurrences as
                 appropriate.
     */
-    proc strip(chars: string = " \t\r\n", leading=true, trailing=true) : string {
+    proc strip(chars: string_ascii = " \t\r\n", leading=true, trailing=true) : string_ascii {
       if this.isEmptyString() then return "";
       if chars.isEmptyString() then return this;
 
-      const localThis: string = this.localize();
-      const localChars: string = chars.localize();
+      const localThis: string_ascii = this.localize();
+      const localChars: string_ascii = chars.localize();
 
       var start = 1;
       var end = localThis.len;
@@ -923,7 +927,7 @@ module String {
     // TODO: I could make this and other routines that use find faster by
     // making a version of search helper that only takes in local strings and
     // localizing in the calling function
-    proc partition(sep: string) : 3*string {
+    proc partition(sep: string_ascii) : 3*string {
       const idx = this.find(sep);
       if idx != 0 {
         return (this[..idx-1], sep, this[idx+sep.length..]);
@@ -1151,8 +1155,8 @@ module String {
       :returns: A new string with all uppercase characters replaced with their
                 lowercase counterpart.
     */
-    proc toLower() : string {
-      var result: string = this;
+    proc toLower() : string_ascii {
+      var result: string_ascii = this;
       if result.isEmptyString() then return result;
 
       for i in 0..#result.len {
@@ -1169,8 +1173,8 @@ module String {
       :returns: A new string with all lowercase characters replaced with their
                 uppercase counterpart.
     */
-    proc toUpper() : string {
-      var result: string = this;
+    proc toUpper() : string_ascii {
+      var result: string_ascii = this;
       if result.isEmptyString() then return result;
 
       for i in 0..#result.len {
@@ -1187,8 +1191,8 @@ module String {
                 character converted to uppercase, and all cased characters
                 following another cased character converted to lowercase.
      */
-    proc toTitle() : string {
-      var result: string = this;
+    proc toTitle() : string_ascii {
+      var result: string_ascii = this;
       if result.isEmptyString() then return result;
 
       param UN = 0, LETTER = 1;
@@ -1220,8 +1224,8 @@ module String {
                 Uncased characters are copied with no changes.
     */
     pragma "no doc"
-    proc capitalize() : string {
-      var result: string = this.toLower();
+    proc capitalize() : string_ascii {
+      var result: string_ascii = this.toLower();
       if result.isEmptyString() then return result;
 
       var b = result.buff[0];
@@ -1240,10 +1244,10 @@ module String {
   pragma "donor fn"
   pragma "auto copy fn"
   pragma "no doc"
-  proc chpl__autoCopy(s: string) {
+  proc chpl__autoCopy(s: string_ascii) {
     // This pragma may be unnecessary.
     pragma "no auto destroy"
-    var ret: string;
+    var ret: string_ascii;
     const slen = s.len; // cache the remote copy of len
     if slen != 0 {
       if _local || s.locale_id == chpl_nodeID {
@@ -1280,10 +1284,10 @@ module String {
    */
   pragma "init copy fn"
   pragma "no doc"
-  proc chpl__initCopy(s: string) {
+  proc chpl__initCopy(s: string_ascii) {
     // This pragma may be unnecessary.
     pragma "no auto destroy"
-    var ret: string;
+    var ret: string_ascii;
     const slen = s.len; // cache the remote copy of len
     if slen != 0 {
       if _local || s.locale_id == chpl_nodeID {
@@ -1312,8 +1316,8 @@ module String {
   /*
      Copies the string `rhs` into the string `lhs`.
   */
-  proc =(ref lhs: string, rhs: string) {
-    inline proc helpMe(ref lhs: string, rhs: string) {
+  proc =(ref lhs: string_ascii, rhs: string_ascii) {
+    inline proc helpMe(ref lhs: string_ascii, rhs: string_ascii) {
       if _local || rhs.locale_id == chpl_nodeID {
         lhs.reinitString(rhs.buff, rhs.len, rhs._size, needToCopy=true);
       } else {
@@ -1341,7 +1345,7 @@ module String {
 
      Halts if `lhs` is a remote string.
   */
-  proc =(ref lhs: string, rhs_c: c_string) {
+  proc =(ref lhs: string_ascii, rhs_c: c_string) {
     // Make this some sort of local check once we have local types/vars
     if !_local && (lhs.locale_id != chpl_nodeID) then
       halt("Cannot assign a c_string to a remote string.");
@@ -1357,14 +1361,14 @@ module String {
   /*
      :returns: A new string which is the result of concatenating `s0` and `s1`
   */
-  proc +(s0: string, s1: string) {
+  proc +(s0: string_ascii, s1: string_ascii) {
     // cache lengths locally
     const s0len = s0.len;
     if s0len == 0 then return s1;
     const s1len = s1.len;
     if s1len == 0 then return s0;
 
-    var ret: string;
+    var ret: string_ascii;
     ret.len = s0len + s1len;
     const allocSize = chpl_here_good_alloc_size(ret.len+1);
     ret._size = allocSize;
@@ -1404,13 +1408,13 @@ module String {
 
        Hello! Hello! Hello!
   */
-  proc *(s: string, n: integral) {
+  proc *(s: string_ascii, n: integral) {
     if n <= 0 then return "";
 
     const sLen = s.length;
     if sLen == 0 then return "";
 
-    var ret: string;
+    var ret: string_ascii;
     ret.len = sLen * n; // TODO: check for overflow
     const allocSize = chpl_here_good_alloc_size(ret.len+1);
     ret._size = allocSize;
@@ -1437,14 +1441,14 @@ module String {
   }
 
   // Concatenation with other types is done by casting to string
-  private inline proc concatHelp(s: string, x:?t) where t != string {
-    var cs = x:string;
+  private inline proc concatHelp(s: string_ascii, x:?t) where t != string {
+    var cs = x:string_ascii;
     const ret = s + cs;
     return ret;
   }
 
-  private inline proc concatHelp(x:?t, s: string) where t != string  {
-    var cs = x:string;
+  private inline proc concatHelp(x:?t, s: string_ascii) where t != string  {
+    var cs = x:string_ascii;
     const ret = cs + s;
     return ret;
   }
@@ -1454,95 +1458,95 @@ module String {
      result of casting the non-string argument to a string, and concatenating
      that result with `s`.
   */
-  inline proc +(s: string, x: numeric) return concatHelp(s, x);
-  inline proc +(x: numeric, s: string) return concatHelp(x, s);
-  inline proc +(s: string, x: enumerated) return concatHelp(s, x);
-  inline proc +(x: enumerated, s: string) return concatHelp(x, s);
-  inline proc +(s: string, x: bool) return concatHelp(s, x);
-  inline proc +(x: bool, s: string) return concatHelp(x, s);
+  inline proc +(s: string_ascii, x: numeric) return concatHelp(s, x);
+  inline proc +(x: numeric, s: string_ascii) return concatHelp(x, s);
+  inline proc +(s: string_ascii, x: enumerated) return concatHelp(s, x);
+  inline proc +(x: enumerated, s: string_ascii) return concatHelp(x, s);
+  inline proc +(s: string_ascii, x: bool) return concatHelp(s, x);
+  inline proc +(x: bool, s: string_ascii) return concatHelp(x, s);
 
   //
   // Param procs
   //
   pragma "no doc"
   proc typeToString(type t) param {
-    compilerWarning("typeToString() has been deprecated.  Please use a cast instead: '(type-expression):string'");
+    compilerWarning("typeToString() has been deprecated.  Please use a cast instead: '(type-expression):string_ascii'");
     return __primitive("typeToString", t);
   }
 
   pragma "no doc"
   proc typeToString(x) param {
-    compilerWarning("typeToString() has been deprecated.  Please use a cast instead: '(type-expression):string'");
+    compilerWarning("typeToString() has been deprecated.  Please use a cast instead: '(type-expression):string_ascii'");
     compilerError("typeToString()'s argument must be a type, not a value");
   }
 
   pragma "no doc"
-  inline proc ==(param s0: string, param s1: string) param  {
+  inline proc ==(param s0: string_ascii, param s1: string_ascii) param  {
     return __primitive("string_compare", s0, s1) == 0;
   }
 
   pragma "no doc"
-  inline proc !=(param s0: string, param s1: string) param {
+  inline proc !=(param s0: string_ascii, param s1: string_ascii) param {
     return __primitive("string_compare", s0, s1) != 0;
   }
 
   pragma "no doc"
-  inline proc <=(param a: string, param b: string) param {
+  inline proc <=(param a: string_ascii, param b: string_ascii) param {
     return (__primitive("string_compare", a, b) <= 0);
   }
 
   pragma "no doc"
-  inline proc >=(param a: string, param b: string) param {
+  inline proc >=(param a: string_ascii, param b: string_ascii) param {
     return (__primitive("string_compare", a, b) >= 0);
   }
 
   pragma "no doc"
-  inline proc <(param a: string, param b: string) param {
+  inline proc <(param a: string_ascii, param b: string_ascii) param {
     return (__primitive("string_compare", a, b) < 0);
   }
 
   pragma "no doc"
-  inline proc >(param a: string, param b: string) param {
+  inline proc >(param a: string_ascii, param b: string_ascii) param {
     return (__primitive("string_compare", a, b) > 0);
   }
 
   pragma "no doc"
-  inline proc +(param a: string, param b: string) param
+  inline proc +(param a: string_ascii, param b: string_ascii) param
     return __primitive("string_concat", a, b);
 
   pragma "no doc"
-  inline proc +(param s: string, param x: integral) param
-    return __primitive("string_concat", s, x:string);
+  inline proc +(param s: string_ascii, param x: integral) param
+    return __primitive("string_concat", s, x:string_ascii);
 
   pragma "no doc"
-  inline proc +(param x: integral, param s: string) param
-    return __primitive("string_concat", x:string, s);
+  inline proc +(param x: integral, param s: string_ascii) param
+    return __primitive("string_concat", x:string_ascii, s);
 
   pragma "no doc"
-  inline proc +(param s: string, param x: enumerated) param
-    return __primitive("string_concat", s, x:string);
+  inline proc +(param s: string_ascii, param x: enumerated) param
+    return __primitive("string_concat", s, x:string_ascii);
 
   pragma "no doc"
-  inline proc +(param x: enumerated, param s: string) param
-    return __primitive("string_concat", x:string, s);
+  inline proc +(param x: enumerated, param s: string_ascii) param
+    return __primitive("string_concat", x:string_ascii, s);
 
   pragma "no doc"
-  inline proc +(param s: string, param x: bool) param
-    return __primitive("string_concat", s, x:string);
+  inline proc +(param s: string_ascii, param x: bool) param
+    return __primitive("string_concat", s, x:string_ascii);
 
   pragma "no doc"
-  inline proc +(param x: bool, param s: string) param
-    return __primitive("string_concat", x:string, s);
+  inline proc +(param x: bool, param s: string_ascii) param
+    return __primitive("string_concat", x:string_ascii, s);
 
   pragma "no doc"
-  inline proc ascii(param a: string) param return __primitive("ascii", a);
+  inline proc ascii(param a: string_ascii) param return __primitive("ascii", a);
 
   pragma "no doc"
-  inline proc param string.length param
+  inline proc param string_ascii.length param
     return __primitive("string_length", this);
 
   pragma "no doc"
-  inline proc _string_contains(param a: string, param b: string) param
+  inline proc _string_contains(param a: string_ascii, param b: string_ascii) param
     return __primitive("string_contains", a, b);
 
 
@@ -1552,7 +1556,7 @@ module String {
   /*
      Appends the string `rhs` to the string `lhs`.
   */
-  proc +=(ref lhs: string, const ref rhs: string) : void {
+  proc +=(ref lhs: string_ascii, const ref rhs: string_ascii) : void {
     // if rhs is empty, nothing to do
     if rhs.len == 0 then return;
 
@@ -1604,7 +1608,7 @@ module String {
   //  "1000" < "101" < "1010".
   //
 
-  private inline proc _strcmp(a: string, b:string) : int {
+  private inline proc _strcmp(a: string_ascii, b:string_ascii) : int {
     // Assumes a and b are on same locale and not empty.
     const size = min(a.len, b.len);
     const result =  c_memcmp(a.buff, b.buff, size);
@@ -1618,8 +1622,8 @@ module String {
   }
 
   pragma "no doc"
-  proc ==(a: string, b: string) : bool {
-    inline proc doEq(a: string, b:string) {
+  proc ==(a: string_ascii, b: string_ascii) : bool {
+    inline proc doEq(a: string_ascii, b:string_ascii) {
       // TODO: is it better to have these outside of the do* fns?
       //       probably would be 2 extra gets worst case, but avoids doing a
       //       local copy if b is remote
@@ -1642,47 +1646,47 @@ module String {
       return ret;
     } else { */
 
-    var localA: string = a.localize();
-    var localB: string = b.localize();
+    var localA: string_ascii = a.localize();
+    var localB: string_ascii = b.localize();
 
     return doEq(localA, localB);
   }
 
   pragma "no doc"
-  inline proc !=(a: string, b: string) : bool {
+  inline proc !=(a: string_ascii, b: string_ascii) : bool {
     return !(a == b);
   }
 
   pragma "no doc"
-  inline proc <(a: string, b: string) : bool {
-    inline proc doLt(a: string, b:string) {
+  inline proc <(a: string_ascii, b: string_ascii) : bool {
+    inline proc doLt(a: string_ascii, b:string_ascii) {
       return _strcmp(a, b) < 0;
     }
 
-    var localA: string = a.localize();
-    var localB: string = b.localize();
+    var localA: string_ascii = a.localize();
+    var localB: string_ascii = b.localize();
 
     return doLt(localA, localB);
   }
 
   pragma "no doc"
-  inline proc >(a: string, b: string) : bool {
-    inline proc doGt(a: string, b:string) {
+  inline proc >(a: string_ascii, b: string_ascii) : bool {
+    inline proc doGt(a: string_ascii, b:string_ascii) {
       return _strcmp(a, b) > 0;
     }
 
-    var localA: string = a.localize();
-    var localB: string = b.localize();
+    var localA: string_ascii = a.localize();
+    var localB: string_ascii = b.localize();
 
     return doGt(localA, localB);
   }
 
   pragma "no doc"
-  inline proc <=(a: string, b: string) : bool {
+  inline proc <=(a: string_ascii, b: string_ascii) : bool {
     return !(a > b);
   }
   pragma "no doc"
-  inline proc >=(a: string, b: string) : bool {
+  inline proc >=(a: string_ascii, b: string_ascii) : bool {
     return !(a < b);
   }
 
@@ -1730,7 +1734,7 @@ module String {
   /*
      :returns: The byte value of the first character in `a` as an integer.
   */
-  inline proc ascii(a: string) : int(32) {
+  inline proc ascii(a: string_ascii) : int(32) {
     if a.isEmptyString() then return 0;
 
     if _local || a.locale_id == chpl_nodeID {
@@ -1760,7 +1764,7 @@ module String {
   // Cast from c_string to string
   pragma "no doc"
   proc _cast(type t, cs: c_string) where t == string {
-    var ret: string;
+    var ret: string_ascii;
     ret.len = cs.length;
     ret._size = ret.len+1;
     ret.buff = if ret.len > 0
@@ -1775,12 +1779,12 @@ module String {
   // Developer Extras
   //
   pragma "no doc"
-  proc chpldev_refToString(ref arg) : string {
+  proc chpldev_refToString(ref arg) : string_ascii {
     // print out the address of class references as well
-    proc chpldev_classToString(x: object) : string
-      return " (class = " + __primitive("ref to string", x):string + ")";
-    proc chpldev_classToString(x) : string return "";
+    proc chpldev_classToString(x: object) : string_ascii
+      return " (class = " + __primitive("ref to string", x):string_ascii + ")";
+    proc chpldev_classToString(x) : string_ascii return "";
 
-    return __primitive("ref to string", arg):string + chpldev_classToString(arg);
+    return __primitive("ref to string", arg):string_ascii + chpldev_classToString(arg);
   }
 }

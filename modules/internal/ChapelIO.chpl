@@ -221,6 +221,8 @@ module ChapelIO {
       str += tup[i]:string;
     }
 
+    compilerWarning(str.type:string);
+    
    str += ")";
 
     return str;
@@ -764,7 +766,7 @@ module ChapelIO {
   }
 
   pragma "no doc"
-  proc ref string.write(args ...?n) {
+  proc ref string_ascii.write(args ...?n) {
     compilerError("string.write deprecated: use string.format or stringify");
   }
 

@@ -558,7 +558,7 @@ inline proc _cond_test(m: reMatch) return m.matched;
     :arg m: a match (e.g. returned by :proc:`regexp.search`)
     :returns: the portion of ``this`` referred to by the match
  */
-proc string.this(m:reMatch) {
+proc string_ascii.this(m:reMatch) {
   if m.matched then return this[m.offset+1..#m.length];
   else return "";
 }
@@ -587,8 +587,8 @@ record regexp {
      :returns: a string describing any error encountered when compiling this
                regular expression
    */
-  proc error():string {
-    return qio_regexp_error(_regexp):string;
+  proc error():string_ascii {
+    return qio_regexp_error(_regexp):string_ascii;
   }
 
   // note - more = overloads are below.
@@ -599,7 +599,7 @@ record regexp {
   }
 
   pragma "no doc"
-  proc _handle_captures(text: string, matches:_ddata(qio_regexp_string_piece_t), nmatches:int, ref captures) {
+  proc _handle_captures(text: string_ascii, matches:_ddata(qio_regexp_string_piece_t), nmatches:int, ref captures) {
     assert(nmatches >= captures.size);
     for param i in 1..captures.size {
       var m = _to_reMatch(matches[i]);
@@ -636,7 +636,7 @@ record regexp {
 
     */
   proc search(text: ?t, ref captures ...?k):reMatch
-    where t == string || t == stringPart
+    where t == string_ascii || t == stringPart
   {
     var ret:reMatch;
     on this.home {
@@ -668,7 +668,7 @@ record regexp {
   // documented in the captures version
   pragma "no doc"
   proc search(text: ?t):reMatch
-    where t == string || t == stringPart
+    where t == string_ascii || t == stringPart
   {
     var ret:reMatch;
     on this.home {
@@ -716,7 +716,7 @@ record regexp {
                where a match occurred
    */
   proc match(text: ?t, ref captures ...?k):reMatch
-    where t == string || t == stringPart
+    where t == string_ascii || t == stringPart
   {
     var ret:reMatch;
     on this.home {
@@ -748,7 +748,7 @@ record regexp {
   // documented in the version taking captures.
   pragma "no doc"
   proc match(text: ?t):reMatch
-    where t == string || t == stringPart
+    where t == string_ascii || t == stringPart
   {
     var ret:reMatch;
     on this.home {
@@ -788,7 +788,7 @@ record regexp {
      :yields: each split portion, one at a time
    */
   iter split(text: ?t, maxsplit: int = 0) 
-    where t == string || t == stringPart 
+    where t == string_ascii || t == stringPart 
   {
     var matches:_ddata(qio_regexp_string_piece_t);
     var ncaptures = qio_regexp_get_ncaptures(_regexp);
@@ -862,7 +862,7 @@ record regexp {
               the match for the whole pattern and the rest are the capture groups.
    */
   iter matches(text: ?t, param captures=0, maxmatches: int = max(int)) 
-    where t == string || t == stringPart 
+    where t == string_ascii || t == stringPart 
   {
     var matches:_ddata(qio_regexp_string_piece_t);
     var nmatches = 1 + captures;
@@ -911,7 +911,7 @@ record regexp {
    */
   // TODO -- move subn after sub for documentation clarity
   proc subn(repl:string, text: ?t, global = true ):(string, int)
-    where t == string || t == stringPart 
+    where t == string_ascii || t == stringPart 
   {
     var pos:int;
     var endpos:int;
@@ -943,7 +943,7 @@ record regexp {
      :returns: the new string
    */
   proc sub(repl:string, text: ?t, global = true )
-    where t == string || t == stringPart 
+    where t == string_ascii || t == stringPart 
   {
     var (str, count) = subn(repl, text, global);
     return str;
@@ -1018,7 +1018,7 @@ proc chpl__initCopy(x: regexp) {
 
 // Cast regexp to string.
 pragma "no doc"
-inline proc _cast(type t, x: regexp) where t == string {
+inline proc _cast(type t, x: regexp) where t == string_ascii {
   var pattern: string;
   on x.home {
     var cs: c_string_copy;
@@ -1045,7 +1045,7 @@ inline proc _cast(type t, x: string) where t == regexp {
    :returns: an :record:`reMatch` object representing the offset in the
              receiving string where a match occurred
  */
-proc string.search(needle: string, ignorecase=false):reMatch
+proc string_ascii.search(needle: string, ignorecase=false):reMatch
 {
   // Create a regexp matching the literal for needle
   var re = compile(needle, literal=true, nocapture=true, ignorecase=ignorecase);
@@ -1054,7 +1054,7 @@ proc string.search(needle: string, ignorecase=false):reMatch
 
 // documented in the captures version
 pragma "no doc"
-proc string.search(needle: regexp):reMatch
+proc string_ascii.search(needle: regexp):reMatch
 {
   return needle.search(this);
 }
@@ -1068,14 +1068,14 @@ proc string.search(needle: regexp):reMatch
    :returns: an :record:`reMatch` object representing the offset in the
              receiving string where a match occurred
  */
-proc string.search(needle: regexp, ref captures ...?k):reMatch
+proc string_ascii.search(needle: regexp, ref captures ...?k):reMatch
 {
   return needle.search(this, (...captures));
 }
 
 // documented in the captures version
 pragma "no doc"
-proc string.match(pattern: regexp):reMatch
+proc string_ascii.match(pattern: regexp):reMatch
 {
   return pattern.match(this);
 }
@@ -1091,7 +1091,7 @@ proc string.match(pattern: regexp):reMatch
              receiving string where a match occurred
  */
 
-proc string.match(pattern: regexp, ref captures ...?k):reMatch
+proc string_ascii.match(pattern: regexp, ref captures ...?k):reMatch
 {
   return pattern.match(this, (...captures));
 }
@@ -1104,7 +1104,7 @@ proc string.match(pattern: regexp, ref captures ...?k):reMatch
    :arg maxsplit: if nonzero, the maximum number of splits to do
    :yields: each split portion, one at a time
  */
-iter string.split(pattern: regexp, maxsplit: int = 0)
+iter string_ascii.split(pattern: regexp, maxsplit: int = 0)
 {
   for v in pattern.split(this, maxsplit) {
     yield v;
@@ -1122,7 +1122,7 @@ iter string.split(pattern: regexp, maxsplit: int = 0)
             the match for the whole pattern and the rest are the capture groups.
 
 */
-iter string.matches(pattern:regexp, param captures=0, maxmatches:int=max(int))
+iter string_ascii.matches(pattern:regexp, param captures=0, maxmatches:int=max(int))
 {
   for v in pattern.matches(this, captures, maxmatches) {
     yield v;

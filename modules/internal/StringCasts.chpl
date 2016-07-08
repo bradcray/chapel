@@ -126,12 +126,12 @@ module StringCasts {
     return ret;
   }
 
-  proc _cast(type t, x:real(?w)) where t == string {
+  proc _cast(type t, x:real(?w)) where t == string_ascii {
     //TODO: switch to using qio's writef somehow
     return _real_cast_helper(x:real(64), false);
   }
 
-  proc _cast(type t, x:imag(?w)) where t == string {
+  proc _cast(type t, x:imag(?w)) where t == string_ascii {
     //TODO: switch to using qio's writef somehow
     // The Chapel version of the imag --> real cast smashes it flat rather than
     // just stripping off the "i".  See the cast in ChapelBase.
@@ -139,7 +139,7 @@ module StringCasts {
     return _real_cast_helper(r, true);
   }
 
-  inline proc _cast(type t, x: string) where isRealType(t) {
+  inline proc _cast(type t, x: string_ascii) where isRealType(t) {
     pragma "insert line file info"
     extern proc c_string_to_real32(x: c_string) : real(32);
     pragma "insert line file info"
@@ -153,7 +153,7 @@ module StringCasts {
     }
   }
 
-  inline proc _cast(type t, x: string) where isImagType(t) {
+  inline proc _cast(type t, x: string_ascii) where isImagType(t) {
     pragma "insert line file info"
     extern proc c_string_to_imag32(x: c_string) : imag(32);
     pragma "insert line file info"
@@ -171,20 +171,20 @@ module StringCasts {
   //
   // complex
   //
-  proc _cast(type t, x: complex(?w)) where t == string {
+  proc _cast(type t, x: complex(?w)) where t == string_ascii {
     if isnan(x.re) || isnan(x.im) then
       return "nan";
-    var re = (x.re):string;
-    var im: string;
-    var op: string;
+    var re = (x.re):string_ascii;
+    var im: string_ascii;
+    var op: string_ascii;
     if x.im < 0 {
-      im = (-x.im):string;
+      im = (-x.im):string_ascii;
       op = " - ";
     } else if x.im == -0.0 && -0.0 != 0.0 { // Special accommodation for Seymour.
       im = "0.0";
       op = " - ";
     } else {
-      im = (x.im):string;
+      im = (x.im):string_ascii;
       op = " + ";
     }
     const ts0 = re + op;
@@ -194,7 +194,7 @@ module StringCasts {
   }
 
 
-  inline proc _cast(type t, x: string) where isComplexType(t) {
+  inline proc _cast(type t, x: string_ascii) where isComplexType(t) {
     pragma "insert line file info"
     extern proc c_string_to_complex64(x:c_string) : complex(64);
     pragma "insert line file info"

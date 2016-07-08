@@ -3164,7 +3164,7 @@ VarSymbol *new_StringSymbol(const char *str) {
 
   int strLength = unescapeString(str, castCall).length();
 
-  CallExpr *ctor = new CallExpr("_construct_string",
+  CallExpr *ctor = new CallExpr("_construct_string_ascii",
       castTemp,
       new_IntSymbol(strLength),   // length
       new_IntSymbol(strLength ? strLength+1 : 0), // size, empty string needs 0

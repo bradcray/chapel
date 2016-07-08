@@ -1150,7 +1150,7 @@ module DefaultRectangular {
       var ischpl = arrayStyle == QIO_ARRAY_FORMAT_CHPL && !binary;
 
       type strType = chpl__signedType(idxType);
-      var makeStridePositive = if dom.ranges(dim).stride > 0 then 1:strType else (-1):strType;
+      var makeStridePositive = if dom.dsiDim(dim).stride > 0 then 1:strType else (-1):strType;
 
       if isjson || ischpl {
         if dim != rank {
@@ -1161,8 +1161,8 @@ module DefaultRectangular {
 
       if dim == rank {
         var first = true;
-        if debugDefaultDist && f.writing then f.writeln(dom.ranges(dim));
-        for j in dom.ranges(dim) by makeStridePositive {
+        if debugDefaultDist && f.writing then f.writeln(dom.dsiDim(dim));
+        for j in dom.dsiDim(dim) by makeStridePositive {
           if first then first = false;
           else if isspace then f <~> new ioLiteral(" ");
           else if isjson || ischpl then f <~> new ioLiteral(", ");
@@ -1170,12 +1170,12 @@ module DefaultRectangular {
           f <~> arr.dsiAccess(idx);
         }
       } else {
-        for j in dom.ranges(dim) by makeStridePositive {
-          var lastIdx =  dom.ranges(dim).last;
+        for j in dom.dsiDim(dim) by makeStridePositive {
+          var lastIdx =  dom.dsiDim(dim).last;
           idx(dim) = j;
 
           recursiveArrayWriter(idx, dim=dim+1,
-                               last=(last || dim == 1) && (j == dom.ranges(dim).alignedHigh));
+                               last=(last || dim == 1) && (j == dom.dsiDim(dim).alignedHigh));
 
           if isjson || ischpl {
             if j != lastIdx {
@@ -1202,7 +1202,7 @@ module DefaultRectangular {
     }
 
     if false && !f.writing && !f.binary() &&
-       rank == 1 && dom.ranges(1).stride == 1 &&
+       rank == 1 && dom.dsiDim(1).stride == 1 &&
        dom._arrs.length == 1 {
 
       // resize-on-read implementation, disabled right now
@@ -1226,7 +1226,7 @@ module DefaultRectangular {
 
       var first = true;
 
-      var offset = dom.ranges(1).low;
+      var offset = dom.dsiDim(1).low;
       var i = 0;
 
       var read_end = false;
@@ -1258,9 +1258,9 @@ module DefaultRectangular {
           }
         }
 
-        if i >= dom.ranges(1).size {
+        if i >= dom.dsiDim(1).size {
           // Create more space.
-          var sz = dom.ranges(1).size;
+          var sz = dom.dsiDim(1).size;
           if sz < 4 then sz = 4;
           sz = 2 * sz;
 

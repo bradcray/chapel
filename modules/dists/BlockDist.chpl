@@ -598,8 +598,7 @@ proc BlockDom.dsiDisplayRepresentation() {
   writeln("BlockDom = {");
   writeln("  whole = ", whole);
   for tli in dist.targetLocDom {
-    writeln("    locDoms[", tli, "].myBlock = ");
-      locDoms[tli].myBlock.displayRepresentation();
+    writeln("    locDoms[", tli, "].myBlock = ", locDoms[tli].myBlock);
   }
   writeln("}");
 }

@@ -19,35 +19,47 @@ locDist[0].myChunk = {-9223372036854775808..4}
 locDist[1].myChunk = {5..7}
 locDist[2].myChunk = {8..9223372036854775807}
 Creating new Block domain:
-whole = {1..0}
-locDoms[0].myBlock = {1..0}
-locDoms[1].myBlock = {5..0}
-locDoms[2].myBlock = {8..0}
+BlockDom = {
+  whole = {1..0}
+    locDoms[0].myBlock = {1..0}
+    locDoms[1].myBlock = {5..0}
+    locDoms[2].myBlock = {8..0}
+}
 Setting indices of Block domain:
-whole = {0..11}
-locDoms[0].myBlock = {0..4}
-locDoms[1].myBlock = {5..7}
-locDoms[2].myBlock = {8..11}
+BlockDom = {
+  whole = {0..11}
+    locDoms[0].myBlock = {0..4}
+    locDoms[1].myBlock = {5..7}
+    locDoms[2].myBlock = {8..11}
+}
 Creating new Block domain:
-whole = {1..0}
-locDoms[0].myBlock = {1..0}
-locDoms[1].myBlock = {5..0}
-locDoms[2].myBlock = {8..0}
+BlockDom = {
+  whole = {1..0}
+    locDoms[0].myBlock = {1..0}
+    locDoms[1].myBlock = {5..0}
+    locDoms[2].myBlock = {8..0}
+}
 Setting indices of Block domain:
-whole = {1..12}
-locDoms[0].myBlock = {1..4}
-locDoms[1].myBlock = {5..7}
-locDoms[2].myBlock = {8..12}
+BlockDom = {
+  whole = {1..12}
+    locDoms[0].myBlock = {1..4}
+    locDoms[1].myBlock = {5..7}
+    locDoms[2].myBlock = {8..12}
+}
 Creating new Block domain:
-whole = {1..0}
-locDoms[0].myBlock = {1..0}
-locDoms[1].myBlock = {5..0}
-locDoms[2].myBlock = {8..0}
+BlockDom = {
+  whole = {1..0}
+    locDoms[0].myBlock = {1..0}
+    locDoms[1].myBlock = {5..0}
+    locDoms[2].myBlock = {8..0}
+}
 Setting indices of Block domain:
-whole = {-1..10}
-locDoms[0].myBlock = {-1..4}
-locDoms[1].myBlock = {5..7}
-locDoms[2].myBlock = {8..10}
+BlockDom = {
+  whole = {-1..10}
+    locDoms[0].myBlock = {-1..4}
+    locDoms[1].myBlock = {5..7}
+    locDoms[2].myBlock = {8..10}
+}
 ProblemDist =
 Block
 -------

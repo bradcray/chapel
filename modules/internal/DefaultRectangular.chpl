@@ -660,7 +660,7 @@ module DefaultRectangular {
           var lastIdx =  dom.dsiDim(dim).last;
           idx(dim) = j;
           recursiveArrayWriter(idx, dim=dim+1,
-                               last=(last || dim == 1) && (j == lastIdx));
+                               last=(last || dim == 1) && (j == dom.ranges(dim).high));
         }
       }
       if !last && dim != 1 && ! binary then

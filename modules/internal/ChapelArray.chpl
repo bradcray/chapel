@@ -2240,7 +2240,8 @@ module ChapelArray {
       where isRectangularDom(this.domain) && isRectangularDom(d)
     {
       if rank != d.rank then
-        compilerError("illegal implicit rank change");
+        compilerError("rank mismatch: cannot reindex() from " + rank + 
+                      " dimension(s) to " + d.rank);
 
       //
       // BLC: Commented the following out b/c it didn't work out

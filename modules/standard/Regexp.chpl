@@ -58,8 +58,8 @@ Using Regular Expression Support
 Now you can use these methods on regular expressions: :proc:`regexp.search`,
 :proc:`regexp.match`, :proc:`regexp.split`, :proc:`regexp.matches`.
 
-You can also use the string versions of these methods: :proc:`string.search`,
-:proc:`string.match`, :proc:`string.split`, or :proc:`string.matches`.
+You can also use the string versions of these methods: :proc:`string_ascii.search`,
+:proc:`string_ascii.match`, :proc:`string_ascii.split`, or :proc:`string_ascii.matches`.
 
 Lastly, you can include regular expressions in the format string for
 :proc:`~IO.readf` for searching on QIO channels using the ``%/<regexp>/``
@@ -587,8 +587,8 @@ record regexp {
      :returns: a string describing any error encountered when compiling this
                regular expression
    */
-  proc error():string_ascii {
-    return qio_regexp_error(_regexp):string_ascii;
+  proc error():string {
+    return qio_regexp_error(_regexp):string;
   }
 
   // note - more = overloads are below.
@@ -599,7 +599,7 @@ record regexp {
   }
 
   pragma "no doc"
-  proc _handle_captures(text: string_ascii, matches:_ddata(qio_regexp_string_piece_t), nmatches:int, ref captures) {
+  proc _handle_captures(text: string, matches:_ddata(qio_regexp_string_piece_t), nmatches:int, ref captures) {
     assert(nmatches >= captures.size);
     for param i in 1..captures.size {
       var m = _to_reMatch(matches[i]);
@@ -636,7 +636,7 @@ record regexp {
 
     */
   proc search(text: ?t, ref captures ...?k):reMatch
-    where t == string_ascii || t == stringPart
+    where t == string || t == stringPart
   {
     var ret:reMatch;
     on this.home {
@@ -668,7 +668,7 @@ record regexp {
   // documented in the captures version
   pragma "no doc"
   proc search(text: ?t):reMatch
-    where t == string_ascii || t == stringPart
+    where t == string || t == stringPart
   {
     var ret:reMatch;
     on this.home {
@@ -716,7 +716,7 @@ record regexp {
                where a match occurred
    */
   proc match(text: ?t, ref captures ...?k):reMatch
-    where t == string_ascii || t == stringPart
+    where t == string || t == stringPart
   {
     var ret:reMatch;
     on this.home {
@@ -748,7 +748,7 @@ record regexp {
   // documented in the version taking captures.
   pragma "no doc"
   proc match(text: ?t):reMatch
-    where t == string_ascii || t == stringPart
+    where t == string || t == stringPart
   {
     var ret:reMatch;
     on this.home {
@@ -788,7 +788,7 @@ record regexp {
      :yields: each split portion, one at a time
    */
   iter split(text: ?t, maxsplit: int = 0) 
-    where t == string_ascii || t == stringPart 
+    where t == string || t == stringPart 
   {
     var matches:_ddata(qio_regexp_string_piece_t);
     var ncaptures = qio_regexp_get_ncaptures(_regexp);
@@ -862,7 +862,7 @@ record regexp {
               the match for the whole pattern and the rest are the capture groups.
    */
   iter matches(text: ?t, param captures=0, maxmatches: int = max(int)) 
-    where t == string_ascii || t == stringPart 
+    where t == string || t == stringPart 
   {
     var matches:_ddata(qio_regexp_string_piece_t);
     var nmatches = 1 + captures;
@@ -911,7 +911,7 @@ record regexp {
    */
   // TODO -- move subn after sub for documentation clarity
   proc subn(repl:string, text: ?t, global = true ):(string, int)
-    where t == string_ascii || t == stringPart 
+    where t == string || t == stringPart 
   {
     var pos:int;
     var endpos:int;
@@ -943,7 +943,7 @@ record regexp {
      :returns: the new string
    */
   proc sub(repl:string, text: ?t, global = true )
-    where t == string_ascii || t == stringPart 
+    where t == string || t == stringPart 
   {
     var (str, count) = subn(repl, text, global);
     return str;
@@ -1018,7 +1018,7 @@ proc chpl__initCopy(x: regexp) {
 
 // Cast regexp to string.
 pragma "no doc"
-inline proc _cast(type t, x: regexp) where t == string_ascii {
+inline proc _cast(type t, x: regexp) where t == string {
   var pattern: string;
   on x.home {
     var cs: c_string_copy;

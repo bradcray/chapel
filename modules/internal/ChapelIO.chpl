@@ -221,8 +221,6 @@ module ChapelIO {
       str += tup[i]:string;
     }
 
-    compilerWarning(str.type:string);
-    
    str += ")";
 
     return str;

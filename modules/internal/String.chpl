@@ -99,8 +99,8 @@ module String {
 
   private config param debugStrings = false;
 
-  proc string type {
-    return string_ascii;
+  record string {
+    var guts: string_ascii;
   }
   
   //

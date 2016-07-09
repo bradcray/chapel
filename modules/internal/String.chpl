@@ -99,9 +99,16 @@ module String {
 
   private config param debugStrings = false;
 
-  record string {
-    var guts: string_ascii;
+  /*
+  proc string type {
+    return string_ascii;
   }
+*/
+
+  record string: string_ascii {
+    //    var guts: string_ascii;
+  }
+
   
   //
   // String Implementation

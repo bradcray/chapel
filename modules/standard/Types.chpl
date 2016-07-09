@@ -131,7 +131,7 @@ proc isImagType(type t) param return
 
 /* Returns `true` if the type `t` is the `string` type. */
 pragma "no instantiation limit"
-proc isStringType(type t) param return t == string;
+proc isStringType(type t) param return t == string_ascii;
 
 /*
 POD stands for Plain Old Data and roughly corresponds to the meaning of Plain
@@ -649,14 +649,14 @@ inline proc integral.safeCast(type T) : T where isUintType(T) {
     if isIntType(this.type) {
       // int(?) -> uint(?)
       if this < 0 then // runtime check
-        halt("casting "+this.type:string+" less than 0 to "+T:string);
+        halt("casting "+this.type:string_ascii+" less than 0 to "+T:string_ascii);
     }
 
     if max(this.type):uint > max(T):uint {
       // [u]int(?) -> uint(?)
       if (this:uint > max(T):uint) then // runtime check
-        halt("casting "+this.type:string+" with a value greater than the maximum of "+
-             T:string+" to "+T:string);
+        halt("casting "+this.type:string_ascii+" with a value greater than the maximum of "+
+             T:string_ascii+" to "+T:string_ascii);
     }
   }
   return this:T;
@@ -670,22 +670,22 @@ inline proc integral.safeCast(type T) : T where isIntType(T) {
       if isUintType(this.type) {
         // uint(?) -> int(?)
         if this:uint > max(T):uint then // runtime check
-          halt("casting "+this.type:string+" with a value greater than the maximum of "+
-               T:string+" to "+T:string);
+          halt("casting "+this.type:string_ascii+" with a value greater than the maximum of "+
+               T:string_ascii+" to "+T:string_ascii);
       } else {
         // int(?) -> int(?)
         // max(T) <= max(int), so cast to int is safe
         if this:int > max(T):int then // runtime check
-          halt("casting "+this.type:string+" with a value greater than the maximum of "+
-               T:string+" to "+T:string);
+          halt("casting "+this.type:string_ascii+" with a value greater than the maximum of "+
+               T:string_ascii+" to "+T:string_ascii);
       }
     }
     if isIntType(this.type) {
       if min(this.type):int < min(T):int {
         // int(?) -> int(?)
         if this:int < min(T):int then // runtime check
-          halt("casting "+this.type:string+" with a value less than the minimum of "+
-               T:string+" to "+T:string);
+          halt("casting "+this.type:string_ascii+" with a value less than the minimum of "+
+               T:string_ascii+" to "+T:string_ascii);
       }
     }
   }

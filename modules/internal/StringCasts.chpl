@@ -25,7 +25,7 @@ module StringCasts {
   //
   // Type -- Foo.type:string
   //
-  proc _cast(type t, type x)  param : string where t == string {
+  proc _cast(type t, type x)  param : string_ascii where t == string_ascii {
     return __primitive("typeToString", x);
   }
 
@@ -33,7 +33,7 @@ module StringCasts {
   // Bool
   //
 
-  inline proc _cast(type t, x: bool) where t == string {
+  inline proc _cast(type t, x: bool) where t == string_ascii {
     if (x) {
       return "true";
     } else {
@@ -55,7 +55,7 @@ module StringCasts {
   //
   // int
   //
-  proc _cast(type t, x: integral) where t == string {
+  proc _cast(type t, x: integral) where t == string_ascii {
     //TODO: switch to using qio's writef somehow
     extern proc integral_to_c_string_copy(x:int(64), size:uint(32), isSigned: bool) : c_string_copy;
     extern proc strlen(const str: c_string_copy) : size_t;

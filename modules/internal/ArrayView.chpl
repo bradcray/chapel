@@ -132,6 +132,21 @@ class ArraySliceViewArr: BaseArr {
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
     return new ArraySliceViewArr(eltType=eltType, dom=privdom, arr=privarr);
   }
+
+  proc dsiHasSingleLocalSubdomain() {
+    compilerError("hasSingleLocalSubdomain() not supported for array slices yet");
+  }
+
+  proc dsiLocalSubdomain() {
+    compilerError("localSubdomain[s]() not supported for array slices yet");
+  }
+
+  iter dsiLocalSubdomains() {
+    // TODO: This is here just to keep the compiler from complaining and
+    // to trigger the compilerError() just above and ultimately needs to
+    // be rewritten
+    yield dsiLocalSubdomain();
+  }
 }
 
 
@@ -494,6 +509,21 @@ class ArrayReindexViewArr: BaseArr {
     //    writeln(here.id, ": ***** About to return new array");
     return new ArrayReindexViewArr(eltType=eltType, dom=privdom, arr=privarr);
   }
+
+  proc dsiHasSingleLocalSubdomain() {
+    compilerError("hasSingleLocalSubdomain() not supported for reindexed arrays yet");
+  }
+
+  proc dsiLocalSubdomain() {
+    compilerError("localSubdomain[s]() not supported for reindexed arrays yet");
+  }
+
+  iter dsiLocalSubdomains() {
+    // TODO: This is here just to keep the compiler from complaining and
+    // to trigger the compilerError() just above and ultimately needs to
+    // be rewritten
+    yield dsiLocalSubdomain();
+  }
 }
 
 
@@ -804,5 +834,20 @@ class ArrayRankChangeViewArr: BaseArr {
     const privdom = chpl_getPrivatizedCopy(dom.type, privdomID);
     const privarr = chpl_getPrivatizedCopy(arr.type, privarrID);
     return new ArrayRankChangeViewArr(eltType=eltType, dom=privdom, arr=privarr, collapsedDim=collapsedDim, idx=idx);
+  }
+
+  proc dsiHasSingleLocalSubdomain() {
+    compilerError("hasSingleLocalSubdomain() not supported for rank-change slices yet");
+  }
+
+  proc dsiLocalSubdomain() {
+    compilerError("localSubdomain[s]() not supported for rank-change slices yet");
+  }
+
+  iter dsiLocalSubdomains() {
+    // TODO: This is here just to keep the compiler from complaining and
+    // to trigger the compilerError() just above and ultimately needs to
+    // be rewritten
+    yield dsiLocalSubdomain();
   }
 }

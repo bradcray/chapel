@@ -140,6 +140,8 @@ module ChapelArray {
 
   config param alwaysUseArrayViews = false;
 
+  config param squashSomeDeletes = false;
+
   // Explicitly use a processor atomic, as most calls to this function are
   // likely be on locale 0
   pragma "no doc"
@@ -161,7 +163,7 @@ module ChapelArray {
 
   proc _newPrivatizedClass(value) {
 
-   const n = numPrivateObjects.fetchAdd(1);
+    const n = numPrivateObjects.fetchAdd(1);
     //    writeln(">> Going in, n is: ", n);
 
     const hereID = here.id;
@@ -245,17 +247,20 @@ module ChapelArray {
 
   proc _newArray(value) {
     //    extern proc printf(x...);
-    
+
     //    printf("%s %s\n", "*** In newArray, value.type is", typeToString(value.type));
-    if _isPrivatized(value) then {
+    if _isPrivatized(value) then
+    {
       //      printf("%s %s\n", "*** Building privatized version", typeToString(value.type));
       return new _array(_newPrivatizedClass(value), value);
-    } else
+    }
+    else
       return new _array(value, value);
   }
 
   proc _newDomain(value) {
-    if _isPrivatized(value) then {
+    if _isPrivatized(value) then
+    {
       //      writeln("Is privatized");
       //      writeln(typeToString(value.type));
       const tmp = _newPrivatizedClass(value);
@@ -264,7 +269,8 @@ module ChapelArray {
       //      writeln("got tmp2");
       return tmp2;
         //      return new _domain(_newPrivatizedClass(value), value);
-    } else
+    }
+    else
       return new _domain(value, value);
   }
 
@@ -1870,10 +1876,14 @@ module ChapelArray {
      if !noRefCount {
       if !_isPrivatized(_valueType) {
         on _value {
+          extern proc printf(x...);
+          //          printf("Destroying value...\n");
           var cnt = _value.destroyArr();
           if cnt == 0 then {
+            //            printf("...count is zero\n");
             chpl_decRefCountsForDomainsInArrayEltTypes(_value.eltType);
-            //          delete _value;
+            if squashSomeDeletes then
+            delete _value;
           }
         }
       }
@@ -2017,17 +2027,21 @@ module ChapelArray {
       var d = _dom((...ranges));
 
       if (!alwaysUseArrayViews && this._value.dsiCanSlice(d._value)) {
-        var a = _value.dsiSlice(d._value);
-        a._arrAlias = _value;
-        if !noRefCount {
-          d._value.incRefCount();
-          a._arrAlias.incRefCount();
-        }
-        return _newArray(a);
+      var a = _value.dsiSlice(d._value);
+      a._arrAlias = _value;
+      pragma "dont disable remote value forwarding"
+      proc help() {
+        //        writeln("Incrementing reference count");
+        d._value.incRefCount();
+        a._arrAlias.incRefCount();
+      }
+      if !noRefCount then
+        help();
+      return _newArray(a);
       } else {
         if !noRefCount {
           d._value.incRefCount();
-          this._value.incRefCount();
+          //          this._value.incRefCount();
         }
         //
         // Avoid stacking array views arbitrarily deep -- short-circuit
@@ -2240,14 +2254,14 @@ module ChapelArray {
       where isRectangularDom(this.domain) && isRectangularDom(d)
     {
       if rank != d.rank then
-        compilerError("rank mismatch: cannot reindex() from " + rank + 
+        compilerError("rank mismatch: cannot reindex() from " + rank +
                       " dimension(s) to " + d.rank);
 
       //
       // BLC: Commented the following out b/c it didn't work out
       // of the box, but should try and restore it before committing.
       //
-  
+
       // Optimization: Just return an alias of this array when
       // reindexing to the same domain. We skip same-ness test
       // if the domain descriptors' types are disjoint.

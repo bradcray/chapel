@@ -1077,7 +1077,8 @@ module DefaultRectangular {
           if d.numIndices > 0 then
             shiftedData = copy.shiftedData;
         //numelm = copy.numelm;
-        //        delete copy;
+        if squashSomeDeletes then
+        delete copy;
         }
       } else {
         halt("illegal reallocation");
@@ -1131,8 +1132,12 @@ module DefaultRectangular {
     chpl_rectArrayReadWriteHelper(f, this);
   }
 
-  proc chpl_rectArrayReadWriteHelper(f /*: Reader or Writer */, 
-                                     arr, dom = arr.dom) {
+  proc chpl_rectArrayReadWriteHelper(f /*: Reader or Writer */, arr) {
+    chpl_rectArrayReadWriteHelper(f, arr, arr.dom);
+  }
+
+
+  proc chpl_rectArrayReadWriteHelper(f /*: Reader or Writer */, arr, dom) {
     param rank = arr.rank;
     type idxType = arr.idxType;
 

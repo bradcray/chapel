@@ -289,8 +289,10 @@ module ChapelDistribution {
         if _arrAlias {
           on _arrAlias {
             var cnt = _arrAlias.destroyArr();
-            if cnt == 0 then
+            if cnt == 0 then {
+              halt("An alias is trying to delete an array");
               delete _arrAlias;
+            }
           }
         } else {
           dsiDestroyData();

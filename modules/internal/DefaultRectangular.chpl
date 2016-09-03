@@ -825,6 +825,8 @@ module DefaultRectangular {
       return getDataIndex(ind);
 
     inline proc getDataIndex(ind: rank* idxType) {
+      if (blk(rank) != 1) then
+        halt("non-unit inner multiply used");
       if stridable {
         var sum = origin;
         for param i in 1..rank do
@@ -973,6 +975,8 @@ module DefaultRectangular {
         alias.blk(i) = blk(i) * s;
         alias.str(i) = d.dsiDim(i).stride;
       }
+      if (alias.blk(rank) != 1) then
+        writeln("setting inner mult to non-1");
     }
 
     proc dsiSlice(d: DefaultRectangularDom) {
@@ -1029,6 +1033,8 @@ module DefaultRectangular {
           alias.origin += blk(j) * (args(j) - off(j)) / str(j);
         }
       }
+      if (alias.blk(newRank) != 1) then
+        writeln("non-unit inner mult set up in rank change");
       alias.computeFactoredOffs();
       alias.initShiftedData();
       }

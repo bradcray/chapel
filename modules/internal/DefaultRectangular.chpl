@@ -825,8 +825,8 @@ module DefaultRectangular {
       return getDataIndex(ind);
 
     inline proc getDataIndex(ind: rank* idxType) {
-      if (blk(rank) != 1) then
-        halt("non-unit inner multiply used");
+      //      if (blk(rank) != 1) then
+        //        halt("non-unit inner multiply used");
       if stridable {
         var sum = origin;
         for param i in 1..rank do
@@ -975,8 +975,9 @@ module DefaultRectangular {
         alias.blk(i) = blk(i) * s;
         alias.str(i) = d.dsiDim(i).stride;
       }
-      if (alias.blk(rank) != 1) then
-        writeln("setting inner mult to non-1");
+      //      if (alias.blk(rank) != 1) then
+      //        alias.blk(rank) = 1;
+      //      writeln("setting inner mult to non-1");
     }
 
     proc dsiSlice(d: DefaultRectangularDom) {
@@ -994,17 +995,20 @@ module DefaultRectangular {
         alias.str = str;
         alias.origin = origin;
         for param i in 1..rank {
-          alias.off(i) = d.dsiDim(i).low;
+          //          alias.off(i) = d.dsiDim(i).low;
+          alias.off(i) = off(i);
           // NOTE: Not bothering to check to see if the abs(..) expression
           //  can fit into idxType
-          if str(i) > 0 {
-            alias.origin += blk(i) * (d.dsiDim(i).low - off(i)) / str(i):idxType;
-          } else {
-            alias.origin -= blk(i) * (d.dsiDim(i).low - off(i)) / abs(str(i)):idxType;
-          }
+          //          if str(i) > 0 {
+          //            alias.origin += blk(i) * (d.dsiDim(i).low - off(i)) / str(i):idxType;
+          //          } else {
+          //            alias.origin -= blk(i) * (d.dsiDim(i).low - off(i)) / abs(str(i)):idxType;
+          //          }
         }
-        alias.computeFactoredOffs();
-        alias.initShiftedData();
+        alias.factoredOffs = factoredOffs;
+        //        alias.computeFactoredOffs();
+        alias.shiftedData = shiftedData;
+        //        alias.initShiftedData();
       }
       return alias;
     }
@@ -1033,8 +1037,9 @@ module DefaultRectangular {
           alias.origin += blk(j) * (args(j) - off(j)) / str(j);
         }
       }
-      if (alias.blk(newRank) != 1) then
-        writeln("non-unit inner mult set up in rank change");
+      //      if (alias.blk(newRank) != 1) then
+      //        alias.blk(newRank) = 1;
+        //        writeln("non-unit inner mult set up in rank change");
       alias.computeFactoredOffs();
       alias.initShiftedData();
       }

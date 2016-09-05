@@ -2044,6 +2044,7 @@ module ChapelArray {
     proc reindex(d: domain)
       where isRectangularDom(this.domain) && isRectangularDom(d)
     {
+      halt("Array reindex called");
       if rank != d.rank then
         compilerError("rank mismatch: cannot reindex() from " + rank +
                       " dimension(s) to " + d.rank);

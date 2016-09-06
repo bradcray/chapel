@@ -783,7 +783,7 @@ proc CyclicArr.dsiReindex(d: CyclicDom) {
   coforall i in dom.dist.targetLocDom {
     on dom.dist.targetLocs(i) {
       const locDom = d.getLocDom(i);
-      const locAlias: [locDom.myBlock] => locArr[i].myElems;
+      const ref locAlias = locArr[i].myElems;
       alias.locArr[i] = new LocCyclicArr(eltType=eltType, idxType=idxType,
                                          locDom=locDom, stridable=d.stridable,
                                          rank=rank, myElems=>locAlias);
@@ -817,7 +817,7 @@ proc CyclicArr.dsiLocalSlice(ranges) {
     low(i) = ranges(i).low;
   }
 
-  var A => locArr(dom.dist.targetLocsIdx(low)).myElems((...ranges));
+  ref A = locArr(dom.dist.targetLocsIdx(low)).myElems((...ranges));
   return A;
 }
 
@@ -992,7 +992,7 @@ iter CyclicArr.these(param tag: iterKind, followThis, param fast: bool = false) 
     //
     // TODO: Can myLocArr be used here to simplify things?
     //
-    var chunk => arrSection.myElems(myFollowThis);
+    ref chunk = arrSection.myElems(myFollowThis);
     if arrSection.locale.id == here.id then local {
       for i in chunk do yield i;
     } else {

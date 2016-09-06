@@ -479,8 +479,7 @@ module ChapelLocale {
       // We don't want to be doing unnecessary ref count updates here
       // as they require additional tasks.  We know we don't need them
       // so tell the compiler to not insert them.
-      pragma "no copy" pragma "no auto destroy"
-      const origLocales => (origRootLocale:RootLocale).getDefaultLocaleArray();
+      const ref origLocales = (origRootLocale:RootLocale).getDefaultLocaleArray();
       var origRL = origLocales._value.theData;
       var newRL = newRootLocale.getDefaultLocaleArray()._value.theData;
       // We must directly implement a bulk copy here, as the mechanisms

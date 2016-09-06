@@ -1946,7 +1946,7 @@ module ChapelArray {
       if (_value.locale != here) then
         halt("Attempting to take a local slice of an array on locale ",
              _value.locale.id, " from locale ", here.id);
-      var A => this(d);
+      ref A = this(d);
       return A;
     }
     pragma "no doc"

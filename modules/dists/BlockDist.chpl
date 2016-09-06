@@ -1148,7 +1148,7 @@ iter BlockArr.these(param tag: iterKind, followThis, param fast: bool = false) r
     // live on a different locale and require communication for reference
     // counting. Simply put: don't slice inside a local block.
     //
-    var chunk => arrSection.myElems(myFollowThisDom);
+    ref chunk = arrSection.myElems(myFollowThisDom);
     local {
       for i in chunk do yield i;
     }
@@ -1213,7 +1213,7 @@ proc BlockArr.dsiLocalSlice(ranges) {
   for param i in 1..rank {
     low(i) = ranges(i).low;
   }
-  var A => locArr(dom.dist.targetLocsIdx(low)).myElems((...ranges));
+  ref A = locArr(dom.dist.targetLocsIdx(low)).myElems((...ranges));
   return A;
 }
 
@@ -1316,7 +1316,7 @@ proc BlockArr.dsiReindex(d: BlockDom) {
   coforall i in d.dist.targetLocDom {
     on d.dist.targetLocales(i) {
       const locDom = d.getLocDom(i);
-      var locAlias: [locDom.myBlock] => locArr[i].myElems;
+      ref locAlias = locArr[i].myElems;
       alias.locArr[i] = new LocBlockArr(eltType=eltType,
                                         rank=rank, idxType=d.idxType,
                                         stridable=d.stridable,

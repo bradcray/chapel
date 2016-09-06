@@ -674,7 +674,7 @@ proc ReplicatedArr.dsiReindex(sliceDef: ReplicatedDom) {
        slicee.localArrs, result.localArrs) do
     on loc do
      {
-      var locAlias: [sliceDefLocDom.domLocalRep] => sliceeLocArr.arrLocalRep;
+      ref locAlias = sliceeLocArr.arrLocalRep;
       resultLocArr = new LocReplicatedArr(eltType,
         sliceDef.rank, sliceDef.idxType, sliceDef.stridable,
         myDom = sliceDefLocDom,

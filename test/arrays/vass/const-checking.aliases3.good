@@ -1,0 +1,5 @@
+const-checking.aliases.chpl:8: In function 'main':
+const-checking.aliases.chpl:23: error: illegal lvalue in assignment
+const-checking.aliases.chpl:24: error: illegal lvalue in assignment
+const-checking.aliases.chpl:27: error: illegal lvalue in assignment
+const-checking.aliases.chpl:28: error: illegal lvalue in assignment

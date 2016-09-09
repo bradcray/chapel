@@ -268,7 +268,7 @@ buildDefaultWrapper(FnSymbol* fn,
           // before it is passed to the called function.
           wrapper->insertAtTail(new DefExpr(arrayTypeTmp));
           wrapper->insertAtTail(new CallExpr(PRIM_MOVE, arrayTypeTmp, arrayTypeExpr));
-          wrapper->insertAtTail(new CallExpr(PRIM_MOVE, temp, new CallExpr("this", gMethodToken, wrapper_formal, new CallExpr("chpl__getDomainFromArrayType", arrayTypeTmp))));
+          wrapper->insertAtTail(new CallExpr(PRIM_MOVE, temp, new CallExpr("reindex", gMethodToken, wrapper_formal, new CallExpr("chpl__getDomainFromArrayType", arrayTypeTmp))));
         } else {
           // Not an array alias field.  Just initialize this formal with
           // its default type expression.

@@ -33,8 +33,11 @@
 #
 # * cd to the test/ directory (or subdirectory) that you want to test
 #   (typically $CHPL_HOME/test) and run testReleasesPerformance.  As
-#   in a normal test run, this will test all subdirectories under the
-#   cwd.
+#   in a normal start_test run, this will test all subdirectories
+#   under the cwd.  Note that for long-running jobs, you will probably
+#   want to 'nohup' this command, for example:
+#
+#     nohup ../util/pastPerformance/testReleasesPerformance 2>&1 &
 #
 # * the script will then run the current performance tests across all
 #   past releases.

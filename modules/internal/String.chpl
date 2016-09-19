@@ -1717,17 +1717,17 @@ module String {
   // TODO: replace with ordinal()
   //
   /*
-     :returns: The byte value of the first character in `a` as an integer.
+     :returns: The byte value of the character at `offset` in `a` as an integer.
   */
-  inline proc ascii(a: string) : uint(8) {
-    if a.isEmptyString() then return 0;
+  inline proc ascii(a: string, offset: int=0) : uint(8) {
+    if offset >= a.length then return 0;
 
     if _local || a.locale_id == chpl_nodeID {
       // the string must be local so we can index into buff
-      return a.buff[0];
+      return a.buff[offset];
     } else {
       // a[1] grabs the first character as a string (making it local)
-      return a[1].buff[0];
+      return a[1].buff[offset];
     }
   }
 

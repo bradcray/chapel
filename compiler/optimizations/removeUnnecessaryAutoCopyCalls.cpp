@@ -109,8 +109,8 @@ void AutoTrack::move(CallExpr* call) {
   SymExpr* rhs = toSymExpr(call->get(2));
   INT_ASSERT(lhs);
   INT_ASSERT(rhs);
-  Root* r = getRoot(rhs->var);
-  rootMap.put(lhs->var, r);
+  Root* r = getRoot(rhs->symbol());
+  rootMap.put(lhs->symbol(), r);
 }
 
 void AutoTrack::autoCopy(CallExpr* call) {
@@ -120,8 +120,8 @@ void AutoTrack::autoCopy(CallExpr* call) {
   INT_ASSERT(rhs);
   SymExpr* se = toSymExpr(rhs->get(1));
   INT_ASSERT(se);
-  Root* r = getRoot(se->var);
-  rootMap.put(lhs->var, r);
+  Root* r = getRoot(se->symbol());
+  rootMap.put(lhs->symbol(), r);
   insertLink(&r->copyHead, call);
   if (r->refCnt >= 0)
     r->refCnt++;
@@ -130,7 +130,7 @@ void AutoTrack::autoCopy(CallExpr* call) {
 void AutoTrack::autoDestroy(CallExpr* call) {
   SymExpr* se = toSymExpr(call->get(1));
   INT_ASSERT(se);
-  Root* r = getRoot(se->var);
+  Root* r = getRoot(se->symbol());
   insertLink(&r->destHead, call);
   if (r->refCnt >= 0)
     r->refCnt--;
@@ -237,7 +237,7 @@ static void removeUnnecessaryAutoCopyCalls(FnSymbol* fn) {
                 INT_ASSERT(rhs->argList.head);
                 SymExpr* se = toSymExpr(call->get(1));
                 // Do not remove necessary autoCopies!
-                if (!se->var->hasFlag(FLAG_NECESSARY_AUTO_COPY))
+                if (!se->symbol()->hasFlag(FLAG_NECESSARY_AUTO_COPY))
                   track.autoCopy(call);
               }
             }
@@ -251,7 +251,7 @@ static void removeUnnecessaryAutoCopyCalls(FnSymbol* fn) {
             SymExpr* se = toSymExpr(call->get(1));
             // Global/module-level symbols have lifetimes larger than function
             // scope, so we ignore them here.
-            if (se->var->defPoint->parentSymbol == fn)
+            if (se->symbol()->defPoint->parentSymbol == fn)
               track.autoDestroy(call);
           }
         }
@@ -292,7 +292,7 @@ static void removePODinitDestroy()
     {
       // We expect both initCopy and autoCopy functions to have one argument
       // whose type is the same as the return type.
-      INT_ASSERT(fn->numFormals() == 1);
+      INT_ASSERT(fn->numFormals() >= 1);
 
       if (fn->getFormal(1)->type != fn->retType)
         // In some cases, the autoCopy function has a different return type than
@@ -345,6 +345,8 @@ void removeUnnecessaryAutoCopyCalls() {
   // primitive types
   //
   removePODinitDestroy();
+
+  return; // TODO -- delete more in removeUnnecessaryAutoCopyCalls.
 
   //
   // remove matched pairs of autoCopy and autoDestroy calls marked with the

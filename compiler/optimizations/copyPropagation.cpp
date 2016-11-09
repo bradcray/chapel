@@ -189,11 +189,11 @@ static void extractReferences(Expr* expr,
     if (call->isPrimitive(PRIM_MOVE) || call->isPrimitive(PRIM_ASSIGN))
     {
       SymExpr* lhe = toSymExpr(call->get(1)); // Left-Hand Expression
-      Symbol* lhs = lhe->var; // Left-Hand Symbol
+      Symbol* lhs = lhe->symbol(); // Left-Hand Symbol
 
       if (SymExpr* rhe = toSymExpr(call->get(2))) // Right-Hand Expression
       {
-        Symbol* rhs = rhe->var; // Right-Hand Symbol
+        Symbol* rhs = rhe->symbol(); // Right-Hand Symbol
 
         if (lhs->isRef() &&
             rhs->isRef())
@@ -204,7 +204,7 @@ static void extractReferences(Expr* expr,
           RefMap::iterator refDef = refs.find(rhs);
           // Refs can come from outside the function (e.g. through arguments),
           // so are not necessarily defined within the function.
-          if (refDef != refs.end())
+          if (refDef != refs.end() && refDef->second != NULL)
           {
             Symbol* val = refDef->second;
 #if DEBUG_CP
@@ -213,6 +213,16 @@ static void extractReferences(Expr* expr,
                      lhs->name, lhs->id, val->name, val->id);
 #endif
             refs.insert(RefMapElem(lhs, val));
+          } else {
+#if DEBUG_CP
+            if (debug > 0) {
+              printf("Setting pair to NULL: %s[%d]\n", lhs->name, lhs->id);
+            }
+#endif
+            // If we can't reason about this usage of a reference, mark its
+            // corresponding value with NULL to indicate that nothing should
+            // happen.
+            refs[lhs] = NULL;
           }
         }
       }
@@ -224,14 +234,24 @@ static void extractReferences(Expr* expr,
           SymExpr* rhe = toSymExpr(rhc->get(1));
 
           // Create the pair lhs <- &rhs.
-          Symbol* lhs = lhe->var;
-          Symbol* rhs = rhe->var;
+          Symbol* lhs = lhe->symbol();
+          Symbol* rhs = rhe->symbol();
+
+          RefMap::iterator refDef = refs.find(lhs);
+          if (refDef != refs.end()) {
+            // Multiple ADDR_OFs. Make the value NULL to indicate that we cannot
+            // replace this reference.
+            refs[lhs] = NULL;
+          } else {
 #if DEBUG_CP
-          if (debug > 0)
-            printf("Creating ref (%s[%d], %s[%d])\n",
-                   lhs->name, lhs->id, rhs->name, rhs->id);
+            if (debug > 0)
+              printf("Creating ref (%s[%d], %s[%d])\n",
+                     lhs->name, lhs->id, rhs->name, rhs->id);
 #endif
-          refs.insert(RefMapElem(lhs, rhs));
+            refs.insert(RefMapElem(lhs, rhs));
+          }
+        } else {
+          refs[lhs] = NULL;
         }
       }
     }
@@ -273,7 +293,7 @@ static bool isDef(SymExpr* se)
   if (FnSymbol* fn = call->isResolved())
   {
     // Skip the "base" symbol.
-    if (se->var == fn)
+    if (se->symbol() == fn)
       return false;
 
     ArgSymbol* arg = actual_to_formal(se);
@@ -366,7 +386,7 @@ static bool isUse(SymExpr* se)
   if (FnSymbol* fn = call->isResolved())
   {
     // Skip the "base" symbol.
-    if (se->var == fn)
+    if (se->symbol() == fn)
       return false;
 
     // A "normal" call.
@@ -474,7 +494,7 @@ static bool isRefUse(SymExpr* se)
   if (FnSymbol* fn = call->isResolved())
   { // A "normal" call.
     // Skip the "base" symbol.
-    if (se->var == fn)
+    if (se->symbol() == fn)
       return false;
 
     if (se->typeInfo()->symbol->hasFlag(FLAG_REF))
@@ -565,8 +585,8 @@ static Expr* derefUse(SymExpr* se)
   CallExpr* call = toCallExpr(se->parentExpr);
   if (call->isPrimitive(PRIM_DEREF))
     return call;
-  if (isDerefMove(call)) {
-    return call->get(2);
+  if (isDerefMove(call) && se == call->get(2)) {
+    return se;
   }
   return NULL;
 }
@@ -586,7 +606,7 @@ static void propagateCopies(std::vector<SymExpr*>& symExprs,
     if (isUse(se))
     {
       // See if there is an (alias,def) pair.
-      AvailableMap::iterator alias_def_pair = available.find(se->var);
+      AvailableMap::iterator alias_def_pair = available.find(se->symbol());
       // If so, replace the alias with its definition.
       if (alias_def_pair != available.end())
       {
@@ -597,7 +617,7 @@ static void propagateCopies(std::vector<SymExpr*>& symExprs,
                  alias_def_pair->second->name, alias_def_pair->second->id);
 #endif
         INT_ASSERT(alias_def_pair->first != alias_def_pair->second);
-        se->var = alias_def_pair->second;
+        se->setSymbol(alias_def_pair->second);
         ++s_repl_count;
       }
     }
@@ -606,7 +626,7 @@ static void propagateCopies(std::vector<SymExpr*>& symExprs,
     // replacements in case the reference is used to modify the symbol's data.
     if (CallExpr* parent = toCallExpr(se->parentExpr)) {
       if (parent->isPrimitive(PRIM_ADDR_OF)) {
-        AvailableMap::iterator ami = available.find(se->var);
+        AvailableMap::iterator ami = available.find(se->symbol());
         if (ami != available.end()) {
           available.erase(ami);
         }
@@ -620,8 +640,8 @@ static void propagateCopies(std::vector<SymExpr*>& symExprs,
     if (call && (call == se || call == se->parentExpr))
     {
       // See if there is a (ref,def) pair.
-      RefMap::iterator ref_def_pair = refs.find(se->var);
-      if (ref_def_pair != refs.end())
+      RefMap::iterator ref_def_pair = refs.find(se->symbol());
+      if (ref_def_pair != refs.end() && ref_def_pair->second != NULL)
       {
 #if DEBUG_CP
         if (debug > 0)
@@ -698,14 +718,14 @@ static void removeKilledSymbols(std::vector<SymExpr*>& symExprs,
       continue;
 
     if (isDef(se))
-      removeAvailable(available, ravailable, se->var);
+      removeAvailable(available, ravailable, se->symbol());
 
     if (isRefUse(se))
     {
       // If se is a reference and is used in a way that it may be assigned,
       // the thing to which it refers is invalidated, as well as anything
       // that thing could refer to ad infinitum.
-      Symbol* cont = se->var;
+      Symbol* cont = se->symbol();
       while (true)
       {
         RefMap::iterator refDef = refs.find(cont);
@@ -725,12 +745,12 @@ static bool maybeVolatile(SymExpr* se)
   // Compile-time constants (immediates) have immutable values.
   // Expression folding should have turned all params into immediates before
   // this pass.
-  if (isVarSymbol(se->var) && toVarSymbol(se->var)->immediate)
+  if (isVarSymbol(se->symbol()) && toVarSymbol(se->symbol())->immediate)
     return false;
 
   // If the symbol is declared as "concurrently accessed" then it is definitely
   // volatile.
-  if (se->var->hasFlag(FLAG_CONCURRENTLY_ACCESSED))
+  if (se->symbol()->hasFlag(FLAG_CONCURRENTLY_ACCESSED))
     return true;
 
   // If the symbol is not defined in this function, then it is in a shared
@@ -741,7 +761,7 @@ static bool maybeVolatile(SymExpr* se)
   // The function containing the SymExpr referencing the variable.
   Symbol* fn = se->parentSymbol; 
   // Where the variable is defined.
-  Symbol* defScope = se->var->defPoint->parentSymbol;
+  Symbol* defScope = se->symbol()->defPoint->parentSymbol;
   if (defScope != fn)
     return true;
 
@@ -760,11 +780,11 @@ static void extractCopies(Expr* expr,
     if (call->isPrimitive(PRIM_MOVE) || call->isPrimitive(PRIM_ASSIGN))
     {
       SymExpr* lhe = toSymExpr(call->get(1)); // Left-Hand Expression
-      Symbol* lhs = lhe->var; // Left-Hand Symbol
+      Symbol* lhs = lhe->symbol(); // Left-Hand Symbol
 
       if (SymExpr* rhe = toSymExpr(call->get(2))) // Right-Hand Expression
       {
-        Symbol* rhs = rhe->var; // Right-Hand Symbol
+        Symbol* rhs = rhe->symbol(); // Right-Hand Symbol
 
         // We would like assume there are no trivial assignments in the tree.
         // INT_ASSERT(lhs != rhs);
@@ -961,13 +981,13 @@ static void computeKillSets(FnSymbol* fn,
       {
         // Invalidate a symbol if it is redefined.
         if (isDef(se))
-          killSet.insert(se->var);
+          killSet.insert(se->symbol());
 
         // Invalidate a symbol if it may be changed through the use of a
         // reference.
         if (isRefUse(se))
         {
-          Symbol* cont = se->var;
+          Symbol* cont = se->symbol();
           while (true)
           {
             RefMap::iterator refDef = refs.find(cont);
@@ -1392,7 +1412,7 @@ size_t singleAssignmentRefPropagation(FnSymbol* fn) {
       if (CallExpr* move = findRefDef(defMap, var)) {
         if (SymExpr* rhs = toSymExpr(move->get(2))) {
           // If it is defined from another reference, these two are mutual aliases.
-          if (isReferenceType(rhs->var->type)) {
+          if (isReferenceType(rhs->symbol()->type)) {
             // Replace each use of the new name with the old name.
             for_uses(se, useMap, var) {
               if (se->parentExpr) {

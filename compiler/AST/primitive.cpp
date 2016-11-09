@@ -23,6 +23,7 @@
 #include "iterator.h"
 #include "stringutil.h"
 #include "type.h"
+#include "resolution.h"
 
 static QualifiedType
 returnInfoUnknown(CallExpr* call) {
@@ -84,10 +85,12 @@ returnInfoInt64(CallExpr* call) {
   return QualifiedType(dtInt[INT_SIZE_64], QUAL_VAL);
 }
 
+/*
 static QualifiedType
 returnInfoUInt64(CallExpr* call) {
   return QualifiedType(dtUInt[INT_SIZE_64], QUAL_VAL);
 }
+*/
 
 static QualifiedType
 returnInfoSizeType(CallExpr* call) {
@@ -145,6 +148,10 @@ static QualifiedType
 returnInfoFirstDeref(CallExpr* call) {
   QualifiedType tmp = call->get(1)->qualType();
   Type* type = tmp.type()->getValType();
+  // if it's a tuple, also remove references in the elements
+  if (type->symbol->hasFlag(FLAG_TUPLE)) {
+    type = computeNonRefTuple(type);
+  }
   return QualifiedType(type, QUAL_VAL);
 }
 
@@ -263,7 +270,7 @@ returnInfoGetMember(CallExpr* call) {
   SymExpr* sym = toSymExpr(call->get(2));
   if (!sym)
     INT_FATAL(call, "bad member primitive");
-  VarSymbol* var = toVarSymbol(sym->var);
+  VarSymbol* var = toVarSymbol(sym->symbol());
   if (!var)
     INT_FATAL(call, "bad member primitive");
   if (var->immediate) {
@@ -306,7 +313,7 @@ returnInfoGetMemberRef(CallExpr* call) {
   INT_ASSERT(ct);
   SymExpr* se = toSymExpr(call->get(2));
   INT_ASSERT(se);
-  VarSymbol* var = toVarSymbol(se->var);
+  VarSymbol* var = toVarSymbol(se->symbol());
   INT_ASSERT(var);
   Type* retType = NULL;
   if (Immediate* imm = var->immediate)
@@ -357,7 +364,7 @@ static QualifiedType
 returnInfoVirtualMethodCall(CallExpr* call) {
   SymExpr* se = toSymExpr(call->get(1));
   INT_ASSERT(se);
-  FnSymbol* fn = toFnSymbol(se->var);
+  FnSymbol* fn = toFnSymbol(se->symbol());
   INT_ASSERT(fn);
   return fn->getReturnQualType();
 }
@@ -609,7 +616,7 @@ initPrimitive() {
   // PRIM_WIDE_GET_NODE. It might make sense to keep both of these
   // functions for debugging.
   prim_def(PRIM_WIDE_GET_NODE, "_wide_get_node", returnInfoNodeID, false, true);
-  prim_def(PRIM_WIDE_GET_ADDR, "_wide_get_addr", returnInfoUInt64, false, true);
+  prim_def(PRIM_WIDE_GET_ADDR, "_wide_get_addr", returnInfoCVoidPtr, false, true);
   prim_def(PRIM_IS_WIDE_PTR, "is wide pointer", returnInfoBool);
 
   prim_def(PRIM_ON_LOCALE_NUM, "chpl_on_locale_num", returnInfoLocaleID);

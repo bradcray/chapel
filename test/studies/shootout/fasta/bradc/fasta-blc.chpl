@@ -8,10 +8,14 @@
      Kyle Brady, and Preston Sahabu.
 */
 
+use Time;
+
 config const n = 1000,                   // the length of the generated strings
              lineLength = 60,            // the number of columns in the output
              blockSize = 1024,           // the parallelization granularity
              numTasks = here.maxTaskPar; // the degree of parallelization
+
+config param timings = false;
 
 //
 // Nucleotide definitions
@@ -121,8 +125,9 @@ proc randomMake(desc, nuclInfo: [?D], n) {
     const chunkSize = lineLength*blockSize;
     const nextTask = (tid + 1) % numTasks;
 
-    var line_buff: [0..(lineLength+1)*blockSize+1] int(8);
+    var line_buff: [0..#(lineLength+1)*blockSize] int(8);
     var rands: [0..chunkSize] int/*(32)*/;
+    var randTime, computeTime, ioTime, startTime, stopTime: real;
 
     //
     // TODO: Use some sort of chunking iterator?
@@ -130,6 +135,8 @@ proc randomMake(desc, nuclInfo: [?D], n) {
     //    writef("tid %i writing %i..%i\n", tid, lo, n);
     for i in 1..n by chunkSize*numTasks align (tid*chunkSize+1) {
 
+      if timings then
+        startTime = getCurrentTime();
       const bytes = min(chunkSize, n-i+1);
       //      writef("tid %i doing %i..#%i\n", tid, i, bytes);
 
@@ -144,6 +151,11 @@ proc randomMake(desc, nuclInfo: [?D], n) {
       */
       //      writef("tid %i passing turn to %i\n", tid, (tid+1)%numTasks);
       rngTid$[nextTask] = myTurn + 1;
+
+      if timings {
+        stopTime = getCurrentTime();
+        randTime += stopTime - startTime;
+      }
 
       var col = 0;
       var off = 0;
@@ -170,6 +182,10 @@ proc randomMake(desc, nuclInfo: [?D], n) {
         line_buff[off] = newline;
         off += 1;
       }
+      if timings {
+        startTime = getCurrentTime();
+        computeTime += startTime - stopTime;
+      }
 
 
       //      writeln("tid = ", tid, "bytes = ", bytes, " off = ", off);
@@ -178,9 +194,14 @@ proc randomMake(desc, nuclInfo: [?D], n) {
         stdout.write(line_buff[0..#off]);
         outTid$[nextTask] = myTurn + 1;
       }
+      if timings {
+        stopTime = getCurrentTime();
+        ioTime += stopTime - startTime;
+      }
     }
-    
-    
+
+    if timings then
+      writeln("tid ", tid, ": ", (randTime, computeTime, ioTime));
     
   }
 }

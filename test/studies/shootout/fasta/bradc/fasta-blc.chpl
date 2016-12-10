@@ -12,14 +12,7 @@ config const n = 1000,           // the length of the generated strings
              lineLength = 60,    // the number of columns in the output
              blockSize = 1024;   // the parallelization granularity
 
-//
-// the computational pipeline has 3 distinct stages, so ideally, we'd
-// like to use 3 tasks.  However, if the locale can't support that
-// much parallelism, we'll use a number of tasks equal to its maximum
-// degree of task parallelism to avoid starvation (because we rely on
-// busy-waits which could cause deadlocks otherwise).
-//
-config const numTasks = min(3, here.maxTaskPar);
+config param frames = 3;         // number of pipeline frames to store
 
 
 //
@@ -124,11 +117,6 @@ proc randomMake(desc, nuclInfo, n) {
     cumul_p[i] = 1 + (p*IM):int;
   }
 
-  var randGo, outGo: [0..#numTasks] atomic int;
-
-  randGo.write(1);
-  outGo.write(1);
-
   /*
   for i in 0..#numTasks {
     randGo[i].write(1);
@@ -136,69 +124,110 @@ proc randomMake(desc, nuclInfo, n) {
   }
 */
 
-  coforall tid in 0..#numTasks {
-    const chunkSize = lineLength*blockSize;
-    const nextTask = (tid + 1) % numTasks;
+  const chunkSize = lineLength*blockSize;
 
-    var line_buff: [0..(lineLength+1)*blockSize+1] int(8);
-    var rands: [0..chunkSize] int/*(32)*/;
+  var line_buff: [0..#frames] [0..(lineLength+1)*blockSize-1] int(8);
+  var rands: [0..#frames] [0..chunkSize] int/*(32)*/;
+  var randGo, computeGo, writeGo: [0..#frames] atomic int;
 
-    //
-    // TODO: Use some sort of chunking iterator?
-    //
-    //    writef("tid %i writing %i..%i\n", tid, lo, n);
-    for i in 1..n by chunkSize*numTasks align (tid*chunkSize+1) {
+  randGo.write(1);
+
+  if (here.maxTaskPar < 3) then
+    writef("Warning: This code uses busy waiting and 3 tasks, so may deadlock",
+           " since here.maxTaskPar = %i", here.maxTaskPar);
+
+  cobegin {
+    computeRands();
+    computeLines();
+    writeLines();
+  }
+
+  proc computeRands() {
+    var frame = 0;
+    for i in 1..n by chunkSize {
+      //      stderr.writef("computeRands waiting on frame %i\n", frame);
+      while (randGo[frame].read() != 1) do ;
+      //      stderr.writef("computeRands resetting frame %i\n", frame);
+      randGo[frame].write(0);
 
       const bytes = min(chunkSize, n-i+1);
-      //      writef("tid %i doing %i..#%i\n", tid, i, bytes);
+      getRands(bytes, rands[frame]);
 
-      //      writef("tid %i working on bytes %i\n", tid, bytes);      
-      //      stderr.writef("tid %i waiting for turn to say %i\n", tid, i);
-      while (randGo[tid].read() != i) do ;
-      //      stderr.writef("tid %i got turn\n", tid);
-      getRands(bytes, rands);
-      /*
-      for (r,i) in zip(getRands(bytes, tid), 0..) do
-        rands[i] = r;
-      */
-      //      stderr.writef("tid %i passing turn %i to %i\n", tid, i+1, nextTask);
-      randGo[nextTask].write(i + chunkSize);
+      //      stderr.writef("computeRands writing %i to computeGo[%i]\n", bytes, frame);
+      computeGo[frame].write(bytes);
 
+      frame += 1;
+      frame %= frames;
+    }
+    //    stderr.writef("computeRands writing -1 to computeGo[%i]\n", frame);
+    computeGo[frame].write(-1);
+  }
+
+  proc computeLines() {
+    var frame = 0;
+    while true {
+      //      stderr.writef("computeLines waiting on frame %i\n", frame);
+      var bytes = 0;
+      while bytes == 0 do
+        bytes = computeGo[frame].read();
+      //      stderr.writef("computeLines read %i\n", bytes);
+      if bytes == -1 then break;
+      //      stderr.writef("computeLines resetting frame %i\n", frame);
+      computeGo[frame].write(0);
+      
       var col = 0;
       var off = 0;
+      ref myRands = rands[frame],
+          myBuff = line_buff[frame];
       for i in 0..#bytes {
-        const r = rands[i];
+        const r = myRands[i];
         var ncnt = 1;
         for j in 1..numNucls do
           if r >= cumul_p[j] then
             ncnt += 1;
 
-        line_buff[off] = nuclInfo[ncnt](nucl);
+        myBuff[off] = nuclInfo[ncnt](nucl);
 
         off += 1;
         col += 1;
         if (col == lineLength) {
           col = 0;
-          line_buff[off] = newline;
+          myBuff[off] = newline;
           off += 1;
         }
       }
       if (col != 0) {
-        line_buff[off] = newline;
+        myBuff[off] = newline;
         off += 1;
       }
 
+      //      stderr.writef("computeLines setting writeGo[%i] to 1\n", frame);
+      writeGo[frame].write(off);
 
-      //      writeln("tid = ", tid, "bytes = ", bytes, " off = ", off);
-      {
-        while (outGo[tid].read() != i) do ;
-        stdout.write(line_buff[0..#off]);
-        outGo[nextTask].write(i+chunkSize);
-      }
+      frame += 1;
+      frame %= frames;
     }
-    
-    
-    
+    //    stderr.writef("computeLines setting writeGo[%i] to -1\n", frame);
+    writeGo[frame].write(-1);
+  }
+
+  proc writeLines() {
+    var frame = 0;
+    while true {
+      var off = 0;
+      //      stderr.writef("writeLines waiting on frame %i\n", frame);
+      while off == 0 do
+        off = writeGo[frame].read();
+      if off == -1 then break;
+      //      stderr.writef("writeLines resetting writeGo[%i]\n", frame);
+      writeGo[frame].write(0);
+
+      stdout.write(line_buff[frame][0..#off]);
+
+      //      stderr.writef("writeLines setting randGo[%i] to 1\n", frame);
+      frame = (frame+1)%frames;
+      randGo[frame].write(1);
+    }
   }
 }
 

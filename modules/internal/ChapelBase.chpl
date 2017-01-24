@@ -298,7 +298,7 @@ module ChapelBase {
   //
 
   inline proc _intExpHelp(a: integral, b) where a.type == b.type {
-    if isIntType(b.type) && b < 0 then
+    if b < 0 then
       if a == 0 then
         halt("cannot compute ", a, " ** ", b);
       else if a == 1 then
@@ -1460,8 +1460,11 @@ module ChapelBase {
   inline proc >(a: uint(64), param b: uint(64)) {
     return __primitive(">", a, b);
   }
+  inline proc >(param a: uint(?w), b: uint(w)) param where a == 0 {
+    return false;
+  }
   inline proc >(param a: uint(64), b: uint(64)) {
-    if a == 0 then return false; else return __primitive(">", a, b);
+    return __primitive(">", a, b);
   }
 
   // non-param/non-param
@@ -1473,8 +1476,11 @@ module ChapelBase {
   }
 
   // non-param/param and param/non-param
+  inline proc <(a: uint(?w), param b: uint(w)) param where b == 0 {
+    return false;
+  }
   inline proc <(a: uint(64), param b: uint(64)) {
-    if b == 0 then return false; else return __primitive("<", a, b);
+    return __primitive("<", a, b);
   }
   inline proc <(param a: uint(64), b: uint(64)) {
     return __primitive("<", a, b);
@@ -1490,8 +1496,11 @@ module ChapelBase {
   }
 
   // non-param/param and param/non-param
+  inline proc >=(a: uint(?w), param b: uint(w)) param where b == 0 {
+    return true;
+  }
   inline proc >=(a: uint(64), param b: uint(64)) {
-    if b == 0 then return true; else return __primitive(">=", a, b);
+    return __primitive(">=", a, b);
   }
   inline proc >=(param a: uint(64), b: uint(64)) {
     return __primitive(">=", a, b);
@@ -1510,8 +1519,11 @@ module ChapelBase {
   inline proc <=(a: uint(64), param b: uint(64)) {
     return __primitive("<=", a, b);
   }
+  inline proc <=(param a: uint(?w), b: uint(w)) param where a == 0 {
+    return true;
+  }
   inline proc <=(param a: uint(64), b: uint(64)) {
-    if a == 0 then return true; else return __primitive("<=", a, b);
+    return __primitive("<=", a, b);
   }
 
   proc isClassType(type t) param where t:object return true;

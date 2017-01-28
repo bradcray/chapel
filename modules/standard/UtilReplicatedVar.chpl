@@ -215,12 +215,17 @@ proc rcExample(initVal: ?MyType, newVal: MyType, newLocale: locale): void {
   writeln("\ncollected copies of myRepVar are:\n", collected);
 }
 
+pragma "no doc" // TODO: move to a primer
+proc rcExampleOverLocales(initVal: ?MyType, newVal: MyType, newLocale: locale): void {
+  rcExampleOverLocales(initVal, newVal, newLocale, Locales);
+}
+
 // This is the same as 'rcExample', except the user can provide
 // specific locales to replicate over. The two differences are marked.
 //
 pragma "no doc" // TODO: move to a primer
 proc rcExampleOverLocales(initVal: ?MyType, newVal: MyType, newLocale: locale,
-                          localesToReplicateOver: [] locale = Locales): void {
+                          localesToReplicateOver): void {
   writeln("starting rcExampleOverLocales over ", localesToReplicateOver);
 
   // declare a replicated variable

@@ -100,7 +100,7 @@ class CandidateDomain {
   
   param rank:       int;
   const D:          domain(rank,stridable=true);
-  const flags:      [D] bool;
+  const flags;  // this will be a slice
   const min_width:  rank*int;
   var   signatures: rank*ArrayWrapper;
   

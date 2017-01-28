@@ -133,6 +133,10 @@ proc canResolve(param fname : string) param : bool
 proc canResolve(param fname : string, args ...) param : bool
   return __primitive("call resolves", fname, (...args));
 
+proc canResolveParamArg(param fname: string, param arg) {
+  return __primitive("call resolves", fname, arg);
+}
+
 // TODO -- how can this work with by-name argument passing?
 
 /* Returns true if a method named `fname` taking no arguments

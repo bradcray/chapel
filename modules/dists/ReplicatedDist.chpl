@@ -184,9 +184,19 @@ class ReplicatedDist : BaseDist {
 }
 
 
+proc ReplicatedDist.ReplicatedDist(targetLocales,
+                                   purposeMessage: string = "used to create a ReplicatedDist") {
+  if targetLocales.rank != 1 then
+    compilerError("ReplicatedDist only accepts a 1D targetLocales array");
+  if traceReplicatedDist then
+    writeln("ReplicatedDist constructor over ", targetLocales);
+  _localesCheckHelper(purposeMessage);
+}
+
+
 // constructor: replicate over the given locales
 // (by default, over all locales)
-proc ReplicatedDist.ReplicatedDist(targetLocales: [] locale = Locales,
+proc ReplicatedDist.ReplicatedDist(targetLocales,
                  purposeMessage: string = "used to create a ReplicatedDist")
 {
   if targetLocales.rank != 1 then
@@ -644,27 +654,6 @@ in this.dom.dsiSetIndices(). In our case, that's nothing.
 proc ReplicatedArr.dsiReallocate(d: domain): void {
   if traceReplicatedDist then
     writeln("ReplicatedArr.dsiReallocate ", dom.domRep, " -> ", d, " (no-op)");
-}
-
-// array slicing
-proc ReplicatedArr.dsiSlice(sliceDef: ReplicatedDom) {
-  if traceReplicatedDist then writeln("ReplicatedArr.dsiSlice on ", sliceDef);
-  const slicee = this;
-  const result = new ReplicatedArr(slicee.eltType, sliceDef);
-
-  // ensure sliceDef and slicee are over the same set of locales/targetIds
-  assert(sliceDef.localDoms.domain == slicee.localArrs.domain);
-
-  coforall (loc, sliceDefLocDom, sliceeLocArr, resultLocArr)
-   in zip(sliceDef.dist.targetLocales, sliceDef.localDoms,
-       slicee.localArrs, result.localArrs) do
-    on loc do
-      resultLocArr = new LocReplicatedArr(eltType,
-        sliceDef.rank, sliceDef.idxType, sliceDef.stridable,
-        myDom = sliceDefLocDom,
-        arrLocalRep => sliceeLocArr.arrLocalRep[sliceDefLocDom.domLocalRep]);
-
-  return result;
 }
 
 // array reindexing

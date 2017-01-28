@@ -654,8 +654,8 @@ FnSymbol* instantiateSignature(FnSymbol*  fn,
   //
   // TODO: Can we remove this evaluate where clause altogether?
   //
-  if (newFn->hasFlag(FLAG_GENERIC)     == false &&
-      evaluateWhereClause(newFn, true) == false) {
+  if (newFn->hasFlag(FLAG_GENERIC) == false &&
+      evaluateWhereClause(newFn)   == false) {
     //
     // where clause evaluates to false so cache gVoid as a function
     //
@@ -680,7 +680,7 @@ FnSymbol* instantiateSignature(FnSymbol*  fn,
 }
 
 
-bool evaluateWhereClause(FnSymbol* fn, bool quiet) {
+bool evaluateWhereClause(FnSymbol* fn) {
   if (fn->where) {
     whereStack.add(fn);
 
@@ -693,11 +693,7 @@ bool evaluateWhereClause(FnSymbol* fn, bool quiet) {
     SymExpr* se = toSymExpr(fn->where->body.last());
 
     if (se == NULL) {
-      if (quiet) {
-        return true;
-      } else {
-        USR_FATAL(fn->where, "invalid where clause");
-      }
+      USR_FATAL(fn->where, "invalid where clause");
     }
 
     if (se->symbol() == gFalse) {

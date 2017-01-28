@@ -2583,9 +2583,13 @@ filterConcreteCandidate(Vec<ResolutionCandidate*>& candidates,
     }
   }
 
+  /* We'd like to enable this in order to evaluate where clauses on
+     concrete things:
+
   if (!evaluateWhereClause(currCandidate->fn)) {
     return;
   }
+  */
 
   candidates.add(currCandidate);
 }

@@ -207,6 +207,6 @@ class ArrayViewSliceArr: BaseArr {
     arr.doiBulkTransfer(B, privDom);
   }
 
-  proc isDefaultRectangular() param return true;
+  proc isDefaultRectangular() param return arr.isDefaultRectangular();
 }
 

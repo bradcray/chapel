@@ -3232,8 +3232,8 @@ module ChapelArray {
     //if debugDefaultDistBulkTransfer then writeln("chpl__useBulkTransferStride");
 
     // constraints specific to a particular domain map array type
-    if !a._value.doiCanBulkTransferStride() then return false;
-    if !b._value.doiCanBulkTransferStride() then return false;
+    if !a._value.doiCanBulkTransferStride(a._dom._value) then return false;
+    if !b._value.doiCanBulkTransferStride(b._dom._value) then return false;
     if !a._value.doiUseBulkTransferStride(b) then return false;
 
     return true;
@@ -3243,9 +3243,7 @@ module ChapelArray {
     if a._value.isDefaultRectangular() {
       if b._value.isDefaultRectangular() {
         // implemented in DefaultRectangular
-        a._value.adjustBlkOffStrForNewDomain(a._value.dom, a._value);
-        b._value.adjustBlkOffStrForNewDomain(b._value.dom, b._value);
-        a._value.doiBulkTransferStride(b._value);
+        a._value.doiBulkTransferStride(b._value, a._dom._value);
       }
       else
         // b's domain map must implement this

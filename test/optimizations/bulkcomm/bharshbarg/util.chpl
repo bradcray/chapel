@@ -43,9 +43,10 @@ proc stridedAssign(A : [], sa, B : [], sb, debug=false) {
 
     if debug then writeln(ldom, " = ", right.domain);
 
-    assert(left._value.arr.oneDData);  // fend off multi-ddata
-    assert(right._value.arr.oneDData); // fend off multi-ddata
-    left._value.doiBulkTransferStride(right._value, left._dom._value);
+    // BHARSH TODO: fix this assertion after array views
+    //assert(left._value.arr.oneDData);  // fend off multi-ddata
+    //assert(right._value.arr.oneDData); // fend off multi-ddata
+    left._value.doiBulkTransferStride(right._value, left._value.dom);
 
     var failOut = false,
         failIn  = false;

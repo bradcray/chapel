@@ -2192,47 +2192,9 @@ module ChapelArray {
     pragma "no doc"
     pragma "fn returns aliasing array"
     proc reindex(d: domain)
-      where isRectangularDom(this.domain) && isRectangularDom(d)
     {
-      if rank != d.rank then
-        compilerError("rank mismatch: cannot reindex() from " + rank +
-                      " dimension(s) to " + d.rank);
-
-      // Optimization: Just return an alias of this array when
-      // reindexing to the same domain. We skip same-ness test
-      // if the domain descriptors' types are disjoint.
-      if isSubtype(_value.dom.type, d._value.type) ||
-         isSubtype(d._value.type, _value.dom.type)
-      then
-        if _value.dom:object == d._value:object then
-          return newAlias();
-
-      for param i in 1..rank do
-        if d.dim(i).length != _value.dom.dsiDim(i).length then
-          halt("extent in dimension ", i, " does not match actual");
-
-      // dsiReindex takes ownership of newDist._value.
-      pragma "no auto destroy" var newDist = new dmap(_value.dom.dist.dsiCreateReindexDist(d.dims(),
-                                                                  _value.dom.dsiDims()));
-      // dsiReindex takes ownership of newDom._value.
-      pragma "no auto destroy" var newDom = {(...d.dims())} dmapped newDist;
-      newDom._value._free_when_no_arrs = true;
-      var x = _value.dsiReindex(newDom._value);
-      x._arrAlias = _value;
-      // this doesn't need to lock since we just created the domain d
-      newDom._value.add_arr(x, locking=false);
-      return _newArray(x);
-    }
-
-    // reindex for all non-rectangular domain types.
-    // See above for the rectangular version.
-    pragma "no doc"
-    pragma "fn returns aliasing array"
-    proc reindex(d:domain) {
-      if this.domain != d then
-        halt("Reindexing of non-rectangular arrays is undefined.");
-      // Does this need to call newAlias()?
-      return newAlias();
+      compilerError("Stop reindexing!  Brad doesn't want you to do it!");
+      return this;
     }
 
     pragma "no doc"

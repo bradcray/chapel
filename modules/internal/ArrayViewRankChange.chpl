@@ -158,6 +158,7 @@ class ArrayViewRankChangeArr: BaseArr {
     // TODO: I worry that I'm being too fast and loose with domain
     // records and classes here
     //
+    pragma "no auto destroy"
     var dom = {(...arr.dom.dsiDims())};
     //    writeln("*** dom was: ", dom);
     var j = 1;
@@ -183,10 +184,6 @@ class ArrayViewRankChangeArr: BaseArr {
   }
 
   /*  I don't think these should be needed...
-  proc doiBulkTransferStride(B) {
-    arr.doiBulkTransferStride(B);
-  }
-
   proc dataChunk(x) ref {
     return arr.dataChunk(x);
   }
@@ -242,17 +239,57 @@ class ArrayViewRankChangeArr: BaseArr {
   proc dsiSupportsBulkTransfer() param {
     return arr.dsiSupportsBulkTransfer();
   }
+  proc dsiSupportsBulkTransferInterface() param return true;
 
+  // contiguous transfer support
   proc doiUseBulkTransfer(B) {
     return arr.doiUseBulkTransfer(B);
   }
 
+  proc _appendView(viewDom) {
+    if viewDom.rank != dom.rank then compilerError("Incorrect usage of _appendView.");
+    pragma "no auto destroy" var them = {(...viewDom.dsiDims())};
+    pragma "no auto destroy" var newView = them[{(...dom.dsiDims())}];
+    return chpl_rankChangeConvertDom(newView._value);
+  }
+
   proc doiCanBulkTransfer(viewDom) {
-    return arr.doiCanBulkTransfer(viewDom);
+    return arr.doiCanBulkTransfer(_appendView(viewDom));
   }
 
   proc doiBulkTransfer(B, viewDom) {
-    arr.doiBulkTransfer(B, viewDom);
+    arr.doiBulkTransfer(B, _appendView(viewDom));
+  }
+
+  // Strided transfer support
+  proc doiUseBulkTransferStride(B) {
+    return arr.doiUseBulkTransferStride(B);
+  }
+
+  proc doiCanBulkTransferStride(viewDom) {
+    return arr.doiCanBulkTransferStride(_appendView(viewDom));
+  }
+
+  proc doiBulkTransferStride(B, viewDom) {
+    arr.doiBulkTransferStride(B, _appendView(viewDom));
+  }
+
+  proc isDefaultRectangular() param return arr.isDefaultRectangular();
+
+  proc _getActualArray() {
+    if arr.isSliceArrayView() || arr.isRankChangeArrayView() {
+      return arr._getActualArray();
+    } else {
+      return arr;
+    }
+  }
+
+  proc _getViewDom(viewDom) {
+    if arr.isSliceArrayView() || arr.isRankChangeArrayView() {
+      return arr._getViewDom(_appendView(viewDom));
+    } else {
+      return _appendView(viewDom);
+    }
   }
 }
 

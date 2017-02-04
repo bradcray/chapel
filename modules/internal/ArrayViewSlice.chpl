@@ -128,10 +128,6 @@ class ArrayViewSliceArr: BaseArr {
     arr.doiBulkTransferToDR(B);
   }
 
-  proc doiBulkTransferStride(B, viewDom) {
-    arr.doiBulkTransferStride(B, privDom);
-  }
-
   /*  I don't think these should be needed...
   proc dataChunk(x) ref {
     return arr.dataChunk(x);
@@ -187,26 +183,55 @@ class ArrayViewSliceArr: BaseArr {
   }
   proc dsiSupportsBulkTransferInterface() param return true;
 
+  proc _appendView(viewDom) {
+    if viewDom.rank != dom.rank then compilerError("Incorrect usage of _appendView.");
+    pragma "no auto destroy" var them = {(...viewDom.dsiDims())};
+    pragma "no auto destroy" var ret  = them[{(...dom.dsiDims())}];
+    return ret._value;
+  }
+
+  // contiguous transfer support
+  proc doiCanBulkTransfer(viewDom) {
+    return arr.doiCanBulkTransfer(_appendView(viewDom));
+  }
+
   proc doiUseBulkTransfer(B) {
     return arr.doiUseBulkTransfer(B);
+  }
+
+  proc doiBulkTransfer(B, viewDom) {
+    arr.doiBulkTransfer(B, _appendView(viewDom));
+  }
+
+  // strided transfer support
+  proc doiCanBulkTransferStride(viewDom) {
+    return arr.doiCanBulkTransferStride(_appendView(viewDom));
   }
 
   proc doiUseBulkTransferStride(B) {
     return arr.doiUseBulkTransferStride(B);
   }
 
-  proc doiCanBulkTransfer(viewDom) {
-    return arr.doiCanBulkTransfer(privDom);
-  }
-
-  proc doiCanBulkTransferStride(viewDom) {
-    return arr.doiCanBulkTransferStride(privDom);
-  }
-
-  proc doiBulkTransfer(B, viewDom) {
-    arr.doiBulkTransfer(B, privDom);
+  proc doiBulkTransferStride(B, viewDom) {
+    arr.doiBulkTransferStride(B, _appendView(viewDom));
   }
 
   proc isDefaultRectangular() param return arr.isDefaultRectangular();
+
+  proc _getActualArray() {
+    if arr.isSliceArrayView() || arr.isRankChangeArrayView() {
+      return arr._getActualArray();
+    } else {
+      return arr;
+    }
+  }
+
+  proc _getViewDom(viewDom) {
+    if arr.isSliceArrayView() || arr.isRankChangeArrayView() {
+      return arr._getViewDom(_appendView(viewDom));
+    } else {
+      return _appendView(viewDom);
+    }
+  }
 }
 

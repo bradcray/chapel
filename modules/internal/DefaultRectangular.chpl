@@ -2094,13 +2094,14 @@ module DefaultRectangular {
     // arrays.
     // gbt TODO
     //
-    var actual = if B._value.isSliceArrayView() then B._value.arr else B._value;
+    var actual = if B._value.isSliceArrayView() || B._value.isRankChangeArrayView() then B._value._getActualArray() else B._value;
     return oneDData && actual.oneDData;
   }
 
   proc DefaultRectangularArr.doiBulkTransfer(B, viewDom) {
-    var actual = if B._value.isSliceArrayView() then B._value.arr else B._value;
-    bulkTransferFrom(viewDom, actual, B.domain._value);
+    var actual = if B._value.isSliceArrayView() || B._value.isRankChangeArrayView() then B._value._getActualArray() else B._value;
+    var bdom   = if B._value.isSliceArrayView() || B._value.isRankChangeArrayView() then B._value._getViewDom(B._value.dom) else B._value.dom;
+    bulkTransferFrom(viewDom, actual, bdom);
   }
 
   proc DefaultRectangularArr.bulkTransferFrom(viewDom, B, Bdom) {
@@ -2205,15 +2206,16 @@ module DefaultRectangular {
   TODO: Pull simple runtime implementation up into module code
   */
   proc DefaultRectangularArr.doiBulkTransferStride(B, viewDom) {
-    var actual = if B.isSliceArrayView() then B.arr else B;
+    var actual = if B.isSliceArrayView() || B.isRankChangeArrayView() then B._getActualArray() else B;
+    var bdom   = if B.isSliceArrayView() || B.isRankChangeArrayView() then B._getViewDom(B.dom) else B.dom;
     if (this.dataChunk(0).locale.id != here.id
         && actual.dataChunk(0).locale.id != here.id) {
       if debugDefaultDistBulkTransfer {
         chpl_debug_writeln("BulkTransferStride: Both arrays on different locale, moving to locale of destination: LOCALE", this.dataChunk(0).locale.id);
       }
-      on this.dataChunk(0) do stridedTransferFrom(viewDom, actual, B.dom);
+      on this.dataChunk(0) do stridedTransferFrom(viewDom, actual, bdom);
     } else {
-      stridedTransferFrom(viewDom, actual, B.dom);
+      stridedTransferFrom(viewDom, actual, bdom);
     }
   }
 
@@ -2259,7 +2261,7 @@ module DefaultRectangular {
         if (LOrigDims(li).size == 1) {
           // LHS has a rank change
           LDims(i) = LOrigDims(li);
-          LBlk(i)  = LHS.blk(li) * (LDims(i).stride / LHS.dom.dsiDim(li).stride);
+          LBlk(i)  = LHS.blk(li) * ((LDims(i).stride / LHS.dom.dsiDim(li).stride):idxType);
           LFirst(li) = if LDims(i).stride < 0 then LDims(i).last else LDims(i).first;
           li = max(1, li-1);
 
@@ -2269,7 +2271,7 @@ module DefaultRectangular {
           // RHS has a rank change
           assert(ROrigDims(ri).size == 1, "doiBulkTransferStride called with invalid view domains.");
           RDims(i) = ROrigDims(ri);
-          RBlk(i)  = RHS.blk(ri) * (RDims(i).stride / RHS.dom.dsiDim(ri).stride);
+          RBlk(i)  = RHS.blk(ri) * ((RDims(i).stride / RHS.dom.dsiDim(ri).stride):idxType);
           RFirst(ri) = if RDims(i).stride < 0 then RDims(i).last else RDims(i).first;
           ri = max(1, ri-1);
 
@@ -2279,11 +2281,11 @@ module DefaultRectangular {
       } else {
         // Non-rank-changing case
         LDims(i) = LOrigDims(li);
-        LBlk(i)  = LHS.blk(li) * (LDims(i).stride / LHS.dom.dsiDim(li).stride);
+        LBlk(i)  = LHS.blk(li) * ((LDims(i).stride / LHS.dom.dsiDim(li).stride):idxType);
         LFirst(li) = if LDims(i).stride < 0 then LDims(i).last else LDims(i).first;
 
         RDims(i) = ROrigDims(ri);
-        RBlk(i)  = RHS.blk(ri) * (RDims(i).stride / RHS.dom.dsiDim(ri).stride);
+        RBlk(i)  = RHS.blk(ri) * ((RDims(i).stride / RHS.dom.dsiDim(ri).stride):idxType);
         RFirst(ri) = if RDims(i).stride < 0 then RDims(i).last else RDims(i).first;
 
         li = max(1, li-1);

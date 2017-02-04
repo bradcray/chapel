@@ -54,7 +54,10 @@ int main(int argc, char* argv[]) {
       const int xbase = xelt*bitsPerElt;
       double cr[8] = {xvals[xbase+0], xvals[xbase+1], xvals[xbase+2], xvals[xbase+3],
                       xvals[xbase+4], xvals[xbase+5], xvals[xbase+6], xvals[xbase+7]};
-      double Zr[8], Zi[8], Tr[8], Ti[8];
+      double Zr[8] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, 
+             Zi[8] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, 
+             Tr[8] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+             Ti[8] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
       for (int iter=0; iter<maxIter; iter++) {
         for (int i=0; i<8; i++) {
@@ -74,7 +77,7 @@ int main(int argc, char* argv[]) {
           break;
       }
 
-      eltType buff;
+      eltType buff = 0;
       if (Tr[0] + Ti[0] <= limit)
         buff |= 0x1 << 7;
       if (Tr[1] + Ti[1] <= limit)
@@ -98,6 +101,8 @@ int main(int argc, char* argv[]) {
   printf("P4\n");
   printf("%d %d\n", n, n);
   for (int i=0; i<n*xdimSize; i++) {
-    printf("%d", image[i]);
+    printf("%d ", image[i]);
+    if (i % xdimSize == xdimSize-1)
+      printf("\n");
   }
 }

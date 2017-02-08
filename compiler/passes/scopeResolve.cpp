@@ -35,6 +35,7 @@
 #include "stmt.h"
 #include "stringutil.h"
 #include "symbol.h"
+#include "view.h"
 
 #include <algorithm>
 #include <map>
@@ -1044,6 +1045,15 @@ static void build_constructor(AggregateType* ct) {
     return;
   }
 
+  bool print = false;
+  
+  if (strcmp(ct->symbol->name, "C") == 0) {
+    print = true;
+  }
+
+  if (print)
+    printf("Building constructor for %s\n", ct->symbol->name);
+  
   // Create the default constructor function symbol,
   FnSymbol* fn = new FnSymbol(astr("_construct_", ct->symbol->name));
 
@@ -1079,6 +1089,8 @@ static void build_constructor(AggregateType* ct) {
   for_fields(tmp, ct) {
     SET_LINENO(tmp);
     if (VarSymbol* field = toVarSymbol(tmp)) {
+      if (print)
+        printf("...field %s\n", tmp->name);
       // Filter inherited fields and other special cases.
       // "outer" is used internally to supply a pointer to
       // the outer parent of a nested class.
@@ -1087,6 +1099,8 @@ static void build_constructor(AggregateType* ct) {
           strcmp(field->name, "outer")) {
         // Create an argument to the default constructor
         // corresponding to the field.
+        if (print)
+          list_view(field->defPoint);
         ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, field->name, field->type);
 
         fieldArgMap[field] = arg;
@@ -1194,6 +1208,9 @@ static void build_constructor(AggregateType* ct) {
     if (fieldArgMap.count(field) == 0)
       continue;
 
+    if (print)
+      printf("On second pass\n");
+    
     ArgSymbol* arg = fieldArgMap[field];
 
     SET_LINENO(field);
@@ -1216,6 +1233,8 @@ static void build_constructor(AggregateType* ct) {
     }
 
     if (init) {
+      if (print)
+        printf("In init branch\n");
       if (!field->isType() && !exprType) {
         // init && !exprType
         VarSymbol* tmp = newTemp();
@@ -1236,25 +1255,46 @@ static void build_constructor(AggregateType* ct) {
     } else if (hadType &&
                !field->isType() &&
                !field->hasFlag(FLAG_PARAM)) {
+      if (print)
+        printf("In hadType branch\n");
       init = new CallExpr(PRIM_INIT, exprType->copy());
     }
 
 
     if (!field->isType() && !field->hasFlag(FLAG_PARAM)) {
       if (hadType) {
+        if (print)
+          printf("In createFieldDefault branch\n");
         init = new CallExpr("_createFieldDefault", exprType->copy(), init);
-      } else if (init)
+        if (print)
+          list_view(init);
+      } else if (init) {
+        if (print)
+          printf("In chpl__initCopy branch\n");
         init = new CallExpr("chpl__initCopy", init);
+      }
     }
 
     if (exprType) {
-      if (!isBlockStmt(exprType))
-        arg->typeExpr = new BlockStmt(exprType, BLOCK_TYPE);
-      else
+      if (!isBlockStmt(exprType)) {
+        if (print)
+          printf("In new BlockStmt branch\n");
+        if (print)
+          list_view(exprType);
+        //        if (print) {
+        //          arg->typeExpr = buildFormalArrayType();
+        //        } else
+          arg->typeExpr = new BlockStmt(exprType, BLOCK_TYPE);
+      } else {
+        if (print)
+          printf("In toBlockStmt branch\n");
         arg->typeExpr = toBlockStmt(exprType);
+      }
     }
 
     if (init) {
+      if (print)
+        printf("In init branch\n");
       if (hadInit)
         arg->defaultExpr = new BlockStmt(init, BLOCK_SCOPELESS);
       else {
@@ -1263,12 +1303,15 @@ static void build_constructor(AggregateType* ct) {
       }
     }
 
-    if (field->isType())
+    if (field->isType()) {
+      if (print)
+        printf("In isType() branch\n");
       // Args with this flag are removed after resolution.
       // Note that in the default type constructor, this flag is also applied
       // (along with FLAG_GENERIC) to arguments whose type is unknown, but would
       // not be pruned in resolution.
       arg->addFlag(FLAG_TYPE_VARIABLE);
+    }
 
     if (!exprType && arg->type == dtUnknown)
       arg->type = dtAny;
@@ -1276,12 +1319,15 @@ static void build_constructor(AggregateType* ct) {
     fn->insertFormalAtTail(arg);
 
     if (arg->type == dtAny && !arg->hasFlag(FLAG_TYPE_VARIABLE) &&
-        !arg->hasFlag(FLAG_PARAM) && !ct->symbol->hasFlag(FLAG_REF))
+        !arg->hasFlag(FLAG_PARAM) && !ct->symbol->hasFlag(FLAG_REF)) {
+      if (print)
+        printf("In dtAny\n");
       fn->insertAtTail(new CallExpr(PRIM_SET_MEMBER, 
                                     fn->_this, 
                                     new_CStringSymbol(arg->name),
                                     new CallExpr("chpl__initCopy", arg)));
-    else
+    }
+    else {
       // Since we don't copy the argument before stuffing it in a field,
       // we will have to remove the autodestroy flag for specific cases.
       // Namely, if the function is a default constructor and the target
@@ -1292,6 +1338,10 @@ static void build_constructor(AggregateType* ct) {
                                     fn->_this, 
                                     new_CStringSymbol(arg->name),
                                     arg));
+      if (print)
+        printf("In else\n");
+
+    }
   }
 
   if (meme)

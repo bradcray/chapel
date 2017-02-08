@@ -103,7 +103,8 @@ void normalize() {
     SET_LINENO(fn);
 
     if (fn->hasFlag(FLAG_TYPE_CONSTRUCTOR)    == false &&
-        fn->hasFlag(FLAG_DEFAULT_CONSTRUCTOR) == false) {
+        (fn->hasFlag(FLAG_DEFAULT_CONSTRUCTOR) == false ||
+         (strcmp(fn->name, "_construct_C") == 0))) {
       fixup_array_formals(fn);
     }
 
@@ -1567,14 +1568,22 @@ static void hack_resolve_types(ArgSymbol* arg) {
 // w.r.t. generic argument types should be done during expansion and resolution,
 // not up front like this. <hilde>
 static void fixup_array_formals(FnSymbol* fn) {
+  bool print = false;
+  if (strcmp(fn->name, "_construct_C") == 0 ||
+      strcmp(fn->name, "C") == 0)
+    print = true;
   for_formals(arg, fn) {
     INT_ASSERT(toArgSymbol(arg));
+    if (print)
+      printf("considering arg %s\n", arg->name);
     if (arg->typeExpr) {
       // The argument has a type expression
       CallExpr* call = toCallExpr(arg->typeExpr->body.tail);
       // Not sure why we select the tail here....
 
       if (call && call->isNamed("chpl__buildArrayRuntimeType")) {
+        if (print)
+          printf("fixing up array arg %s\n", arg->name);
         // We are building an array type.
         bool noDomain = (isSymExpr(call->get(1))) ?  toSymExpr(call->get(1))->symbol() == gNil : false;
         DefExpr* queryDomain = toDefExpr(call->get(1));

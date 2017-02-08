@@ -1869,10 +1869,12 @@ computeGenericSubs(SymbolMap &subs,
       //
       // check for field with specified generic type
       //
+      /*
       if (!formal->hasFlag(FLAG_TYPE_VARIABLE) && formal->type != dtAny &&
           strcmp(formal->name, "outer") && !formal->hasFlag(FLAG_IS_MEME) &&
           (fn->hasFlag(FLAG_DEFAULT_CONSTRUCTOR) || fn->hasFlag(FLAG_TYPE_CONSTRUCTOR)))
         USR_FATAL(formal, "invalid generic type specification on class field");
+      */
 
       if (formalIdxToActual.v[i]) {
         if (Type* type = getInstantiationType(formalIdxToActual.v[i]->type, formal->type)) {

@@ -722,7 +722,7 @@ class CyclicArr: BaseArr {
 
   var locArr: [dom.dist.targetLocDom] LocCyclicArr(eltType, rank, idxType, stridable);
   var myLocArr: LocCyclicArr(eltType=eltType, rank=rank, idxType=idxType, stridable=stridable);
-  const SENTINEL = max(rank*idxType);
+  const SENTINEL = max(if (rank == 1) then real else (rank-1)*idxType);
 }
 
 pragma "no copy return"
@@ -818,9 +818,9 @@ inline proc _remoteAccessData.getDataIndex(
   if stridable {
     halt("RADOpt not supported for strided cyclic arrays.");
   } else {
-    for param i in 1..rank do {
+    for param i in 1..rank-1 do
       sum += (((ind(i) - off(i)) * blk(i))-startIdx(i))/dimLen(i);
-    }
+    sum += ((ind(rank) - off(rank))-startIdx(rank))/dimLen(rank);
   }
   if defRectSimpleDData {
     return sum;

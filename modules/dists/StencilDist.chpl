@@ -325,7 +325,7 @@ class StencilArr: BaseArr {
   var dom: StencilDom(rank, idxType, stridable, ignoreFluff);
   var locArr: [dom.dist.targetLocDom] LocStencilArr(eltType, rank, idxType, stridable);
   var myLocArr: LocStencilArr(eltType, rank, idxType, stridable);
-  const SENTINEL = max(rank*idxType);
+  const SENTINEL = max(if (rank == 1) then real else (rank-1)*idxType);
 }
 
 //

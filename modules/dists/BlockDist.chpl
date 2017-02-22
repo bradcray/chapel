@@ -383,7 +383,7 @@ class BlockArr: BaseArr {
   var dom: BlockDom(rank, idxType, stridable, sparseLayoutType);
   var locArr: [dom.dist.targetLocDom] LocBlockArr(eltType, rank, idxType, stridable);
   var myLocArr: LocBlockArr(eltType, rank, idxType, stridable);
-  const SENTINEL = max(rank*idxType);
+  const SENTINEL = max(if (rank == 1) then real else (rank-1)*idxType);
 }
 
 //
@@ -1070,8 +1070,9 @@ inline proc _remoteAccessData.getDataIndex(param stridable, ind: rank*idxType) {
   // modified from DefaultRectangularArr.getDataIndex
   if stridable {
     var sum = origin;
-    for param i in 1..rank do
+    for param i in 1..rank-1 do
       sum += (ind(i) - off(i)) * blk(i) / abs(str(i)):idxType;
+    sum += (ind(rank) - off(rank)) / abs(str(rank)):idxType;
     if defRectSimpleDData then {
       return sum;
     } else {
@@ -1084,8 +1085,9 @@ inline proc _remoteAccessData.getDataIndex(param stridable, ind: rank*idxType) {
     }
   } else {
     var sum = if earlyShiftData then 0:idxType else origin;
-    for param i in 1..rank do
+    for param i in 1..rank-1 do
       sum += ind(i) * blk(i);
+    sum += ind(rank);
     if !earlyShiftData then sum -= factoredOffs;
     if defRectSimpleDData {
       return sum;

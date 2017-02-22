@@ -643,7 +643,8 @@ module DefaultRectangular {
     param stridable: bool;
 
     var off: rank*idxType;
-    var blk: rank*idxType;
+    //    var blk: (max(rank-1),1)*idxType; // TODO: make this void if rank == 1
+    var blk: if (rank == 1) then real else (rank-1)*idxType;
     var str: rank*chpl__signedType(idxType);
     var origin: idxType;
     var factoredOffs: idxType;
@@ -756,7 +757,8 @@ module DefaultRectangular {
     var dom : DefaultRectangularDom(rank=rank, idxType=idxType,
                                            stridable=stridable);
     var off: rank*idxType;
-    var blk: rank*idxType;
+    //    var blk: (max(rank-1,1))*idxType;  // TODO: make this void if rank == 1
+    var blk: if (rank == 1) then real else (rank-1)*idxType;
     var str: rank*idxSignedType;
     var origin: idxType;
     var factoredOffs: idxType;
@@ -1201,8 +1203,8 @@ module DefaultRectangular {
     }
 
     proc computeFactoredOffs() {
-      factoredOffs = 0:idxType;
-      for param i in 1..rank do {
+      factoredOffs = off(rank):idxType;
+      for param i in 1..rank-1 do {
         factoredOffs = factoredOffs + blk(i) * off(i);
       }
     }
@@ -1240,11 +1242,14 @@ module DefaultRectangular {
         off(dim) = dom.dsiDim(dim).alignedLow;
         str(dim) = dom.dsiDim(dim).stride;
       }
-      blk(rank) = 1:idxType;
-      for param dim in 1..(rank-1) by -1 do
-        blk(dim) = blk(dim+1) * dom.dsiDim(dim+1).length;
+      var size = dom.dsiDim(1).length;
+      if (rank > 1) {
+        blk(rank-1) = dom.dsiDim(rank).length;
+        for param dim in 1..(rank-2) by -1 do
+          blk(dim) = blk(dim+1) * dom.dsiDim(dim+1).length;
+        size *= blk(1);
+      }
       computeFactoredOffs();
-      var size = blk(1) * dom.dsiDim(1).length;
 
       if defRectSimpleDData {
         data = _ddata_allocate(eltType, size);
@@ -1358,8 +1363,9 @@ module DefaultRectangular {
         }
 
         var sum = origin;
-        for param i in 1..rank do
+        for param i in 1..rank-1 do
           sum += (ind(i) - off(i)) * blk(i) / abs(str(i)):idxType;
+        sum += (ind(rank) - off(rank)) / abs(str(rank)):idxType;
         if chunkify then
           return chunked_dataIndex(sum, str=abs(str(mdParDim)):idxType);
         else
@@ -1878,10 +1884,11 @@ module DefaultRectangular {
     if debugDefaultDistBulkTransfer then
       chpl_debug_writeln("isDataContiguous(): origin=", origin, " off=", off, " blk=", blk);
 
-    if blk(rank) != 1 then return false;
-
-    for param dim in 1..(rank-1) by -1 do
-      if blk(dim) != blk(dim+1)*dom.dsiDim(dim+1).length then return false;
+    if (rank > 1) {
+      if blk(rank-1) != dom.dsiDim(rank).length then return false;
+      for param dim in 1..(rank-2) by -1 do
+        if blk(dim) != blk(dim+1)*dom.dsiDim(dim+1).length then return false;
+    }
 
     // Strictly speaking a multi-ddata array isn't contiguous, but
     // nevertheless we do support bulk transfer on such arrays, so
@@ -2107,8 +2114,10 @@ module DefaultRectangular {
       if RViewDims(ri).size == 1 && ri > idx {
         while RViewDims(ri).size == 1 && ri > idx do ri -= 1;
       }
-      LBlk(idx) = LHS.blk(li) * (LViewDims(li).stride / LHS.dom.dsiDim(li).stride):idxType;
-      RBlk(idx) = RHS.blk(ri) * (RViewDims(ri).stride / RHS.dom.dsiDim(ri).stride):idxType;
+      const lblk = if (LHS.rank == 1) || (li == LHS.rank) then 1:idxType else LHS.blk(li);
+      LBlk(idx) = lblk * (LViewDims(li).stride / LHS.dom.dsiDim(li).stride):idxType;
+      const rblk = if (RHS.rank == 1) || (ri == RHS.rank) then 1:idxType else RHS.blk(ri);
+      RBlk(idx) = rblk * (RViewDims(ri).stride / RHS.dom.dsiDim(ri).stride):idxType;
       li -= 1;
       ri -= 1;
     }

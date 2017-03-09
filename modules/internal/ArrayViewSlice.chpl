@@ -84,8 +84,8 @@ module ArrayViewSlice {
     //
 
     iter these() ref {
-      for i in privDom do
-        yield arr.dsiAccess(i);
+      for elem in chpl__serialDRiterWithDom(privDom) do
+        yield elem;
     }
 
     iter these(param tag: iterKind) ref

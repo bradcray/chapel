@@ -1267,6 +1267,15 @@ module DefaultRectangular {
       if debugDefaultDist {
         chpl_debug_writeln("*** In defRectArr simple-dd serial iterator");
       }
+      for elem in chpl__serialDRiterWithDom(dom) do
+        yield elem;
+    }
+
+    iter chpl__serialDRiterWithDom(dom,
+                                   tasksPerLocale:int = dataParTasksPerLocale,
+                                   ignoreRunning:bool = dataParIgnoreRunningTasks,
+                                   minIndicesPerTask:int = dataParMinGranularity) ref where !defRectSimpleDData {
+
       if rank == 1 {
         // This is specialized to avoid overheads of calling dsiAccess()
         if !dom.stridable {
@@ -1363,6 +1372,14 @@ module DefaultRectangular {
       if debugDefaultDist {
         chpl_debug_writeln("*** In defRectArr multi-dd serial iterator");
       }
+      for elem in chpl__serialDRiterWithDom(dom) do
+        yield elem;
+    }
+
+    iter chpl__serialDRiterWithDom(dom,
+                                   tasksPerLocale:int = dataParTasksPerLocale,
+                                   ignoreRunning:bool = dataParIgnoreRunningTasks,
+                                   minIndicesPerTask:int = dataParMinGranularity) ref where !defRectSimpleDData {
       if rank == 1 {
         if !dom.stridable {
           const first = getDataIndex(dom.dsiLow, getChunked=false);

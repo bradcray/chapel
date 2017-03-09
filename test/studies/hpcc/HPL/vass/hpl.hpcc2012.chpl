@@ -369,8 +369,8 @@ proc schurComplement(blk, AD, BD, Rest) {
 // NB works only when storage indices for sliceDim1,2 are contiguous
 // Each sliceDim1,2 can be either a range or an int
 
-pragma "no copy return"
-proc DimensionalArr.dsiLocalSlice1((sliceDim1, sliceDim2)) {
+
+proc DimensionalArr.dsiLocalSlice1((sliceDim1, sliceDim2)) ref {
   // might be more elegant to replace the explicit arg tuple with 'slice'
   proc toScalar(slice)
     return if isIntegralType(slice.type) then slice else slice.low;

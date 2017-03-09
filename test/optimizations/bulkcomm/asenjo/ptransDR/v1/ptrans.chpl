@@ -23,10 +23,8 @@ record localInfo {
   var A: [domA] elType;
   var B: [domB] elType;
 
-  pragma "no copy return"
-  proc Acompute return A[domA];
-  pragma "no copy return"
-  proc Bcompute return B[domB];
+  proc Acompute ref return A[domA];
+  proc Bcompute ref return B[domB];
 
   var localDelta: elType;
 }

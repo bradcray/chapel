@@ -535,6 +535,7 @@ module ChapelArray {
     if (isArrayType(eltType)) {
       var ev: eltType;
       const refcount = ev.domain._value.remove_containing_arr(arr);
+      writeln("Decrementing reference counts ", refcount);
       if refcount == 0 then
         _delete_dom(ev.domain._value, _isPrivatized(ev.domain._value));
       chpl_decRefCountsForDomainsInArrayEltTypes(arr, ev.eltType);
@@ -959,7 +960,10 @@ module ChapelArray {
     }
 
     proc _do_destroy () {
+      extern proc printf(x...);
+      printf("In do_destroy\n");
       if ! _unowned {
+        printf("owned\n");
         on _instance {
           // Count the number of arrays that refer to this domain,
           // and mark the domain to be freed when that number reaches 0.
@@ -976,9 +980,13 @@ module ChapelArray {
           if distToFree != nil then
             _delete_dist(distToFree, _isPrivatized(inst.dist));
         }
+      } else {
+        printf("unowned\n");
       }
     }
     proc deinit () {
+      extern proc printf(x...);
+      printf("In deinit\n");
       _do_destroy();
     }
 

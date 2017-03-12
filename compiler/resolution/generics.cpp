@@ -36,11 +36,11 @@
 #include <cstdlib>
 #include <inttypes.h>
 
-int                    explainInstantiationLine   = -2;
-ModuleSymbol*          explainInstantiationModule = NULL;
+static int             explainInstantiationLine   = -2;
+static ModuleSymbol*   explainInstantiationModule = NULL;
 static Vec<FnSymbol*>  whereStack;
 
-void
+static void
 explainInstantiation(FnSymbol* fn) {
   if (strcmp(fn->name, fExplainInstantiation) &&
       (strncmp(fn->name, "_construct_", 11) ||
@@ -97,7 +97,7 @@ explainInstantiation(FnSymbol* fn) {
 }
 
 
-void
+static void
 copyGenericSub(SymbolMap& subs, FnSymbol* root, FnSymbol* fn, Symbol* key, Symbol* value) {
   if (!strcmp("_type_construct__tuple", root->name) && key->name[0] == 'x') {
     subs.put(new_IntSymbol(atoi(key->name+1)), value);
@@ -171,7 +171,7 @@ checkInfiniteWhereInstantiation(FnSymbol* fn) {
 // because folding is done via instantiation; therefore, be careful
 // developing in the base module
 //
-void
+static void
 checkInstantiationLimit(FnSymbol* fn) {
   static Map<FnSymbol*,int> instantiationLimitMap;
 
@@ -252,76 +252,6 @@ void renameInstantiatedTypeString(TypeSymbol* sym, VarSymbol* var)
   }
 }
 
-static void
-renameInstantiatedType(TypeSymbol* sym, SymbolMap& subs, FnSymbol* fn) {
-  if (sym->name[strlen(sym->name)-1] == ')') {
-    // avoid "strange" instantiated type names based on partial instantiation
-    //  instead of C(int,real)(imag) this results in C(int,real,imag)
-    char* buf = (char*)malloc(strlen(sym->name) + 1);
-    memcpy(buf, sym->name, strlen(sym->name));
-    buf[strlen(sym->name)-1] = '\0';
-    sym->name = astr(buf, ",");
-    free(buf);
-  } else {
-    sym->name = astr(sym->name, "(");
-  }
-  sym->cname = astr(sym->cname, "_");
-  bool first = false;
-  for_formals(formal, fn) {
-    if (Symbol* value = subs.get(formal)) {
-      if (TypeSymbol* ts = toTypeSymbol(value)) {
-        if (!first && sym->hasFlag(FLAG_TUPLE)) {
-          if (sym->hasFlag(FLAG_STAR_TUPLE)) {
-            sym->name = astr(istr(fn->numFormals()-1), "*", ts->name);
-            sym->cname = astr(sym->cname, "star_", ts->cname);
-            return;
-          } else {
-            sym->name = astr("(");
-          }
-        }
-        if (!sym->hasFlag(FLAG_STAR_TUPLE)) {
-          if (first) {
-            sym->name = astr(sym->name, ",");
-            sym->cname = astr(sym->cname, "_");
-          }
-          sym->name = astr(sym->name, ts->name);
-          sym->cname = astr(sym->cname, ts->cname);
-        }
-        first = true;
-      } else {
-        if (first) {
-          sym->name = astr(sym->name, ",");
-          sym->cname = astr(sym->cname, "_");
-        }
-        VarSymbol* var = toVarSymbol(value);
-        if (var && var->immediate) {
-          Immediate* immediate = var->immediate;
-          if (var->type == dtString || var->type == dtStringC)
-            renameInstantiatedTypeString(sym, var);
-          else if (immediate->const_kind == NUM_KIND_BOOL) {
-            // Handle boolean types specially.
-            const char* name4bool = immediate->bool_value() ? "true" : "false";
-            const char* cname4bool = immediate->bool_value() ? "T" : "F";
-            sym->name = astr(sym->name, name4bool);
-            sym->cname = astr(sym->cname, cname4bool);
-          } else {
-            const size_t bufSize = 128;
-            char imm[bufSize];
-            snprint_imm(imm, bufSize, *var->immediate);
-            sym->name = astr(sym->name, imm);
-            sym->cname = astr(sym->cname, imm);
-          }
-        } else {
-          sym->name = astr(sym->name, value->cname);
-          sym->cname = astr(sym->cname, value->cname);
-        }
-        first = true;
-      }
-    }
-  }
-  sym->name = astr(sym->name, ")");
-}
-
 /** Instantiate a type
  *
  * \param fn   Type constructor we are working on
@@ -392,7 +322,7 @@ instantiateTypeForTypeConstructor(FnSymbol* fn, SymbolMap& subs, CallExpr* call,
     }
   }
 
-  renameInstantiatedType(newType->symbol, subs, fn);
+  newType->symbol->renameInstantiatedMulti(subs, fn);
 
   fn->retType->symbol->defPoint->insertBefore(new DefExpr(newType->symbol));
 
@@ -471,12 +401,7 @@ FnSymbol* instantiateSignature(FnSymbol*  fn,
   //
   // determine root function in the case of partial instantiation
   //
-  FnSymbol* root = fn;
-
-  while (root->instantiatedFrom != NULL &&
-         root->numFormals()     == root->instantiatedFrom->numFormals()) {
-    root = root->instantiatedFrom;
-  }
+  FnSymbol* root = determineRootFunc(fn);
 
   //
   // determine all substitutions (past substitutions in a partial
@@ -484,16 +409,7 @@ FnSymbol* instantiateSignature(FnSymbol*  fn,
   // substitutions to refer to the root function's formal arguments
   //
   SymbolMap all_subs;
-
-  if (fn->instantiatedFrom) {
-    form_Map(SymbolMapElem, e, fn->substitutions) {
-      all_subs.put(e->key, e->value);
-    }
-  }
-
-  form_Map(SymbolMapElem, e, subs) {
-    copyGenericSub(all_subs, root, fn, e->key, e->value);
-  }
+  determineAllSubs(fn, root, subs, all_subs);
 
   //
   // use cached instantiation if possible
@@ -522,13 +438,76 @@ FnSymbol* instantiateSignature(FnSymbol*  fn,
   //
   // instantiate function
   //
-
   SymbolMap map;
 
   if (newType) {
     map.put(fn->retType->symbol, newType->symbol);
   }
 
+  FnSymbol* newFn = instantiateFunction(fn, root, all_subs, call, subs, map);
+
+  if (newType) {
+    newType->defaultTypeConstructor = newFn;
+    newFn->retType                  = newType;
+  }
+  
+  bool fixedTuple = fixupTupleFunctions(fn, newFn, call);
+  // Fix up chpl__initCopy for user-defined records
+  if (!fixedTuple &&
+      fn->hasFlag(FLAG_INIT_COPY_FN) &&
+      fn->hasFlag(FLAG_COMPILER_GENERATED) ) {
+    // Generate the initCopy function based upon initializer
+    fixupDefaultInitCopy(fn, newFn, call);
+  }
+
+  if (newFn->numFormals()       >  1 &&
+      newFn->getFormal(1)->type == dtMethodToken) {
+    newFn->getFormal(2)->type->methods.add(newFn);
+  }
+
+  newFn->tagIfGeneric();
+
+  explainAndCheckInstantiation(newFn, fn);
+
+  return newFn;
+}
+
+//
+// determine root function in the case of partial instantiation
+//
+FnSymbol* determineRootFunc(FnSymbol* fn) {
+  FnSymbol* root = fn;
+
+  while (root->instantiatedFrom != NULL &&
+         root->numFormals()     == root->instantiatedFrom->numFormals()) {
+    root = root->instantiatedFrom;
+  }
+  return root;
+}
+
+  //
+  // determine all substitutions (past substitutions in a partial
+  // instantiation plus the current substitutions) and change the
+  // substitutions to refer to the root function's formal arguments
+  //
+void determineAllSubs(FnSymbol* fn, FnSymbol* root, SymbolMap& subs,
+                      SymbolMap& all_subs) {
+  if (fn->instantiatedFrom) {
+    form_Map(SymbolMapElem, e, fn->substitutions) {
+      all_subs.put(e->key, e->value);
+    }
+  }
+
+  form_Map(SymbolMapElem, e, subs) {
+    copyGenericSub(all_subs, root, fn, e->key, e->value);
+  }
+}
+
+//
+// instantiate function
+//
+FnSymbol* instantiateFunction(FnSymbol* fn, FnSymbol* root, SymbolMap& all_subs,
+                              CallExpr* call, SymbolMap& subs, SymbolMap& map) {
   FnSymbol* newFn = fn->partialCopy(&map);
 
   addCache(genericsCache, root, newFn, &all_subs);
@@ -629,28 +608,10 @@ FnSymbol* instantiateSignature(FnSymbol*  fn,
       }
     }
   }
+  return newFn;
+}
 
-  if (newType) {
-    newType->defaultTypeConstructor = newFn;
-    newFn->retType                  = newType;
-  }
-  
-  bool fixedTuple = fixupTupleFunctions(fn, newFn, call);
-  // Fix up chpl__initCopy for user-defined records
-  if (!fixedTuple &&
-      fn->hasFlag(FLAG_INIT_COPY_FN) &&
-      fn->hasFlag(FLAG_COMPILER_GENERATED) ) {
-    // Generate the initCopy function based upon initializer
-    fixupDefaultInitCopy(fn, newFn, call);
-  }
-
-  if (newFn->numFormals()       >  1 &&
-      newFn->getFormal(1)->type == dtMethodToken) {
-    newFn->getFormal(2)->type->methods.add(newFn);
-  }
-
-  newFn->tagIfGeneric();
-
+void explainAndCheckInstantiation(FnSymbol* newFn, FnSymbol* fn) {
   if (explainInstantiationLine == -2) {
     parseExplainFlag(fExplainInstantiation,
                      &explainInstantiationLine,
@@ -662,10 +623,7 @@ FnSymbol* instantiateSignature(FnSymbol*  fn,
   }
 
   checkInstantiationLimit(fn);
-
-  return newFn;
 }
-
 
 bool evaluateWhereClause(FnSymbol* fn) {
   if (fn->where) {

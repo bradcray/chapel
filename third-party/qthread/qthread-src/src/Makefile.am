@@ -11,7 +11,6 @@ SUBDIRS =
 noinst_HEADERS = affinity/shufflesheps.h
 
 libqthread_la_SOURCES = \
-	aligned_alloc.c \
 	cacheline.c \
 	envariables.c \
 	feb.c \
@@ -30,12 +29,13 @@ libqthread_la_SOURCES = \
 	workers.c \
 	threadqueues/@with_scheduler@_threadqueues.c \
 	sincs/@with_sinc@.c \
+	alloc/@with_alloc@.c \
 	affinity/common.c \
 	affinity/@qthread_topo@.c \
 	touch.c \
 	teams.c
 
-EXTRA_DIST = 
+EXTRA_DIST = alloc/
 
 if COMPILE_LF_HASH
 libqthread_la_SOURCES += lf_hashmap.c

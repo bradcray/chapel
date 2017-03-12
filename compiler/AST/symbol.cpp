@@ -86,6 +86,7 @@ VarSymbol *gFalse = NULL;
 VarSymbol *gTryToken = NULL;
 VarSymbol *gBoundsChecking = NULL;
 VarSymbol *gCastChecking = NULL;
+VarSymbol *gDivZeroChecking = NULL;
 VarSymbol* gPrivatization = NULL;
 VarSymbol* gLocal = NULL;
 VarSymbol* gNodeID = NULL;
@@ -198,6 +199,9 @@ static Qualifier qualifierForArgIntent(IntentTag intent)
     case INTENT_PARAM:     return QUAL_PARAM; // TODO
     case INTENT_TYPE:      return QUAL_UNKNOWN; // TODO
     case INTENT_BLANK:     return QUAL_UNKNOWN;
+    case INTENT_REF_MAYBE_CONST:
+           return QUAL_REF; // a white lie until cullOverReferences
+
     // no default to get compiler warning if other intents are added
   }
   return QUAL_UNKNOWN;
@@ -210,10 +214,13 @@ QualifiedType Symbol::qualType() {
     Qualifier q = qualifierForArgIntent(arg->intent);
     if (qual == QUAL_WIDE_REF && (q == QUAL_REF || q == QUAL_CONST_REF)) {
       q = QUAL_WIDE_REF;
+      // MPF: Should this be CONST_WIDE_REF in some cases?
     }
     ret = QualifiedType(type, q);
   } else {
     ret = QualifiedType(type, qual);
+    if (hasFlag(FLAG_CONST))
+      ret = ret.toConst();
   }
 
   return ret;
@@ -254,11 +261,6 @@ bool Symbol::isRefOrWideRef() {
 // Returns the scope in which the given symbol is declared; NULL otherwise.
 BlockStmt* Symbol::getDeclarationScope() const {
   return (defPoint != NULL) ? defPoint->getScopeBlock() : NULL;
-}
-
-
-FnSymbol* Symbol::getFnSymbol() {
-  return NULL;
 }
 
 
@@ -769,6 +771,7 @@ const char* ArgSymbol::intentDescrString(void) {
     case INTENT_CONST: return "'const'";
     case INTENT_CONST_IN: return "'const in'";
     case INTENT_CONST_REF: return "'const ref'";
+    case INTENT_REF_MAYBE_CONST: return "'const? ref'";
     case INTENT_REF: return "'ref'";
     case INTENT_PARAM: return "'param'";
     case INTENT_TYPE: return "'type'";
@@ -788,6 +791,7 @@ const char* intentDescrString(IntentTag intent) {
     case INTENT_CONST:     return "'const' intent";
     case INTENT_CONST_IN:  return "'const in' intent";
     case INTENT_CONST_REF: return "'const ref' intent";
+    case INTENT_REF_MAYBE_CONST: return "'const? ref' intent";
     case INTENT_REF:       return "'ref' intent";
     case INTENT_PARAM:     return "'param' intent";
     case INTENT_TYPE:      return "'type' intent";
@@ -865,6 +869,97 @@ void TypeSymbol::accept(AstVisitor* visitor) {
 
     visitor->exitTypeSym(this);
   }
+}
+
+void TypeSymbol::renameInstantiatedMulti(SymbolMap& subs, FnSymbol* fn) {
+  renameInstantiatedStart();
+
+  bool notFirst = false;
+  for_formals(formal, fn) {
+    if (Symbol* value = subs.get(formal)) {
+      if (!notFirst) {
+        if (TypeSymbol* ts = toTypeSymbol(value)) {
+          if (this->hasFlag(FLAG_TUPLE)) {
+            if (this->hasFlag(FLAG_STAR_TUPLE)) {
+              this->name = astr(istr(fn->numFormals()-1), "*", ts->name);
+              this->cname = astr(this->cname, "star_", ts->cname);
+              return;
+            } else {
+              this->name = astr("(");
+            }
+          }
+        }
+        notFirst = true;
+      } else {
+        this->name = astr(this->name, ",");
+        this->cname = astr(this->cname, "_");
+      }
+      renameInstantiatedIndividual(value);
+    }
+  }
+
+  renameInstantiatedEnd();
+}
+
+void TypeSymbol::renameInstantiatedSingle(Symbol* sym) {
+  renameInstantiatedStart();
+  if (this->hasFlag(FLAG_TUPLE)) {
+    USR_FATAL(sym, "initializers don't handle tuples yet, sorry!");
+  } else {
+    renameInstantiatedIndividual(sym);
+  }
+  renameInstantiatedEnd();
+}
+
+void TypeSymbol::renameInstantiatedStart() {
+  if (this->name[strlen(this->name)-1] == ')') {
+    // avoid "strange" instantiated type names based on partial instantiation
+    //  instead of C(int,real)(imag) this results in C(int,real,imag)
+    char* buf = (char*)malloc(strlen(this->name) + 1);
+    memcpy(buf, this->name, strlen(this->name));
+    buf[strlen(this->name)-1] = '\0';
+    this->name = astr(buf, ",");
+    free(buf);
+  } else {
+    this->name = astr(this->name, "(");
+  }
+  this->cname = astr(this->cname, "_");
+}
+
+void TypeSymbol::renameInstantiatedIndividual(Symbol* sym) {
+  if (TypeSymbol* ts = toTypeSymbol(sym)) {
+    if (!this->hasFlag(FLAG_STAR_TUPLE)) {
+      this->name = astr(this->name, ts->name);
+      this->cname = astr(this->cname, ts->cname);
+    }
+  } else {
+    VarSymbol* var = toVarSymbol(sym);
+    if (var && var->immediate) {
+      Immediate* immediate = var->immediate;
+      if (var->type == dtString || var->type == dtStringC)
+        renameInstantiatedTypeString(this, var);
+      else if (immediate->const_kind == NUM_KIND_BOOL) {
+        // Handle boolean types specially.
+        const char* name4bool = immediate->bool_value() ? "true" : "false";
+        const char* cname4bool = immediate->bool_value() ? "T" : "F";
+        this->name = astr(this->name, name4bool);
+        this->cname = astr(this->cname, cname4bool);
+      } else {
+        const size_t bufSize = 128;
+        char imm[bufSize];
+        snprint_imm(imm, bufSize, *var->immediate);
+        this->name = astr(this->name, imm);
+        this->cname = astr(this->cname, imm);
+      }
+    } else {
+      this->name = astr(this->name, sym->cname);
+      this->cname = astr(this->cname, sym->cname);
+    }
+  }
+}
+
+void TypeSymbol::renameInstantiatedEnd() {
+  this->name = astr(this->name, ")");
 }
 
 /************************************* | **************************************
@@ -959,11 +1054,6 @@ void FnSymbol::verify() {
   // Should those even persist between passes?
   verifyInTree(valueFunction, "FnSymbol::valueFunction");
   verifyInTree(retSymbol, "FnSymbol::retSymbol");
-}
-
-
-FnSymbol* FnSymbol::getFnSymbol(void) {
-  return this;
 }
 
 
@@ -1507,6 +1597,16 @@ int FnSymbol::hasGenericFormals() const {
   bool hasGenericDefaults =  true;
   int  retval             =     0;
 
+  bool resolveInit = false;
+  if (this->hasFlag(FLAG_METHOD) && _this) {
+    if (AggregateType* at = toAggregateType(_this->type)) {
+      if (at->initializerStyle == DEFINES_INITIALIZER  &&
+          strcmp(name, "init") == 0) {
+        resolveInit = true;
+      }
+    }
+  }
+
   for_formals(formal, this) {
     bool isGeneric = false;
 
@@ -1518,7 +1618,9 @@ int FnSymbol::hasGenericFormals() const {
           formal->hasFlag(FLAG_MARKED_GENERIC) == true ||
           formal                               == _this ||
           formal->hasFlag(FLAG_IS_MEME)        == true) {
-        isGeneric = true;
+        if (!(formal == _this && resolveInit)) {
+          isGeneric = true;
+        }
       }
     }
 
@@ -1726,6 +1828,24 @@ bool FnSymbol::throwsError() const {
   return _throwsError;
 }
 
+bool FnSymbol::retExprDefinesNonVoid() const {
+  bool retval = true;
+
+  if (retExprType == NULL) {
+    retval = false;
+
+  } else if (retExprType->length() != 1) {
+    retval = true;
+
+  } else if (SymExpr* expr = toSymExpr(retExprType->body.get(1))) {
+    retval = expr->symbol()->type != dtVoid ? true : false;
+
+  } else {
+    retval = true;
+  }
+
+  return retval;
+}
 
 /******************************** | *********************************
 *                                                                   *
@@ -2383,7 +2503,7 @@ VarSymbol *new_StringSymbol(const char *str) {
   VarSymbol* castTemp = newTemp("call_tmp");
   CallExpr *castCall = new CallExpr(PRIM_MOVE,
       castTemp,
-      new CallExpr("_cast", cptrTemp, new_CStringSymbol(str)));
+      createCast(new_CStringSymbol(str), cptrTemp));
 
   int strLength = unescapeString(str, castCall).length();
 

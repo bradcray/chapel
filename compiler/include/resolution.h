@@ -81,31 +81,18 @@ void      instantiateBody(FnSymbol* fn);
 
 // generics support
 TypeSymbol* getNewSubType(FnSymbol* fn, Symbol* key, TypeSymbol* actualTS);
-void
-copyGenericSub(SymbolMap& subs, FnSymbol* root, FnSymbol* fn, Symbol* key, Symbol* value);
 void checkInfiniteWhereInstantiation(FnSymbol* fn);
-extern int explainInstantiationLine;
-extern ModuleSymbol* explainInstantiationModule;
-void explainInstantiation(FnSymbol* fn);
-void checkInstantiationLimit(FnSymbol* fn);
 void renameInstantiatedTypeString(TypeSymbol* sym, VarSymbol* var);
+FnSymbol* determineRootFunc(FnSymbol* fn);
+void determineAllSubs(FnSymbol* fn, FnSymbol* root, SymbolMap& subs,
+                      SymbolMap& all_subs);
+FnSymbol* instantiateFunction(FnSymbol* fn, FnSymbol* root, SymbolMap& all_subs,
+                              CallExpr* call, SymbolMap& subs, SymbolMap& map);
+void explainAndCheckInstantiation(FnSymbol* newFn, FnSymbol* fn);
 
 // visible functions
-class VisibleFunctionBlock {
- public:
-  Map<const char*,Vec<FnSymbol*>*> visibleFunctions;
-  VisibleFunctionBlock() { }
-};
-
-extern Map<BlockStmt*,VisibleFunctionBlock*> visibleFunctionMap;
-extern int nVisibleFunctions; // for incremental build
-void buildVisibleFunctionMap();
-BlockStmt*
-getVisibleFunctions(BlockStmt* block,
-                    const char* name,
-                    Vec<FnSymbol*>& visibleFns,
-                    Vec<BlockStmt*>& visited,
-                    CallExpr* callOrigin);
+void fillVisibleFuncVec(CallExpr* call, CallInfo &info,
+                        Vec<FnSymbol*> &visibleFns);
 
 // disambiguation
 /** A wrapper for candidates for function call resolution.
@@ -146,13 +133,21 @@ public:
   bool computeAlignment(CallInfo& info);
 
   /// Compute substitutions for wrapped function that is generic.
-  void computeSubstitutions();
+  void computeSubstitutions(bool inInitRes = false);
 };
+
+bool checkResolveFormalsWhereClauses(ResolutionCandidate* currCandidate);
+bool checkGenericFormals(ResolutionCandidate* currCandidate);
+void explainGatherCandidate(Vec<ResolutionCandidate*>& candidates,
+                            CallInfo& info, CallExpr* call);
+void wrapAndCleanUpActuals(ResolutionCandidate* best, CallInfo& info,
+                           bool buildFastFollowerChecks);
 
 typedef enum {
   FIND_EITHER = 0,
   FIND_REF,
-  FIND_NOT_REF
+  FIND_CONST_REF,
+  FIND_NOT_REF_OR_CONST_REF, // !(ref || const_ref)
 } disambiguate_kind_t;
 
 
@@ -216,11 +211,13 @@ FnSymbol* tryResolveCall(CallExpr* call);
 void resolveFns(FnSymbol* fn);
 void resolveDefaultGenericType(CallExpr* call);
 void resolveTypedefedArgTypes(FnSymbol* fn);
+void resolveReturnType(FnSymbol* fn);
 
 // FnSymbol changes
 extern bool tryFailure;
 void insertFormalTemps(FnSymbol* fn);
-void insertCasts(BaseAST* ast, FnSymbol* fn, Vec<CallExpr*>& casts);
+void insertAndResolveCasts(FnSymbol* fn);
+void ensureInMethodList(FnSymbol* fn);
 
 FnSymbol* defaultWrap(FnSymbol* fn, Vec<ArgSymbol*>* actualFormals,  CallInfo* info);
 void reorderActuals(FnSymbol* fn, Vec<ArgSymbol*>* actualFormals,  CallInfo* info);

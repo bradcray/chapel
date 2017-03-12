@@ -104,10 +104,14 @@ third-party-try-gmp: FORCE
 	fi
 
 third-party-test-venv: FORCE
-	cd third-party && $(MAKE) test-venv
+	-@if [ -z "$$CHPL_DONT_BUILD_TEST_VENV" ]; then \
+	cd third-party && $(MAKE) test-venv; \
+	fi
 
 third-party-chpldoc-venv: FORCE
-	cd third-party && $(MAKE) chpldoc-venv
+	-@if [ -z "$$CHPL_DONT_BUILD_CHPLDOC_VENV" ]; then \
+	cd third-party && $(MAKE) chpldoc-venv; \
+	fi
 
 test-venv: third-party-test-venv
 

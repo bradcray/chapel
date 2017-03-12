@@ -373,7 +373,9 @@ module ChapelBase {
     return a << exp;
   }
 
-  proc _canOptimizeExp(param b: integral) param return b >= 0 && b <= 8 && b != 7;
+  proc _canOptimizeExp(param b: integral) param
+    return b >= 0 && b <= 8 && b != 7;
+  //    return b >= (0:b.type) && b <= (8:b.type) && b != (7:b.type);
 
   // complement and compare is an efficient way to test for a power of 2
   proc _basePowerTwo(param a: integral) param return (a > 0 && ((a & (~a + 1)) == a));
@@ -520,7 +522,7 @@ module ChapelBase {
   //
   inline proc isNonnegative(i: int(?)) return i >= 0;
   inline proc isNonnegative(i: uint(?)) param return true;
-  inline proc isNonnegative(param i) param return i >= 0;
+  inline proc isNonnegative(param i) param return i >= 0:i.type;
 
 
   //
@@ -1162,7 +1164,7 @@ module ChapelBase {
     if (isRecord(arg)) then
       compilerError("delete not allowed on records");
 
-    arg.chpl__deinit();
+    arg.deinit();
     on arg do
       chpl_here_free(__primitive("_wide_get_addr", arg));
   }
@@ -1484,6 +1486,10 @@ module ChapelBase {
   }
 
 
+  proc chpl_nonPosParamInt(param a: int(?w)) param {
+    return __primitive("<=", a, 0:int(w));
+  }
+
   // non-param/non-param
   inline proc >(a: uint(64), b: int(64)) {
     return (b < 0) || (a > b: uint(64));
@@ -1491,16 +1497,19 @@ module ChapelBase {
   inline proc >(a: int(64), b: uint(64)) {
     return !(a < 0) && (a: uint(64) > b);
   }
-
-  // non-param/param and param/non-param
-  inline proc >(a: uint(64), param b: uint(64)) {
-    return __primitive(">", a, b);
+  inline proc >(param a: uint(64), param b: int(64)) param {
+    return (b < 0) || (a > b: uint(64));
   }
+  inline proc >(param a: int(64), param b: uint(64)) param {
+    return !(a < 0) && (a: uint(64) > b);
+  }
+
+  // param/non-param where we know the answer
   inline proc >(param a: uint(?w), b: uint(w)) param where a == 0 {
     return false;
   }
-  inline proc >(param a: uint(64), b: uint(64)) {
-    return __primitive(">", a, b);
+  inline proc >(param a: int(?w), b: uint(?w2)) param where chpl_nonPosParamInt(a) {
+    return false;
   }
 
   // non-param/non-param
@@ -1510,16 +1519,19 @@ module ChapelBase {
   inline proc <(a: int(64), b: uint(64)) {
     return (a < 0) || (a:uint(64) < b);
   }
+  inline proc <(param a: uint(64), param b: int(64)) param {
+    return !(b < 0) && (a < b:uint(64));
+  }
+  inline proc <(param a: int(64), param b: uint(64)) param {
+    return (a < 0) || (a:uint(64) < b);
+  }
 
-  // non-param/param and param/non-param
+  // non-param/param where we know the answer
   inline proc <(a: uint(?w), param b: uint(w)) param where b == 0 {
     return false;
   }
-  inline proc <(a: uint(64), param b: uint(64)) {
-    return __primitive("<", a, b);
-  }
-  inline proc <(param a: uint(64), b: uint(64)) {
-    return __primitive("<", a, b);
+  inline proc <(a: uint(?w), param b: int(?w2)) param where chpl_nonPosParamInt(b) {
+    return false;
   }
 
 
@@ -1530,16 +1542,19 @@ module ChapelBase {
   inline proc >=(a: int(64), b: uint(64)) {
     return !(a < 0) && (a: uint(64) >= b);
   }
+  inline proc >=(param a: uint(64), param b: int(64)) param {
+    return (b < 0) || (a >= b: uint(64));
+  }
+  inline proc >=(param a: int(64), param b: uint(64)) param {
+    return !(a < 0) && (a: uint(64) >= b);
+  }
 
-  // non-param/param and param/non-param
+  // non-param/param where we know the answer
   inline proc >=(a: uint(?w), param b: uint(w)) param where b == 0 {
     return true;
   }
-  inline proc >=(a: uint(64), param b: uint(64)) {
-    return __primitive(">=", a, b);
-  }
-  inline proc >=(param a: uint(64), b: uint(64)) {
-    return __primitive(">=", a, b);
+  inline proc >=(a: uint(?w), param b: int(?w2)) param where chpl_nonPosParamInt(b) {
+    return true;
   }
 
 
@@ -1550,16 +1565,19 @@ module ChapelBase {
   inline proc <=(a: int(64), b: uint(64)) {
     return (a < 0) || (a:uint(64) <= b);
   }
-
-  // non-param/param and param/non-param
-  inline proc <=(a: uint(64), param b: uint(64)) {
-    return __primitive("<=", a, b);
+  inline proc <=(param a: uint(64), param b: int(64)) param {
+    return !(b < 0) && (a <= b: uint(64));
   }
+  inline proc <=(param a: int(64), param b: uint(64)) param {
+    return (a < 0) || (a:uint(64) <= b);
+  }
+
+  // non-param/param where we know the answer
   inline proc <=(param a: uint(?w), b: uint(w)) param where a == 0 {
     return true;
   }
-  inline proc <=(param a: uint(64), b: uint(64)) {
-    return __primitive("<=", a, b);
+  inline proc <=(param a: int(?w), b: uint(?w2)) param where chpl_nonPosParamInt(a) {
+    return true;
   }
 
   proc isClassType(type t) param where t:object return true;

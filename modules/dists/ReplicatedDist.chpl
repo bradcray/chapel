@@ -437,7 +437,7 @@ iter ReplicatedDom.these() {
   //---
   // ... so we simply do the same a few times
   var dom = redirectee();
-  for count in 1..#numReplicands do
+//  for count in 1..#numReplicands do
     for i in dom do
       yield i;
 }
@@ -491,7 +491,7 @@ proc ReplicatedDom.dsiStride
 
 // here replication is visible
 proc ReplicatedDom.dsiNumIndices
-  return redirectee().numIndices * numReplicands;
+  return redirectee().numIndices;
 
 proc ReplicatedDom.dsiMember(indexx)
   return redirectee().member(indexx);

@@ -58,7 +58,6 @@ void TransformLogicalShortCircuit::exitCallExpr(CallExpr* call)
           Expr*      right = call->get(2);
           VarSymbol* lvar  = newTemp();
 
-          VarSymbol* eMsg  = NULL;
           FnSymbol*  ifFn  = NULL;
 
           left->remove();
@@ -68,21 +67,17 @@ void TransformLogicalShortCircuit::exitCallExpr(CallExpr* call)
 
           if (isLogicalAnd)
           {
-            eMsg = new_StringSymbol("cannot promote short-circuiting && operator");
             ifFn = buildIfExpr(new CallExpr("isTrue", lvar),
                                new CallExpr("isTrue", right),
                                new SymExpr(gFalse));
           }
           else
           {
-            eMsg = new_StringSymbol("cannot promote short-circuiting || operator");
             ifFn = buildIfExpr(new CallExpr("isTrue", lvar),
                                new SymExpr(gTrue),
                                new CallExpr("isTrue", right));
           }
 
-          ifFn->insertAtHead(new CondStmt(new CallExpr("_cond_invalid", lvar),
-                                          new CallExpr("compilerError", eMsg)));
           ifFn->insertAtHead(new CallExpr(PRIM_MOVE, lvar, left));
           ifFn->insertAtHead(new DefExpr(lvar));
 

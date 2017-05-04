@@ -337,11 +337,6 @@ static Expr* buildLogicalAndExpr(BaseAST* left, BaseAST* right) {
                                 new CallExpr("isTrue", right),
                                 new SymExpr(gFalse));
 
-  VarSymbol* eMsg = new_StringSymbol("cannot promote short-circuiting && operator");
-
-  ifFn->insertAtHead(new CondStmt(new CallExpr("_cond_invalid", lvar),
-                                  new CallExpr("compilerError", eMsg)));
-
   ifFn->insertAtHead(new CallExpr(PRIM_MOVE, lvar, left));
   ifFn->insertAtHead(new DefExpr(lvar));
 

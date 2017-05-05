@@ -539,46 +539,20 @@ proc ReplicatedArr.dsiAccess(indexx) ref {
   return chpl_myLocArr().arrLocalRep[indexx];
 }
 
-//
-// TODO: chpldoc me!
-//
-inline proc writeReplicands(arr: [], sorted=true) {
-  stdout.writeReplicands(arr, sorted);
-}
-
-//
-// TODO: chpldoc me!
-//
-proc channel.writeReplicands(arr: [], sorted=true) {
-  if sorted {
-    var neednl = false;
-    for idx in arr._value.dom.dist.targetLocDom.sorted() {
-      //  on locArr {  // may cause deadlock
-      if neednl then this.write("\n"); neednl = true;
-      this.write(arr._value.localArrs[idx].locale, ":\n");
-      arr._value.localArrs[idx].arrLocalRep._value.dsiSerialWrite(this);
-      //  }
-    }
-  } else {
-    var neednl = false;
-    for idx in arr._value.dom.dist.targetLocDom {
-      //  on locArr {  // may cause deadlock
-      if neednl then this.write("\n"); neednl = true;
-      this.write(arr._value.localArrs[idx].locale, ":\n");
-      arr._value.localArrs[idx].arrLocalRep._value.dsiSerialWrite(this);
-      //  }
-    }
-  }
-  this.write("\n");
-}
-
 // Write the array out to the given Writer serially.
 proc ReplicatedArr.dsiSerialWrite(f): void {
-  chpl_myLocArr().arrLocalRep._value.dsiSerialWrite(f);
+  //  writeln("in dsiSerialWrite() on locale ", here.id);
+  localArrs[f.readWriteThisFromLocale().id].arrLocalRep._value.dsiSerialWrite(f);
+}
+
+proc ReplicatedArr.dsiSerialRead(f, loc): void {
+  localArrs[f.readWriteThisFromLocale().id].arrLocalRep._value.dsiSerialRead(f);
 }
 
 proc chpl_serialReadWriteRectangular(f, arr, dom) where chpl__getActualArray(arr) : ReplicatedArr {
-  chpl_serialReadWriteRectangularHelper(f, arr, dom);
+  const origloc = f.readWriteThisFromLocale();
+  on origloc do
+    chpl_serialReadWriteRectangularHelper(f, arr, dom);
 }
 
 proc ReplicatedArr.dsiDestroyArr(isslice:bool) {

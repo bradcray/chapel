@@ -1275,6 +1275,11 @@ module ChapelBase {
       chpl_here_free(__primitive("_wide_get_addr", arg));
   }
 
+  proc chpl__delete(arg: []) {
+    forall a in arg do
+      delete a;
+  }
+
   // report an error when 'delete' is inappropriate
   proc chpl__delete(arg) {
     if isRecord(arg) then

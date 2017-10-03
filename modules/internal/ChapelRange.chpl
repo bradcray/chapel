@@ -295,7 +295,7 @@ module ChapelRange {
   /* Returns the alignment of the range */
   inline proc range.alignment where stridable return _alignment;
   pragma "no doc"
-  proc range.alignment where !stridable return low;
+  proc range.alignment where !stridable return 0:idxType;
 
   /* Returns true if the range is aligned */
   inline proc range.aligned where stridable return _aligned;

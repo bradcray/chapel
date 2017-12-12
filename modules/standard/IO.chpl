@@ -1955,7 +1955,11 @@ proc =(ref ret:channel, x:channel) {
 }
 
 pragma "no doc"
-proc channel.channel(param writing:bool, param kind:iokind, param locking:bool, f:file, out error:syserr, hints:c_int, start:int(64), end:int(64), in local_style:iostyle) {
+proc channel.init(param writing:bool, param kind:iokind, param locking:bool, f:file, out error:syserr, hints:c_int, start:int(64), end:int(64), in local_style:iostyle) {
+  this.writing = writing;
+  this.kind = kind;
+  this.locking = locking;
+  super.init();
   on f.home {
     this.home = f.home;
     if kind != iokind.dynamic {

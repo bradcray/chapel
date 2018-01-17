@@ -57,8 +57,8 @@ module OwnedObject {
      that this :record:`Owned` is the only thing responsible for managing
      the lifetime of the class instance.
    */
-  pragma "no copy"
-  pragma "copy mutates"
+  //  pragma "no copy"
+  //  pragma "copy mutates"
   record Owned {
     pragma "no doc"
     type t;                // contained type (class type)
@@ -101,7 +101,7 @@ module OwnedObject {
        that takes over ownership from `src`. `src` will
        refer to `nil` after this call.
      */
-    proc init(ref src:Owned) {
+    proc init(ref src:Owned(?)) {
       this.t = src.t;
       this.p = src.release();
       super.init();
@@ -166,27 +166,5 @@ module OwnedObject {
   pragma "no doc"
   proc =(ref lhs:Owned, ref rhs: Owned) {
     lhs.retain(rhs.release());
-  }
-
-  // initCopy is defined explicitly as a workaround
-  // for problems with generic initializers
-  pragma "init copy fn"
-  pragma "no doc"
-  proc chpl__initCopy(ref src: Owned) {
-    var ret = new Owned(src);
-    return ret;
-  }
-
-  // autoCopy is defined explicitly to create a
-  // compilation error if it is invoked
-  // (if we decided it was OK, we'd need to do const-checking
-  //  on the argument to this autoCopy call).
-  pragma "no doc"
-  pragma "donor fn"
-  pragma "auto copy fn"
-  pragma "erroneous autocopy"
-  proc chpl__autoCopy(ref src: Owned) {
-    var ret = new Owned(src);
-    return ret;
   }
 }

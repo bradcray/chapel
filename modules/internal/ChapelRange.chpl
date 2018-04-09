@@ -168,6 +168,52 @@ module ChapelRange {
   // range (for example) without being warned.
   //
   pragma "no doc"
+  proc range.init(_low: ?t, _high: t) {
+    this.idxType     = t;
+    this.boundedType = BoundedRangeType.bounded;
+    this.stridable   = false;
+    this._low        = _low;
+    this._high       = _high;
+  }
+
+  pragma "no doc"
+    proc range.init(_low: ?t, _high: t, _stride: integral, _alignment=0,
+                    _aligned = false) {
+    this.idxType     = t;
+    this.boundedType = BoundedRangeType.bounded;
+    this.stridable   = true;
+    this._low        = _low;
+    this._high       = _high;
+    this._stride     = _stride;
+    this._alignment  = _alignment;
+    this._aligned    = _aligned;
+  }
+
+  pragma "no doc"
+  proc range.init(_low: ?t) {
+    this.idxType     = t;
+    this.boundedType = BoundedRangeType.boundedLow;
+    this.stridable   = false;
+    this._low        = _low;
+  }
+
+  pragma "no doc"
+  proc range.init(_high: ?t) {
+    this.idxType     = t;
+    this.boundedType = BoundedRangeType.boundedHigh;
+    this.stridable   = false;
+    this._high       = _high;
+  }
+
+  pragma "no doc"
+  proc range.init(type idxType) {
+    this.idxType     = idxType;
+    this.boundedType = BoundedRangeType.boundedNone;
+    this.stridable   = false;
+  }
+
+  /*
+  pragma "no doc"
   proc range.init(type idxType = int,
                   param boundedType : BoundedRangeType = BoundedRangeType.bounded,
                   param stridable : bool = false,
@@ -191,14 +237,18 @@ module ChapelRange {
     if !stridable && boundsChecking then
       assert(_stride == 1);
   }
+  */
 
+  /*
   private proc _isAnyVoid(args...) param : bool {
     for param i in 1..args.size {
       if isVoidType(args(i).type) then return true;
     }
     return false;
   }
+  */
 
+  /*
   pragma "no doc"
   proc range.init(type idxType = int,
                   param boundedType : BoundedRangeType = BoundedRangeType.bounded,
@@ -219,6 +269,7 @@ module ChapelRange {
     if stridable then
       compilerError("non-stridable range initializer called with stridable=true");
   }
+  */
 
   /////////////////////////////////
   // for debugging
@@ -235,14 +286,14 @@ module ChapelRange {
 
   // Range builders for fully bounded ranges
   proc chpl_build_bounded_range(low: int(?w), high: int(w))
-    return new range(int(w), _low=low, _high=high);
+    return new range(_low=low, _high=high);
   proc chpl_build_bounded_range(low: uint(?w), high: uint(w))
-    return new range(uint(w), _low=low, _high=high);
+    return new range(_low=low, _high=high);
   proc chpl_build_bounded_range(low: enumerated, high: enumerated) {
     if (low.type != high.type) then
       compilerError("ranges of enums must use a single enum type");
     compilerError("ranges of enum type are not currently supported");
-    return new range(low.type, _low=low, _high=high);
+    return new range(_low=low, _high=high);
   }
   proc chpl_build_bounded_range(low, high) {
     compilerError("Bounds of 'low..high' must be integers of compatible types.");
@@ -250,10 +301,10 @@ module ChapelRange {
 
   // Range builders for low bounded ranges
   proc chpl_build_low_bounded_range(low: integral)
-    return new range(low.type, BoundedRangeType.boundedLow, _low=low);
+    return new range(_low=low);
   proc chpl_build_low_bounded_range(low: enumerated) {
     compilerError("ranges of enum type are not currently supported");
-    return new range(low.type, BoundedRangeType.boundedLow, _low=low);
+    return new range(_low=low);
   }
   proc chpl_build_low_bounded_range(low) {
     compilerError("Bound of 'low..' must be an integer");
@@ -261,10 +312,10 @@ module ChapelRange {
 
   // Range builders for high bounded ranges
   proc chpl_build_high_bounded_range(high: integral)
-    return new range(high.type, BoundedRangeType.boundedHigh, _high=high);
+    return new range(_high=high);
   proc chpl_build_high_bounded_range(high: enumerated) {
     compilerError("ranges of enum type are not currently supported");
-    return new range(high.type, BoundedRangeType.boundedHigh, _high=high);
+    return new range(_high=high);
   }
   proc chpl_build_high_bounded_range(high) {
     compilerError("Bound of '..high' must be an integer.");
@@ -272,7 +323,7 @@ module ChapelRange {
 
   // Range builder for unbounded ranges
   proc chpl_build_unbounded_range()
-    return new range(int, BoundedRangeType.boundedNone);
+    return new range(int);
 
 
   //################################################################################
@@ -1066,7 +1117,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
           if r.stridable then (r.aligned, r.alignment)
                          else (false, 0:r.idxType);
 
-    return new range(i, b, true,  lw, hh, st, alt, ald);
+    return new range(lw, hh, st, alt, ald);
   }
 
   /*
@@ -1359,14 +1410,10 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
 
     if (count == 0) then
       // Return a degenerate range.
-      return new range(idxType = resultType,
-                       boundedType = BoundedRangeType.bounded,
-                       stridable = r.stridable,
-                       _low = 1,
-                       _high = 0,
-                       _stride = r.stride,
-                       _alignment = 0,
-                       _aligned = false);
+      if r.stridable then
+        return new range(_low = 1:resultType, _high = 0:resultType, _stride = r.stride);
+      else
+        return new range(_low = 1:resultType, _high = 0:resultType);
 
     if !r.hasFirst() && count > 0 then
       halt("With a positive count, the range must have a first index.");
@@ -1412,15 +1459,12 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
       if r.hasHighBound() && hi > r._high then hi = r._high;
     }
 
-    return new range(idxType = resultType,
-                     boundedType = BoundedRangeType.bounded,
-                     stridable = r.stridable,
-                     _low = lo,
-                     _high = hi,
-                     _stride = if r.stridable then (r.stride: strType)
-                                            else _void,
-                     _alignment = if r.stridable then r.alignment else _void,
-                     _aligned = if r.stridable then r.aligned else _void);
+    if r.stridable {
+      return new range(_low = lo, _high = hi, r.stride: strType,
+                       r.alignment, r.aligned);
+    } else {
+      return new range(_low= lo, _high = hi);
+    }
   }
 
   proc #(r:range(?i), count:chpl__rangeStrideType(i)) {

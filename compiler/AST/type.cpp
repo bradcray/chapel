@@ -753,11 +753,14 @@ static VarSymbol*     createSymbol(PrimitiveType* primType, const char* name);
 
 #define INIT_PRIM_INT( name, width)                                             \
   dtInt[INT_SIZE_ ## width] = createPrimitiveType (name, "int" #width "_t");    \
+  dtInt[INT_SIZE_ ## width]->symbol->addFlag(FLAG_EXTERN);             \
   dtInt[INT_SIZE_ ## width]->defaultValue = new_IntSymbol( 0, INT_SIZE_ ## width)
 
 #define INIT_PRIM_UINT( name, width)                                            \
   dtUInt[INT_SIZE_ ## width] = createPrimitiveType (name, "uint" #width "_t");  \
+  dtUInt[INT_SIZE_ ## width]->symbol->addFlag(FLAG_EXTERN);             \
   dtUInt[INT_SIZE_ ## width]->defaultValue = new_UIntSymbol( 0, INT_SIZE_ ## width)
+           
 
 #define INIT_PRIM_REAL( name, width)                                            \
   dtReal[FLOAT_SIZE_ ## width] = createPrimitiveType (name, "_real" #width);    \
@@ -873,6 +876,7 @@ void initPrimitiveTypes() {
   // used in some runtime interfaces
   dtCVoidPtr   = createPrimitiveType("c_void_ptr", "c_void_ptr" );
   dtCVoidPtr->symbol->addFlag(FLAG_NO_CODEGEN);
+  dtCVoidPtr->symbol->addFlag(FLAG_EXTERN);
   dtCVoidPtr->defaultValue = gOpaque;
   dtCFnPtr = createPrimitiveType("c_fn_ptr", "c_fn_ptr");
   dtCFnPtr->symbol->addFlag(FLAG_NO_CODEGEN);
@@ -948,7 +952,9 @@ void initPrimitiveTypes() {
 }
 
 static PrimitiveType* createPrimitiveType(const char* name, const char* cname) {
-  return createType(name, cname, false);
+  PrimitiveType* pt = createType(name, cname, false);
+  //  pt->symbol->addFlag(FLAG_EXTERN);
+  return pt;
 }
 
 static PrimitiveType* createInternalType(const char* name, const char* cname) {

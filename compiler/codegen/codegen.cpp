@@ -1151,7 +1151,7 @@ static void protectNameFromC(Symbol* sym) {
   //
   ModuleSymbol* symMod = sym->getModule();
   if (symMod->modTag == MOD_INTERNAL) {
-    return;
+    //    return;
   }
 
   //

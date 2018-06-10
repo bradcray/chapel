@@ -279,6 +279,8 @@ module ChapelBase {
   inline proc +(a: complex(?w), b: real(w/2)) return (a.re+b, a.im):complex(w);
   inline proc +(a: imag(?w), b: complex(w*2)) return (b.re, _i2r(a)+b.im):complex(w*2);
   inline proc +(a: complex(?w), b: imag(w/2)) return (a.re, a.im+_i2r(b)):complex(w);
+  inline proc +(a: enumerated, b: integral)
+    return chpl__orderToEnum(chpl__enumToOrder(a) + b, a.type);
 
   inline proc -(a: int(?w), b: int(w)) return __primitive("-", a, b);
   inline proc -(a: uint(?w), b: uint(w)) return __primitive("-", a, b);
@@ -292,6 +294,10 @@ module ChapelBase {
   inline proc -(a: complex(?w), b: real(w/2)) return (a.re-b, a.im):complex(w);
   inline proc -(a: imag(?w), b: complex(w*2)) return (-b.re, _i2r(a)-b.im):complex(w*2);
   inline proc -(a: complex(?w), b: imag(w/2)) return (a.re, a.im-_i2r(b)):complex(w);
+  inline proc -(a: enumerated, b: integral)
+    return chpl__orderToEnum(chpl__enumToOrder(a) - b, a.type);
+  inline proc -(a: enumerated, b: enumerated) where (a.type == b.type)
+    return chpl__enumToOrder(a) - chpl__enumToOrder(b);
 
   //
   // binary + and - on param values

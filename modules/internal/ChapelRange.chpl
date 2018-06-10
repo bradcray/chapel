@@ -1836,7 +1836,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
                       __primitive( "=", i, start),
                       __primitive(">=", high, low),  // execute at least once?
                       __primitive("+=", i, stride: i.type)) {
-      yield chpl__idxToInt(idxType, i);
+      yield chpl__intToIdx(idxType, i);
       if i == end then break;
     }
   }

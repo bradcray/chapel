@@ -4569,4 +4569,21 @@ module BigInteger {
   proc chpl_checkIfRangeIterWillOverflow(type idxType: bigint, low, high, stride, first=low, last=high, shouldHalt=true) param {
     return false;
   }
+
+  iter (range(bigint, ?b, ?s)).generalIterator() {
+    if this.isAmbiguous() then
+      __primitive("chpl_error", c"these -- Attempt to iterate over a range with ambiguous alignment.");
+
+    var i: this.intIdxType;
+    const start = this.first;
+    const end = if this.low > this.high then start else this.last;
+
+    i = start;
+    while this.high >= this.low {
+      yield i;
+      i += this.stride;
+      if i == end then break;
+    }
+  }
+
 }

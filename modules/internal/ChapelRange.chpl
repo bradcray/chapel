@@ -1815,6 +1815,8 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
     if this.isAmbiguous() then
       __primitive("chpl_error", c"these -- Attempt to iterate over a range with ambiguous alignment.");
 
+    if (useOptimizedRangeIterators) {
+
     // This iterator could be split into different cases depending on the
     // stride like the bounded iterators. However, all that gets you is the
     // ability to use low/alignedLow over first. The additional code isn't
@@ -1827,6 +1829,9 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
                       true,
                       __primitive("+=", i, stride: intIdxType)) {
       yield chpl_intToIdx(i);
+    }
+    } else {
+      for i in this.generalIterator() do yield i;
     }
   }
 

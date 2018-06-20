@@ -241,7 +241,7 @@ module ChapelRange {
                   param stridable : bool = false,
                   _low : idxType = chpl__intToIdx(idxType, 1),
                   _high : idxType = chpl__intToIdx(idxType, 0),
-                  _stride : chpl__rangeStrideType(idxType) = 1,
+                  _stride =  1: chpl__rangeStrideType(idxType),
                   _alignment : idxType = chpl__intToIdx(idxType, 0),
                   _aligned : bool = false) {
     this.idxType     = idxType;

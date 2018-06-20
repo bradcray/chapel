@@ -4544,4 +4544,29 @@ module BigInteger {
       }
     }
   }
+
+  proc chpl_build_bounded_range(low: bigint, high: bigint)
+    return new range(bigint, _low=low, _high=high);
+
+  proc chpl__rangeStrideType(type idxType: bigint) type {
+    return bigint;
+  }
+
+  inline proc chpl__idxToInt(i: bigint) {
+    return i;
+  }
+
+  inline proc chpl__intToIdx(type idxType: bigint, i: bigint) {
+    return i;
+  }
+
+  inline proc chpl__intToIdx(type idxType: bigint, i: integral) {
+    return i: bigint;
+  }
+
+  proc (range(bigint, ?b, false)).stride return 1: bigint;
+
+  proc chpl_checkIfRangeIterWillOverflow(type idxType: bigint, low, high, stride, first=low, last=high, shouldHalt=true) param {
+    return false;
+  }
 }

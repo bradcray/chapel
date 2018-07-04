@@ -838,39 +838,53 @@ static void build_enum_enumerate_function(EnumType* et) {
 }
 
 static void build_enum_cast_function(EnumType* et) {
-  // integral value to enumerated type cast function
-  FnSymbol* fn = new FnSymbol(astr_cast);
-  fn->addFlag(FLAG_COMPILER_GENERATED);
-  fn->addFlag(FLAG_LAST_RESORT);
-  ArgSymbol* arg1 = new ArgSymbol(INTENT_BLANK, "t", dtAny);
-  arg1->addFlag(FLAG_TYPE_VARIABLE);
-  ArgSymbol* arg2 = new ArgSymbol(INTENT_BLANK, "_arg2", dtIntegral);
-  fn->insertFormalAtTail(arg1);
-  fn->insertFormalAtTail(arg2);
-  fn->where = new BlockStmt(new CallExpr("==", arg1, et->symbol));
-  if (fNoBoundsChecks) {
-    fn->addFlag(FLAG_INLINE);
-    fn->insertAtTail(new CallExpr(PRIM_RETURN, new CallExpr(PRIM_CAST, et->symbol, arg2)));
-  } else {
+  bool initsExist = false;
+  for_enums(constant, et) {
+    if (constant->init) {
+      initsExist = true;
+      break;
+    }
+  }
+
+  FnSymbol* fn;
+  ArgSymbol* arg1, *arg2;
+  DefExpr* def;
+  // only build the int<->enum cast functions if some enums were given values
+  if (initsExist) {
+    // build the integral value to enumerated type cast function
+    fn = new FnSymbol(astr_cast);
+    fn->addFlag(FLAG_COMPILER_GENERATED);
+    fn->addFlag(FLAG_LAST_RESORT);
+    arg1 = new ArgSymbol(INTENT_BLANK, "t", et);
+    arg1->addFlag(FLAG_TYPE_VARIABLE);
+    arg2 = new ArgSymbol(INTENT_BLANK, "_arg2", dtIntegral);
+    fn->insertFormalAtTail(arg1);
+    fn->insertFormalAtTail(arg2);
+
     // Generate a select statement with when clauses for each of the
     // enumeration constants, and an otherwise clause that calls halt.
     int64_t count = 0;
     BlockStmt* whenstmts = buildChapelStmt();
-    Expr* lastInit = new SymExpr(new_IntSymbol(count));
+    Expr* lastInit = NULL;
     for_enums(constant, et) {
       if (constant->init) {
         lastInit = constant->init;
         count = 0;
       } else {
-        count++;
+        if (lastInit) {
+          count++;
+        }
       }
-      CondStmt* when =
-        new CondStmt(new CallExpr(PRIM_WHEN,
-                                  new CallExpr("+", lastInit->copy(), new SymExpr(new_IntSymbol(count)))),
-                     new CallExpr(PRIM_RETURN,
-                                  new CallExpr(PRIM_CAST,
-                                               et->symbol, arg2)));
-      whenstmts->insertAtTail(when);
+      if (lastInit != NULL) {
+        CondStmt* when =
+          new CondStmt(new CallExpr(PRIM_WHEN,
+                                    new CallExpr("+", lastInit->copy(), 
+                                                 new SymExpr(new_IntSymbol(count)))),
+                       new CallExpr(PRIM_RETURN,
+                                    new CallExpr(PRIM_CAST,
+                                                  et->symbol, arg2)));
+        whenstmts->insertAtTail(when);
+      }
     }
     const char * errorString = "enumerated type out of bounds";
     CondStmt* otherwise =
@@ -879,17 +893,74 @@ static void build_enum_cast_function(EnumType* et) {
                                  new_StringSymbol(errorString))));
     whenstmts->insertAtTail(otherwise);
     fn->insertAtTail(buildSelectStmt(new SymExpr(arg2), whenstmts));
-  }
-  DefExpr* def = new DefExpr(fn);
-  //
-  // these cast functions need to go in the base module because they
-  // are automatically inserted to handle implicit coercions
-  //
-  baseModule->block->insertAtTail(def);
-  reset_ast_loc(def, et->symbol);
-  normalize(fn);
 
-  fn->tagIfGeneric();
+    def = new DefExpr(fn);
+    baseModule->block->insertAtTail(def);
+    reset_ast_loc(def, et->symbol);
+    normalize(fn);
+    fn->tagIfGeneric();
+
+    // build the enumerated to integer cast
+    fn = new FnSymbol(astr_cast);
+    fn->addFlag(FLAG_COMPILER_GENERATED);
+    fn->addFlag(FLAG_LAST_RESORT);
+    arg1 = new ArgSymbol(INTENT_BLANK, "t", dtIntegral);
+    arg1->addFlag(FLAG_TYPE_VARIABLE);
+    arg2 = new ArgSymbol(INTENT_BLANK, "_arg2", et);
+    fn->insertFormalAtTail(arg1);
+    fn->insertFormalAtTail(arg2);
+
+    // Generate a select statement with when clauses for each of the
+    // enumeration constants, and an otherwise clause that calls halt.
+    count = 0;
+    whenstmts = buildChapelStmt();
+    lastInit = NULL;
+    for_enums(constant, et) {
+      if (constant->init) {
+        lastInit = constant->init;
+        count = 0;
+      } else {
+        if (lastInit != NULL) {
+          count++;
+        }
+      }
+      CallExpr* result;
+      if (lastInit) {
+        result = new CallExpr(PRIM_RETURN,
+                              new CallExpr(PRIM_CAST, arg1,
+                                           new CallExpr("+", lastInit->copy(),
+                                                        new SymExpr(new_IntSymbol(count)))));
+      } else {
+        const char *errorString = astr("illegal cast: ", et->symbol->name, 
+                                       ".", constant->sym->name,
+                                       " has no integer value");
+        result = new CallExpr("halt", new_StringSymbol(errorString));
+      }
+      CondStmt* when =
+        new CondStmt(new CallExpr(PRIM_WHEN, new SymExpr(constant->sym)),
+                     result);
+                                  
+      whenstmts->insertAtTail(when);
+    }
+
+    otherwise =
+      new CondStmt(new CallExpr(PRIM_WHEN),
+                   new BlockStmt(new CallExpr("halt",
+                                              new_StringSymbol(errorString))));
+    whenstmts->insertAtTail(otherwise);
+    fn->insertAtTail(buildSelectStmt(new SymExpr(arg2), whenstmts));
+
+    def = new DefExpr(fn);
+    //
+    // Like other enum functions, these cast functions have
+    // traditionally needed to go in the base module in order to be
+    // available in the event of local enums.
+    //
+    baseModule->block->insertAtTail(def);
+    reset_ast_loc(def, et->symbol);
+    normalize(fn);
+    fn->tagIfGeneric();
+  }
 
   // string to enumerated type cast function
   fn = new FnSymbol(astr_cast);
@@ -982,6 +1053,7 @@ static void build_enum_to_order_function(EnumType* et, bool paramVersion) {
   baseModule->block->insertAtTail(def);
   reset_ast_loc(def, et->symbol);
   normalize(fn);
+  fn->tagIfGeneric();
 }
 
 //
@@ -1443,18 +1515,20 @@ static void buildInitializerCall(AggregateType* ct,
   call->insertAtTail(new SymExpr(gMethodToken));
   call->insertAtTail(new NamedExpr("this", new SymExpr(_this)));
 
+  bool named = ct->wantsDefaultInitializer();
+
   for_fields(field, ct) {
     if (field->isParameter() == true) {
       Flag         flag = FLAG_PARAM;
       PrimitiveTag tag  = PRIM_QUERY_PARAM_FIELD;
 
-      buildRecordQuery(fn, arg, call, field, flag, tag, false);
+      buildRecordQuery(fn, arg, call, field, flag, tag, named);
 
     } else if (field->hasFlag(FLAG_TYPE_VARIABLE) == true) {
       Flag         flag = FLAG_TYPE_VARIABLE;
       PrimitiveTag tag  = PRIM_QUERY_TYPE_FIELD;
 
-      buildRecordQuery(fn, arg, call, field, flag, tag, false);
+      buildRecordQuery(fn, arg, call, field, flag, tag, named);
 
     } else if (field->defPoint->exprType == NULL &&
                field->defPoint->init     == NULL) {
@@ -1464,7 +1538,7 @@ static void buildInitializerCall(AggregateType* ct,
       //
       // BHARSH INIT TODO: Try to write a test that fails because we cannot
       // correctly generate a _defaultOf for something with an explicit init.
-      buildRecordQueryVarField(fn, arg, call, field, ct->wantsDefaultInitializer());
+      buildRecordQueryVarField(fn, arg, call, field, named);
 
     }
   }
@@ -1634,7 +1708,10 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
 
     fn->addFlag(FLAG_COMPILER_GENERATED);
     fn->addFlag(FLAG_LAST_RESORT);
-    fn->addFlag(FLAG_INLINE);
+    if (ct->isClass() && ct != dtObject)
+      fn->addFlag(FLAG_OVERRIDE);
+    else
+      fn->addFlag(FLAG_INLINE);
 
     fn->cname = astr("_auto_", ct->symbol->name, "_write");
     fn->_this = new ArgSymbol(INTENT_BLANK, "this", ct);
@@ -1683,7 +1760,10 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
 
     fn->addFlag(FLAG_COMPILER_GENERATED);
     fn->addFlag(FLAG_LAST_RESORT);
-    fn->addFlag(FLAG_INLINE);
+    if (ct->isClass() && ct != dtObject)
+      fn->addFlag(FLAG_OVERRIDE);
+    else
+      fn->addFlag(FLAG_INLINE);
 
     fn->cname = astr("_auto_", ct->symbol->name, "_read");
 

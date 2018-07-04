@@ -27,6 +27,7 @@
 #include "expr.h"
 #include "initializerRules.h"
 #include "iterator.h"
+#include "LoopExpr.h"
 #include "UnmanagedClassType.h"
 #include "passes.h"
 #include "scopeResolve.h"
@@ -1667,14 +1668,14 @@ void AggregateType::buildConstructor() {
 
     if (exprType != NULL) {
       if (isBlockStmt(exprType) == false)
-        arg->typeExpr = new BlockStmt(exprType, BLOCK_TYPE);
+        arg->typeExpr = new BlockStmt(exprType->copy(), BLOCK_TYPE);
       else
-        arg->typeExpr = toBlockStmt(exprType);
+        arg->typeExpr = toBlockStmt(exprType->copy());
     }
 
     if (init != NULL) {
       if (hadInit == true)
-        arg->defaultExpr = new BlockStmt(init, BLOCK_SCOPELESS);
+        arg->defaultExpr = new BlockStmt(init->copy(), BLOCK_SCOPELESS);
       else {
         Expr* initVal = new SymExpr(gTypeDefaultToken);
 
@@ -1854,6 +1855,14 @@ void AggregateType::fieldToArg(FnSymbol*              fn,
           arg->addFlag(FLAG_TYPE_VARIABLE);
         }
 
+        if (LoopExpr* fe = toLoopExpr(defPoint->init)) {
+          if (field->isType() == false) {
+            CallExpr* copy = new CallExpr("chpl__initCopy");
+            defPoint->init->replace(copy);
+            copy->insertAtTail(fe);
+          }
+        }
+
         //
         // A generic field.  Could be type/param/variable
         //
@@ -1865,36 +1874,6 @@ void AggregateType::fieldToArg(FnSymbol*              fn,
         // Type inference is required if this is a param or variable field
         //
         } else if (defPoint->exprType == NULL && defPoint->init != NULL) {
-          VarSymbol* tmp      = newTemp();
-          BlockStmt* typeExpr = new BlockStmt(new DefExpr(tmp), BLOCK_TYPE);
-
-          // tmp->addFlag(FLAG_INSERT_AUTO_DESTROY);
-          // Lydia NOTE 06/16/17: The default constructor adds this flag
-          // to its equivalent temporary.  I have decided not to do so
-          // and am not seeing issues so far, but may have missed something,
-          // so I am leaving it here just in case.
-
-          tmp->addFlag(FLAG_MAYBE_TYPE);
-          tmp->addFlag(FLAG_MAYBE_PARAM);
-
-          typeExpr->insertAtTail(new CallExpr(PRIM_MOVE,
-                                              tmp,
-                                              defPoint->init->copy()));
-
-          // Lydia NOTE 06/16/17: I believe we don't need to make an
-          // initCopy call for the field's init (like the default
-          // constructor version attempts).
-          // I might have missed something, though, so if it turns out we
-          // do need that initCopy, use this instead of the above statement:
-          // typeExpr->insertAtTail(
-          //           new CallExpr(PRIM_MOVE,
-          //                        tmp,
-          //                        new CallExpr("chpl__initCopy",
-          //                                     defPoint->init->copy())));
-
-          typeExpr->insertAtTail(new CallExpr(PRIM_TYPEOF, tmp));
-
-          arg->typeExpr = typeExpr;
           if (arg->hasFlag(FLAG_TYPE_VARIABLE)) {
             arg->type = dtAny;
           }
@@ -1902,6 +1881,9 @@ void AggregateType::fieldToArg(FnSymbol*              fn,
           // set up the ArgSymbol appropriately for the type
           // and initialization from the field declaration.
           arg->defaultExpr = new BlockStmt(defPoint->init->copy());
+
+          // mimic normalize's hack_resolve_types
+          arg->typeExpr = arg->defaultExpr->copy();
 
 
         //

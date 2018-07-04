@@ -39,19 +39,19 @@ module DefaultRectangular {
 
   pragma "use default init"
   class DefaultDist: BaseDist {
-    proc dsiNewRectangularDom(param rank: int, type idxType, param stridable: bool, inds) {
+    override proc dsiNewRectangularDom(param rank: int, type idxType, param stridable: bool, inds) {
       const dom = new unmanaged DefaultRectangularDom(rank, idxType, stridable, _to_unmanaged(this));
       dom.dsiSetIndices(inds);
       return dom;
     }
 
-    proc dsiNewAssociativeDom(type idxType, param parSafe: bool)
+    override proc dsiNewAssociativeDom(type idxType, param parSafe: bool)
       return new unmanaged DefaultAssociativeDom(idxType, parSafe, _to_unmanaged(this));
 
-    proc dsiNewOpaqueDom(type idxType, param parSafe: bool)
+    override proc dsiNewOpaqueDom(type idxType, param parSafe: bool)
       return new unmanaged DefaultOpaqueDom(_to_unmanaged(this), parSafe);
 
-    proc dsiNewSparseDom(param rank: int, type idxType, dom: domain)
+    override proc dsiNewSparseDom(param rank: int, type idxType, dom: domain)
       return new unmanaged DefaultSparseDom(rank, idxType, _to_unmanaged(this), dom);
 
     proc dsiIndexToLocale(ind) return this.locale;
@@ -754,7 +754,7 @@ module DefaultRectangular {
 
   proc _remoteAccessData.initShiftedData() {
     if earlyShiftData && !stridable {
-      type idxSignedType = chpl__signedType(idxType);
+      type idxSignedType = chpl__signedType(chpl__idxTypeToIntIdxType(idxType));
       const shiftDist = if isIntType(idxType) then origin - factoredOffs
                         else origin:idxSignedType - factoredOffs:idxSignedType;
       shiftedData = _ddata_shift(eltType, data, shiftDist);
@@ -972,7 +972,7 @@ module DefaultRectangular {
         pragma "no copy" pragma "no auto destroy" var er = __primitive("array_get", dv, 0);
         pragma "no copy" pragma "no auto destroy" var ev = __primitive("deref", er);
         if (chpl__maybeAutoDestroyed(ev)) {
-          var numElts:idxType = 0;
+          var numElts:intIdxType = 0;
           // dataAllocRange may be empty or contain a meaningful value
           if rank == 1 && !stridable then
             numElts = dataAllocRange.length;
@@ -1238,8 +1238,7 @@ module DefaultRectangular {
                                             stridable=d._value.stridable,
                                             dom=d._value);
 
-        // MPF: could this be parallel?
-        for i in d((...dom.ranges)) do
+        forall i in d((...dom.ranges)) do
           copy.dsiAccess(i) = dsiAccess(i);
         off = copy.off;
         blk = copy.blk;
@@ -1343,7 +1342,7 @@ module DefaultRectangular {
               second = info.getDataIndex(viewDom.chpl_intToIdx(viewDomDim.firstAsInt + stride));
 
         var   first  = info.getDataIndex(start);
-        const step   = (second-first):chpl__signedType(viewDom.idxType);
+        const step   = (second-first):chpl__signedType(viewDom.intIdxType);
         var   last   = first + (viewDomDim.length-1) * step:viewDom.intIdxType;
 
         if step < 0 then
@@ -1408,7 +1407,7 @@ module DefaultRectangular {
   proc chpl_serialReadWriteRectangularHelper(f, arr, dom) {
     param rank = arr.rank;
     type idxType = arr.idxType;
-    type idxSignedType = chpl__signedType(idxType);
+    type idxSignedType = chpl__signedType(chpl__idxTypeToIntIdxType(idxType));
 
     const isNative = f.styleElement(QIO_STYLE_ELEMENT_IS_NATIVE_BYTE_ORDER): bool;
 

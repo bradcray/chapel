@@ -31,6 +31,7 @@
 #include "ForallStmt.h"
 #include "IfExpr.h"
 #include "initializerRules.h"
+#include "LoopExpr.h"
 #include "stlUtil.h"
 #include "stringutil.h"
 #include "TransformLogicalShortCircuit.h"
@@ -52,6 +53,7 @@ static void        handleReduceAssign();
 
 static bool        isArrayFormal(ArgSymbol* arg);
 
+static bool        returnsArray(FnSymbol* fn);
 static void        makeExportWrapper(FnSymbol* fn);
 
 static void        fixupArrayFormals(FnSymbol* fn);
@@ -562,6 +564,8 @@ static void normalizeBase(BaseAST* base) {
 
   lowerIfExprs(base);
 
+  lowerLoopExprs(base);
+
 
   //
   // Phase 4
@@ -645,10 +649,8 @@ void checkUseBeforeDefs(FnSymbol* fn) {
 
                 // Only complain one time
                 if (undefined.find(sym) == undefined.end()) {
-                  USR_FATAL_CONT(se,
-                                 "'%s' used before defined (first used here)",
-                                 sym->name);
-
+                  USR_FATAL_CONT(se, "'%s' used before defined", sym->name);
+                  USR_PRINT(sym->defPoint, "defined here");
                   undefined.insert(sym);
                 }
               }
@@ -688,7 +690,15 @@ static void checkUseBeforeDefs() {
   USR_STOP();
 }
 
-// If the AST node defines a symbol, then extract that symbol
+// guard against "var a:int = a;"
+static void checkSelfDef(CallExpr* call, Symbol* sym) {
+  if (SymExpr* se2 = toSymExpr(call->get(2)))
+    if (se2->symbol() == sym)
+      USR_FATAL_CONT(se2, "'%s' is used to define itself", sym->name);
+}
+
+// If the AST node defines a symbol, then return that symbol.
+// Otheriwse return NULL. Also check for self-defs.
 static Symbol* theDefinedSymbol(BaseAST* ast) {
   Symbol* retval = NULL;
 
@@ -696,21 +706,19 @@ static Symbol* theDefinedSymbol(BaseAST* ast) {
   // or a variable initialization.
   //
   // The caller performs a post-order traversal and so we find the
-  // symExpr before we see the callExpr
-  //
-  // TODO reacting to SymExprs, like it is done here, allows things like
-  //   "var a: int = a" to sneak in.
-  // Instead, we should react to CallExprs that are PRIM_MOVE, init, etc.
-  // Reacting to CallExprs is also more economical, as there are fewer
-  // CallExprs than there are SymExprs.
-  //
+  // symExpr before we see the callExpr.
+  // In particular, given a move(symexpr1,symexpr2), if we consider
+  // the move itself as defining the symbol, symexpr1 will raise
+  // the "use before defined" error.
+
   if (SymExpr* se = toSymExpr(ast)) {
     if (CallExpr* call = toCallExpr(se->parentExpr)) {
-      if (call->isPrimitive(PRIM_MOVE)     == true  ||
-          call->isPrimitive(PRIM_ASSIGN)   == true  ||
-          call->isPrimitive(PRIM_INIT_VAR) == true)  {
+      if (call->isPrimitive(PRIM_MOVE)      ||
+          call->isPrimitive(PRIM_ASSIGN)    ||
+          call->isPrimitive(PRIM_INIT_VAR) ) {
         if (call->get(1) == se) {
           retval = se->symbol();
+          checkSelfDef(call, se->symbol());
         }
       }
       // Allow for init() for a task-private variable, which occurs in
@@ -924,6 +932,7 @@ class LowerIfExprVisitor : public AstVisitorTraverse
 void LowerIfExprVisitor::exitIfExpr(IfExpr* ife) {
   if (isAlive(ife) == false) return;
   if (isDefExpr(ife->parentExpr)) return;
+  if (isLoopExpr(ife->parentExpr)) return;
 
   SET_LINENO(ife);
 
@@ -1094,11 +1103,14 @@ static void processManagedNew(CallExpr* newCall) {
 *                                                                             *
 ************************************** | *************************************/
 
+static void fixupExportedArrayReturns(FnSymbol* fn);
 static bool isVoidReturn(CallExpr* call);
 static void insertRetMove(FnSymbol* fn, VarSymbol* retval, CallExpr* ret);
 
 static void normalizeReturns(FnSymbol* fn) {
   SET_LINENO(fn);
+
+  fixupExportedArrayReturns(fn);
 
   std::vector<CallExpr*> rets;
   std::vector<CallExpr*> calls;
@@ -1215,6 +1227,26 @@ static void normalizeReturns(FnSymbol* fn) {
 
   if (labelIsUsed == false) {
     label->defPoint->remove();
+  }
+}
+
+// Expected to run after we make the wrapper, since the wrapper is generated
+// prior to any normalization occurring on the function, and this gets called
+// during normalize called on a specific AST node.
+static void fixupExportedArrayReturns(FnSymbol* fn) {
+  if (fn->hasFlag(FLAG_EXPORT) &&
+      fn->hasFlag(FLAG_COMPILER_GENERATED) &&
+      returnsArray(fn)) {
+    fn->retExprType->replace(new BlockStmt(new SymExpr(dtExternalArray->symbol)));
+
+    CallExpr* retCall = toCallExpr(fn->body->body.tail);
+    INT_ASSERT(retCall && retCall->isPrimitive(PRIM_RETURN));
+
+    // This appears to be prior to any insertion of call temps, etc, so it seems
+    // okay for now to just insert the conversion call around the function call.
+    CallExpr* transformRet = new CallExpr("convertToExternalArray",
+                                          retCall->get(1)->remove());
+    retCall->insertAtTail(transformRet);
   }
 }
 
@@ -1665,40 +1697,19 @@ static bool shouldInsertCallTemps(CallExpr* call) {
   Expr*     parentExpr = call->parentExpr;
   CallExpr* parentCall = toCallExpr(parentExpr);
   Expr*     stmt       = call->getStmtExpr();
-  bool      retval     = false;
 
-  if        (parentExpr                               == NULL) {
-    retval = false;
+  if (parentExpr == NULL                                 ||
+      isDefExpr(parentExpr)                              ||
+      isContextCallExpr(parentExpr)                      ||
+      stmt == NULL                                       ||
+      call == stmt                                       ||
+      call->partialTag                                   ||
+      call->isPrimitive(PRIM_TUPLE_EXPAND)               ||
+      (parentCall && parentCall->isPrimitive(PRIM_MOVE)) ||
+      (parentCall && parentCall->isPrimitive(PRIM_NEW)) )
+    return false;
 
-  } else if (isDefExpr(parentExpr)                    == true) {
-    retval = false;
-
-  } else if (isContextCallExpr(parentExpr)            == true) {
-    retval = false;
-
-  } else if (stmt                                     == NULL) {
-    retval = false;
-
-  } else if (call                                     == stmt) {
-    retval = false;
-
-  } else if (call->partialTag                         == true) {
-    retval = false;
-
-  } else if (call->isPrimitive(PRIM_TUPLE_EXPAND)     == true) {
-    retval = false;
-
-  } else if (parentCall && parentCall->isPrimitive(PRIM_MOVE)) {
-    retval = false;
-
-  } else if (parentCall && parentCall->isPrimitive(PRIM_NEW))  {
-    retval = false;
-
-  } else {
-    retval =  true;
-  }
-
-  return retval;
+  return true;
 }
 
 static void evaluateAutoDestroy(CallExpr* call, VarSymbol* tmp) {
@@ -1721,7 +1732,7 @@ static void evaluateAutoDestroy(CallExpr* call, VarSymbol* tmp) {
   //   types/typedefs/bradc/arrayTypedef
   //
   // I'm sure that there is a better way to handle this either in the
-  // module init function or in a sequence of parloopexpr functions
+  // module init function or in a sequence of forall-expr functions
   // computing an array type that are in a module init fn
 
   while (fn->hasFlag(FLAG_MAYBE_ARRAY_TYPE) == true) {
@@ -2247,6 +2258,9 @@ static void normVarTypeInference(DefExpr* defExpr) {
   } else if (IfExpr* ife = toIfExpr(initExpr)) {
     defExpr->insertAfter(new CallExpr(PRIM_INIT_VAR, var, ife));
 
+  } else if (LoopExpr* fe = toLoopExpr(initExpr)) {
+    defExpr->insertAfter(new CallExpr(PRIM_INIT_VAR, var, fe));
+
   } else {
     INT_ASSERT(false);
   }
@@ -2693,13 +2707,14 @@ static void makeExportWrapper(FnSymbol* fn) {
     }
   }
 
-  // TODO: Also check if return type is an array.  Don't make two wrappers,
-  // pls.
-  if (argsToReplace) {
-    // We have at least one array argument.  Need to make a version of this
-    // function that can be exported
+  if (argsToReplace || returnsArray(fn)) {
+    // Either we have at least one array argument, or we return an array.
+    // Need to make a version of this function that can be exported
     FnSymbol* newFn = fn->copy();
     newFn->addFlag(FLAG_COMPILER_GENERATED);
+    // Avoid resolution conflicts when the arguments remain unchanged (but we
+    // needed to make a wrapper due to the return type)
+    newFn->addFlag(FLAG_LAST_RESORT);
 
     fn->defPoint->insertBefore(new DefExpr(newFn));
 
@@ -2730,6 +2745,25 @@ static bool hasNonVoidReturnStmt(FnSymbol* fn) {
   }
   return false;
 }
+
+// Determines if we explicitly declare an exported function as returning an
+// array.  In that case, we should make a wrapper (if we aren't already), and
+// transform that array into a form that a caller from another programming
+// language would understand.
+static bool returnsArray(FnSymbol* fn) {
+  if (fn->retExprType != NULL) {
+    if (CallExpr* call = toCallExpr(fn->retExprType->body.tail)) {
+      if (call->isNamed("chpl__buildArrayRuntimeType")) {
+        return true;
+      }
+    }
+  }
+  // SIMPLIFYING ASSUMPTION:
+  // If we don't have a declared return type, assume we don't return an array
+  return false;
+}
+
+
 /************************************* | **************************************
 *                                                                             *
 * The parser represents formals with an array type specifier as a formal with *

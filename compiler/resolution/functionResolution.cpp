@@ -1355,11 +1355,12 @@ static numeric_type_t classifyNumericType(Type* t)
 // Returns 'true' for types that are the type of numeric literals.
 // e.g. 1 is an 'int', so this function returns 'true' for 'int'.
 // e.g. 0.0 is a 'real', so this function returns 'true' for 'real'.
-static bool isNumericParamDefaultType(Type* t)
+bool isNumericParamDefaultType(Type* t)
 {
   if (t == dtInt[INT_SIZE_DEFAULT] ||
       t == dtReal[FLOAT_SIZE_DEFAULT] ||
-      t == dtImag[FLOAT_SIZE_DEFAULT])
+      t == dtImag[FLOAT_SIZE_DEFAULT] ||
+      t == dtBools[BOOL_SIZE_DEFAULT])
     return true;
 
   return false;
@@ -1517,6 +1518,19 @@ explainCallMatch(CallExpr* call) {
   return true;
 }
 
+static bool shouldSkip(CallExpr* call) {
+  FnSymbol* fn = call->getFunction();
+  ModuleSymbol* mod = call->getModule();
+
+  if (mod->modTag == MOD_INTERNAL) {
+    return true;
+  } else if (fn->hasFlag(FLAG_LINE_NUMBER_OK) == false &&
+             fn->hasFlag(FLAG_COMPILER_GENERATED)) {
+    return true;
+  }
+
+  return false;
+}
 
 static CallExpr*
 userCall(CallExpr* call) {
@@ -1525,13 +1539,12 @@ userCall(CallExpr* call) {
   // If the called function is compiler-generated or is in one of the internal
   // modules, back up the stack until a call is encountered whose target
   // function is neither.
-  // TODO: This function should be rewritten so each test appears only once.
-  if (call->getFunction()->hasFlag(FLAG_COMPILER_GENERATED) ||
-      call->getModule()->modTag == MOD_INTERNAL) {
+
+  if (shouldSkip(call)) {
     for (int i = callStack.n-1; i >= 0; i--) {
-      if (!callStack.v[i]->getFunction()->hasFlag(FLAG_COMPILER_GENERATED) &&
-          callStack.v[i]->getModule()->modTag != MOD_INTERNAL)
-        return callStack.v[i];
+      CallExpr* cur = callStack.v[i];
+      if (!shouldSkip(cur))
+        return cur;
     }
   }
   return call;
@@ -1956,6 +1969,7 @@ void resolveDestructor(AggregateType* at) {
   FnSymbol* deinitFn = resolveUninsertedCall(at, call, false);
 
   if (deinitFn != NULL) {
+    deinitFn->instantiationPoint = at->symbol->instantiationPoint;
     resolveFunction(deinitFn);
     at->setDestructor(deinitFn);
   }
@@ -2724,16 +2738,18 @@ void trimVisibleCandidates(CallInfo&       info,
                            Vec<FnSymbol*>& visibleFns) {
   CallExpr* call = info.call;
 
-  bool isInit = false;
-  if (call->numActuals() >= 2 && call->isNamedAstr(astrInit)) {
+  bool isMethod = false;
+  if (call->numActuals() >= 2) {
     if (SymExpr* se = toSymExpr(call->get(1))) {
-      isInit = se->symbol() == gMethodToken;
+      isMethod = se->symbol() == gMethodToken;
     }
   }
 
-  bool isNew = call->numActuals() >= 1 && call->isNamedAstr(astrNew);
+  bool isInit   = isMethod && call->isNamedAstr(astrInit);
+  bool isNew    = call->numActuals() >= 1 && call->isNamedAstr(astrNew);
+  bool isDeinit = isMethod && call->isNamedAstr(astrDeinit);
 
-  if (isInit == false && isNew == false) {
+  if (!(isInit || isNew || isDeinit)) {
     mostApplicable = visibleFns;
   } else {
     forv_Vec(FnSymbol, fn, visibleFns) {
@@ -2741,7 +2757,7 @@ void trimVisibleCandidates(CallInfo&       info,
       BaseAST* actual = NULL;
       BaseAST* formal = NULL;
 
-      if (isInit && fn->isInitializer()) {
+      if ((isInit && fn->isInitializer()) || (isDeinit && fn->isMethod())) {
         actual = call->get(2);
         formal = fn->_this;
       } else if (isNew && (fn->hasFlag(FLAG_NEW_WRAPPER) || fn->isInitializer())) {
@@ -2750,9 +2766,21 @@ void trimVisibleCandidates(CallInfo&       info,
       }
 
       if (actual != NULL && formal != NULL) {
-        AggregateType* actualType = toAggregateType(actual->getValType())->getRootInstantiation();
-        AggregateType* formalType = toAggregateType(formal->getValType())->getRootInstantiation();
-        if (actualType != formalType) {
+        Type* at = canonicalClassType(actual->getValType());
+        Type* ft = canonicalClassType(formal->getValType());
+
+        AggregateType* actualType = toAggregateType(at)->getRootInstantiation();
+        AggregateType* formalType = toAggregateType(ft)->getRootInstantiation();
+
+        // Allow deinit to match dtObject's deinit so that it will at least
+        // dispatch at some point. Without this check, the compiler would
+        // fail to resolve a 'deinit' call for a concrete class declared in
+        // another module. See the following for examples:
+        //   - modules/diten/returnClassDiffModule*.chpl
+        //   - classes/moduleScope/mod-init.chpl
+        if (isDeinit && formalType == dtObject) {
+          shouldKeep = true;
+        } else if (actualType != formalType) {
           shouldKeep = false;
         }
       } else {
@@ -6767,11 +6795,14 @@ void ensureEnumTypeResolved(EnumType* etype) {
     // below.
     etype->integerType = dtInt[INT_SIZE_DEFAULT];
 
-    int64_t v = 1;
-    uint64_t uv = 1;
+    int64_t v;
+    uint64_t uv;
+    bool foundInit = false;
+    bool foundNegs = false;
 
     for_enums(def, etype) {
       if (def->init != NULL) {
+        foundInit = true;
         Expr* enumTypeExpr = resolveTypeOrParamExpr(def->init);
 
         Type* t = enumTypeExpr->typeInfo();
@@ -6795,30 +6826,38 @@ void ensureEnumTypeResolved(EnumType* etype) {
         if( get_int( def->init, &v ) ) {
           if( v >= 0 ) uv = v;
           else uv = 1;
+          if (v < 0) {
+            foundNegs = true;
+          }
         } else if( get_uint( def->init, &uv ) ) {
           v = uv;
         }
       } else {
-        // Use the u/v value we had from adding 1 to the previous one
-        if( v >= INT32_MIN && v <= INT32_MAX )
-          def->init = new SymExpr(new_IntSymbol(v, INT_SIZE_32));
-        else if (uv <= UINT32_MAX)
-          def->init = new SymExpr(new_IntSymbol(v, INT_SIZE_64));
-        else
-          def->init = new SymExpr(new_UIntSymbol(uv, INT_SIZE_64));
+        if (foundInit) {
+          // Use the u/v value we had from adding 1 to the previous one
+          if( v >= INT32_MIN && v <= INT32_MAX )
+            def->init = new SymExpr(new_IntSymbol(v, INT_SIZE_32));
+          else if (uv <= UINT32_MAX)
+            def->init = new SymExpr(new_IntSymbol(v, INT_SIZE_64));
+          else
+            def->init = new SymExpr(new_UIntSymbol(uv, INT_SIZE_64));
 
-        parent_insert_help(def, def->init);
+          parent_insert_help(def, def->init);
+        }
       }
       if (uv > INT64_MAX) {
         // Switch to uint(64) as the current enum type.
         etype->integerType = dtUInt[INT_SIZE_DEFAULT];
+        if (foundNegs) {
+          USR_FATAL(etype,
+                    "this enum cannot be represented with a single integer type");
+        }
       }
-      v++;
-      uv++;
+      if (foundInit) {
+        v++;
+        uv++;
+      }
     }
-
-    // Now try computing the enum size...
-    etype->sizeAndNormalize();
   }
 
   INT_ASSERT(etype->integerType != NULL);
@@ -8108,9 +8147,15 @@ static void resolveAutoCopyEtc(AggregateType* at) {
 
       FnSymbol* fn = resolveUninsertedCall(at, call);
       INT_ASSERT(fn);
+
+      if (at->hasInitializers()) {
+        fn->instantiationPoint = at->symbol->instantiationPoint;
+      }
+
       resolveFunction(fn);
 
       at->setDestructor(fn);
+
     }
   }
 
@@ -9223,14 +9268,20 @@ static void removeRandomPrimitive(CallExpr* call) {
       // Remove member accesses of types
       // Replace string literals with field symbols in member primitives
       Type* baseType = call->get(1)->typeInfo();
-      if (baseType->symbol->hasFlag(FLAG_RUNTIME_TYPE_VALUE))
-        break;
 
       if (!call->parentSymbol->hasFlag(FLAG_REF) &&
           baseType->symbol->hasFlag(FLAG_REF))
         baseType = baseType->getValType();
 
-      const char* memberName = get_string(call->get(2));
+      SymExpr* memberSE = toSymExpr(call->get(2));
+      const char* memberName = NULL;
+
+      if (!get_string(memberSE, &memberName)) {
+        // Confirm that this is already a correct field Symbol.
+        INT_ASSERT(memberSE->symbol()->defPoint->parentSymbol
+                   == baseType->symbol);
+        break;
+      }
 
       Symbol* sym = baseType->getField(memberName);
       if (sym->hasFlag(FLAG_TYPE_VARIABLE) ||
@@ -10047,7 +10098,7 @@ static void removeReturnTypeBlocks() {
   forv_Vec(FnSymbol, fn, gFnSymbols) {
     if (fn->retExprType && fn->retExprType->parentSymbol) {
       // First, move any defs in the return type block out
-      // (e.g. an array return type creates parloopexpr fns)
+      // (e.g. an array return type creates forall-expr fns)
       for_alist(expr, fn->retExprType->body) {
         if (DefExpr* def = toDefExpr(expr)) {
           if (isFnSymbol(def->sym)) {

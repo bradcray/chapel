@@ -4586,4 +4586,7 @@ module BigInteger {
     }
   }
 
+  proc chpl_CLoopsSupportType(type t: bigint) param {
+    return false;
+  }
 }

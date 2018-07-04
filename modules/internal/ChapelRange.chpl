@@ -1784,7 +1784,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
   // to check/coerce types (i.e. they assume args are of legal types, low/high
   // are the same same type, stride is valid, etc.)
   iter chpl_direct_pos_stride_range_iter(low: ?t, high, stride) {
-    if (useOptimizedRangeIterators) {
+    if (useOptimizedRangeIterators && chpl_CLoopsSupportType(t)) {
       chpl_range_check_stride(stride, t);
 
       if boundsChecking then
@@ -1803,7 +1803,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
   }
 
   iter chpl_direct_param_stride_range_iter(low: ?t, high, param stride) {
-    if (useOptimizedRangeIterators) {
+    if (useOptimizedRangeIterators && chpl_CLoopsSupportType(t)) {
       chpl_range_check_stride(stride, t);
 
       var i: t;
@@ -1851,7 +1851,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
     if this.isAmbiguous() then
       __primitive("chpl_error", c"these -- Attempt to iterate over a range with ambiguous alignment.");
 
-    if (useOptimizedRangeIterators) {
+    if (useOptimizedRangeIterators && chpl_CLoopsSupportType(intIdxType)) {
 
     // This iterator could be split into different cases depending on the
     // stride like the bounded iterators. However, all that gets you is the
@@ -1875,7 +1875,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
   pragma "no doc"
   iter range.these()
     where boundedType == BoundedRangeType.bounded && stridable == true {
-    if (useOptimizedRangeIterators) {
+    if (useOptimizedRangeIterators && chpl_CLoopsSupportType(intIdxType)) {
       if boundsChecking then checkIfIterWillOverflow();
 
       if this.isAmbiguous() then
@@ -1902,7 +1902,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
   pragma "no doc"
   iter range.these()
     where boundedType == BoundedRangeType.bounded && stridable == false {
-    if (useOptimizedRangeIterators) {
+    if (useOptimizedRangeIterators && chpl_CLoopsSupportType(intIdxType)) {
       if boundsChecking then checkIfIterWillOverflow();
 
       // don't need to check if isAmbiguous since stride is one
@@ -1948,12 +1948,23 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
     const start = this.first;
     const end = if this.low > this.high then start else this.last;
 
-    while __primitive("C for loop",
-                      __primitive( "=", i, start),
-                      __primitive(">=", high, low),  // execute at least once?
-                      __primitive("+=", i, stride: intIdxType)) {
-      yield i;
-      if i == end then break;
+    // TODO: Elliot and I have wondered whether we should just always
+    // use a while loop here... Is the for loop buying anything?  It
+    // seems like a confusing-to-humans use of the loop pattern...
+    if (chpl_CLoopsSupportType(intIdxType)) {
+      while __primitive("C for loop",
+                        __primitive( "=", i, start),
+                        __primitive(">=", high, low),  // execute at least once?
+                        __primitive("+=", i, stride: intIdxType)) {
+        yield i;
+        if i == end then break;
+      }
+    } else {
+      i = start;
+      while (high >= low) {
+        yield i;
+        i += stride:intIdxType;
+      }
     }
   }
 
@@ -2563,5 +2574,9 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
 
   inline proc chpl__idxToInt(param i: bool) param {
     return i: int;
+  }
+
+  proc chpl_CLoopsSupportType(type t: integral) param {
+    return true;
   }
 }

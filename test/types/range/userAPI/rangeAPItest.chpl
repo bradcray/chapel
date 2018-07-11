@@ -1,23 +1,43 @@
 config param testError = 0, testDisplayRepresentation = false;
 
 proc testRangeAPI(lbl, r: range(?), idx, subr) {
+  proc testHi() {
+    writeln(r.low);
+    writeln(r.high);
+    writeln(r.alignment);
+  }
   writeln(lbl);
   writeln("------------");
   writeln(r);
+    testHi();
   writeln("idxType          = ", r.idxType:string);
+    testHi();
   writeln("stridable        = ", r.stridable);
+    testHi();
   writeln("boundedType      = ", r.boundedType);
+    testHi();
   writeln("isRangeType()    = ", isRangeType(r.type));
+    testHi();
   writeln("isBoundedRange() = ", isBoundedRange(r));
+    testHi();
   writeln("hasLowBound()    = ", r.hasLowBound());
+    testHi();
   writeln("hasHighBound()   = ", r.hasHighBound());
+    testHi();
   writeln("stride           = ", r.stride);
+    testHi();
   writeln("alignment        = ", r.alignment);
+    testHi();
   writeln("aligned          = ", r.aligned);
+    testHi();
   writeln("first            = ", r.first);
+    testHi();
   writeln("last             = ", r.last);
+    testHi();
   writeln("low              = ", r.low);
+    testHi();
   writeln("high             = ", r.high);
+  /*
   writeln("alignedLow       = ", r.alignedLow);
   writeln("alignedHigh      = ", r.alignedHigh);
   writeln("isEmpty()        = ", r.isEmpty());
@@ -28,6 +48,8 @@ proc testRangeAPI(lbl, r: range(?), idx, subr) {
   writeln("isNat.Algned()   = ", r.isNaturallyAligned());
   writeln("isAmbiguous      = ", r.isAmbiguous());
   writeln("member(", idx, ") = ", r.member(idx));
+  writeln(subr.stride);
+  writeln(subr.stride < 0);
   writeln("member(", subr, ") = ", r.member(subr));
   writeln("ident(self)      = ", ident(r, r));
   writeln("ident(other)     = ", ident(r, subr));
@@ -42,7 +64,7 @@ proc testRangeAPI(lbl, r: range(?), idx, subr) {
   writeln("exterior(2)      = ", r.exterior(2));
   writeln("exterior(-2)     = ", r.exterior(-2));
   writeln("expand(2)        = ", r.expand(2));
-  writeln("offset(2)        = ", r.offset(2));
+  writeln("offset(1)        = ", r.offset(1));
           
   writeln("serial iteration = ");
   for i in r do
@@ -58,4 +80,5 @@ proc testRangeAPI(lbl, r: range(?), idx, subr) {
   
   var r2 = r;
   writeln("Copying...        = ", r2);
+  */
 }

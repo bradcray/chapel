@@ -709,7 +709,7 @@ module BigInteger {
     return c;
   }
 
-  proc -(const ref a: bigint, const ref b: int) {
+  proc -(const ref a: bigint, b: int) {
     var c = new bigint();
 
     if b >= 0 {
@@ -3921,6 +3921,12 @@ module BigInteger {
     }
   }
 
+  proc abs(const ref x: bigint) {
+    var absx: bigint;
+    absx.abs(x);
+    return absx;
+  }
+
   // 5.6 Division Functions
   proc bigint.div_q(const ref n: bigint,
                     const ref d: bigint,
@@ -4588,5 +4594,43 @@ module BigInteger {
 
   proc chpl_CLoopsSupportType(type t: bigint) param {
     return false;
+  }
+
+  proc chpl__extendedEuclid(const ref u: bigint, const ref v: bigint) {
+    return chpl__extendedEuclidHelper(u, v);
+  }
+
+  proc bigint.safeCast(type t: bigint) {
+    return this;
+  }
+
+  proc integral.safeCast(type t: bigint) {
+    var b: bigint = this;
+    return b;
+  }
+
+  // This is a little goofy but permits our current implementation of '#'
+  // to work.  Note that it implies that '#' on bigint ranges will only
+  // support int/uint arguments at present, but this is probably true of
+  // most of the range operators for now.
+  proc chpl__rangeUnsignedType(type idxType: bigint) type {
+    return int;
+  }
+
+  proc chpl__computeTypeForCountMath(type t1: bigint, type t2: integral) type {
+    return bigint;
+  }
+
+  proc chpl__computeTypeForCountMath(type t1: integral, type t2: bigint) type {
+    return bigint;
+  }
+
+  proc chpl__signedType(type t: bigint) type {
+    return bigint;
+  }
+
+  proc chpl__add(a: bigint, b: bigint, type resultType: bigint)
+  {
+    return (a + b);
   }
 }

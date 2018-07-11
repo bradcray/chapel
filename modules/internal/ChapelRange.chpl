@@ -434,7 +434,12 @@ module ChapelRange {
 
   /* Return the range's high bound. If the range does not have a high
      bound the behavior is undefined. */
-  inline proc range.high return chpl_intToIdx(_high);
+  inline proc range.high {
+    if (idxType != int) {
+      writeln(_high);
+    }
+    return chpl_intToIdx(_high);
+  }
 
 
   /* Returns the range's aligned low bound. If the aligned low bound is
@@ -611,11 +616,15 @@ module ChapelRange {
     // Since slicing preserves the direction of the first arg, may need
     // to negate one of the strides (shouldn't matter which).
     if stridable {
-      if (stride > 0 && other.stride < 0) || (stride < 0 && other.stride > 0)
-        then return _memberHelp(this, other);
-    } else {
-      if other.stride < 0
-        then return _memberHelp(this, other);
+      if (stride > 0 && other.stride < 0) || (stride < 0 && other.stride > 0) {
+        compilerWarning("In first case");
+        return _memberHelp(this, other);
+      }
+    } else if other.stridable {
+      if other.stride < 0 {
+        compilerWarning("In second case");
+        return _memberHelp(this, other);
+      }
     }
     return other == this(other);
   }

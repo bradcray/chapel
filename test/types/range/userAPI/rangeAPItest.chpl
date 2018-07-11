@@ -8,7 +8,7 @@ proc testRangeAPI(lbl, r: range(?), idx, subr) {
   writeln("stridable        = ", r.stridable);
   writeln("boundedType      = ", r.boundedType);
   writeln("isRangeType()    = ", isRangeType(r.type));
-  writeln("isBoundedRange() = ", r.isBoundedRange());
+  writeln("isBoundedRange() = ", isBoundedRange(r));
   writeln("hasLowBound()    = ", r.hasLowBound());
   writeln("hasHighBound()   = ", r.hasHighBound());
   writeln("stride           = ", r.stride);
@@ -22,13 +22,13 @@ proc testRangeAPI(lbl, r: range(?), idx, subr) {
   writeln("alignedHigh      = ", r.alignedHigh);
   writeln("isEmpty()        = ", r.isEmpty());
   writeln("size             = ", r.size);
-  wrtteln("length           = ", r.length);
+  writeln("length           = ", r.length);
   writeln("hasFirst()       = ", r.hasFirst());
   writeln("hasLast()        = ", r.hasLast());
   writeln("isNat.Algned()   = ", r.isNaturallyAligned());
   writeln("isAmbiguous      = ", r.isAmbiguous());
-  writeln("member(", idx, ")= ", r.member(idx));
-  writeln("member(", subr, "= ", r.member(subr));
+  writeln("member(", idx, ") = ", r.member(idx));
+  writeln("member(", subr, ") = ", r.member(subr));
   writeln("ident(self)      = ", ident(r, r));
   writeln("ident(other)     = ", ident(r, subr));
   writeln("boundsCheck(", idx, ") = ", r.boundsCheck(idx));
@@ -40,7 +40,7 @@ proc testRangeAPI(lbl, r: range(?), idx, subr) {
   writeln("interior(2)      = ", r.interior(2));
   writeln("interior(-2)     = ", r.interior(-2));
   writeln("exterior(2)      = ", r.exterior(2));
-  writeln("exterior(-2)     = ", r.exterior(2));
+  writeln("exterior(-2)     = ", r.exterior(-2));
   writeln("expand(2)        = ", r.expand(2));
   writeln("offset(2)        = ", r.offset(2));
           
@@ -52,7 +52,7 @@ proc testRangeAPI(lbl, r: range(?), idx, subr) {
   writeln("r#2               = ", r#2);
   writeln("r#-2              = ", r#-2);
   writeln("r == subr         = ", r == subr);
-  writeln("r !- subr         = ", r != subr);
+  writeln("r != subr         = ", r != subr);
   writeln("r[subr]           = ", r[subr]);
   writeln("r[subr] == subr[r]= ", r[subr] == subr[r]);
   

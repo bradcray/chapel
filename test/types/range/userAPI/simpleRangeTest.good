@@ -1,0 +1,53 @@
+./rangeAPITest.chpl:3: In function 'testRangeAPI':
+./rangeAPITest.chpl:45: warning: invoking 'offset' on an unstrided range has no effect.
+basic range
+------------
+1..10
+idxType          = int(64)
+stridable        = false
+boundedType      = bounded
+isRangeType()    = true
+isBoundedRange() = true
+hasLowBound()    = true
+hasHighBound()   = true
+stride           = 1
+alignment        = 1
+aligned          = true
+first            = 1
+last             = 10
+low              = 1
+high             = 10
+alignedLow       = 1
+alignedHigh      = 10
+isEmpty()        = false
+size             = 10
+length           = 10
+hasFirst()       = true
+hasLast()        = true
+isNat.Algned()   = true
+isAmbiguous      = false
+member(4) = true
+member(3..6) = true
+ident(self)      = true
+ident(other)     = false
+boundsCheck(4) = true
+boundsCheck(3..6) = true
+indexOrder(4) = 3
+orderToIndex(3)  = 4
+translate(2)     = 3..12
+translate(2)     = -1..8
+interior(2)      = 9..10
+interior(-2)     = 1..2
+exterior(2)      = 11..12
+exterior(-2)     = -1..0
+expand(2)        = -1..12
+offset(2)        = 1..10
+serial iteration = 
+1 2 3 4 5 6 7 8 9 10 
+r#2               = 1..2
+r#-2              = 9..10
+r == subr         = false
+r != subr         = true
+r[subr]           = 3..6
+r[subr] == subr[r]= true
+Copying...        = 1..10

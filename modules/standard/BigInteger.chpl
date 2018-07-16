@@ -200,7 +200,7 @@ module BigInteger {
     pragma "no doc"
     proc deinit() {
       if _local || this.localeId == chpl_nodeID {
-        mpz_clear(this.mpz);
+        //        mpz_clear(this.mpz);
       }
     }
 
@@ -1426,7 +1426,7 @@ module BigInteger {
     return cmp(a, b) > 0;
   }
 
-  proc >(b: int, const ref a: bigint) {
+  proc >(a: int, const ref b: bigint) {
     return cmp(a, b) > 0;
   }
 
@@ -1434,7 +1434,7 @@ module BigInteger {
     return cmp(a, b) > 0;
   }
 
-  proc >(b: uint, const ref a: bigint) {
+  proc >(a: uint, const ref b: bigint) {
     return cmp(a, b) > 0;
   }
 
@@ -1449,7 +1449,7 @@ module BigInteger {
     return cmp(a, b) < 0;
   }
 
-  proc <(b: int, const ref a: bigint) {
+  proc <(a: int, const ref b: bigint) {
     return cmp(a, b) < 0;
   }
 
@@ -1457,7 +1457,7 @@ module BigInteger {
     return cmp(a, b) < 0;
   }
 
-  proc <(b: uint, const ref a: bigint) {
+  proc <(a: uint, const ref b: bigint) {
     return cmp(a, b) < 0;
   }
 
@@ -1471,7 +1471,7 @@ module BigInteger {
     return cmp(a, b) >= 0;
   }
 
-  proc >=(b: int, const ref a: bigint) {
+  proc >=(a: int, const ref b: bigint) {
     return cmp(a, b) >= 0;
   }
 
@@ -1479,7 +1479,7 @@ module BigInteger {
     return cmp(a, b) >= 0;
   }
 
-  proc >=(b: uint, const ref a: bigint) {
+  proc >=(a: uint, const ref b: bigint) {
     return cmp(a, b) >= 0;
   }
 
@@ -1494,7 +1494,7 @@ module BigInteger {
     return cmp(a, b) <= 0;
   }
 
-  proc <=(b: int, const ref a: bigint) {
+  proc <=(a: int, const ref b: bigint) {
     return cmp(a, b) <= 0;
   }
 
@@ -1502,7 +1502,7 @@ module BigInteger {
     return cmp(a, b) <= 0;
   }
 
-  proc <=(b: uint, const ref a: bigint) {
+  proc <=(a: uint, const ref b: bigint) {
     return cmp(a, b) <= 0;
   }
 
@@ -4551,23 +4551,32 @@ module BigInteger {
     }
   }
 
-  proc chpl_build_bounded_range(low: bigint, high: bigint)
-    return new range(bigint, _low=low, _high=high);
+  proc chpl_build_bounded_range(low: bigint, high: bigint) {
+    var lowCopy = low;
+    var highCopy = high;
+    return new range(bigint, _low=lowCopy, _high=highCopy);
+  }
 
   proc chpl__rangeStrideType(type idxType: bigint) type {
     return bigint;
   }
 
   inline proc chpl__idxToInt(i: bigint) {
-    return i;
+    var j: bigint;
+    j = i;
+    return j;
   }
 
   inline proc chpl__intToIdx(type idxType: bigint, i: bigint) {
-    return i;
+    var j: bigint;
+    j = i;
+    return j;
   }
 
   inline proc chpl__intToIdx(type idxType: bigint, i: integral) {
-    return i: bigint;
+    var b: bigint;
+    b = i;
+    return b;
   }
 
   proc (range(bigint, ?b, false)).stride return 1: bigint;

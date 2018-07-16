@@ -435,9 +435,6 @@ module ChapelRange {
   /* Return the range's high bound. If the range does not have a high
      bound the behavior is undefined. */
   inline proc range.high {
-    if (idxType != int) {
-      writeln(_high);
-    }
     return chpl_intToIdx(_high);
   }
 

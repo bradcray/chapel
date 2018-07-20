@@ -525,7 +525,9 @@ static void findReachableBlocks(FnSymbol* fn, BasicBlockSet& reachable)
   std::queue<BasicBlock*> work_queue;
 
   INT_ASSERT(fn->basicBlocks);
-  INT_ASSERT(fn->basicBlocks->size() > 0);
+  if (fn->basicBlocks->size() <= 0) {
+    return;
+  }
   work_queue.push((*fn->basicBlocks)[0]);
 
   // Then we iterate until there are no more blocks to visit.

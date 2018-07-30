@@ -136,7 +136,6 @@ module TomlParser {
   const tabSpace = 4;
 
   pragma "no doc"
-  pragma "use default init"
   class Parser {
 
     var source: Source;
@@ -969,8 +968,8 @@ module TomlReader {
 
     var tomlStr: string;
     var tokenD = {1..0},
-      tokenlist: [tokenD] Tokens;
-    var currentLine: Tokens;
+      tokenlist: [tokenD] unmanaged Tokens;
+    var currentLine: unmanaged Tokens;
 
 
     proc init(tomlStr: string) {

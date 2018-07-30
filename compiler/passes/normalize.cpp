@@ -2055,7 +2055,7 @@ static void init_typed_var(VarSymbol* var,
   if (var->hasFlag(FLAG_EXTERN) == true) {
     INT_ASSERT(var->hasFlag(FLAG_PARAM) == false);
 
-    BlockStmt* block = new BlockStmt(NULL, BLOCK_EXTERN_TYPE);
+    BlockStmt* block = new BlockStmt(BLOCK_EXTERN_TYPE);
 
     block->insertAtTail(typeDefn);
     block->insertAtTail(initMove);
@@ -2361,7 +2361,7 @@ static void normVarTypeWoutInit(DefExpr* defExpr) {
   //
   // expects to find the init code inside a block stmt.
   if (var->hasFlag(FLAG_EXTERN) == true) {
-    BlockStmt* block    = new BlockStmt(NULL, BLOCK_EXTERN_TYPE);
+    BlockStmt* block    = new BlockStmt(BLOCK_EXTERN_TYPE);
 
     VarSymbol* typeTemp = newTemp("type_tmp");
     DefExpr*   typeDefn = new DefExpr(typeTemp);
@@ -3723,6 +3723,8 @@ static bool isConstructor(FnSymbol* fn) {
   return retval;
 }
 
+static bool firstConstructorWarning = true;
+
 static void updateConstructor(FnSymbol* fn) {
   SymbolMap      map;
   Type*          type = fn->getFormal(2)->type;
@@ -3794,6 +3796,13 @@ static void updateConstructor(FnSymbol* fn) {
       USR_FATAL_CONT(fn, "Type '%s' defined a constructor here",
                      ct->symbol->name);
     }
+  } else if (fWarnConstructors) {
+    if (firstConstructorWarning == true) {
+      USR_PRINT(fn, "Constructors have been deprecated as of Chapel 1.18. Please use initializers instead.");
+      firstConstructorWarning = false;
+    }
+
+    USR_WARN(fn, "Type '%s' defines a constructor here", ct->symbol->name);
   }
 
   fn->addFlag(FLAG_CONSTRUCTOR);

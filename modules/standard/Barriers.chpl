@@ -69,7 +69,7 @@ module Barriers {
   /* A barrier that will cause `numTasks` to wait before proceeding. */
   record Barrier {
     pragma "no doc"
-    var bar: BarrierBaseType;
+    var bar: unmanaged BarrierBaseType;
     pragma "no doc"
     var isowned: bool = false;
 
@@ -176,7 +176,6 @@ module Barriers {
   /* The BarrierBaseType class provides an abstract base type for barriers
    */
   pragma "no doc"
-  pragma "use default init"
   class BarrierBaseType {
     pragma "no doc"
     proc barrier() {

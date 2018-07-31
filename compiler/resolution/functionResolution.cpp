@@ -7825,6 +7825,7 @@ static void resolveExports() {
          !fn->hasFlag(FLAG_RESOLVED) &&
          !fn->hasFlag(FLAG_INVISIBLE_FN) &&
          !fn->hasFlag(FLAG_INLINE) &&
+         !fn->hasFlag(FLAG_EXTERN) &&
          //         !fn->hasFlag(FLAG_COMPILER_NESTED_FUNCTION)
          !fn->hasFlag(FLAG_COMPILER_GENERATED) &&
          // TODO: What chpl_ functions are not marked compiler-generated?

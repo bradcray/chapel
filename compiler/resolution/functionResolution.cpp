@@ -7826,6 +7826,8 @@ static void resolveExports() {
          !fn->hasFlag(FLAG_INVISIBLE_FN) &&
          !fn->hasFlag(FLAG_INLINE) &&
          !fn->hasFlag(FLAG_EXTERN) &&
+         !fn->hasFlag(FLAG_ON) && 
+         !fn->hasFlag(FLAG_COBEGIN_OR_COFORALL) &&
          //         !fn->hasFlag(FLAG_COMPILER_NESTED_FUNCTION)
          !fn->hasFlag(FLAG_COMPILER_GENERATED) &&
          // TODO: What chpl_ functions are not marked compiler-generated?
@@ -7834,13 +7836,14 @@ static void resolveExports() {
          fn->defPoint->getModule() &&
          fn->defPoint->getModule()->modTag == MOD_USER)) {
       SET_LINENO(fn);
-      /*
-      printf("---\n");
-      printf("%s\n", fn->name);
-      printf("---\n");
-      viewFlags(fn->id);
-      printf("---\n\n");
-      */
+
+      if (developer) {
+        printf("---\n");
+        printf("%s\n", fn->name);
+        printf("---\n");
+        viewFlags(fn->id);
+        printf("---\n\n");
+      }
 
       resolveSignatureAndFunction(fn);
     }

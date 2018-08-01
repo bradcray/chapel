@@ -7833,6 +7833,12 @@ static void resolveExports() {
          // TODO: What chpl_ functions are not marked compiler-generated?
          (strncmp(fn->name, "chpl_", 5) != 0) &&
          fn->defPoint &&
+         // Nested functions are tricky because their resolution may depend
+         // on the resolution of the outer function in which they are located;
+         // i.e., they may be generic w.r.t. outer-scoped variables, yet not
+         // marked with FLAG_GENERIC.  How to distinguish simple nested
+         // concrete functions which could be resolved from those that can't?
+         !isFnSymbol(fn->defPoint->parentSymbol) && // fn is not nested
          fn->defPoint->getModule() &&
          fn->defPoint->getModule()->modTag == MOD_USER)) {
       SET_LINENO(fn);

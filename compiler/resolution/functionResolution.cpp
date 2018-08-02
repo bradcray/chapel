@@ -1032,6 +1032,11 @@ bool canCoerce(Type*     actualType,
     }
   }
 
+  // Handle coercions nil -> owned/shared
+  if (actualType == dtNil && isManagedPtrType(formalType)) {
+    return true;
+  }
+
   if (canCoerceTuples(actualType, actualSym, formalType, fn)) {
     return true;
   }

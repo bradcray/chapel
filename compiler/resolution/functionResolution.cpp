@@ -35,6 +35,7 @@
 #include "CForLoop.h"
 #include "DeferStmt.h"
 #include "driver.h"
+#include "expandVarArgs.h"
 #include "ForallStmt.h"
 #include "ForLoop.h"
 #include "implementForallIntents.h"
@@ -7822,6 +7823,7 @@ static void resolveExports() {
 
     if (fn->hasFlag(FLAG_EXPORT) ||
         (!fn->hasFlag(FLAG_GENERIC) &&
+         !hasVariableArgs(fn) &&
          !fn->hasFlag(FLAG_RESOLVED) &&
          !fn->hasFlag(FLAG_INVISIBLE_FN) &&
          !fn->hasFlag(FLAG_INLINE) &&

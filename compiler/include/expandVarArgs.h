@@ -24,6 +24,8 @@ class CallInfo;
 class FnSymbol;
 class PartialCopyData;
 
+bool hasVariableArgs(FnSymbol* fn);
+
 FnSymbol* expandIfVarArgs(FnSymbol* fn,
                           CallInfo& info);
 

@@ -92,8 +92,18 @@ static void      cacheExtend(FnSymbol* fn, FnSymbol* expansion);
 *                                                                             *
 ************************************** | *************************************/
 
-static bool hasVariableArgs(FnSymbol* fn);
 
+bool hasVariableArgs(FnSymbol* fn) {
+  bool retval = false;
+
+  for_formals(formal, fn) {
+    if (formal->variableExpr != NULL) {
+      retval = true;
+    }
+  }
+
+  return retval;
+}
 
 FnSymbol* expandIfVarArgs(FnSymbol* fn, CallInfo& info) {
   FnSymbol* retval = fn;
@@ -108,18 +118,6 @@ FnSymbol* expandIfVarArgs(FnSymbol* fn, CallInfo& info) {
       if (retval != NULL) {
         cacheExtend(fn, retval);
       }
-    }
-  }
-
-  return retval;
-}
-
-static bool hasVariableArgs(FnSymbol* fn) {
-  bool retval = false;
-
-  for_formals(formal, fn) {
-    if (formal->variableExpr != NULL) {
-      retval = true;
     }
   }
 

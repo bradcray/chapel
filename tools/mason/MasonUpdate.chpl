@@ -22,6 +22,8 @@ use FileSystem;
 use MasonUtils;
 use MasonEnv;
 use MasonSystem; 
+use MasonExternal;
+
 
 /*
 Update: Performs the upfront dependency resolution and generates the lock file.
@@ -123,10 +125,8 @@ proc checkRegistryChanged() {
 
 /* Pulls the mason-registry. Cloning if !exist */
 proc updateRegistry(tf: string, args : [] string) {
-  for a in args {
-    if a == "--no-update-registry" {
-      return;
-    }
+  if args.find("--no-update")[1] {
+    return;
   }
 
   checkRegistryChanged();
@@ -297,12 +297,17 @@ private proc createDepTree(root: unmanaged Toml) {
       }
     }
   }
+
   // Check for pkg-config dependencies
   if root.pathExists("system") {
     const exDeps = getPCDeps(root["system"]);
-    var PCdom: domain(string);
-    var PCtoml: [PCdom] unmanaged Toml;
     depTree["system"] = exDeps;
+  }
+
+  // Check for non-Chapel dependencies
+  if root.pathExists("external") {
+    const externals = getExternalPackages(root["external"]);
+    depTree["external"] = externals;
   }
   return depTree;
 }
@@ -450,15 +455,4 @@ private proc getDependencies(tomlTbl: unmanaged Toml) {
   }
   return deps;
 }
-
-/* Iterator to collect fields from a toml
-   TODO custom fields returned */
-iter allFields(tomlTbl: unmanaged Toml) {
-  for (k,v) in zip(tomlTbl.D, tomlTbl.A) {
-    if v.tag == fieldToml then
-      continue;
-    else yield(k,v);
-  }
-}
-
 

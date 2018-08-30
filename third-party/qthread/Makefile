@@ -52,13 +52,20 @@ ifeq ($(CFLAGS_NEEDS_RT_INCLUDES), y)
   # do not want -DNDEBUG; if we have that set when building Qthreads it
   # seems to cause Chapel programs built with the result to hang during
   # exit when shutting down Qthreads.
-  CFLAGS += \
+  INCS_DEFS := \
     $(shell $(CHPL_MAKE_HOME)/util/config/compileline --includes-and-defines \
+            || echo compilelineFAILURE)
+  ifneq (, $(findstring compilelineFAILURE,$(INCS_DEFS)))
+    $(error compileline failed!)
+  endif
+  INCS_DEFS_PROCESSED := \
+    $(shell echo $(INCS_DEFS) \
             | tr ' ' '\n' \
             | grep '^-DCHPL\|/runtime//*include\|/third-party/.*/install' \
             | grep -v '/third-party/qthread/install' \
             | tr '\n' ' ' \
             | sed 's/ $$//')
+  CFLAGS += $(INCS_DEFS_PROCESSED)
 endif
 
 # enable oversubscription for testing
@@ -67,7 +74,9 @@ CHPL_QTHREAD_CFG_OPTIONS += --enable-oversubscription
 endif
 
 # enable guard pages for stack overflow detection, unless directed not to
+HAVE_GUARD_PAGES = 0
 ifeq (, $(call isTrue, $(CHPL_QTHREAD_NO_GUARD_PAGES)))
+HAVE_GUARD_PAGES = 1
 CHPL_QTHREAD_CFG_OPTIONS += --enable-guard-pages
 endif
 
@@ -179,6 +188,9 @@ qthread-chapel-h: FORCE
 	     > $(QTHREAD_INSTALL_DIR)/include/qthread-chapel.h
 	echo "#define CHPL_QTHREAD_SCHEDULER_ONE_WORKER_PER_SHEPHERD" \
 	     $(ONE_WORKER_PER_SHEPHERD) \
+	     >> $(QTHREAD_INSTALL_DIR)/include/qthread-chapel.h
+	echo "#define CHPL_QTHREAD_HAVE_GUARD_PAGES" \
+	     $(HAVE_GUARD_PAGES) \
 	     >> $(QTHREAD_INSTALL_DIR)/include/qthread-chapel.h
 
 qthread: qthread-config qthread-build qthread-chapel-h

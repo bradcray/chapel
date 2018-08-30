@@ -36,13 +36,15 @@ const char* forallIntentTagDescription(ForallIntentTag tfiTag) {
   switch (tfiTag) {
     case TFI_DEFAULT:       return "default";
     case TFI_CONST:         return "const";
-    case TFI_IN_OUTERVAR:   return "in-outervar";
+    case TFI_IN_PARENT:     return "parent-in";
     case TFI_IN:            return "in";
     case TFI_CONST_IN:      return "const in";
     case TFI_REF:           return "ref";
     case TFI_CONST_REF:     return "const ref";
     case TFI_REDUCE:        return "reduce";
-    case TFI_REDUCE_OP:     return "reduceOp";
+    case TFI_REDUCE_OP:        return "reduce-Op";
+    case TFI_REDUCE_PARENT_AS: return "parent-reduce-AS";
+    case TFI_REDUCE_PARENT_OP: return "parent-reduce-Op";
     case TFI_TASK_PRIVATE:  return "task-private";
   }
   INT_ASSERT(false);
@@ -372,7 +374,7 @@ bool astUnderFI(const Expr* ast, ForallIntents* fi) {
 //
 //  * find the target parallel iterator (standalone or leader) and resolve it
 //  * issue an error, if neither is found
-//  * handle forall intents, using implementForallIntents1New()
+//  * handle forall intents, using setupAndResolveShadowVars()
 //  * partly lower by building leader+follow loop(s) as needed
 //
 // This happens when resolveExpr() encounters the first iterated expression
@@ -440,7 +442,7 @@ static QualifiedType buildIterYieldType(ForallStmt* fs, FnSymbol* iterFn, FnSymb
     switch (svar->intent) {
       case TFI_DEFAULT:
       case TFI_CONST:
-      case TFI_IN_OUTERVAR:
+      case TFI_IN_PARENT:
       case TFI_IN:
       case TFI_CONST_IN:
       case TFI_REF:
@@ -448,13 +450,18 @@ static QualifiedType buildIterYieldType(ForallStmt* fs, FnSymbol* iterFn, FnSymb
         ovar = svar->outerVarSym();
         break;
 
-      case TFI_REDUCE:     // _OP probably gets here first
-      case TFI_REDUCE_OP:
+      case TFI_REDUCE:
         // ... except for reduce intents - they are TODO.
         USR_FATAL_CONT(svar, "Reduce intents are currently not implemented"
           " for forall- or for-loops over recursive parallel iterators");
         USR_PRINT(iterFn, "the parallel iterator is here");
         USR_STOP();
+        break;
+
+      case TFI_REDUCE_OP:
+      case TFI_REDUCE_PARENT_AS:
+      case TFI_REDUCE_PARENT_OP:
+        // The error should have been issued above upon TFI_REDUCE.
         break;
 
       case TFI_TASK_PRIVATE:
@@ -485,7 +492,6 @@ static QualifiedType buildIterYieldType(ForallStmt* fs, FnSymbol* iterFn, FnSymb
   return result;
 }
 
-
 //
 // Given an iterator function, find the type that it yields.
 // It would be fn->retType, alas protoIteratorClass() messes with that.
@@ -512,6 +518,13 @@ static QualifiedType fsIterYieldType(ForallStmt* fs, FnSymbol* iterFn,
     return fsIterYieldType(fs, iterator, origIterFn, alreadyResolved);
   }
 }
+
+
+static bool acceptUnmodifiedIterCall(ForallStmt* pfs, CallExpr* iterCall)
+{
+  return pfs->createdFromForLoop();
+}
+
 
 // Like in build.cpp, here for ForallStmt.
 static BlockStmt*
@@ -631,7 +644,7 @@ static CallExpr* buildForallParIterCall(ForallStmt* pfs, SymExpr* origSE)
       targetName = astr(astr_loopexpr_iter, targetName + forallExprNameLen);
     }
 
-    if (pfs->fFromResolvedForLoop) {
+    if (acceptUnmodifiedIterCall(pfs, origIterCall)) {
       iterCall = origIterCall;
       iterCall->remove();
     } else {
@@ -661,11 +674,6 @@ static void checkForExplicitTagArgs(CallExpr* iterCall) {
       USR_STOP();
     }
   }
-}
-
-static bool acceptUnmodifiedIterCall(ForallStmt* pfs, CallExpr* iterCall)
-{
-  return pfs->iterCallAlreadyTagged();
 }
 
 static bool findStandaloneOrLeader(ForallStmt* pfs, CallExpr* iterCall)
@@ -957,9 +965,7 @@ CallExpr* resolveForallHeader(ForallStmt* pfs, SymExpr* origSE)
 
     resolveParallelIteratorAndIdxVar(pfs, iterCall, origIterFn, gotSA);
 
-    implementForallIntents1New(pfs, iterCall);
-
-    setupShadowVariables(pfs);
+    setupAndResolveShadowVars(pfs);
 
     if (gotSA) {
       if (origSE->qualType().type()->symbol->hasFlag(FLAG_ITERATOR_RECORD)) {
@@ -1090,7 +1096,7 @@ static void convertIteratorForLoopexpr(ForallStmt* fs) {
   if (CallExpr* iterCall = toCallExpr(fs->iteratedExpressions().head))
     if (SymExpr* calleeSE = toSymExpr(iterCall->baseExpr))
       if (FnSymbol* calleeFn = toFnSymbol(calleeSE->symbol()))
-        if (!strncmp(calleeFn->name, astr_loopexpr_iter, strlen(astr_loopexpr_iter))) {
+        if (isLoopExprFun(calleeFn)) {
           // In this case, we have a _toLeader call and no side effects.
           // Just use the iterator corresponding to the iterator record.
           FnSymbol* iterator = getTheIteratorFnFromIteratorRec(calleeFn->retType);

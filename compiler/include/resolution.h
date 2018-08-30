@@ -56,17 +56,11 @@ extern char                             primCoerceTmpName[];
 
 extern Map<Type*,     FnSymbol*>        autoDestroyMap;
 
-extern Map<FnSymbol*, FnSymbol*>        iteratorLeaderMap;
-
-extern Map<FnSymbol*, FnSymbol*>        iteratorFollowerMap;
-
 extern Map<Type*,     FnSymbol*>        valueToRuntimeTypeMap;
 
 extern std::map<Type*,     Serializers> serializeMap;
 
 extern std::map<CallExpr*, CallExpr*>   eflopiMap;
-
-
 
 
 
@@ -146,7 +140,7 @@ CallExpr* resolveForallHeader(ForallStmt* pfs, SymExpr* origSE);
 void implementForallIntents1(DefExpr* defChplIter);
 void implementForallIntents2(CallExpr* call, CallExpr* origToLeaderCall);
 void implementForallIntents2wrapper(CallExpr* call, CallExpr* origToLeaderCall);
-void implementForallIntents1New(ForallStmt* fs, CallExpr* parCall);
+void setupAndResolveShadowVars(ForallStmt* fs);
 void stashPristineCopyOfLeaderIter(FnSymbol* origLeader, bool ignoreIsResolved);
 
 // reduce intents
@@ -279,5 +273,7 @@ void trimVisibleCandidates(CallInfo& call,
                            Vec<FnSymbol*>& visibleFns);
 
 bool isNumericParamDefaultType(Type* type);
+
+void resolveGenericActuals(CallExpr* call);
 
 #endif

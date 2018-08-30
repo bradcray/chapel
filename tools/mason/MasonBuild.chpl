@@ -26,17 +26,28 @@ use MasonHelp;
 use MasonEnv;
 use MasonUpdate;
 use MasonSystem;
+use MasonExample;
 
-proc masonBuild(args) {
+proc masonBuild(args) throws {
   var show = false;
   var release = false;
   var force = false;
   var compopts: [1..0] string;
+  var opt = false;
+  var example = false;
   if args.size > 2 {
     for arg in args[2..] {
-      if arg == '-h' || arg == '--help' {
+      if opt == true {
+        compopts.push_back(arg);
+      }
+      else if arg == '-h' || arg == '--help' {
         masonBuildHelp();
-        exit();
+        exit(0);
+      }
+      else if arg == '--' {
+        if example then
+          throw new MasonError("Examples do not support `--` syntax");
+        opt = true;
       }
       else if arg == '--release' {
         release = true;
@@ -47,15 +58,32 @@ proc masonBuild(args) {
       else if arg == '--show' {
         show = true;
       }
+      else if arg == '--example' {
+        example = true;
+      }
+      // passed to UpdateLock
+      else if arg == '--no-update' {
+        continue;
+      }
       else {
         compopts.push_back(arg);
       }
     }
   }
-  const configNames = UpdateLock(args);
-  const tomlName = configNames[1];
-  const lockName = configNames[2];
-  buildProgram(release, show, force, compopts, tomlName, lockName);
+  if example {
+    // compopts become test names. Build never runs examples
+    compopts.push_back("--no-run");
+    if show then compopts.push_back("--show");
+    if release then compopts.push_back("--release");
+    if force then compopts.push_back("--force");
+    masonExample(compopts);
+  }
+  else {
+    const configNames = UpdateLock(args);
+    const tomlName = configNames[1];
+    const lockName = configNames[2];
+    buildProgram(release, show, force, compopts, tomlName, lockName);
+  }
 }
 
 private proc checkChplVersion(lockFile : borrowed Toml) throws {
@@ -104,7 +132,7 @@ proc buildProgram(release: bool, show: bool, force: bool, cmdLineCompopts: [?d] 
         getSrcCode(sourceList, show);
 
         // get compilation options including external dependencies
-        const compopts = getCompopts(lockFile, cmdLineCompopts);
+        const compopts = getTomlCompopts(lockFile, cmdLineCompopts);
 
         // Compile Program
         if compileSrc(lockFile, binLoc, show, release, compopts, projectHome) {
@@ -158,8 +186,11 @@ proc compileSrc(lockFile: borrowed Toml, binLoc: string, show: bool,
     }
 
     // Verbosity control
-    if show then writeln(command);
-    else writeln("Compiling "+ project);
+    if show then writeln("Compilation command: " + command);
+    else {
+      if release then writeln("Compiling [release] target: " + project);
+      else writeln("Compiling [debug] target: " + project);
+    }
 
     // compile Program with deps
     var compilation = runWithStatus(command);
@@ -182,7 +213,7 @@ proc genSourceList(lockFile: borrowed Toml) {
   var sourceList: [1..0] (string, string, string);
   for (name, package) in zip(lockFile.D, lockFile.A) {
     if package.tag == fieldToml {
-      if name == "root" || name == "system" then continue;
+      if name == "root" || name == "system" || name == "external" then continue;
       else {
         var version = lockFile[name]["version"].s;
         var source = lockFile[name]["source"].s;
@@ -227,17 +258,31 @@ proc getSrcCode(sourceList: [?d] 3*string, show) {
   }
 }
 
-private proc getCompopts(lock: borrowed Toml, compopts: [?d] string) {
+// Retrieves root table compopts, external compopts, and system compopts
+proc getTomlCompopts(lock: borrowed Toml, compopts: [?d] string) {
 
   // Checks for compilation options are present in Mason.toml
   if lock.pathExists('root.compopts') {
     const cmpFlags = lock["root"]["compopts"].s;
     compopts.push_back(cmpFlags);
   }
-  // Get pkgconfig dependency compilation options
-  if lock.pathExists('system') {
-    const exDeps = lock['system'];
+  
+  if lock.pathExists('external') {
+    const exDeps = lock['external'];
     for (name, depInfo) in zip(exDeps.D, exDeps.A) {
+      for (k,v) in allFields(depInfo) {
+        select k {
+            when "libs" do compopts.push_back("-L" + v.s); 
+            when "include" do compopts.push_back("-I" + v.s);
+            when "other" do compopts.push_back("-I" + v.s);
+            otherwise continue;
+          }
+      }
+    }
+  }
+  if lock.pathExists('system') {
+    const pkgDeps = lock['system'];
+    for (name, depInfo) in zip(pkgDeps.D, pkgDeps.A) {
       compopts.push_back(depInfo["libs"].s);
       compopts.push_back("-I" + depInfo["include"].s);
     }

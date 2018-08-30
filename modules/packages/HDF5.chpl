@@ -19,6 +19,11 @@
 
 module HDF5 {
 
+  // This interface was generated with HDF5 1.10.1. Due to a change of the
+  // `hid_t` type from 32-bit to 64-bit in this version, versions prior
+  // to 1.10.0 cannot be safely used.
+  verifyMinimumHDF5Version(1, 10, 0);
+
   coforall loc in Locales do on loc {
     // Check that the HDF5 version matches what is expected
     // and initialize the HDF5 library on all locales.
@@ -3398,6 +3403,19 @@ module HDF5 {
     }
   }
   */
+  // Verify that the HDF5 version in use is at least as high as the
+  // (major, minor, release) arguments.
+  private proc verifyMinimumHDF5Version(major, minor, release) {
+    const HDF5Version = (C_HDF5.H5_VERS_MAJOR,
+                         C_HDF5.H5_VERS_MINOR,
+                         C_HDF5.H5_VERS_RELEASE),
+          requiredVersion = (major, minor, release);
+
+    if HDF5Version < requiredVersion {
+      halt("HDF5 version ", HDF5Version,
+           " is below the required version ", requiredVersion);
+    }
+  }
 
   /* Read the dataset named `dsetName` from all HDF5 files in the
      directory `dirName` with filenames that begin with `filenameStart`.
@@ -3473,17 +3491,14 @@ module HDF5 {
    */
   proc readNamedHDF5FilesInto1DArrayInt(filenames: [] string,
                                         fnCols: int, fnRows: int,
-                                        dsetName: string) {
-    // Would like to add an argument:
-    // `preprocessor: HDF5Preprocessor=nil`
-    // and forward it along to the `readAllNamedHDF5Files` call, but the
-    // Python->Chapel interface is not currently able to handle Chapel types
+                                        dsetName: string,
+                                        preprocessor: HDF5Preprocessor = nil) {
     use BlockDist;
 
     var filenames2D = reshape(filenames, {1..fnCols, 1..fnRows});
 
     var data = readAllNamedHDF5Files(Locales, filenames2D, dsetName,
-                                     int, rank=2);
+                                     int, rank=2, preprocessor=preprocessor);
     const rows = + reduce [subset in data[.., 1]] subset.D.dim(1).length;
     const cols = + reduce [subset in data[1, ..]] subset.D.dim(2).length;
 
@@ -3878,11 +3893,6 @@ module HDF5 {
     }
   }
 
-  // There is an internal error involving function arguments of this type
-  // being passed as shadow variables to forall loops if this type is not
-  // used in any other way.  As a workaround, declare an instance so that
-  // it is used.
-  private const unusedInternalErrorWorkaround: HDF5Preprocessor;
 
   /* A record that stores a rectangular array.  An array of `ArrayWrapper`
      records can store multiple differently sized arrays.

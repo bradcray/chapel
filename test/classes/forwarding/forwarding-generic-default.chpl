@@ -31,24 +31,27 @@ class C:B{
   var cfield:int;
 }
 
-
-var c1 = new unmanaged A(new unmanaged C());
+var c1d = new unmanaged C();
+var c1 = new unmanaged A(c1d);
 writeln(c1.foo1());
 
-var c2 = new unmanaged A(new unmanaged C());
+var c2d = new unmanaged C();
+var c2 = new unmanaged A(c2d);
 writeln(c2.foo2("Test"));
 
-var c3 = new unmanaged A(new unmanaged C());
+var c3d = new unmanaged C();
+var c3 = new unmanaged A(c3d);
 writeln(c3.foo3("Test", "Test"));
 
-var c4 = new unmanaged A(new unmanaged C());
+var c4d = new unmanaged C();
+var c4 = new unmanaged A(c4d);
 writeln(c4.foo4("Test"));
 
-delete c4.driver;
+delete c4d;
 delete c4;
-delete c3.driver;
+delete c3d;
 delete c3;
-delete c2.driver;
+delete c2d;
 delete c2;
-delete c1.driver;
+delete c1d;
 delete c1;

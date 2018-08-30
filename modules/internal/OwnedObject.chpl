@@ -129,12 +129,16 @@ module OwnedObject {
 
        :arg p: the class instance to manage. Must be of class type.
      */
-    proc init(p) {
-      this.t = _to_borrowed(p.type);
+    proc init(p:borrowed) {
+      this.t = p.type;
 
-      if !isClass(p) then
-        compilerError("Owned only works with classes");
+      this.p = p;
+    }
 
+    proc init(p:?T) where isClass(T) == false && isSubtype(T, _owned) == false  &&
+                    isIterator(p) == false {
+      compilerError("Owned only works with classes");
+      this.t = T;
       this.p = p;
     }
 
@@ -155,7 +159,7 @@ module OwnedObject {
     proc deinit() {
       if isClass(p) { // otherwise, let error happen on init call
         if p != nil then
-          delete p;
+          delete _to_unmanaged(p);
       }
     }
 
@@ -165,7 +169,7 @@ module OwnedObject {
      */
     proc ref clear() {
       if p != nil {
-        delete p;
+        delete _to_unmanaged(p);
         p = nil;
       }
     }
@@ -180,7 +184,7 @@ module OwnedObject {
       var oldPtr = p;
       p = newPtr;
       if oldPtr then
-        delete oldPtr;
+        delete _to_unmanaged(oldPtr);
     }
 
     /*

@@ -47,8 +47,9 @@ proc masonHelp() {
   writeln('    env         Print environment variables recognized by mason');
   writeln('    clean       Remove the target directory');
   writeln('    doc         Build this project\'s documentation');
-  writeln('    test        Compile and run tests found in test/');
   writeln('    system      Integrate with system packages found via pkg-config');
+  writeln('    test        Compile and run tests found in /test');
+  writeln('    external    Integrate external dependencies into mason packages');
 }
 
 proc masonList() {
@@ -59,7 +60,8 @@ proc masonList() {
   writeln('      update             ');
   writeln('      build              ');
   writeln('      run                ');
-  writeln('      test                ');
+  writeln('      test               ');
+  writeln('      external           ');
   writeln('      search             ');
   writeln('      env                ');
   writeln('      clean              ');
@@ -80,11 +82,18 @@ proc masonRunHelp() {
   writeln('    -h, --help                   Display this message');
   writeln('        --build                  Compile before running binary');
   writeln('        --show                   Increase verbosity');
-  writeln('Runtime arguments can also be included after the run arguments ');
+  writeln('        --example <example>      Run an example');
+  writeln();
+  writeln('When --example is thrown without an example, all available examples will be listed');
   writeln();
   writeln('When no options are provided, the following will take place:');
   writeln('   - Execute binary from mason project if target/ is present');
   writeln('   - If no target directory, build and run is Mason.toml is present');
+  writeln();
+  writeln('Runtime arguments can be included after mason arguments.');
+  writeln('To ensure that runtime arguments and mason arguments to not conflict, separate them');
+  writeln('with a single dash(`-`). For example');
+  writeln('   e.g. mason run --build - --runtimeArg=true');
 }
 
 proc masonBuildHelp() {
@@ -98,9 +107,17 @@ proc masonBuildHelp() {
   writeln('        --show                   Increase verbosity');
   writeln('        --release                Compile to target/release with optimizations (--fast)');
   writeln('        --force                  Force Mason to build the project');
+  writeln('        --example <example>      Build an example from the example/ directory');
+  writeln('        --no-update              Do not update the mason registry before building');
   writeln();
+  writeln('When --example is thrown without an example, all examples will be built');
   writeln('When no options are provided, the following will take place:');
   writeln('   - Build from mason project if Mason.lock present');
+  writeln();
+  writeln('Compilation flags and arguments can be included after mason arguments.');
+  writeln('To ensure compilation flags and mason arguments to not conflict, separate them with a');
+  writeln('single dash(`-`). For example');
+  writeln('   e.g. mason build --force - --savec tmpdir');
 }
 
 proc masonNewHelp() {
@@ -167,6 +184,165 @@ proc masonEnvHelp() {
   writeln("asterisk at the end of the line.");
 }
 
+proc masonExternalHelp() {
+  writeln("Use, install and search for external packages to build Mason packages with");
+  writeln();
+  writeln("Usage:");
+  writeln('    mason external [options] [<args>...]');
+  writeln('    mason external [options]');
+  writeln();
+  writeln("Options:");  
+  writeln("    search                      Search for a specific external package");
+  writeln("    compiler                    List and search for compilers on system");
+  writeln("    install                     Install an external package");
+  writeln("    uninstall                   Uninstall an external package");
+  writeln("    info                        Show information about an external package");
+  writeln("    find                        Find information about installed external packages");
+  writeln("    -h, --help                  Display this message");
+  writeln("        --setup                 Download and install Spack backend");
+  writeln("        --spec                  Display Spack specification help");
+  writeln();
+  writeln("Please see Mason documentation for more instructions on using external packages");
+}
+
+proc masonExternalFindHelp() {
+  writeln("Find external packages on your system and get information about them");
+  writeln();
+  writeln("Usage:");
+  writeln("    mason external find [options]");
+  writeln("    mason external find [options] <package>");
+  writeln();
+  writeln("    <package>: a Spack spec expression indicating the package to find");
+  writeln();
+  writeln("Options:");
+  writeln("    -h, --help                  Display this message"); 
+  writeln();
+  writeln("Display Options:");
+  writeln("    -s, --short                 Show only specs (default)");
+  writeln("    -p, --paths                 Show paths to package install directories");
+  writeln("    -d, --deps                  Show full dependency DAG of installed packages");
+  writeln("    -l, --long                  Show dependency hashes as well as versions");
+  writeln("    -L, --very-long             Show full dependency hashes as well as versions");
+  writeln("    -t TAGS, --tags TAGS        Filter a package query by tags");
+  writeln("        --show-flags            Show spec compiler flags");
+  writeln("        --show-full-compiler    Show full compiler specs");
+  writeln("        --variants              Show variants in output (can be long)");
+  writeln("    -e, --explicit              Show only specs that were installed explicitly");
+  writeln("    -E, --implicit              Show only specs that were installed as dependencies");
+  writeln("    -u, --unknown               Show only specs Spack does not have a package for");
+  writeln("    -m, --missing               Show missing dependencies as well as installed specs");
+  writeln("    -M, --only-missing          Show only missing dependencies");
+  writeln("    -N, --namespace             Show fully qualified package names");
+  writeln();
+  writeln("When no package is listed, all installed external packages will be listed.");
+}
+
+proc masonExternalInfoHelp() {
+  writeln("Get information about external packages and system architecture");
+  writeln();
+  writeln("Usage:");
+  writeln("    mason external info [options] <package>");
+  writeln();
+  writeln("    <package>: a Spack spec expression indicating the package to retrieve information on");
+  writeln();
+  writeln("Options:");
+  writeln("    -h, --help                  Display this message");
+  writeln("        --arch                  Print architecture information about current system");
+  writeln();
+}
+
+proc masonExternalSearchHelp() {
+  writeln("Search for external packages");
+  writeln();
+  writeln("Usage:");
+  writeln("    mason external search [options] <search string>");
+  writeln();
+  writeln("Options:");
+  writeln("    -h, --help                  Display this message");
+  writeln("    -d, --desc                  Parse descriptions of package to include more search results");
+  writeln();
+}
+
+proc masonInstallHelp() {
+  writeln("Install external packages onto your system");
+  writeln();
+  writeln("Usage:");
+  writeln("    mason external install [options] <package> ");
+  writeln();
+  writeln("    <package>: a Spack spec expression indicating the package to install");
+  writeln();
+  writeln("Options:");
+  writeln("    -h, --help                     Display this message");
+  writeln("    --only {package,dependencies}  Select the mode of installation. the default is to");
+  writeln("                                   install the package along with all its dependencies.");
+  writeln("                                   alternatively one can decide to install only the");
+  writeln("                                   package or only the dependencies");
+  writeln("    --jobs JOBS                    Explicitly set number of make jobs. default is #cpus");
+  writeln("    --overwrite                    reinstall an existing spec, even if it has dependents");
+  writeln("    --keep-prefix                  Don't remove the install prefix if installation fails");
+  writeln("    --keep-stage                   Don't remove the build stage if installation succeeds");
+  writeln("    --restage                      If a partial install is detected, delete prior state");
+  writeln("    --use-cache                    Check for pre-built packages in mirrors");
+  writeln("    --show-log-on-error            Print full build log to stderr if build fails");
+  writeln("    --source                       Install source files in prefix");
+  writeln("    --no-checksum                  Do not check packages against checksum");
+  // writeln("    -v, --verbose               Display verbose build output while installing"); #10622
+  writeln("    --fake                         Fake install for debug purposes.");
+  writeln("    --file                         Install from file. Read specs to install from .yaml");
+  writeln("    --clean                        Sanitize the environment from variables that can");
+  writeln("                                   affect how packages find libraries or headers");
+  writeln("    --dirty                        Maintain the current environment without trying to");
+  writeln("                                   sanitize it");
+  writeln("    --test {root,all}              If 'root' is chosen, run package tests during");
+  writeln("                                   installation for top-level packages (but skip tests");
+  writeln("                                   for dependencies). if 'all' is chosen, run package");
+  writeln("                                   tests during installation for all packages. If neither");
+  writeln("                                   are chosen, don't run tests for any packages.");
+  writeln("    --run-tests                    Run package tests during installation (same as --test=all)");
+  writeln("    --log-format {junit}           Format to be used for log files");
+  writeln("    --log-file LOG_FILE            Filename for the log file. if not passed a default will be used");
+  writeln("    --yes-to-all                   Assume 'yes' is the answer to every confirmation request");
+  writeln();
+  writeln("External Mason packages can be installed as follows:");
+  writeln("    mason external install <full Spack spec expression>");
+  writeln();
+  }
+
+
+proc masonUninstallHelp() {
+  writeln("Uninstall external packages on your system");
+  writeln();
+  writeln("Usage:");
+  writeln("    mason external uninstall [options] <package> ");
+  writeln();
+  writeln("    <package>: a Spack spec expression indicating the package to install");
+  writeln();
+  writeln("Options:");
+  writeln("    -h, --help                  Display this message");
+  writeln("        --force                 Remove regardless of dependents");
+  writeln("        --all                   USE CAREFULLY. remove ALL installed packages that match supplied spec");
+  writeln("        --dependents            Also uninstall any dependent packages");
+  writeln();
+  writeln("External Mason packages can be uninstalled as follows:");
+  writeln("    mason external uninstall <full Spack spec expression>");
+  writeln();
+}
+
+proc masonCompilerHelp() {
+  writeln("Find and view compilers on your system");
+  writeln();
+  writeln("Usage:");
+  writeln("    mason external compiler [options]");
+  writeln();
+  writeln("Options:");
+  writeln("    -h, --help                  Display this message");
+  writeln("        --find                  Find compilers on your system");
+  writeln("        --edit                  Open the compilers configuration file in $EDITOR");
+  writeln("        --list                  List the compilers on your system");
+  writeln();
+ }
+
+
 proc masonTestHelp() {
   writeln("Run test files located within target/debug/test");
   writeln();
@@ -182,6 +358,7 @@ proc masonTestHelp() {
   writeln("Test configuration is up to the user");
   writeln("Tests pass if they exit with status code 0");
 }
+
 
 proc masonSystemHelp() {
   writeln("Integrate a Mason package with system packages found via pkg-config");

@@ -182,7 +182,7 @@ static bool isFollowerITer(FnSymbol* iter) {
 }
 
 static FnSymbol* findForallexprFollower(FnSymbol* serialIter) {
-  if (strncmp(serialIter->name, astr_loopexpr_iter, strlen(astr_loopexpr_iter)))
+  if (!isLoopExprFun(serialIter))
     // Not a forall-expression.
     return NULL;
 
@@ -805,9 +805,7 @@ static Expr* preFoldPrimOp(CallExpr* call) {
     FnSymbol* iterator     = getTheIteratorFn(call);
     CallExpr* followerCall = NULL;
 
-    if (FnSymbol* follower = iteratorFollowerMap.get(iterator)) {
-      followerCall = new CallExpr(follower);
-    } else if (FnSymbol* f2 = findForallexprFollower(iterator)) {
+    if (FnSymbol* f2 = findForallexprFollower(iterator)) {
       followerCall = new CallExpr(f2);
     } else {
       followerCall = new CallExpr(iterator->name);
@@ -845,13 +843,7 @@ static Expr* preFoldPrimOp(CallExpr* call) {
 
   } else if (call->isPrimitive(PRIM_TO_LEADER)) {
     FnSymbol* iterator   = getTheIteratorFn(call);
-    CallExpr* leaderCall = NULL;
-
-    if (FnSymbol* leader = iteratorLeaderMap.get(iterator)) {
-      leaderCall = new CallExpr(leader);
-    } else {
-      leaderCall = new CallExpr(iterator->name);
-    }
+    CallExpr* leaderCall = new CallExpr(iterator->name);
 
     for_formals(formal, iterator) {
       // Note: this can add a use formal outside of its function
@@ -912,7 +904,9 @@ static Expr* preFoldPrimOp(CallExpr* call) {
       // Keep in sync with setIteratorRecordShape(CallExpr* call).
       INT_ASSERT(ir->type->symbol->hasFlag(FLAG_ITERATOR_RECORD));
       Symbol* shapeSpec = toSymExpr(call->get(2))->symbol();
-      retval = setIteratorRecordShape(call, ir, shapeSpec);
+      Symbol* fromForLoop = toSymExpr(call->get(3))->symbol();
+      retval = setIteratorRecordShape(call, ir, shapeSpec,
+                 getSymbolImmediate(fromForLoop)->bool_value());
       call->replace(retval);
     }
 
@@ -1818,7 +1812,8 @@ static Expr* createFunctionAsValue(CallExpr *call) {
     wrapper->insertAtTail(new CallExpr(PRIM_RETURN,
                                        new CallExpr(PRIM_CAST,
                                                     parent->symbol,
-                                                    new CallExpr("_new",
+                                                    new CallExpr(PRIM_NEW,
+                                                                 new NamedExpr(astr_chpl_manager, new SymExpr(dtUnmanaged->symbol)),
                                                                  new SymExpr(ct->symbol)))));
   } else {
     wrapper->insertAtTail(new CallExpr(PRIM_RETURN,
@@ -1893,7 +1888,7 @@ static Expr* dropUnnecessaryCast(CallExpr* call) {
 
           if (newType == oldType) {
             if (isUserDefinedRecord(newType) && !getSymbolImmediate(var)) {
-              result = new CallExpr("chpl__initCopy", var);
+              result = new CallExpr("_removed_cast", var);
               call->replace(result);
             } else {
               result = new SymExpr(var);

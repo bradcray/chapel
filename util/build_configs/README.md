@@ -1,26 +1,109 @@
-## New scripts to build customizable Chapel module from source
+## New scripts to build customizable Chapel modules from source
 
-Work-in-progress (2018-07-31)
+This directory contains scripts to build customizable Chapel binaries
+in multiple configurations.
+
+The `cray-internal` subdirectory adds scripts to package Chapel binaries
+(already pre-built with `setenv-example3.bash` from this directory) into an
+RPM suitable for installation on a Cray-XC. See `./cray-internal/README.md`
+for more info.
 
 ### Files in this directory:
 
 * build_configs.py:
   Provides a CLI for building Chapel binaries in multiple configurations.
   Moved here from CHPL_HOME/util and adapted for this application.
+  Run with "-h" option for Help.
 
-* setenv-example-*.bash:
+* setenv-example-\*.bash:
   Example setenv script files
+  - setenv-example-1: The simplest tutorial illustrating a trivial Chapel configuration
+    (With and without Gasnet; Gasnet with two comm substrates).
+  - setenv-example-2: Same trivial Chapel configuration, but a more elaborate scripting style.
+  - setenv-example-3: Realistic Chapel configuration for a Cray-XC
+    (With and without Cray ugni; Slurm launcher; two target compilers).
 
 * chapel_build.bash:
-  Example high-level wrapper script to run a complete build process
+  Example high-level wrapper script to run a complete Chapel build.
+  Run with "-h" option for Help.
 
-* functions.bash: Misc shell functions for use in other bash scripts
+* functions.bash: General-purpose shell functions for use in bash scripts
 
-* Users local Chapel projects:
+* module-functions.bash: Shell functions to manipulate Cray system modules
 
-  For convenience, users may keep their own setenv script files, make
-  logs, CHPL_HOME workspaces, etc in this directory, without adding
-  them to Git.
+* package-functions.bash: General-purpose shell functions for use in Chapel
+    packaging scripts; see for example ./cray-internal/chapel_package-cray.bash.
+
+* build-common.bash: Reusable bash code to find existing CHPL_HOME directory
+    or create a new one from a given Chapel release tarball.
+    See for example chapel_build.bash.
+
+* package-common.bash: Reusable bash code for use in Chapel packaging scripts;
+    see for example ./cray-internal/chapel_package-cray.bash.
+
+### Users local Chapel projects:
+
+For convenience, users may keep their own setenv script files, make
+logs, CHPL_HOME workspaces, etc in this directory, without adding
+them to Git. A hypothetical user story follows.
+
+Let's say you have a Linux cluster with Slurm; you want to build Chapel
+binaries with and without Gasnet (where Gasnet may use either of two widely-
+supported comm substrates); and you also want the option to use the native
+Slurm launcher "slurm-srun", as well as Chapel's default Gasnet launcher(s).
+Let's call your new project "slurm".
+
+The Chapel build config matrix shown in setenv-example-1 and -2 seems quite
+similar, except it does not include the native Slurm launcher.
+
+To get started, copy file setenv-example-2.bash to a new file "slurm.bash",
+and edit the new file.
+* Find the build_configs.py command `to make Chapel "runtime"`
+* That build_configs.py command line includes existing parameters:
+  - `--comm=none,gasnet --launcher=UNSET --substrate=none,$substrates`
+* Replace `--launcher=UNSET` with `--launcher=UNSET,slurm-srun`.
+
+This will add another Chapel make (with CHPL_LAUNCHER=slurm-srun) to each
+existing Gasnet config:
+```
+        # CHPL_COMM   CHPL_COMM_SUBSTRATE   CHPL_LAUNCHER   Make Chapel?
+        # ---------   -------------------   -------------   -----------
+        # none        none                  <default>       Yes
+        # none        none                  slurm-srun      Yes (?)
+        # none        mpi                   <default>       No  (skip)
+        # none        mpi                   slurm-srun      No  (skip)
+        # none        udp                   <default>       No  (skip)
+        # none        udp                   slurm-srun      No  (skip)
+        # gasnet      none                  <default>       No  (skip)
+        # gasnet      none                  slurm-srun      No  (skip)
+        # gasnet      mpi                   <default>       Yes
+        # gasnet      mpi                   slurm-srun      Yes
+        # gasnet      udp                   <default>       Yes
+        # gasnet      udp                   slurm-srun      Yes
+```
+It will also add another Chapel make (with slurm-srun) to the existing
+non-Gasnet (CHPL_COMM=none) config.
+You might want to add something to the setenv callback to skip the relatively-
+useless CHPL_COMM=none and CHPL_LAUNCHER=slurm-srun config. But, its optional.
+
+(Please see [Using Chapel](https://chapel-lang.org/docs/usingchapel/launcher.html)
+for more information about Slurm launchers.)
+
+You could then try your new setenv script file in an existing Chapel build
+workspace:
+```
+export CHPL_HOME=/your/chapel-home-directory
+./slurm.bash
+```
+Or you could use the existing chapel_build.bash script to create a new Chapel
+build workspace from a Chapel source tar file you have downloaded (e.g., from
+[GitHub](https://github.com/chapel-lang/chapel/releases/download/1.17.1/chapel-1.17.1.tar.gz)).
+
+The following command will create the new CHPL_HOME under your current
+working directory, and then run your "slurm.bash" setenv project:
+```
+  ./chapel_build.bash -s slurm.bash -t /your/chapel-x.y.z.tar.gz
+```
 
 ### Discussion
 
@@ -70,9 +153,11 @@ Components
       for each Chapel build config, to customize the host environment seen by
       each Chapel make. It can also skip the Chapel make command entirely.
 
-* Cray module packaging script. (2018-07-31: not available yet)
+* Cray module packaging script:
   Given an existing build workspace with the makes completed, create the
   Chapel RPM and collateral.
+
+  - 2018-08-21: Now implemented in subdirectory ./cray-internal
 
 * High-level wrappers.
 
@@ -80,10 +165,9 @@ Components
     A script to unroll a Chapel release tarball, call a setenv project, and
     possibly the Cray module packaging script.
 
-    WIP example: chapel_build.sh
+    Example: cray-internal/chapel_build.sh
 
   * For Cray-internal Jenkins build script replacement:
     A script to build a new (or unroll a previously-built) Chapel release tarball;
     call a different setenv project, depending on Cray-XC or XE; and
     call the Cray module packaging script.
-

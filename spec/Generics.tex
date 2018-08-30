@@ -509,7 +509,11 @@ writeln(n.next);
 writeln(n.next.type:string);
 delete n;
 \end{chapelpost}
+\begin{chapelcompopts}
+--legacy-new
+\end{chapelcompopts}
 \begin{chapeloutput}
+NodeClass.chpl:10: warning: 'delete' can only be applied to unmanaged classes
 3.14
 nil
 Node(real(64))
@@ -625,7 +629,12 @@ writeln(list.next.data);
 delete list.next;
 delete list;
 \end{chapelpost}
+\begin{chapelcompopts}
+--legacy-new
+\end{chapelcompopts}
 \begin{chapeloutput}
+fieldWithoutType.chpl:9: warning: 'delete' can only be applied to unmanaged classes
+fieldWithoutType.chpl:10: warning: 'delete' can only be applied to unmanaged classes
 1
 2
 \end{chapeloutput}
@@ -770,9 +779,11 @@ delete g1;
 delete g2;
 \end{chapelpost}
 \begin{chapelcompopts}
---no-warn-constructors
+--no-warn-constructors --legacy-new
 \end{chapelcompopts}
 \begin{chapeloutput}
+constructorsForGenericFields.chpl:28: warning: 'delete' can only be applied to unmanaged classes
+constructorsForGenericFields.chpl:29: warning: 'delete' can only be applied to unmanaged classes
 1
 a string
 {c1 = 11, v1 = 111, x1 = 0, c5 = 5.5, v5 = 555, x5 = 0.0}
@@ -999,7 +1010,12 @@ s.push(3);
 while !s.isEmpty do
   writeln(s.pop());
 \end{chapelpost}
+\begin{chapelcompopts}
+--legacy-new
+\end{chapelcompopts}
 \begin{chapeloutput}
+genericStack.chpl:15: In function 'pop':
+genericStack.chpl:21: warning: 'delete' can only be applied to unmanaged classes
 3
 2
 1

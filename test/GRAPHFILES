@@ -142,14 +142,12 @@ studies/shootout/submitted/fannkuchredux-submitted.graph
 studies/shootout/submitted/fasta-submitted.graph
 studies/shootout/submitted/knucleotide-submitted.graph
 studies/shootout/submitted/mandelbrot-submitted.graph
-studies/shootout/submitted/meteor-submitted.graph
 studies/shootout/submitted/nbody-submitted.graph
 studies/shootout/submitted/pidigits-submitted.graph
 studies/shootout/submitted/regexdna-submitted.graph
 studies/shootout/submitted/regexdnaredux-submitted.graph
 studies/shootout/submitted/revcomp-submitted.graph
 studies/shootout/submitted/spectralnorm-submitted.graph
-studies/shootout/submitted/threadring-submitted.graph
 # suite: Shootout extras
 studies/shootout/fasta/fasta-extras.graph
 studies/shootout/fasta/fastaredux.graph
@@ -269,6 +267,7 @@ library/packages/Sort/performance/sorts-quadratic.graph
 library/packages/LinearAlgebra/performance/linearalgebra-perf.graph
 sparse/CS/multiplication/cs-multiplication.graph
 sparse/CS/resize/cs-resize.graph
+library/packages/Sort/RadixSort/radixsortMSB.graph
 # suite: Misc
 users/franzf/v0/chpl/main.graph
 reductions/diten/testSerialReductions.graph

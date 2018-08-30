@@ -15,7 +15,7 @@ class C {
 }
 
 class D : C {
-  proc foo() {
+  override proc foo() {
     writeln("In D.foo()");
   }
 
@@ -25,7 +25,7 @@ class D : C {
 }
 
 class E : C {
-  proc foo() {
+  override proc foo() {
     writeln("In E.foo()");
   }
 

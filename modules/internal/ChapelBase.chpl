@@ -923,11 +923,11 @@ module ChapelBase {
     type taskCntType = if !forceLocalTypes && useAtomicTaskCnt then atomic int
                                            else int;
     if forceLocalTypes {
-      return new _EndCount(iType=chpl__processorAtomicType(int),
-                           taskType=taskCntType);
+      return new unmanaged _EndCount(iType=chpl__processorAtomicType(int),
+                                     taskType=taskCntType);
     } else {
-      return new _EndCount(iType=chpl__atomicType(int),
-                           taskType=taskCntType);
+      return new unmanaged _EndCount(iType=chpl__atomicType(int),
+                                     taskType=taskCntType);
     }
   }
 
@@ -939,7 +939,7 @@ module ChapelBase {
   // on statement needed.
   pragma "dont disable remote value forwarding"
   inline proc _endCountFree(e: _EndCount) {
-    delete e;
+    delete _to_unmanaged(e);
   }
 
   // This function is called by the initiating task once for each new
@@ -1065,10 +1065,19 @@ module ChapelBase {
       throw new unmanaged TaskErrors(e.errors);
   }
 
+  proc _do_command_line_cast(type t, x:c_string) throws {
+    var str = x:string;
+    if t == string {
+      return str;
+    } else {
+      return str:t;
+    }
+  }
+  // param s is used for error reporting
   pragma "command line setting"
-  proc _command_line_cast(param s: c_string, type t, x) {
+  proc _command_line_cast(param s: c_string, type t, x:c_string) {
     try! {
-      return _cast(t, x:string);
+      return _do_command_line_cast(t, x);
     }
   }
 
@@ -1367,6 +1376,7 @@ module ChapelBase {
 
 
   // implements 'delete' statement
+  pragma "no borrow convert"
   inline proc chpl__delete(arg)
     where isClassType(arg.type) || isExternClassType(arg.type) {
 
@@ -1375,6 +1385,10 @@ module ChapelBase {
 
     if arg.type == _nilType then
       compilerError("should not delete 'nil'");
+
+    // TODO - this should be an error after 1.18
+    if !isExternClassType(arg.type) && !isSubtype(arg.type, _unmanaged) then
+      compilerWarning("'delete' can only be applied to unmanaged classes");
 
     if (arg != nil) {
       arg.deinit();
@@ -1390,8 +1404,13 @@ module ChapelBase {
   }
 
   // report an error when 'delete' is inappropriate
+  pragma "no borrow convert"
   proc chpl__delete(arg) {
-    if isRecord(arg) then
+    if isSubtype(arg.type, _owned) then
+      compilerError("'delete' is not allowed on an owned class type");
+    else if isSubtype(arg.type, _shared) then
+      compilerError("'delete' is not allowed on a shared class type");
+    else if isRecord(arg) then
       // special case for records as a more likely occurrence
       compilerError("'delete' is not allowed on records");
     else
@@ -1997,5 +2016,10 @@ module ChapelBase {
   // cast from unmanaged to borrow
   inline proc _cast(type t:borrowed, x:_unmanaged) where isSubtype(_to_borrowed(x.type),t) {
     return __primitive("cast", t, x);
+  }
+
+  pragma "no borrow convert"
+  inline proc _removed_cast(in x) {
+    return x;
   }
 }

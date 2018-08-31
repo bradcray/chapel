@@ -14,7 +14,7 @@ class myAbstractLocaleModel : myLocale {
 
 class myNumaDomain : myAbstractLocaleModel {
   const name: string;
-  proc chpl_name() return name;
+  override proc chpl_name() return name;
 
   proc init() {
     name = "test";

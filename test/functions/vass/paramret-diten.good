@@ -1,3 +1,5 @@
+paramret-diten.chpl:13: In function 'notAllControlFlowsHaveReturn':
+paramret-diten.chpl:13: error: control reaches end of function that returns a value
 3
 3
 3

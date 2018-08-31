@@ -578,8 +578,14 @@ class MDNode
     
     for d in 1..rank            do subranges(d) = Domain.dim(d);
     for d in bisect_dim+1..rank do subranges(d) = Domain.dim(d);    
-    
-    subranges(bisect_dim) = Domain.low(bisect_dim) .. right_low-Domain.stride(bisect_dim) by Domain.stride(bisect_dim);
+
+    if stridable {
+      subranges(bisect_dim) = Domain.low(bisect_dim) .. right_low-Domain.stride(bisect_dim) by Domain.stride(bisect_dim);
+    } else {
+      if Domain.stride(bisect_dim) != 1 then
+        halt("stridable == false but intended stride != 1");
+      subranges(bisect_dim) = Domain.low(bisect_dim) .. right_low-Domain.stride(bisect_dim);
+    }      
     
     var child_domain: domain(rank, stridable=stridable) = subranges;
     
@@ -598,7 +604,13 @@ class MDNode
     for d in 1..rank            do subranges(d) = Domain.dim(d);
     for d in bisect_dim+1..rank do subranges(d) = Domain.dim(d);
     
-    subranges(bisect_dim) = right_low .. Domain.high(bisect_dim) by Domain.stride(bisect_dim);
+    if stridable {
+      subranges(bisect_dim) = right_low .. Domain.high(bisect_dim) by Domain.stride(bisect_dim);
+    } else {
+      if Domain.stride(bisect_dim) != 1 then
+        halt("stridable == false but intended stride != 1");
+      subranges(bisect_dim) = right_low .. Domain.high(bisect_dim);
+    }
     
     var child_domain: domain(rank, stridable=stridable) = subranges;
     
@@ -701,8 +713,14 @@ proc MDNode.extendToContain( D: domain(rank,stridable=stridable) ) : unmanaged M
       // subranges(ext_d) = D.low(ext_d) .. ext_index-s by s;
       // D_temp           = subranges;
       // sibling          = new MDNode( rank, stridable, D_temp, false );
-      
-      subranges(ext_d) = D.low(ext_d) .. Domain.high(ext_d) by s;
+
+      if stridable {
+        subranges(ext_d) = D.low(ext_d) .. Domain.high(ext_d) by s;
+      } else {
+        if s != 1 then
+          halt("stridable == false but stride != 1");
+        subranges(ext_d) = D.low(ext_d) .. Domain.high(ext_d);
+      }
       D_temp           = subranges;
       parent            = new unmanaged MDNode( rank, stridable, D_temp );
       parent.bisect_dim = ext_d;
@@ -724,8 +742,14 @@ proc MDNode.extendToContain( D: domain(rank,stridable=stridable) ) : unmanaged M
       // D_temp           = subranges;
       // sibling          = new MDNode( rank, stridable, D_temp, false );
       // sibling.filled   = false;
-      
-      subranges(ext_d)  = Domain.low(ext_d) .. D.high(ext_d) by s;
+
+      if stridable {
+        subranges(ext_d)  = Domain.low(ext_d) .. D.high(ext_d) by s;
+      } else {
+        if s != 1 then
+          halt("stridable == false but stride != 1");
+        subranges(ext_d)  = Domain.low(ext_d) .. D.high(ext_d);
+      }
       D_temp            = subranges;
       parent            = new unmanaged MDNode( rank, stridable, D_temp );
       parent.bisect_dim = ext_d;

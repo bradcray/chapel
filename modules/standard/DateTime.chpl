@@ -1659,7 +1659,6 @@ module DateTime {
   /* Abstract base class for time zones. This class should not be used
      directly, but concrete implementations of time zones should be
      derived from it. */
-  pragma "use default init"
   class TZInfo {
     /* The offset from UTC this class represents */
     proc utcoffset(dt: datetime): timedelta {
@@ -1680,7 +1679,7 @@ module DateTime {
     }
 
     /* Convert a `time` in UTC to this time zone */
-    proc fromutc(in dt: datetime): datetime {
+    proc fromutc(dt: datetime): datetime {
       HaltWrappers.pureVirtualMethodHalt();
       return new datetime(0,0,0);
     }

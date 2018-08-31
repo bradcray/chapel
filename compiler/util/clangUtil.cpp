@@ -300,6 +300,20 @@ void setupClangContext(GenInfo* info, ASTContext* Ctx)
 }
 
 
+static astlocT getClangDeclLocation(clang::Decl* d) {
+  INT_ASSERT(gGenInfo->clangInfo->Ctx);
+  SourceManager& srcm = gGenInfo->clangInfo->Ctx->getSourceManager();
+  SourceLocation loc = d->getLocation();
+  PresumedLoc ploc = srcm.getPresumedLoc(loc, true);
+  const char* filename = astr(ploc.getFilename());
+  unsigned lineno = ploc.getLine();
+  astlocT ret(lineno, filename);
+  return ret;
+}
+
+
+
+
 static const bool debugPrintMacros = false;
 
 static void handleMacroToken(const MacroInfo* inMacro,
@@ -1504,11 +1518,13 @@ bool lookupInExternBlock(ModuleSymbol* module, const char* name,
                          clang::TypeDecl** cTypeOut,
                          clang::ValueDecl** cValueOut,
                          const char** cCastedToTypeOut,
-                         ChapelType** chplTypeOut)
+                         ChapelType** chplTypeOut,
+                         astlocT* astlocOut)
 {
   if( ! module->extern_info ) return false;
   module->extern_info->gen_info->lvt->getCDecl(name, cTypeOut, cValueOut,
-                                               cCastedToTypeOut);
+                                               cCastedToTypeOut,
+                                               astlocOut);
   VarSymbol* var = module->extern_info->gen_info->lvt->getVarSymbol(name);
   if( var ) *chplTypeOut = var->typeInfo();
   return ( (*cTypeOut) || (*cValueOut) || (*chplTypeOut) );
@@ -1594,7 +1610,13 @@ void runClang(const char* just_parse_filename) {
 
   if (compilingWithPrgEnv()) {
     std::string gather_prgenv(CHPL_HOME);
-    gather_prgenv += "/util/config/gather-cray-prgenv-arguments.bash compile";
+    gather_prgenv += "/util/config/gather-cray-prgenv-arguments.bash compile '";
+    gather_prgenv += CHPL_COMM;
+    gather_prgenv += "' '";
+    gather_prgenv += CHPL_COMM_SUBSTRATE;
+    gather_prgenv += "' '";
+    gather_prgenv += CHPL_AUX_FILESYS;
+    gather_prgenv += "'";
     readArgsFromCommand(gather_prgenv, args);
   }
 
@@ -2057,6 +2079,8 @@ void LayeredValueTable::addGlobalCDecl(StringRef name, NamedDecl* cdecl, const c
     store.u.cValueDecl = cast<ValueDecl>(cdecl);
     store.u.castChplVarTo = castToType;
   }
+
+  store.astloc = getClangDeclLocation(cdecl);
 }
 
 
@@ -2154,7 +2178,7 @@ llvm::Type *LayeredValueTable::getType(StringRef name) {
 // Sets the output arguments to NULL if a type/value was not found.
 // Either output argument can be NULL.
 void LayeredValueTable::getCDecl(StringRef name, TypeDecl** cTypeOut,
-    ValueDecl** cValueOut, const char** cCastedToTypeOut) {
+    ValueDecl** cValueOut, const char** cCastedToTypeOut, astlocT* astlocOut) {
 
   if (cValueOut) *cValueOut = NULL;
   if (cTypeOut) *cTypeOut = NULL;
@@ -2178,6 +2202,7 @@ void LayeredValueTable::getCDecl(StringRef name, TypeDecl** cTypeOut,
     if (store->u.castChplVarTo) {
       if (cCastedToTypeOut) *cCastedToTypeOut = store->u.castChplVarTo;
     }
+    if (astlocOut) *astlocOut = store->astloc;
   }
 }
 
@@ -2707,7 +2732,13 @@ void makeBinaryLLVM(void) {
 
   if (compilingWithPrgEnv()) {
     std::string gather_prgenv(CHPL_HOME);
-    gather_prgenv += "/util/config/gather-cray-prgenv-arguments.bash link";
+    gather_prgenv += "/util/config/gather-cray-prgenv-arguments.bash link '";
+    gather_prgenv += CHPL_COMM;
+    gather_prgenv += "' '";
+    gather_prgenv += CHPL_COMM_SUBSTRATE;
+    gather_prgenv += "' '";
+    gather_prgenv += CHPL_AUX_FILESYS;
+    gather_prgenv += "'";
     readArgsFromCommand(gather_prgenv, clangLDArgs);
   }
 

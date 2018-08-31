@@ -171,6 +171,54 @@ Expr* preFold(CallExpr* call) {
 *                                                                             *
 ************************************** | *************************************/
 
+static bool isFollowerITer(FnSymbol* iter) {
+  // Follower iterator is not resolved yet - can't use isFollowerIterator().
+  // Instead, heuristically just look for a "followThis" formal.
+  // This is OK because we are in compiler-generated loopexpr function.
+  for_formals(formal, iter)
+    if (!strcmp(formal->name, iterFollowthisArgname))
+      return true;
+  return false;
+}
+
+static FnSymbol* findForallexprFollower(FnSymbol* serialIter) {
+  if (!isLoopExprFun(serialIter))
+    // Not a forall-expression.
+    return NULL;
+
+  // All iterators are defined in the same block - loopexpr function's body.
+  BlockStmt* parent = toBlockStmt(serialIter->defPoint->parentExpr);
+  for (Expr* curr = parent->body.head; curr != NULL; curr = curr->next) {
+    if (DefExpr* def = toDefExpr(curr))
+      if (FnSymbol* fn = toFnSymbol(def->sym))
+        if (fn->name == serialIter->name)
+          if (isFollowerITer(fn))
+            return fn;
+  }
+
+  //
+  // The loopexpr function does not define parallel iterators
+  // when it implements a (serial) for-expression.
+  // We may still try to run a forall loop over it because of this code
+  // in chpl__transferArray (whose 'b' corresponds to our serialIter):
+  //
+  //     {...
+  //     } else if chpl__tryToken { // try to parallelize ....
+  //       forall (aa,bb) in zip(a,b) do
+  //         aa = bb;
+  //     } else {
+  //       for (aa,bb) in zip(a,b) do
+  //         aa = bb;
+  //     }
+  //
+  // So the "if chpl__tryToken" will take the 'else' branch.
+  // Ex. 1st line in studies/sudoku/deitz/sudoku.chpl
+  // Or the user may mistakenly run a forall loop over a for-expression.
+  // In either case, the resolution should fail. So, return NULL.
+  //
+  return NULL;
+}
+
 static Expr* preFoldPrimOp(CallExpr* call) {
   Expr* retval = NULL;
 
@@ -286,9 +334,8 @@ static Expr* preFoldPrimOp(CallExpr* call) {
 
   } else if (call->isPrimitive(PRIM_FIELD_BY_NUM)) {
     // if call->get(1) is a reference type, dereference it
-    AggregateType* classType  = toAggregateType(call->get(1)->typeInfo());
-
-    classType = toAggregateType(classType->getValType());
+    Type*          t          = canonicalClassType(call->get(1)->getValType());
+    AggregateType* classType  = toAggregateType(t);
 
     VarSymbol*     var        = toVarSymbol(toSymExpr(call->get(2))->symbol());
 
@@ -320,10 +367,8 @@ static Expr* preFoldPrimOp(CallExpr* call) {
     call->replace(retval);
 
   } else if (call->isPrimitive(PRIM_FIELD_NAME_TO_NUM)) {
-    SymExpr*       se1        = toSymExpr(call->get(1));
-    AggregateType* classType  = toAggregateType(se1->symbol()->type);
-
-    classType = toAggregateType(classType->getValType());
+    Type*          t          = canonicalClassType(call->get(1)->getValType());
+    AggregateType* classType  = toAggregateType(t);
 
     VarSymbol*     var        = toVarSymbol(toSymExpr(call->get(2))->symbol());
     Immediate*     imm        = var->immediate;
@@ -349,8 +394,8 @@ static Expr* preFoldPrimOp(CallExpr* call) {
     call->replace(retval);
 
   } else if (call->isPrimitive(PRIM_FIELD_NUM_TO_NAME)) {
-    SymExpr*       se1        = toSymExpr(call->get(1));
-    AggregateType* classType  = toAggregateType(se1->symbol()->type);
+    Type*          t          = canonicalClassType(call->get(1)->getValType());
+    AggregateType* classType  = toAggregateType(t);
 
     classType = toAggregateType(classType->getValType());
 
@@ -742,11 +787,9 @@ static Expr* preFoldPrimOp(CallExpr* call) {
     }
 
   } else if (call->isPrimitive(PRIM_NUM_FIELDS)) {
-    SymExpr*       se1        = toSymExpr(call->get(1));
-    AggregateType* classType  = toAggregateType(se1->symbol()->type);
+    Type*          t          = canonicalClassType(call->get(1)->getValType());
+    AggregateType* classType  = toAggregateType(t);
     int            fieldCount = 0;
-
-    classType = toAggregateType(classType->getValType());
 
     for_fields(field, classType) {
       if (isNormalField(field) == true) {
@@ -762,8 +805,8 @@ static Expr* preFoldPrimOp(CallExpr* call) {
     FnSymbol* iterator     = getTheIteratorFn(call);
     CallExpr* followerCall = NULL;
 
-    if (FnSymbol* follower = iteratorFollowerMap.get(iterator)) {
-      followerCall = new CallExpr(follower);
+    if (FnSymbol* f2 = findForallexprFollower(iterator)) {
+      followerCall = new CallExpr(f2);
     } else {
       followerCall = new CallExpr(iterator->name);
     }
@@ -800,13 +843,7 @@ static Expr* preFoldPrimOp(CallExpr* call) {
 
   } else if (call->isPrimitive(PRIM_TO_LEADER)) {
     FnSymbol* iterator   = getTheIteratorFn(call);
-    CallExpr* leaderCall = NULL;
-
-    if (FnSymbol* leader = iteratorLeaderMap.get(iterator)) {
-      leaderCall = new CallExpr(leader);
-    } else {
-      leaderCall = new CallExpr(iterator->name);
-    }
+    CallExpr* leaderCall = new CallExpr(iterator->name);
 
     for_formals(formal, iterator) {
       // Note: this can add a use formal outside of its function
@@ -867,7 +904,9 @@ static Expr* preFoldPrimOp(CallExpr* call) {
       // Keep in sync with setIteratorRecordShape(CallExpr* call).
       INT_ASSERT(ir->type->symbol->hasFlag(FLAG_ITERATOR_RECORD));
       Symbol* shapeSpec = toSymExpr(call->get(2))->symbol();
-      retval = setIteratorRecordShape(call, ir, shapeSpec);
+      Symbol* fromForLoop = toSymExpr(call->get(3))->symbol();
+      retval = setIteratorRecordShape(call, ir, shapeSpec,
+                 getSymbolImmediate(fromForLoop)->bool_value());
       call->replace(retval);
     }
 
@@ -1651,7 +1690,6 @@ static Expr* createFunctionAsValue(CallExpr *call) {
   fcf_name << "_chpl_fcf_" << unique_fcf_id++ << "_" << flname;
 
   TypeSymbol *ts = new TypeSymbol(astr(fcf_name.str().c_str()), ct);
-  ts->addFlag(FLAG_USE_DEFAULT_INIT);
 
   // Allow a use of a FCF to appear at the statement level i.e.
   //    nameOfFunc;
@@ -1774,7 +1812,8 @@ static Expr* createFunctionAsValue(CallExpr *call) {
     wrapper->insertAtTail(new CallExpr(PRIM_RETURN,
                                        new CallExpr(PRIM_CAST,
                                                     parent->symbol,
-                                                    new CallExpr("_new",
+                                                    new CallExpr(PRIM_NEW,
+                                                                 new NamedExpr(astr_chpl_manager, new SymExpr(dtUnmanaged->symbol)),
                                                                  new SymExpr(ct->symbol)))));
   } else {
     wrapper->insertAtTail(new CallExpr(PRIM_RETURN,
@@ -1849,7 +1888,7 @@ static Expr* dropUnnecessaryCast(CallExpr* call) {
 
           if (newType == oldType) {
             if (isUserDefinedRecord(newType) && !getSymbolImmediate(var)) {
-              result = new CallExpr("chpl__initCopy", var);
+              result = new CallExpr("_removed_cast", var);
               call->replace(result);
             } else {
               result = new SymExpr(var);
@@ -1962,7 +2001,6 @@ static AggregateType* createAndInsertFunParentClass(CallExpr*   call,
   TypeSymbol*    parentTs = new TypeSymbol(name, parent);
 
   parentTs->addFlag(FLAG_FUNCTION_CLASS);
-  parentTs->addFlag(FLAG_USE_DEFAULT_INIT);
 
   // Because this function type needs to be globally visible (because
   // we don't know the modules it will be passed to), we put it at the

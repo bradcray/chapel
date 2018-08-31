@@ -114,7 +114,7 @@ class TomlError : Error {
   proc init(msg:string) {
     this.msg = msg;
   }
-  proc message() {
+  override proc message() {
     return msg;
   }
 }
@@ -136,7 +136,6 @@ module TomlParser {
   const tabSpace = 4;
 
   pragma "no doc"
-  pragma "use default init"
   class Parser {
 
     var source: Source;
@@ -645,7 +644,7 @@ used to recursively hold tables and respective values
     }
 
     /* Write a Table to channel f in TOML format */
-    proc writeThis(f) {
+    override proc writeThis(f) {
       writeTOML(f);
     }
 
@@ -969,8 +968,8 @@ module TomlReader {
 
     var tomlStr: string;
     var tokenD = {1..0},
-      tokenlist: [tokenD] Tokens;
-    var currentLine: Tokens;
+      tokenlist: [tokenD] unmanaged Tokens;
+    var currentLine: unmanaged Tokens;
 
 
     proc init(tomlStr: string) {

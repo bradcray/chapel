@@ -4,10 +4,13 @@ use Random;
 use Time;
 
 config const printStats = true,
-             printArrays = false;
+             printArrays = false,
+             verify = true;
 
 config const useRandomSeed = true,
              seed = if useRandomSeed then SeedGenerator.oddCurrentTime else 314159265;
+
+config const useBufferedAtomics = false;
 
 config const numTasksPerLocale = here.maxTaskPar;
 const numTasks = numLocales * numTasksPerLocale;
@@ -37,12 +40,18 @@ proc main() {
   var t: Timer;
   t.start();
 
-  /* main loop */
-  forall r in rindex {
+  if useBufferedAtomics {
+    use BufferedAtomics;
+    forall r in rindex do
+      A[r].addBuff(1);
+    flushAtomicBuff();
+  } else {
+   forall r in rindex do
     A[r].add(1);
   }
 
   t.stop();
+
   if printStats {
     writeln("Time: " + t.elapsed());
 
@@ -50,6 +59,10 @@ proc main() {
     const mbPerTask = bytesPerTask:real / (1<<20):real;
     writeln("MB/s per task: " + mbPerTask / t.elapsed());
     writeln("MB/s per node: " + mbPerTask * numTasksPerLocale / t.elapsed());
+  }
+
+  if verify {
+    assert(numUpdates == +reduce A.read());
   }
 
   if printArrays {

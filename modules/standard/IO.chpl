@@ -2023,7 +2023,6 @@ and :proc:`channel.write`) can use arguments of this type in order to read or
 write a single Unicode code point.
 
  */
-pragma "use default init"
 record ioChar {
   /* The code point value */
   var ch:int(32);
@@ -2056,7 +2055,6 @@ When reading an ioNewline, read routines will skip any character sequence
 ``skipWhitespaceOnly`` is set to true.
 
  */
-pragma "use default init"
 record ioNewline {
   /*
     Normally, we will skip anything at all to get to a \n,
@@ -2087,7 +2085,6 @@ When reading, the ioLiteral must be matched exactly - or else the read call
 will return an error with code :data:`SysBasic.EFORMAT`.
 
 */
-pragma "use default init"
 record ioLiteral {
   /* The value of the literal */
   var val: string;
@@ -2112,7 +2109,6 @@ Represents a value with a particular bit length that we want to read or write.
 The I/O will always be done in binary mode.
 
 */
-pragma "use default init"
 record ioBits {
   /* The bottom ``nbits`` of v will be read or written */
   var v:uint(64);
@@ -3218,7 +3214,7 @@ proc channel.readIt(ref x) {
 }
 
 pragma "no doc"
-proc channel.writeIt(x) {
+proc channel.writeIt(const x) {
   if !writing then compilerError("write on read-only channel");
   const origLocale = this.getLocaleOfIoRequest();
   on this.home {
@@ -3239,7 +3235,7 @@ proc channel.writeIt(x) {
    For a reading channel, reads as with :proc:`channel.read`.
    Stores any error encountered in the channel. Does not return anything.
  */
-inline proc channel.readwrite(x) where this.writing {
+inline proc channel.readwrite(const x) where this.writing {
   this.writeIt(x);
 }
 // documented in the writing version.
@@ -4399,7 +4395,6 @@ proc channel.modifyStyle(f:func(iostyle, iostyle))
    of a single type. Also supports an iterator yielding
    the read values.
  */
-pragma "use default init"
 record ItemReader {
   /* What type do we read and yield? */
   type ItemType;
@@ -4442,7 +4437,6 @@ proc channel.itemReader(type ItemType, param kind:iokind=iokind.dynamic) {
   return new ItemReader(ItemType, kind, locking, this);
 }
 
-pragma "use default init"
 record ItemWriter {
   /* What type do we write? */
   type ItemType;
@@ -5800,7 +5794,6 @@ proc _toRegexp(x:?t) where t != regexp
 }
 
 pragma "no doc"
-pragma "use default init"
 class _channel_regexp_info {
   var hasRegexp = false;
   var matchedRegexp = false;

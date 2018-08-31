@@ -27,6 +27,7 @@
 #include "expr.h"
 #include "files.h"
 #include "insertLineNumbers.h"
+#include "library.h"
 #include "llvmDebug.h"
 #include "llvmUtil.h"
 #include "LayeredValueTable.h"
@@ -160,6 +161,14 @@ static void legalizeName(Symbol* sym) {
   {
     sym->cname = astr("chpl__", sym->cname);
   }
+
+  // Append number of array dimensions to polly_array_index
+  // It helps Polly Optimizer to select the correct function
+  if (strcmp("polly_array_index",sym->name) == 0){
+    int numDims = (toFnSymbol(sym)->numFormals() - 1) / 2;
+    sym->cname = astr("polly_array_index_",istr(numDims));
+  }
+
 }
 
 static void
@@ -1077,49 +1086,6 @@ static void codegen_aggregate_def(AggregateType* ct) {
   ct->symbol->codegenDef();
 }
 
-//
-// Generates a .h file to complement the library file created using --library
-// This .h file will contain necessary #includes, any explicitly exported
-// functions, and the module initialization function declarations.
-//
-static void codegen_library_header(std::vector<FnSymbol*> functions) {
-  if (fLibraryCompile) {
-    fileinfo libhdrfile = { NULL, NULL, NULL };
-
-    // Name the generated header file after the executable (and assume any
-    // modifications to it have already happened)
-    openCFile(&libhdrfile, libmodeHeadername, "h");
-    // SIMPLIFYING ASSUMPTION: not handling LLVM just yet.  If were to, would
-    // probably put assignment to gChplCompilationConfig here
-
-    // follow convention of just not writing to the file if we can't open it
-    if (libhdrfile.fptr != NULL) {
-      FILE* save_cfile = gGenInfo->cfile;
-
-      gGenInfo->cfile = libhdrfile.fptr;
-
-      //genComment("Generated header file for use with %s",
-      //           executableFilename);
-
-      fprintf(libhdrfile.fptr, "#include \"stdchpl.h\"\n");
-
-      // Maybe need something here to support LLVM extern blocks?
-
-      // Print out the module initialization function headers and the exported
-      // functions
-      for_vector(FnSymbol, fn, functions) {
-        if (fn->hasFlag(FLAG_EXPORT) &&
-            fn->getModule()->modTag != MOD_INTERNAL &&
-            fn->hasFlag(FLAG_GEN_MAIN_FUNC) == false) {
-          fn->codegenPrototype();
-        }
-      }
-
-      gGenInfo->cfile = save_cfile;
-    }
-    closeCFile(&libhdrfile);
-  }
-}
 
 //
 // Produce compilation-time configuration info into a .c file and
@@ -1634,6 +1600,7 @@ static void codegen_header(std::set<const char*> & cnames, std::vector<TypeSymbo
 
   if (fLibraryCompile) {
     codegen_library_header(functions);
+    codegen_library_python(functions);
   }
 
   FILE* hdrfile = info->cfile;
@@ -2168,10 +2135,11 @@ static void setupDefaultFilenames() {
 
     // find the last slash in the filename's path, if there is one
     const char* lastSlash = strrchr(mainModFilename, '/');
+    const char* filename = NULL;
     if (lastSlash == NULL) {
-      lastSlash = mainModFilename;
+      filename = mainModFilename;
     } else {
-      lastSlash++;
+      filename = lastSlash + 1;
     }
 
     // "Executable" name should be given a "lib" prefix in library compilation,
@@ -2181,10 +2149,10 @@ static void setupDefaultFilenames() {
       if (libmodeHeadername[0] == '\0') {
         // copy from that slash onwards into the libmodeHeadername,
         // saving space for a `\0` terminator
-        if (strlen(lastSlash) >= sizeof(libmodeHeadername)) {
+        if (strlen(filename) >= sizeof(libmodeHeadername)) {
           INT_FATAL("input filename exceeds header filename buffer size");
         }
-        strncpy(libmodeHeadername, lastSlash, sizeof(libmodeHeadername)-1);
+        strncpy(libmodeHeadername, filename, sizeof(libmodeHeadername)-1);
         libmodeHeadername[sizeof(libmodeHeadername)-1] = '\0';
         // remove the filename extension from the library header name.
         char* lastDot = strrchr(libmodeHeadername, '.');
@@ -2195,20 +2163,32 @@ static void setupDefaultFilenames() {
         }
         *lastDot = '\0';
       }
-      if (strlen(lastSlash) >= sizeof(executableFilename) - 3) {
+      if (strlen(filename) >= sizeof(executableFilename) - 3) {
         INT_FATAL("input filename exceeds executable filename buffer size");
       }
       strcpy(executableFilename, "lib");
-      strncat(executableFilename, lastSlash,
+      strncat(executableFilename, filename,
               sizeof(executableFilename)-strlen(executableFilename)-1);
+
+      if (fLibraryPython && pythonModulename[0] == '\0') {
+        strncpy(pythonModulename, filename, sizeof(pythonModulename)-1);
+        pythonModulename[sizeof(pythonModulename)-1] = '\0';
+        char* lastDot = strrchr(pythonModulename, '.');
+        if (lastDot == NULL) {
+          INT_FATAL(mainMod,
+                    "main module filename is missing its extension: %s\n",
+                    pythonModulename);
+        }
+        *lastDot = '\0';
+      }
 
     } else {
       // copy from that slash onwards into the executableFilename,
       // saving space for a `\0` terminator
-      if (strlen(lastSlash) >= sizeof(executableFilename)) {
+      if (strlen(filename) >= sizeof(executableFilename)) {
         INT_FATAL("input filename exceeds executable filename buffer size");
       }
-      strncpy(executableFilename, lastSlash, sizeof(executableFilename)-1);
+      strncpy(executableFilename, filename, sizeof(executableFilename)-1);
       executableFilename[sizeof(executableFilename)-1] = '\0';
     }
 
@@ -2227,6 +2207,13 @@ static void setupDefaultFilenames() {
   if (fLibraryCompile && libmodeHeadername[0] == '\0') {
     strncpy(libmodeHeadername, executableFilename, sizeof(libmodeHeadername)-1);
     libmodeHeadername[sizeof(libmodeHeadername)-1] = '\0';
+  }
+
+  // If we're in library mode and the library name was explicitly set, use that
+  // name for the python module.
+  if (fLibraryCompile && fLibraryPython && pythonModulename[0] == '\0') {
+    strncpy(pythonModulename, executableFilename, sizeof(pythonModulename)-1);
+    pythonModulename[sizeof(pythonModulename)-1] = '\0';
   }
 }
 
@@ -2346,6 +2333,9 @@ void codegen(void) {
     }
 
     codegen_makefile(&mainfile, NULL, false, userFileName);
+    if (fLibraryCompile && fLibraryMakefile) {
+      codegen_library_makefile();
+    }
   }
 
   // Vectors to store different symbol names to be used while generating header
@@ -2445,6 +2435,10 @@ void makeBinary(void) {
                                makeflags,
                                getIntermediateDirName(), "/Makefile");
     mysystem(command, "compiling generated source");
+
+    if (fLibraryCompile && fLibraryPython) {
+      codegen_make_python_module();
+    }
   }
 }
 

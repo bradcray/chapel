@@ -179,10 +179,10 @@ module ChapelLocale {
       :returns: locale number, in the range ``0..numLocales-1``
       :rtype: int
      */
-    proc id : int return chpl_id();  // just the node part
+    proc id : int return chpl_nodeFromLocaleID(__primitive("_wide_get_locale", this));
 
     pragma "no doc"
-    proc localeid : chpl_localeID_t return chpl_localeid(); // full locale id
+    proc localeid : chpl_localeID_t return __primitive("_wide_get_locale", this);
 
     /*
       Get the name of this locale.
@@ -478,12 +478,10 @@ module ChapelLocale {
   // too complicated this early on, so we are using a for loop to
   // broadcast that we are done.
   pragma "no doc"
-  pragma "use default init"
   class localesSignal {
     var s: atomic bool;
   }
   pragma "no doc"
-  pragma "use default init"
   record localesBarrier {
     proc wait(locIdx, flags) {
       if locIdx==0 {
@@ -529,6 +527,9 @@ module ChapelLocale {
   // object.
   pragma "no doc"
   proc chpl_init_rootLocale() {
+    if numLocales > 1 && _local then
+      halt("Cannot run a program compiled with --local in more than 1 locale");
+
     origRootLocale = new unmanaged RootLocale();
     (origRootLocale:borrowed RootLocale).setup();
   }
@@ -715,6 +716,6 @@ module ChapelLocale {
   //
   pragma "no doc"
   proc deinit() {
-    delete origRootLocale;
+    delete _to_unmanaged(origRootLocale);
   }
 }

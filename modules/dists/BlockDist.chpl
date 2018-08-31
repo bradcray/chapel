@@ -337,7 +337,6 @@ class LocBlock {
 // locDoms:   a non-distributed array of local domain classes
 // whole:     a non-distributed domain that defines the domain's indices
 //
-pragma "use default init"
 class BlockDom: BaseRectangularDom {
   type sparseLayoutType;
   const dist: unmanaged Block(rank, idxType, sparseLayoutType);
@@ -353,7 +352,6 @@ class BlockDom: BaseRectangularDom {
 // stridable: generic domain stridable parameter
 // myBlock: a non-distributed domain that defines the local indices
 //
-pragma "use default init"
 class LocBlockDom {
   param rank: int;
   type idxType;
@@ -372,7 +370,6 @@ class LocBlockDom {
 // locArr: a non-distributed array of local array classes
 // myLocArr: optimized reference to here's local array class (or nil)
 //
-pragma "use default init"
 class BlockArr: BaseRectangularArr {
   type sparseLayoutType;
   var doRADOpt: bool = defaultDoRADOpt;
@@ -393,7 +390,6 @@ class BlockArr: BaseRectangularArr {
 // locDom: reference to local domain class
 // myElems: a non-distributed array of local elements
 //
-pragma "use default init"
 class LocBlockArr {
   type eltType;
   param rank: int;
@@ -403,8 +399,7 @@ class LocBlockArr {
   var locRAD: unmanaged LocRADCache(eltType, rank, idxType, stridable); // non-nil if doRADOpt=true
   pragma "local field"
   var myElems: [locDom.myBlock] eltType;
-  var locRADLock: atomicbool; // This will only be accessed locally
-                              // force the use of processor atomics
+  var locRADLock: chpl__processorAtomicType(bool); // only accessed locally
 
   // These functions will always be called on this.locale, and so we do
   // not have an on statement around the while loop below (to avoid
@@ -527,7 +522,7 @@ override proc Block.dsiDestroyDist() {
   }
 }
 
-proc Block.dsiDisplayRepresentation() {
+override proc Block.dsiDisplayRepresentation() {
   writeln("boundingBox = ", boundingBox);
   writeln("targetLocDom = ", targetLocDom);
   writeln("targetLocales = ", for tl in targetLocales do tl.id);
@@ -662,7 +657,7 @@ proc LocBlock.init(param rank: int,
 
 override proc BlockDom.dsiMyDist() return dist;
 
-proc BlockDom.dsiDisplayRepresentation() {
+override proc BlockDom.dsiDisplayRepresentation() {
   writeln("whole = ", whole);
   for tli in dist.targetLocDom do
     writeln("locDoms[", tli, "].myBlock = ", locDoms[tli].myBlock);
@@ -891,7 +886,7 @@ proc BlockDom.dsiIndexOrder(i) {
 //
 proc LocBlockDom.member(i) return myBlock.member(i);
 
-proc BlockArr.dsiDisplayRepresentation() {
+override proc BlockArr.dsiDisplayRepresentation() {
   for tli in dom.dist.targetLocDom {
     writeln("locArr[", tli, "].myElems = ", for e in locArr[tli].myElems do e);
     if doRADOpt then
@@ -1254,7 +1249,6 @@ proc Block.dsiReprivatize(other, reprivatizeData) {
 
 proc BlockDom.dsiSupportsPrivatization() param return true;
 
-pragma "use default init"
 record BlockDomPrvData {
   var distpid;
   var dims;

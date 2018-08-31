@@ -57,6 +57,7 @@
  */
 module SharedObject {
 
+  use OwnedObject;
 
   // TODO unify with RefCountBase. Even though that one is for
   // intrusive ref-counting and this one isn't, there's no fundamental
@@ -122,14 +123,11 @@ module SharedObject {
 
        :arg p: the class instance to manage. Must be of class type.
      */
-    proc init(p) {
-      this.t = _to_borrowed(p.type);
+    proc init(p : borrowed) {
+      this.t = p.type;
 
       // Boost version default-initializes px and pn
       // and then swaps in different values.
-
-      if !isClass(p) then
-        compilerError("Shared only works with classes");
 
       var rc:unmanaged ReferenceCount = nil;
 
@@ -145,6 +143,41 @@ module SharedObject {
       // enable_shared_from_this to record a weak pointer back to the
       // shared pointer. That would need to be handled in a Phase 2
       // since it would refer to `this` as a whole here.
+    }
+
+    proc init(p: ?T) where isClass(T) == false && isSubtype(T, _shared) == false &&
+                     isIterator(p) == false {
+      compilerError("Shared only works with classes");
+      this.t = T;
+      this.p = p;
+    }
+
+    /*
+       Initialize a :record:`Shared` taking a pointer from
+       a :record:`Owned`.
+
+       This :record:`Shared` will take over the deletion of the class
+       instance. It is an error to directly delete the class instance
+       while it is managed by :record:`Shared`.
+
+       :arg take: the owned value to take ownership from
+     */
+    proc init(in take:owned) {
+      var p = take.release();
+      this.t = _to_borrowed(p.type);
+
+      if !isClass(p) then
+        compilerError("Shared only works with classes");
+
+      var rc:unmanaged ReferenceCount = nil;
+
+      if p != nil then
+        rc = new unmanaged ReferenceCount();
+
+      this.p = p;
+      this.pn = rc;
+
+      this.complete();
     }
 
     /*
@@ -198,7 +231,7 @@ module SharedObject {
         if p != nil && pn != nil {
           var count = pn.release();
           if count == 0 {
-            delete p;
+            delete _to_unmanaged(p);
             delete pn;
           }
         }
@@ -238,6 +271,20 @@ module SharedObject {
   }
 
   /*
+     Set a :record:`Shared` from a :record`Owned`.
+     On return, `lhs` will refer to the object previously
+     managed by `rhs`, and `rhs` will refer to `nil`.
+   */
+  proc =(ref lhs:_shared, in rhs:owned) {
+    lhs.retain(rhs.release());
+  }
+
+  pragma "no doc"
+  proc =(ref lhs:shared, rhs:_nilType) {
+    lhs.clear();
+  }
+
+  /*
      Swap two :record:`Shared` objects.
    */
   proc <=>(ref lhs: _shared, ref rhs: _shared) {
@@ -270,13 +317,20 @@ module SharedObject {
   // It only works in a value context (i.e. when the result of the
   // coercion is a value, not a reference).
   pragma "no doc"
-  inline proc _cast(type t:_shared, x:_shared) where isSubtype(x.t,t.t) {
+  inline proc _cast(type t:_shared, in x:_shared) where isSubtype(x.t,t.t) {
     var ret:t; // default-init the Shared type to return
     ret.p = x.p:t.t; // cast the class type
     ret.pn = x.pn;
-    if ret.pn != nil then
-      ret.pn.retain();
+    // steal the reference count increment we did for 'in' intent
+    x.p = nil;
+    x.pn = nil;
     return ret;
+  }
+
+  // cast from nil to shared
+  inline proc _cast(type t:_shared, x:_nilType) {
+    var tmp:t;
+    return tmp;
   }
 
   type Shared = _shared;

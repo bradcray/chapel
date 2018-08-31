@@ -47,7 +47,6 @@ module ArrayViewRankChange {
   // rank-change domains and arrays similar to the one that caused
   // it to be created.
   //
-  pragma "use default init"
   class ArrayViewRankChangeDist: BaseDist {
     // a pointer down to the distribution that this class is creating
     // lower-dimensional views of
@@ -109,6 +108,10 @@ module ArrayViewRankChange {
 
     override proc dsiDestroyDist() {
     }
+
+    proc dsiIsLayout() param {
+      return downDistInst.dsiIsLayout();
+    }
   }
 
   private proc downDomType(param rank : int,
@@ -128,7 +131,6 @@ module ArrayViewRankChange {
   // for rectangular domains (because they're the only ones with
   // rank>1), so this is a subclass of BaseRectangularDom.
   //
- pragma "use default init"
  class ArrayViewRankChangeDom: BaseRectangularDom {
     // the lower-dimensional index set that we represent upwards
     var upDom: unmanaged DefaultRectangularDom(rank, idxType, stridable);

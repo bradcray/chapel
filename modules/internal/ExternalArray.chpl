@@ -38,11 +38,10 @@ module ExternalArray {
 
   extern proc chpl_free_external_array(x: chpl_external_array);
 
-  pragma "use default init"
   class ExternDist: BaseDist {
 
-    proc dsiNewRectangularDom(param rank: int = 1, type idxType = int,
-                              param stridable: bool = false, inds) {
+    override proc dsiNewRectangularDom(param rank: int = 1, type idxType = int,
+                                       param stridable: bool = false, inds) {
       if (rank != 1) {
         halt("external arrays are only allowed a rank of 1 right now");
       }
@@ -73,6 +72,8 @@ module ExternalArray {
     override proc dsiTrackDomains() return false;
 
     proc singleton() param return true;
+
+    proc dsiIsLayout() param return true;
   }
 
   var defaultExternDist = new unmanaged ExternDist();

@@ -317,7 +317,7 @@ proc test_permuteMatrix(rprt = true) : bool {
     // little too meta here?)
 
     param n = 10;
-    var rand = new owned RandomStream();
+    var rand = new owned RandomStream(real);
 
     // this n by n array is filled so each element is assigned to its
     // row number. This test will permute these elements, keeping a pivot
@@ -351,7 +351,7 @@ proc test_permuteMatrix(rprt = true) : bool {
 }
 
 proc test_panelSolve(rprt = true) : bool {
-    var rand = new owned RandomStream();
+    var rand = new owned RandomStream(real);
 
     var piv : [1..8] int = [i in 1..8] i;
     var A : [1..8, 1..9] real =
@@ -391,7 +391,7 @@ proc test_panelSolve(rprt = true) : bool {
 }
 
 proc test_updateBlockRow(rprt = true) : bool {
-    var rand = new owned RandomStream();
+    var rand = new owned RandomStream(real);
 
     // construct a matrix A = [X | Y], where X is an already LU-factorized
     // submatrix and Y is the block row we wish to update and test
@@ -503,7 +503,7 @@ proc test_LUFactorize(rprt = true) : bool {
     var arg_b    : [1..arg_n] real;
     var arg_AHat : [1..arg_n, 1..arg_n] real;
     var arg_bHat : [1..arg_n] real;
-    var arg_piv  : [1..arg_n] real;
+    var arg_piv  : [1..arg_n] int;
 
     arg_A = origA[1..randomN, 1..randomN];
     arg_b = origA[1..randomN, randomN+1];

@@ -19,7 +19,7 @@ class intList {
 }
 
 class intSortedList: intList {
-  proc insert(value: int) {
+  override proc insert(value: int) {
     if head == nil || head.value >= value {
       head = new unmanaged Node(value, head);
       return;

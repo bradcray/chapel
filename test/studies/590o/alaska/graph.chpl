@@ -431,8 +431,10 @@ class Graph {
 
 
   iter nodeEdges(u:unmanaged Node) : unmanaged Edge {
-    yield inEdges[u.id];
-    yield outEdges[u.id];
+    for e in inEdges[u.id] do
+      yield e;
+    for e in outEdges[u.id] do
+      yield e;
   }
 
 

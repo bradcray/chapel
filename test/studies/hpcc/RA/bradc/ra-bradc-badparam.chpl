@@ -5,11 +5,11 @@ config const verify = false;
 
 config const totMemSize = 1000:uint;
 config const logTableSize = computeLogTableSize(totMemSize);
-const tableSize = 1 << logTableSize;
+const tableSize = 1:uint << logTableSize;
 
 config const errorTolerance = 0.01;
 
-const tableDom = {0..tableSize:int-1};    // BLC: unfortunate cast
+const tableDom = {0..tableSize-1};    // BLC: unfortunate cast
 var Table: [tableDom] uint;
 
 const numUpdates = 4*tableSize;
@@ -41,7 +41,7 @@ proc VerifyResults() {
   var temp = 0x1:uint(64);
   for i in updateDom {
     temp = (temp << 1) ^ (if (temp < 0) then POLY else 0);
-    Table(temp & (tableSize-1)) ^= temp;
+    Table((temp & (tableSize-1))) ^= temp;
   }
 
   var numErrors = 0;

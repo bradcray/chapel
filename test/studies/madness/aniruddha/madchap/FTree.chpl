@@ -216,16 +216,17 @@ class FTree {
                 yield coeffs;
     }
 
-    // BLC: Really want to replace these with a non-zippered parallel
-    // iterator
-    iter these(param tag: iterKind) where tag == iterKind.leader {
+  /* Unused and can't get this to compile when resolving all concrete functions
+
+    iter these(param tag: iterKind) where tag == iterKind.standalone {
       coforall t in tree do
-        yield t;
+        for coeffs in t do
+          yield coeffs;
     }
+  */
+
 
     iter these(param tag: iterKind, followThis) where tag == iterKind.follower {
-      for coeffs in followThis do
-        yield coeffs;
     }
 
     iter coeffs_iter(lvl: int) {
@@ -286,21 +287,19 @@ proc main() {
             writeln(coeffs);
     }
     
-    var node = new unmanaged Node(4, 5);
+    var node = new Node(4, 5);
     writeln("\n\nf.has_coeffs((4, 5)) = ", f.has_coeffs(node));
     writeln("f.peek((4, 5)) = ", f.peek(node));
     writeln("f[(4, 5)] = ", f[node]);
     writeln("f.remove((4, 5))");
     f.remove(node);
-    delete node;
 
-    node = new unmanaged Node(1, 2);
+    node = new Node(1, 2);
     writeln("\n\nf.has_coeffs((1, 2)) = ", f.has_coeffs(node));
     writeln("f.peek((1, 2)) = ", f.peek(node));
     writeln("f[(1, 2)] = ", f[node]);
     writeln("f.remove((1, 2))");
     f.remove(node);
-    delete node;
 
     node = new Node(3, 4);
     writeln("\n\nf.remove((3, 4))");
@@ -315,7 +314,6 @@ proc main() {
     writeln("\n\nentire tree = ");
     for coeffs in f do
         writeln(coeffs);
-    delete node;
 
     var f1 = f.copy();
 
@@ -347,7 +345,6 @@ proc main() {
     for node in f.node_iter() do
         writeln(node.get_coords());
 
-    delete node;
     delete f1;
     delete f;
 }

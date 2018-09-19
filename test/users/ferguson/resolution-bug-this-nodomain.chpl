@@ -23,4 +23,4 @@ class CC {
   proc this(idx: int):unmanaged RR { return new unmanaged RR(); }
 }
 
-proc f(arg:unmanaged CC):unmanaged RR return arg;
+proc f(arg:unmanaged CC):unmanaged RR return arg(1);

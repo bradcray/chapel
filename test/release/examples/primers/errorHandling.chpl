@@ -74,9 +74,9 @@ proc openFilename(f_name: string) throws {
   var f: file;
 
   try {
-    f = open(f, iomode.r);
+    f = open(f_name, iomode.r);
   } catch e: FileNotFoundError {
-    writeln("Warning: ", f, " does not exist");
+    writeln("Warning: ", f_name, " does not exist");
   } // throws all other errors
 
   return f;

@@ -15,7 +15,7 @@ var gridLocales: [gridDom] locale;
 setupGridLocales();
 
 type elType = real;
-//const adjcoords = ((0,-1), (-1,0), (0,1), (1,0));
+const adjcoords = ((0,-1), (-1,0), (0,1), (1,0));
 
 record localInfo {
   var domAlloc = {0..n+1, 0..m+1};  // does not change

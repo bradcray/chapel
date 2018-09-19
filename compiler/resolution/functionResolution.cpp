@@ -7692,6 +7692,15 @@ static void resolveExports() {
       continue;
     }
 
+    AggregateType* at = NULL;
+    if (fn->_this) {
+      at = toAggregateType(fn->_this->type);
+      if (at && at->isGeneric()) {
+        //        printf("Filtering out generic method %s.%s\n", fn->_this->type->name(),
+        //               fn->name);
+      }
+    }
+
     if (fn->hasFlag(FLAG_EXPORT) ||
         (!fn->hasFlag(FLAG_GENERIC) &&
          !fn->hasFlag(FLAG_RESOLVED) &&
@@ -7699,19 +7708,22 @@ static void resolveExports() {
          !fn->hasFlag(FLAG_INLINE) &&
          //         !fn->hasFlag(FLAG_COMPILER_NESTED_FUNCTION)
          !fn->hasFlag(FLAG_COMPILER_GENERATED) &&
+         // either this is not a method, or at least it's not a method
+         // on a generic type
+         (fn->_this == NULL || !at || !at->isGeneric()) &&
          // TODO: What chpl_ functions are not marked compiler-generated?
          (strncmp(fn->name, "chpl_", 5) != 0) &&
          fn->defPoint &&
          fn->defPoint->getModule() &&
          fn->defPoint->getModule()->modTag == MOD_USER)) {
       SET_LINENO(fn);
-      /*
-      printf("---\n");
-      printf("%s\n", fn->name);
-      printf("---\n");
-      viewFlags(fn->id);
-      printf("---\n\n");
-      */
+      if (developer) {
+        printf("---\n");
+        printf("%s\n", fn->name);
+        printf("---\n");
+        viewFlags(fn->id);
+        printf("---\n\n");
+      }
 
       resolveSignatureAndFunction(fn);
     }

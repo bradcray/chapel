@@ -411,7 +411,7 @@ GenRet codegenWideAddrWithAddr(GenRet base, GenRet newAddr, Type* wideType = NUL
 #define USE_TBAA 1
 
 static
-void codegenInvariantStart(llvm::Value *val, llvm::Value *addr)
+void codegenInvariantStart(llvm::Type *valType, llvm::Value *addr)
 {
   GenInfo *info = gGenInfo;
 
@@ -425,8 +425,8 @@ void codegenInvariantStart(llvm::Value *val, llvm::Value *addr)
   const llvm::DataLayout& dataLayout = info->module->getDataLayout();
 
   uint64_t sizeInBytes;
-  if(val->getType()->isSized())
-    sizeInBytes = dataLayout.getTypeSizeInBits(val->getType())/8;
+  if(valType->isSized())
+    sizeInBytes = dataLayout.getTypeSizeInBits(valType)/8;
   else
     return;
 
@@ -477,7 +477,7 @@ llvm::StoreInst* codegenStoreLLVM(llvm::Value* val,
   }
 
   if(addInvariantStart)
-    codegenInvariantStart(val, ptr);
+    codegenInvariantStart(val->getType(), ptr);
 
   return ret;
 }
@@ -3494,6 +3494,25 @@ GenRet CallExpr::codegen() {
           ret.val = converted;
         }
       }
+
+      // Handle setting LLVM invariant on const records after
+      // they are initialized
+      if (fn->isInitializer()) {
+        if (isUserDefinedRecord(get(1)->typeInfo())) {
+          if (SymExpr* initedSe = toSymExpr(get(1))) {
+            if (initedSe->symbol()->isConstValWillNotChange()) {
+              GenRet genSe = args[0];
+              llvm::Value* ptr = genSe.val;
+              INT_ASSERT(ptr);
+              llvm::Type* ptrTy = ptr->getType();
+              INT_ASSERT(ptrTy && ptrTy->isPointerTy());
+              llvm::Type* eltTy = ptrTy->getPointerElementType();
+              codegenInvariantStart(eltTy, ptr);
+            }
+          }
+        }
+      }
+
 #endif
     }
   }
@@ -3628,7 +3647,6 @@ DEFINE_PRIM(PRIM_MOVE) {
 DEFINE_PRIM(PRIM_DEREF) { codegenIsSpecialPrimitive(NULL, call, ret); }
 DEFINE_PRIM(PRIM_GET_SVEC_MEMBER_VALUE) { codegenIsSpecialPrimitive(NULL, call, ret); }
 DEFINE_PRIM(PRIM_GET_MEMBER_VALUE) { codegenIsSpecialPrimitive(NULL, call, ret); }
-DEFINE_PRIM(PRIM_GET_PRIV_CLASS) { codegenIsSpecialPrimitive(NULL, call, ret); }
 DEFINE_PRIM(PRIM_ARRAY_GET) { codegenIsSpecialPrimitive(NULL, call, ret); }
 DEFINE_PRIM(PRIM_ARRAY_GET_VALUE) { codegenIsSpecialPrimitive(NULL, call, ret); }
 DEFINE_PRIM(PRIM_ON_LOCALE_NUM) { codegenIsSpecialPrimitive(NULL, call, ret); }
@@ -4959,6 +4977,21 @@ DEFINE_PRIM(PRIM_LOOKUP_FILENAME) {
     ret = call->codegenBasicPrimitiveExpr();
 }
 
+DEFINE_PRIM(PRIM_INVARIANT_START) {
+
+  GenInfo* info = gGenInfo;
+  if (info->cfile) {
+    // do nothing for the C backend
+  } else {
+#ifdef HAVE_LLVM
+    GenRet ptr = codegenValue(call->get(1));
+    llvm::Value* val = ptr.val;
+    llvm::Type* ty = val->getType()->getPointerElementType();
+    codegenInvariantStart(ty, val);
+#endif
+  }
+}
+
 void CallExpr::registerPrimitivesForCodegen() {
   // The following macros call registerPrimitiveCodegen for
   // the DEFINE_PRIM routines above for each primitive labelled
@@ -5233,7 +5266,7 @@ static bool codegenIsSpecialPrimitive(BaseAST* target, Expr* e, GenRet& ret) {
       SymExpr* se = toSymExpr(call->get(2));
 
       // Invalid AST to use PRIM_GET_MEMBER with a ref field
-      INT_ASSERT(!call->get(2)->isRef());
+      INT_ASSERT(!call->get(2)->isRefOrWideRef());
 
       if (call->get(1)->typeInfo()->symbol->hasFlag(FLAG_WIDE_CLASS) ||
           call->get(1)->isWideRef()   ||
@@ -5391,6 +5424,7 @@ static bool codegenIsSpecialPrimitive(BaseAST* target, Expr* e, GenRet& ret) {
         ret = codegenAddrOf(tmp);
         retval = true;
       }
+      // Should this handle target being wide?
 
       break;
     }
@@ -5413,19 +5447,6 @@ static bool codegenIsSpecialPrimitive(BaseAST* target, Expr* e, GenRet& ret) {
         retval = true;
       }
 
-      break;
-    }
-
-    case PRIM_GET_PRIV_CLASS: {
-      GenRet r = codegenCallExpr("chpl_getPrivatizedClass", call->get(2));
-
-      if (target && (target->typeInfo()->symbol->hasFlag(FLAG_WIDE_CLASS))) {
-        r = codegenAddrOf(codegenWideHere(r, target->typeInfo()));
-      }
-
-      ret = r;
-
-      retval = true;
       break;
     }
 

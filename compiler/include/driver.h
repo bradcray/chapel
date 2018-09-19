@@ -163,8 +163,9 @@ extern int  fLinkStyle;
 extern int  debugParserLevel;
 extern int  debugShortLoc;
 extern bool fLibraryCompile;
+extern bool fLibraryMakefile;
+extern bool fLibraryPython;
 extern bool fUseNoinit;
-extern bool fNoUserConstructors;
 extern bool no_codegen;
 extern bool developer;
 extern bool fVerify;
@@ -182,6 +183,8 @@ extern int  squelch_header_errors;
 extern bool fWarnConstLoops;
 extern bool fWarnUnstable;
 extern bool fDefaultUnmanaged;
+extern bool fLegacyNew;
+extern bool fWarnConstructors;
 
 extern bool fReportOptimizedLoopIterators;
 extern bool fReportInlinedIterators;
@@ -203,7 +206,7 @@ extern int  numGlobalsOnHeap;
 extern bool preserveInlinedLineNumbers;
 
 extern int breakOnID;
-extern int breakOnDeleteID;
+extern int breakOnRemoveID;
 
 extern char stopAfterPass[128];
 

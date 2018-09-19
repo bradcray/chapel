@@ -1554,7 +1554,11 @@ makeHeapAllocations() {
                    call->get(1) == use) {
           VarSymbol* tmp = newTemp(var->qualType().toRef());
           call->getStmtExpr()->insertBefore(new DefExpr(tmp));
-          call->getStmtExpr()->insertBefore(new CallExpr(PRIM_MOVE, tmp, new CallExpr(PRIM_GET_MEMBER, use->symbol(), heapType->getField(1))));
+          PrimitiveTag op = PRIM_GET_MEMBER;
+          if (heapType->getField(1)->isRef()) {
+            op = PRIM_GET_MEMBER_VALUE;
+          }
+          call->getStmtExpr()->insertBefore(new CallExpr(PRIM_MOVE, tmp, new CallExpr(op, use->symbol(), heapType->getField(1))));
           use->replace(new SymExpr(tmp));
         } else {
           VarSymbol* tmp = newTemp(var->type);
@@ -1573,71 +1577,6 @@ makeHeapAllocations() {
   freeHeapAllocatedVars(heapAllocatedVars);
 }
 
-
-//
-// re-privatize privatized object fields in iterator classes
-//
-static void
-reprivatizeIterators() {
-  if (fLocal)
-    return; // no need for privatization
-
-  std::vector<Symbol*> privatizedFields;
-
-  forv_Vec(AggregateType, ct, gAggregateTypes) {
-    for_fields(field, ct) {
-      if (ct->symbol->hasFlag(FLAG_ITERATOR_CLASS) &&
-          field->type->symbol->hasFlag(FLAG_PRIVATIZED_CLASS)) {
-        privatizedFields.push_back(field);
-      }
-    }
-  }
-
-
-  for_vector(Symbol, sym, privatizedFields) {
-    for_SymbolSymExprs(se, sym) {
-      SET_LINENO(se);
-      if (CallExpr* call = toCallExpr(se->parentExpr)) {
-        if (call->isPrimitive(PRIM_GET_MEMBER_VALUE)) {
-          CallExpr* move = toCallExpr(call->parentExpr);
-          INT_ASSERT(move->isPrimitive(PRIM_MOVE));
-          SymExpr* lhs = toSymExpr(move->get(1));
-          AggregateType* ct = toAggregateType(se->symbol()->type);
-          VarSymbol* tmp = newTemp(ct->getField("pid")->type);
-          move->insertBefore(new DefExpr(tmp));
-          lhs->replace(new SymExpr(tmp));
-          move->insertAfter(new CallExpr(PRIM_MOVE, lhs->symbol(), new CallExpr(PRIM_GET_PRIV_CLASS, lhs->symbol()->type->symbol, tmp)));
-        } else if (call->isPrimitive(PRIM_GET_MEMBER)) {
-          CallExpr* move = toCallExpr(call->parentExpr);
-          INT_ASSERT(move->isPrimitive(PRIM_MOVE));
-          SymExpr* lhs = toSymExpr(move->get(1));
-          AggregateType* ct = toAggregateType(se->symbol()->type);
-          VarSymbol* tmp = newTemp(ct->getField("pid")->type);
-          move->insertBefore(new DefExpr(tmp));
-          lhs->replace(new SymExpr(tmp));
-          call->primitive = primitives[PRIM_GET_MEMBER_VALUE];
-          VarSymbol* valTmp = newTemp(lhs->getValType());
-          move->insertBefore(new DefExpr(valTmp));
-          move->insertAfter(new CallExpr(PRIM_MOVE, lhs, new CallExpr(PRIM_SET_REFERENCE, valTmp)));
-          move->insertAfter(new CallExpr(PRIM_MOVE, valTmp, new CallExpr(PRIM_GET_PRIV_CLASS, lhs->getValType()->symbol, tmp)));
-        } else if (call->isPrimitive(PRIM_SET_MEMBER)) {
-          AggregateType* ct = toAggregateType(se->symbol()->type);
-          VarSymbol* tmp = newTemp(ct->getField("pid")->type);
-          call->insertBefore(new DefExpr(tmp));
-          call->insertBefore(new CallExpr(PRIM_MOVE, tmp, new CallExpr(PRIM_GET_MEMBER_VALUE, call->get(3)->remove(), ct->getField("pid"))));
-          call->insertAtTail(new SymExpr(tmp));
-        } else
-          INT_FATAL(se, "unexpected case in re-privatization in iterator");
-      } else
-        INT_FATAL(se, "unexpected case in re-privatization in iterator");
-    }
-  }
-
-  for_vector(Symbol, sym, privatizedFields) {
-    if (sym)
-      sym->type = dtInt[INT_SIZE_DEFAULT];
-  }
-}
 
 //
 // A helper function for replaceRecordWrappedRefs that updates the type and
@@ -1763,8 +1702,6 @@ void parallel() {
   replaceRecordWrappedRefs();
 
   remoteValueForwarding();
-
-  reprivatizeIterators();
 
   if (requireOutlinedOn()) {
     makeHeapAllocations();

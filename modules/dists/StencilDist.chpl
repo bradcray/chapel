@@ -300,7 +300,6 @@ class StencilDom: BaseRectangularDom {
 // NeighDom will be a rectangular domain where each dimension is the range
 // -1..1
 //
-pragma "use default init"
 class LocStencilDom {
   param rank: int;
   type idxType;
@@ -324,7 +323,6 @@ class LocStencilDom {
 // locArr: a non-distributed array of local array classes
 // myLocArr: optimized reference to here's local array class (or nil)
 //
-pragma "use default init"
 class StencilArr: BaseRectangularArr {
   param ignoreFluff: bool;
   var doRADOpt: bool = defaultDoRADOpt;
@@ -345,7 +343,6 @@ class StencilArr: BaseRectangularArr {
 // locDom: reference to local domain class
 // myElems: a non-distributed array of local elements
 //
-pragma "use default init"
 class LocStencilArr {
   type eltType;
   param rank: int;
@@ -355,8 +352,7 @@ class LocStencilArr {
   var locRAD: unmanaged LocRADCache(eltType, rank, idxType, stridable); // non-nil if doRADOpt=true
   pragma "local field"
   var myElems: [locDom.myFluff] eltType;
-  var locRADLock: atomicbool; // This will only be accessed locally
-                              // force the use of processor atomics
+  var locRADLock: chpl__processorAtomicType(bool); // only accessed locally
 
   // TODO: use void type when packed update is disabled
   var recvBufs, sendBufs : [locDom.NeighDom] [locDom.bufDom] eltType;
@@ -481,7 +477,7 @@ proc Stencil.dsiClone() {
                    ignoreFluff=this.ignoreFluff);
 }
 
-proc Stencil.dsiDestroyDist() {
+override proc Stencil.dsiDestroyDist() {
   coforall ld in locDist do {
     on ld do
       delete ld;
@@ -499,8 +495,8 @@ proc Stencil.dsiDisplayRepresentation() {
     writeln("locDist[", tli, "].myChunk = ", locDist[tli].myChunk);
 }
 
-proc Stencil.dsiNewRectangularDom(param rank: int, type idxType,
-                                  param stridable: bool, inds) {
+override proc Stencil.dsiNewRectangularDom(param rank: int, type idxType,
+                                           param stridable: bool, inds) {
   if idxType != this.idxType then
     compilerError("Stencil domain index type does not match distribution's");
   if rank != this.rank then
@@ -633,7 +629,7 @@ proc StencilDom.init(param rank : int,
   this.periodic = periodic;
 }
 
-proc StencilDom.dsiMyDist() return dist;
+override proc StencilDom.dsiMyDist() return dist;
 
 proc StencilDom.dsiDisplayRepresentation() {
   writeln("whole = ", whole);
@@ -1003,7 +999,7 @@ proc StencilArr.dsiDisplayRepresentation() {
   }
 }
 
-proc StencilArr.dsiGetBaseDom() return dom;
+override proc StencilArr.dsiGetBaseDom() return dom;
 
 //
 // NOTE: Each locale's myElems array must be initialized prior to setting up
@@ -1043,7 +1039,7 @@ proc StencilArr.setup() {
   if doRADOpt && disableStencilLazyRAD then setupRADOpt();
 }
 
-proc StencilArr.dsiDestroyArr() {
+override proc StencilArr.dsiDestroyArr() {
   coforall localeIdx in dom.dist.targetLocDom {
     on locArr(localeIdx) {
       if !ignoreFluff then
@@ -1591,7 +1587,7 @@ proc StencilArr.updateFluff() {
   }
 }
 
-proc StencilArr.dsiReallocate(bounds:rank*range(idxType,BoundedRangeType.bounded,stridable))
+override proc StencilArr.dsiReallocate(bounds:rank*range(idxType,BoundedRangeType.bounded,stridable))
 {
   //
   // For the default rectangular array, this function changes the data
@@ -1607,7 +1603,7 @@ proc StencilArr.dsiReallocate(bounds:rank*range(idxType,BoundedRangeType.bounded
 }
 
 // Call this *after* the domain has been reallocated
-proc StencilArr.dsiPostReallocate() {
+override proc StencilArr.dsiPostReallocate() {
   if doRADOpt then setupRADOpt();
 }
 

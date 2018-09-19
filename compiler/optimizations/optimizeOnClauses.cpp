@@ -101,7 +101,6 @@ classifyPrimitive(CallExpr *call) {
 
   case PRIM_GET_MEMBER:
   case PRIM_GET_SVEC_MEMBER:
-  case PRIM_GET_PRIV_CLASS:
   case PRIM_NEW_PRIV_CLASS:
 
   case PRIM_CHECK_NIL:
@@ -136,6 +135,8 @@ classifyPrimitive(CallExpr *call) {
   case PRIM_STACK_ALLOCATE_CLASS:
 
   case PRIM_CLASS_NAME_BY_ID:
+
+  case PRIM_INVARIANT_START:
     return FAST_AND_LOCAL;
 
   case PRIM_MOVE:
@@ -270,6 +271,8 @@ classifyPrimitive(CallExpr *call) {
   case PRIM_IS_TUPLE_TYPE:
   case PRIM_IS_STAR_TUPLE_TYPE:
   case PRIM_IS_SUBTYPE:
+  case PRIM_IS_SUBTYPE_ALLOW_VALUES:
+  case PRIM_IS_PROPER_SUBTYPE:
   case PRIM_IS_WIDE_PTR:
   case PRIM_TUPLE_EXPAND:
   case PRIM_QUERY:
@@ -322,6 +325,8 @@ classifyPrimitive(CallExpr *call) {
   case PRIM_TO_UNMANAGED_CLASS:
   case PRIM_TO_BORROWED_CLASS:
   case PRIM_NEEDS_AUTO_DESTROY:
+  case PRIM_AUTO_DESTROY_RUNTIME_TYPE:
+  case PRIM_GET_RUNTIME_TYPE_FIELD:
     INT_FATAL("This primitive should have been removed from the tree by now.");
     break;
 
@@ -573,6 +578,17 @@ removeUnnecessaryFences(FnSymbol* fn)
   return ret;
 }
 
+static CallExpr* findRealOnCall(FnSymbol* wrapperFn) {
+  std::vector<CallExpr*> calls;
+  collectFnCalls(wrapperFn, calls);
+  for_vector(CallExpr, call, calls) {
+    if (call->resolvedFunction()->hasFlag(FLAG_ON)) {
+      return call;
+    }
+  }
+  INT_ASSERT(false);
+  return NULL;
+}
 
 // Insert runningTaskCounter increment and decrement calls for on-stmts.
 //
@@ -587,9 +603,10 @@ static void addRunningTaskModifiers(void) {
       // executing the body. Fast on's run directly in the comm-handler and
       // will not spawn a task.
       if (fn->hasFlag(FLAG_FAST_ON) == false) {
-        SET_LINENO(fn);
-        fn->insertAtHead(new CallExpr(gChplIncRunningTask));
-        fn->insertBeforeEpilogue(new CallExpr(gChplDecRunningTask));
+        CallExpr* call = findRealOnCall(fn);
+        SET_LINENO(call);
+        call->insertBefore(new CallExpr(gChplIncRunningTask));
+        call->insertAfter(new CallExpr(gChplDecRunningTask));
       }
 
       // For on stmts that aren't fast or non-blocking, decrement the local
@@ -615,8 +632,9 @@ optimizeOnClauses(void) {
   if (0 != strcmp(CHPL_ATOMICS, "locks")) {
     forv_Vec(ModuleSymbol, module, gModuleSymbols) {
       if( module->hasFlag(FLAG_ATOMIC_MODULE) ) {
-        Vec<FnSymbol*> moduleFunctions = module->getTopLevelFunctions(true);
-        forv_Vec(FnSymbol, fn, moduleFunctions) {
+        std::vector<FnSymbol*> moduleFunctions =
+          module->getTopLevelFunctions(true);
+        for_vector(FnSymbol, fn, moduleFunctions) {
           if( fn->hasFlag(FLAG_EXTERN) ) {
             fn->addFlag(FLAG_FAST_ON_SAFE_EXTERN);
             fn->addFlag(FLAG_LOCAL_FN);

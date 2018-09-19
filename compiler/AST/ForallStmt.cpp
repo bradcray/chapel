@@ -38,7 +38,6 @@ ForallStmt::ForallStmt(bool zippered, BlockStmt* body):
   fFromForLoop(false),
   fContinueLabel(NULL),
   fErrorHandlerLabel(NULL),
-  fFromResolvedForLoop(false),
   fRecIterIRdef(NULL),
   fRecIterICdef(NULL),
   fRecIterGetIterator(NULL),
@@ -62,7 +61,6 @@ ForallStmt* ForallStmt::copyInner(SymbolMap* map) {
     _this->fShadowVars.insertAtTail(COPY_INT(expr));
 
   _this->fFromForLoop = fFromForLoop;
-  _this->fFromResolvedForLoop = fFromResolvedForLoop;
   // todo: fContinueLabel, fErrorHandlerLabel
 
   _this->fRecIterIRdef        = COPY_INT(fRecIterIRdef);
@@ -255,6 +253,15 @@ ForallStmt* enclosingForallStmt(Expr* expr) {
     if (ForallStmt* fs = toForallStmt(curr))
       return fs;
   return NULL;
+}
+
+// Is 'expr' the DefExpr of an induction variable in some ForallStmt?
+bool isForallIterVarDef(Expr* expr) {
+  if (expr->list != NULL)
+    if (ForallStmt* pfs = toForallStmt(expr->parentExpr))
+      if (expr->list == &pfs->inductionVariables())
+        return true;
+  return false;
 }
 
 // Is 'expr' an iterable-expression for some ForallStmt?

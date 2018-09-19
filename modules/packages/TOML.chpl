@@ -25,15 +25,8 @@ This module provides support for parsing and writing toml files.
 
   .. note::
 
-    The TOML library for chapel is a work in progress. Many of the types listed in the `TOML specification <https://github.com/toml-lang/toml>`_ are not supported by this library. A core group of the spec is followed, but the library currently does not support the following types:
-      - Array of tables
-      - Exponent reals
-      - Underscore notation for integers and reals
-      - Date
-      - Time
-      - Datetime with offset
-
-    Other known issues with the library can be found in the `Improve Toml issue <https://github.com/chapel-lang/chapel/issues/7104>`_.
+    The planned features and known limitations of this module can be found in
+    `Improve Toml issue <https://github.com/chapel-lang/chapel/issues/7104>`_.
 
 
 */
@@ -114,7 +107,7 @@ class TomlError : Error {
   proc init(msg:string) {
     this.msg = msg;
   }
-  proc message() {
+  override proc message() {
     return msg;
   }
 }
@@ -136,7 +129,6 @@ module TomlParser {
   const tabSpace = 4;
 
   pragma "no doc"
-  pragma "use default init"
   class Parser {
 
     var source: Source;
@@ -645,7 +637,7 @@ used to recursively hold tables and respective values
     }
 
     /* Write a Table to channel f in TOML format */
-    proc writeThis(f) {
+    override proc writeThis(f) {
       writeTOML(f);
     }
 
@@ -969,8 +961,8 @@ module TomlReader {
 
     var tomlStr: string;
     var tokenD = {1..0},
-      tokenlist: [tokenD] Tokens;
-    var currentLine: Tokens;
+      tokenlist: [tokenD] unmanaged Tokens;
+    var currentLine: unmanaged Tokens;
 
 
     proc init(tomlStr: string) {

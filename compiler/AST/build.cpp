@@ -25,6 +25,7 @@
 #include "CatchStmt.h"
 #include "config.h"
 #include "DeferStmt.h"
+#include "docsDriver.h"
 #include "driver.h"
 #include "files.h"
 #include "ForLoop.h"
@@ -143,12 +144,6 @@ static void addPragmaFlags(Symbol* sym, Vec<const char*>* pragmas) {
           USR_WARN(fn, "function's return type is not a value type.  Ignoring.");
         }
         fn->retTag = RET_TYPE;
-      } else if (flag == FLAG_USE_DEFAULT_INIT) {
-        AggregateType* at = toAggregateType(sym->type);
-        if (!isTypeSymbol(sym) || at == NULL) {
-          USR_FATAL_CONT(sym, "cannot apply 'use default init' to symbol '%s',"
-                         " not a class or record definition", sym->name);
-        }
       }
     }
   }
@@ -648,7 +643,26 @@ buildIfStmt(Expr* condExpr, Expr* thenExpr, Expr* elseExpr) {
 
 BlockStmt*
 buildExternBlockStmt(const char* c_code) {
-  return buildChapelStmt(new ExternBlockStmt(c_code));
+  BlockStmt* ret = NULL;
+  ret = buildChapelStmt(new ExternBlockStmt(c_code));
+
+  // Check that the compiler supports extern blocks
+  // but skip these checks for chpldoc.
+  if (fDocs == false) {
+#ifdef HAVE_LLVM
+    // Chapel was built with LLVM
+    // Just bring up an error if extern blocks are disabled
+    if (externC == false)
+      USR_FATAL(ret, "extern block syntax is turned off. Use "
+                     "--extern-c flag to turn on.");
+#else
+    // If Chapel wasn't built with LLVM, we can't handle extern blocks
+    USR_FATAL(ret, "Chapel must be built with llvm in order to "
+                    "use the extern block syntax");
+#endif
+  }
+
+  return ret;
 }
 
 ModuleSymbol* buildModule(const char* name,
@@ -2348,13 +2362,14 @@ DefExpr* buildForwardingExprFnDef(Expr* expr) {
   // This way, we can work with the rest of the compiler that
   // assumes that 'this' is an ArgSymbol.
   static int delegate_counter = 0;
-  const char* name = astr("forwarding_expr", istr(++delegate_counter));
+  const char* name = astr("chpl_forwarding_expr", istr(++delegate_counter));
   if (UnresolvedSymExpr* usex = toUnresolvedSymExpr(expr))
     name = astr(name, "_", usex->unresolved);
   FnSymbol* fn = new FnSymbol(name);
 
   fn->addFlag(FLAG_INLINE);
   fn->addFlag(FLAG_MAYBE_REF);
+  fn->addFlag(FLAG_REF_TO_CONST_WHEN_CONST_THIS);
   fn->addFlag(FLAG_COMPILER_GENERATED);
 
   fn->body->insertAtTail(new CallExpr(PRIM_RETURN, expr));

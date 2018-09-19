@@ -439,9 +439,6 @@ void resolveFunction(FnSymbol* fn) {
         } else if (fn->hasFlag(FLAG_TYPE_CONSTRUCTOR) == true) {
           resolveTypeConstructor(fn);
 
-        } else if (fn->hasFlag(FLAG_PRIVATIZED_CLASS) == true &&
-                   fn->getReturnSymbol()              == gTrue) {
-          fn->getFormal(1)->type->symbol->addFlag(FLAG_PRIVATIZED_CLASS);
         }
 
         if (fn->isMethod() == true && fn->_this != NULL) {
@@ -1807,6 +1804,13 @@ static void insertCasts(BaseAST* ast, FnSymbol* fn, Vec<CallExpr*>& casts) {
                 resolveExpr(init);
                 resolveExpr(moveInit);
                 resolveExpr(assign);
+
+                // Enable error messages assignment between local
+                // and distributed domains. It would be better if this
+                // could be handled by some flavor of initializer.
+                CallExpr* check = new CallExpr("chpl_checkCopyInit", to, from);
+                call->insertBefore(check);
+                resolveExpr(check);
 
                 // We've replaced the move with no-init/assign, so remove it.
                 call->remove();

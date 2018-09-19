@@ -1,7 +1,4 @@
-#include "reliesOnGlobal.h"
-
-extern void chpl_library_init(int argc, char* argv[]);
-extern void chpl_library_finalize(void);
+#include "lib/reliesOnGlobal.h"
 
 // Test of calling an exported Chapel library that relies on a global.
 int main(int argc, char* argv[]) {

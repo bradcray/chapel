@@ -17,7 +17,48 @@
  * limitations under the License.
  */
 
+/* HDF5 bindings for Chapel
+
+This module implements the C-API for HDF5 version 1.10.1, as well as some
+functionality for reading and writing HDF5 files built on top of the C-API.
+
+Compiling with HDF5
+-------------------
+
+In order to compile a Chapel program that uses this module, the HDF5 library
+must be installed on the system.  The paths to the ``hdf5_hl.h`` header
+file and HDF5 library must be known to the compiler, either by finding
+them in a default search path, or by using the ``-I`` and ``-L`` compiler
+arguments.
+
+The compilation command should look something like this:
+
+.. code-block:: sh
+
+  chpl -I$PATH_TO_HDF5_DIR \
+       -L$PATH_TO_HDF5_LIBS -lhdf5 source.chpl
+
+On Cray systems with the ``cray-hdf5`` module loaded, no compiler flags
+are necessary to use the HDF5 module.
+
+This module currently requires using a version of the Chapel compiler that
+is linked with LLVM.  See :ref:`readme-llvm`.
+
+Chapel HDF5 API
+---------------
+This module provides some higher-level functions using the HDF5 API. It
+provides for parallel reads and writes to HDF5 files using multiple
+Chapel locales.
+
+The native HDF5 functions can be called directly by calling into the
+:mod:`C_HDF5` submodule.
+*/
 module HDF5 {
+
+  // This interface was generated with HDF5 1.10.1. Due to a change of the
+  // `hid_t` type from 32-bit to 64-bit in this version, versions prior
+  // to 1.10.0 cannot be safely used.
+  verifyMinimumHDF5Version(1, 10, 0);
 
   coforall loc in Locales do on loc {
     // Check that the HDF5 version matches what is expected
@@ -26,6 +67,11 @@ module HDF5 {
     C_HDF5.H5open();
   }
 
+  /* The C_HDF5 module defines the interface to the HDF5 library.
+     Documentation for its functions, types, and constants can be found
+     at the official HDF5 web site:
+     https://portal.hdfgroup.org/display/HDF5/HDF5
+  */
   module C_HDF5 {
 
     // Header given to c2chapel:
@@ -3311,9 +3357,8 @@ module HDF5 {
       return H5T_UNIX_D64LE_g;
     }
 
-    /*
-     * Types particular to the C language.  String types use `bytes' instead
-     * of `bits' as their size.
+    /* Types particular to the C language.  String types use 'bytes' instead
+       of 'bits' as their size.
      */
     proc H5T_C_S1 {
       return H5T_C_S1_g;
@@ -3322,9 +3367,7 @@ module HDF5 {
       return (-1):size_t;
     }
 
-    /*
-     * Types particular to Fortran.
-     */
+    /* Types particular to Fortran.  */
     proc H5T_FORTRAN_S1 {
       return H5T_FORTRAN_S1_g;
     }
@@ -3333,6 +3376,7 @@ module HDF5 {
        makes difficult/impossible to use otherwise. The workaround wrappers are
        named the same thing as the original HDF5 name, but with a `_WAR` suffix.
        Since this uses an `extern` block, LLVM is required. */
+    pragma "no doc"
     module HDF5_WAR {
       extern {
 #include "hdf5_hl.h"
@@ -3398,6 +3442,19 @@ module HDF5 {
     }
   }
   */
+  // Verify that the HDF5 version in use is at least as high as the
+  // (major, minor, release) arguments.
+  private proc verifyMinimumHDF5Version(major, minor, release) {
+    const HDF5Version = (C_HDF5.H5_VERS_MAJOR,
+                         C_HDF5.H5_VERS_MINOR,
+                         C_HDF5.H5_VERS_RELEASE),
+          requiredVersion = (major, minor, release);
+
+    if HDF5Version < requiredVersion {
+      halt("HDF5 version ", HDF5Version,
+           " is below the required version ", requiredVersion);
+    }
+  }
 
   /* Read the dataset named `dsetName` from all HDF5 files in the
      directory `dirName` with filenames that begin with `filenameStart`.
@@ -3473,17 +3530,14 @@ module HDF5 {
    */
   proc readNamedHDF5FilesInto1DArrayInt(filenames: [] string,
                                         fnCols: int, fnRows: int,
-                                        dsetName: string) {
-    // Would like to add an argument:
-    // `preprocessor: HDF5Preprocessor=nil`
-    // and forward it along to the `readAllNamedHDF5Files` call, but the
-    // Python->Chapel interface is not currently able to handle Chapel types
+                                        dsetName: string,
+                                        preprocessor: HDF5Preprocessor = nil) {
     use BlockDist;
 
     var filenames2D = reshape(filenames, {1..fnCols, 1..fnRows});
 
     var data = readAllNamedHDF5Files(Locales, filenames2D, dsetName,
-                                     int, rank=2);
+                                     int, rank=2, preprocessor=preprocessor);
     const rows = + reduce [subset in data[.., 1]] subset.D.dim(1).length;
     const cols = + reduce [subset in data[1, ..]] subset.D.dim(2).length;
 
@@ -3761,6 +3815,112 @@ module HDF5 {
   }
 
 
+    /* Read the HDF5 dataset named `dsetName` from the file `filename` into
+       the distributed array `A`.  Each locale reads its local portion of
+       the array from the file.
+
+       Currently only Block and Cyclic distributed arrays are supported.
+     */
+    proc hdf5ReadDistributedArray(A, filename: string, dsetName: string) {
+      // This function currently only supports Block and Cyclic distributed
+      // arrays.  It is expected that this will be expanded to other
+      // distributions in the future.
+      //
+      // BlockCyclic would work if it stored elements in its local blocks
+      // sequentially instead of storing blocks side-by-side.
+      // e.g. for 2x2 blocks A and B, store the elements of each block next
+      // to each other in memory:
+      // A11, A12, A21, A22, B11, B12, B21, B22
+      // instead of:
+      // A11, A12, B11, B12
+      // A21, A22, B21, B22
+      use BlockDist, CyclicDist;
+      proc isBlock(D: Block) param return true;
+      proc isBlock(D) param return false;
+      proc isCyclic(D: Cyclic) param return true;
+      proc isCyclic(D) param return false;
+      if !(isBlock(A.dom.dist) || isCyclic(A.dom.dist)) then
+        compilerError("hdf5ReadDistributedArray currently only supports block or cyclic distributed arrays");
+
+      coforall loc in A.targetLocales() do on loc {
+        // make sure the file name is local
+        var filenameCopy = filename;
+        var file_id = C_HDF5.H5Fopen(filenameCopy.c_str(),
+                                     C_HDF5.H5F_ACC_RDONLY,
+                                     C_HDF5.H5P_DEFAULT);
+        var dataset = C_HDF5.H5Dopen(file_id, dsetName.c_str(),
+                                     C_HDF5.H5P_DEFAULT);
+        var dataspace = C_HDF5.H5Dget_space(dataset);
+        var dsetRank: c_int;
+
+        C_HDF5.H5LTget_dataset_ndims(file_id, dsetName.c_str(), dsetRank);
+
+        var dims: [1..dsetRank] C_HDF5.hsize_t;
+        {
+          /*
+          // This chained module call causes a compiler error.  As a
+          // workaround, 'use' the module in a new scope instead.
+          C_HDF5.HDF5_WAR.H5LTget_dataset_info_WAR(file_id, dsetName.c_str(),
+                                                   c_ptrTo(dims), nil, nil);
+          */
+          use C_HDF5.HDF5_WAR;
+          H5LTget_dataset_info_WAR(file_id, dsetName.c_str(),
+                                   c_ptrTo(dims), nil, nil);
+        }
+
+        const wholeLow = A.domain.whole.low;
+        for dom in A.localSubdomains() {
+          // The dataset is 0-based, so unTranslate each block
+          const dsetBlock = dom.chpl__unTranslate(wholeLow);
+
+          // Arrays to represent locations with the file
+          var dsetOffsetArr, dsetCountArr,
+              dsetStrideArr: [1..dom.rank] C_HDF5.hsize_t;
+
+          // Arrays to represent locations in the distributed array
+          var memOffsetArr, memCountArr,
+              memStrideArr: [1..dom.rank] C_HDF5.hsize_t;
+
+          for param i in 1..dom.rank {
+            dsetOffsetArr[i] = dsetBlock.dim(i).low: C_HDF5.hsize_t;
+            dsetCountArr[i]  = dsetBlock.dim(i).size: C_HDF5.hsize_t;
+            dsetStrideArr[i] = dsetBlock.dim(i).stride: C_HDF5.hsize_t;
+
+            // We'll write to a slice of the array so that offset is always 0
+            memOffsetArr[i] = 0: C_HDF5.hsize_t;
+            memStrideArr[i] = 1: C_HDF5.hsize_t;
+            memCountArr[i] = dom.dim(i).size: C_HDF5.hsize_t;
+          }
+
+          // create the hyperslab into the dataset on disk
+          C_HDF5.H5Sselect_hyperslab(dataspace, C_HDF5.H5S_SELECT_SET,
+                                     c_ptrTo(dsetOffsetArr),
+                                     c_ptrTo(dsetStrideArr),
+                                     c_ptrTo(dsetCountArr), nil);
+
+          // create the hyperslab into the array to read the dataset into
+          var memspace = C_HDF5.H5Screate_simple(dom.rank,
+                                                 c_ptrTo(memCountArr), nil);
+          C_HDF5.H5Sselect_hyperslab(memspace, C_HDF5.H5S_SELECT_SET,
+                                     c_ptrTo(memOffsetArr),
+                                     c_ptrTo(memStrideArr),
+                                     c_ptrTo(memCountArr), nil);
+          ref AA = A[dom];
+          C_HDF5.H5Dread(dataset, getHDF5Type(A.eltType), memspace, dataspace,
+                         C_HDF5.H5P_DEFAULT, c_ptrTo(AA));
+
+          C_HDF5.H5Sclose(memspace);
+
+        }
+
+        // close dataspace, dataset
+        C_HDF5.H5Dclose(dataset);
+        C_HDF5.H5Sclose(dataspace);
+        C_HDF5.H5Fclose(file_id);
+      }
+    }
+
+
   /* A class to preprocess arrays returned by HDF5 file reading procedures.
      Procedures in this module that take an `HDF5Preprocessor` argument can
      accept a subclass of this class with the `preprocess` method overridden
@@ -3772,11 +3932,6 @@ module HDF5 {
     }
   }
 
-  // There is an internal error involving function arguments of this type
-  // being passed as shadow variables to forall loops if this type is not
-  // used in any other way.  As a workaround, declare an instance so that
-  // it is used.
-  private const unusedInternalErrorWorkaround: HDF5Preprocessor;
 
   /* A record that stores a rectangular array.  An array of `ArrayWrapper`
      records can store multiple differently sized arrays.

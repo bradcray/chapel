@@ -69,14 +69,17 @@ For example:
 
 This domain map is a layout, i.e. it maps all indices to the current locale.
 All elements of a CS-distributed array are stored
-on the locale where the array variable is declared.
+on the locale where the array variable is declared.  By default, the CS
+layout stores sparse indices in sorted order.  However, this default can
+be changed for a program by compiling with ``-sLayoutCSDefaultToSorted=false``, 
+or for a specific domain by passing ``sortedIndices=false`` as an argument
+to the ``CS()`` initializer.
 */
-pragma "use default init"
 class CS: BaseDist {
   param compressRows: bool = true;
   param sortedIndices: bool = LayoutCSDefaultToSorted;
 
-  proc dsiNewSparseDom(param rank: int, type idxType, dom: domain) {
+  override proc dsiNewSparseDom(param rank: int, type idxType, dom: domain) {
     return new unmanaged CSDom(rank, idxType, this.compressRows, this.sortedIndices, dom.stridable, _to_unmanaged(this), dom);
   }
 
@@ -90,6 +93,10 @@ class CS: BaseDist {
 
   proc dsiEqualDMaps(that) param {
     return false;
+  }
+
+  proc dsiIsLayout() param {
+    return true;
   }
 } // CS
 
@@ -361,8 +368,8 @@ class CSDom: BaseSparseDomImpl {
     return 1;
   }
 
-  proc bulkAdd_help(inds: [?indsDom] rank*idxType, dataSorted=false,
-                    isUnique=false) {
+  override proc bulkAdd_help(inds: [?indsDom] rank*idxType, dataSorted=false,
+                             isUnique=false) {
 
     if this.compressRows then
       bulkAdd_prepareInds(inds, dataSorted, isUnique, cmp=Sort.defaultComparator);
@@ -547,7 +554,7 @@ class CSDom: BaseSparseDomImpl {
     return 1;
   }
 
-  proc dsiClear() {
+  override proc dsiClear() {
     nnz = 0;
     startIdx = 1;
   }
@@ -591,7 +598,6 @@ class CSDom: BaseSparseDomImpl {
 } // CSDom
 
 
-pragma "use default init"
 class CSArr: BaseSparseArrImpl {
 
   proc dsiAccess(ind: rank*idxType) ref {

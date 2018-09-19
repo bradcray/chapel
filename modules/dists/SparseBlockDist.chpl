@@ -137,7 +137,7 @@ class SparseBlockDom: BaseSparseDomImpl {
     return max reduce ([l in locDoms] l.mySparseBlock.last);
   }
 
-  proc bulkAdd_help(inds: [] index(rank,idxType),
+  override proc bulkAdd_help(inds: [] index(rank,idxType),
       dataSorted=false, isUnique=false) {
     use Sort;
     use Search;
@@ -258,13 +258,15 @@ class SparseBlockDom: BaseSparseDomImpl {
     }
   }
 
-  proc dsiMember(ind) {
-    on whole.dist.idxToLocale(ind) {
-      writeln("Need to add support for mapping locale to local domain");
+  proc dsiMember(ind) : bool {
+    var _retval : bool = false;
+    on dist.dsiIndexToLocale(ind) {
+      _retval = locDoms[dist.targetLocsIdx(ind)].dsiMember(ind);
     }
+    return _retval;
   }
 
-  proc dsiClear() {
+  override proc dsiClear() {
     nnz = 0;
     coforall locDom in locDoms do
       on locDom do
@@ -290,7 +292,6 @@ class SparseBlockDom: BaseSparseDomImpl {
 // stridable: generic domain stridable parameter
 // mySparseBlock: a non-distributed domain that defines the local indices
 //
-pragma "use default init"
 class LocSparseBlockDom {
   param rank: int;
   type idxType;
@@ -460,7 +461,7 @@ class SparseBlockArr: BaseSparseArr {
 
 
 
-  proc dsiGetBaseDom() return dom;
+  override proc dsiGetBaseDom() return dom;
 
 }
 
@@ -474,7 +475,6 @@ class SparseBlockArr: BaseSparseArr {
 // locDom: reference to local domain class
 // myElems: a non-distributed array of local elements
 //
-pragma "use default init"
 class LocSparseBlockArr {
   type eltType;
   param rank: int;
@@ -806,3 +806,22 @@ proc dropDims(D: domain, dims...) {
   return DResult;
 }
 
+proc SparseBlockDom.dsiHasSingleLocalSubdomain() param return true;
+proc SparseBlockArr.dsiHasSingleLocalSubdomain() param return true;
+
+proc SparseBlockDom.dsiLocalSubdomain() {
+  // TODO -- could be replaced by a privatized myLocDom in BlockDom
+  // as it is with BlockArr
+  var myLocDom:unmanaged LocSparseBlockDom(rank, idxType, stridable, sparseLayoutType) = nil;
+  for (loc, locDom) in zip(dist.targetLocales, locDoms) {
+    if loc == here {
+      myLocDom = locDom;
+      break;
+    }
+  }
+  return myLocDom.mySparseBlock;
+}
+
+proc SparseBlockArr.dsiLocalSubdomain() {
+  return myLocArr.locDom.mySparseBlock;
+}

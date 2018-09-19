@@ -1,10 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "exportFuncWithRealArr.h"
-
-extern void chpl_library_init(int argc, char* argv[]);
-extern void chpl_library_finalize(void);
+#include "lib/exportFuncWithRealArr.h"
 
 // Test of calling an exported function that takes an array
 int main(int argc, char* argv[]) {

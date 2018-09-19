@@ -1,10 +1,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-#include "exportFuncWithArrayArg.h"
-
-extern void chpl_library_init(int argc, char* argv[]);
-extern void chpl_library_finalize(void);
+#include "lib/exportFuncWithArrayArg.h"
 
 // Test of calling an exported function that takes an array
 int main(int argc, char* argv[]) {

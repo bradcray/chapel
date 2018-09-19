@@ -342,6 +342,12 @@ all:
     - Avoid using syncvar_t in the qthreads shim (#10082)
   07/04/18:
     - Remove spinwaiting from qthreads chpl_sync_lock() (#10133)
+  08/01/18:
+    - text: cannot reproduce old numbers for gn+aries
+      config: 16 node XC
+  08/15/18:
+    - text: Revert to stack-allocated rfDone indicators. (#10728)
+      config: 16 node XC
 
 
 AllCompTime:
@@ -496,6 +502,12 @@ create-views:
     - Convert BaseDist-inheriting classes to use initializers (#9075)
   04/19/18:
     - Use zero-arg initializer in BaseDom (#9250)
+  06/30/18:
+    - text: Could not repro old numbers (later "fixed" by reboot)
+      config: chapcs
+  08/04/18:
+    - text: Machine rebooted
+      config: chapcs
 
 dgemm.128:
   09/06/13:
@@ -526,6 +538,10 @@ ep.ml-perf: &ep-ml-base
     - Make associative domains of enums more standard (#9978)
 ep.ml-time:
   <<: *ep-ml-base
+
+empty-chpl-barrier.ml-time:
+  08/02/18:
+    - Optimize the atomic barrier implementation for network atomics (#10633)
 
 fannkuch-redux:
   07/22/14:
@@ -647,6 +663,8 @@ isx.ml-time: &isx-ml-base
     - Avoid task yielding during ugni memory registration (#8162)
   01/24/18:
     - Stop forcing serial initialization for isx-hand-optimized (#8290)
+  08/02/18:
+    - Optimize the atomic barrier implementation for network atomics (#10633)
 isx-hand-optimized.ml-time:
   <<: *isx-ml-base
 isx-release.ml-time:
@@ -819,6 +837,10 @@ memleaks:
     - Have reindex domains/distributions preserve locality (#5757)
   07/25/17:
     - fix leaks introduced by reindex views in PR 5757 (#6776)
+  07/24/18:
+    - Initializers on by default (#10459)
+  07/25/18:
+    - Fix size of loop expr in LCALS (#10499)
 
 memleaksfull:
   07/08/14:
@@ -899,6 +921,17 @@ memleaksfull:
   06/19/18:
     - Remove origin field from DefaultRectangular (#9863)
     - Allow basic usage of nested types with initializers (#9886)
+  07/20/18:
+    - Fix leak in locale.cwd() (#10411)
+  07/24/18:
+    - Initializers on by default (#10459)
+  07/25/18:
+    - Fix size of loop expr in LCALS (#10499)
+  07/26/18:
+    - Close DataFrame leaks (#10514)
+    - Fix leak in cast to string from c_ptr (#10523)
+  08/01/18:
+    - Additional SparseBlockDom/Arr dsi methods to support bale-toposort (#10604)
 
 meteor:
   12/18/13:
@@ -1226,8 +1259,6 @@ thread-ring: &thread-ring-base
     - Enforce qualified refs after inlining (#7906)
   06/07/18:
     - Prevent serialization from qthread sync vars (#9737)
-threadring-submitted:
-  <<: *thread-ring-base
 
 time_array_vs_ddata:
   05/31/14:
@@ -1284,6 +1315,8 @@ timeVectorArray:
     - Enforce qualified refs after inlining (#7906)
   06/22/18:
     - Make 'for' loop in dsiReallocate parallel (#9895)
+  08/17/18:
+    - Add a new dsiReallocate that is aware of allocated size (#10793)
 
 views-forall-iter:
   10/12/17:

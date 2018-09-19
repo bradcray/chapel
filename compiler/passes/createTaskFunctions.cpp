@@ -186,9 +186,11 @@ ArgSymbol* tiMarkForForallIntent(ForallIntentTag intent) {
       retval = tiMarkConstRef;
       break;
 
-    case TFI_IN_OUTERVAR:
+    case TFI_IN_PARENT:
     case TFI_REDUCE:
     case TFI_REDUCE_OP:
+    case TFI_REDUCE_PARENT_AS:
+    case TFI_REDUCE_PARENT_OP:
     case TFI_TASK_PRIVATE:
       INT_FATAL("unexpected intent in tiMarkForForallIntent()");
       break;
@@ -340,7 +342,9 @@ static void addReduceIntentSupport(FnSymbol* fn, CallExpr* call,
 
   CallExpr* newOp = new CallExpr(PRIM_NEW,
                                  reduceAt->symbol,
-                                 new NamedExpr("eltType", new SymExpr(eltType)));
+                                 new NamedExpr("eltType", new SymExpr(eltType)),
+                                 new NamedExpr(astr_chpl_manager,
+                                             new SymExpr(dtUnmanaged->symbol)));
   headAnchor->insertBefore(new CallExpr(PRIM_MOVE, globalOp, newOp));
 
   insertInitialAccumulate(headAnchor, globalOp, origSym);
@@ -719,8 +723,9 @@ void createTaskFunctions(void) {
       if( module->hasFlag(FLAG_ATOMIC_MODULE) ) {
         // we could do this with for_alist ... as in getFunctions()
         // instead of creating a copy of the list of functions here.
-        Vec<FnSymbol*> moduleFunctions = module->getTopLevelFunctions(false);
-        forv_Vec(FnSymbol, fnSymbol, moduleFunctions) {
+        std::vector<FnSymbol*> moduleFunctions =
+          module->getTopLevelFunctions(false);
+        for_vector(FnSymbol, fnSymbol, moduleFunctions) {
           ArgSymbol* order = NULL;
           // Does this function have an order= argument?
           // If so, add memory consistency functions (future - if they are not

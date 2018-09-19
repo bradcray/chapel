@@ -444,6 +444,11 @@ returnInfoToBorrowed(CallExpr* call) {
   return QualifiedType(t, QUAL_VAL);
 }
 
+static QualifiedType
+returnInfoRuntimeTypeField(CallExpr* call) {
+  return call->get(1)->qualType();
+}
+
 
 
 // print the number of each type of primitive present in the AST
@@ -667,6 +672,9 @@ initPrimitive() {
   // PRIM_IS_SUBTYPE arguments are (parent, sub) and it checks
   // if sub is a sub-type of parent.
   prim_def(PRIM_IS_SUBTYPE, "is_subtype", returnInfoBool);
+  // same as above but can apply to non-type
+  // this variant can be removed if normalization of type queries is updated
+  prim_def(PRIM_IS_SUBTYPE_ALLOW_VALUES, "is_subtype_allow_values", returnInfoBool);
   // same as above but excludes same type
   prim_def(PRIM_IS_PROPER_SUBTYPE, "is_proper_subtype", returnInfoBool);
   // PRIM_CAST arguments are (type to cast to, value to cast)
@@ -807,7 +815,6 @@ initPrimitive() {
   prim_def(PRIM_RT_WARNING, "chpl_warning", returnInfoVoid, true, true);
 
   prim_def(PRIM_NEW_PRIV_CLASS, "chpl_newPrivatizedClass", returnInfoVoid);
-  prim_def(PRIM_GET_PRIV_CLASS, "chpl_getPrivatizedClass",  returnInfoFirst);
 
   prim_def(PRIM_GET_USER_LINE, "_get_user_line", returnInfoDefaultInt, true, true);
   prim_def(PRIM_GET_USER_FILE, "_get_user_file", returnInfoInt32, true, true);
@@ -871,6 +878,17 @@ initPrimitive() {
   prim_def(PRIM_TO_BORROWED_CLASS, "to borrowed class", returnInfoToBorrowed, false, false);
 
   prim_def(PRIM_NEEDS_AUTO_DESTROY, "needs auto destroy", returnInfoBool, false, false);
+  prim_def(PRIM_AUTO_DESTROY_RUNTIME_TYPE, "auto destroy runtime type", returnInfoVoid, false, false);
+
+  // Accepts 3 arguments:
+  // 1) type variable representing static type of field in _RuntimeTypeInfo
+  // 2) type variable that will become the _RuntimeTypeInfo
+  // 3) param-string name of the field in the _RuntimeTypeInfo
+  prim_def(PRIM_GET_RUNTIME_TYPE_FIELD, "get runtime type field", returnInfoRuntimeTypeField, false, false);
+
+  // Corresponds to LLVM's invariant start
+  // takes in a pointer/reference argument that is the invariant thing
+  prim_def(PRIM_INVARIANT_START, "invariant start", returnInfoVoid, false, false);
 }
 
 static Map<const char*, VarSymbol*> memDescsMap;

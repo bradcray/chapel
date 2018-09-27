@@ -7235,15 +7235,18 @@ static Expr* resolveExprHandleTryFailure(FnSymbol* fn) {
   return retval;
 }
 
+bool squashCompilerMessages = false;
+
 static void resolveExprMaybeIssueError(CallExpr* call) {
   //
   // Disable compiler warnings in internal modules that are triggered within
   // a dynamic dispatch context to reduce potential user confusion.
   //
-  if (call->isPrimitive(PRIM_ERROR)         == true          ||
-      call->getModule()->modTag             != MOD_INTERNAL  ||
-      inDynamicDispatchResolution           == false         ||
-      callStack.head()->getModule()->modTag != MOD_INTERNAL) {
+  if (squashCompilerMessages == false &&
+      (call->isPrimitive(PRIM_ERROR)         == true          ||
+       call->getModule()->modTag             != MOD_INTERNAL  ||
+       inDynamicDispatchResolution           == false         ||
+       callStack.head()->getModule()->modTag != MOD_INTERNAL)) {
 
     //
     // If an errorDepth was specified, report a diagnostic about the call
@@ -7702,8 +7705,12 @@ static void resolveExports() {
       }
     }
 
-    if (fn->hasFlag(FLAG_EXPORT) ||
-        (!fn->hasFlag(FLAG_GENERIC) &&
+    if (fn->hasFlag(FLAG_EXPORT)) {
+      SET_LINENO(fn);
+      resolveSignatureAndFunction(fn);
+    } else {
+      if ((!fn->hasFlag(FLAG_GENERIC) &&
+         fMinimalModules == false &&
          !hasVariableArgs(fn) &&
          !fn->hasFlag(FLAG_RESOLVED) &&
          !fn->hasFlag(FLAG_INVISIBLE_FN) &&
@@ -7731,15 +7738,19 @@ static void resolveExports() {
 
       if (developer) {
         printf("---\n");
-        printf("%s\n", fn->name);
+        printf("%s (%s:%d)\n", fn->name, fn->astloc.filename, fn->astloc.lineno);
         printf("---\n");
         viewFlags(fn->id);
         printf("---\n\n");
       }
 
+      assert(!inDynamicDispatchResolution);
+      squashCompilerMessages = true;
       resolveSignatureAndFunction(fn);
+      squashCompilerMessages = false;
     }
   }
+}
 }
 
 /************************************* | **************************************

@@ -19,7 +19,7 @@ class Arithmetic : Abstract {
 }
 
 class AbsDense: Arithmetic {
-  proc clear() {
+  override proc clear() {
     compilerError("Can't clear a dense domain");
   }
 

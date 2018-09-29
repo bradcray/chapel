@@ -277,7 +277,7 @@ proc main() {
     var f = new unmanaged FTree(2);
 
     for (i, j) in {1..3, 2..4} {
-        const node = new unmanaged Node(i, j); 
+        const node = new Node(i, j); 
         f[node] = (i, j);
     }
 

@@ -621,14 +621,14 @@ class Function {
 /*************************************************************************/
 
 
-proc +(F: unmanaged Function, G: unmanaged Function): unmanaged Function {
+proc +(F: unmanaged Function, G: unmanaged Function): Function {
     return F.add(G);
 }
 
-proc -(F: unmanaged Function, G: unmanaged Function): unmanaged Function {
+proc -(F: unmanaged Function, G: unmanaged Function): Function {
     return F.subtract(G);
 }
     
-proc *(F: unmanaged Function, G: unmanaged Function): unmanaged Function {
+proc *(F: unmanaged Function, G: unmanaged Function): Function {
     return F.multiply(G);
 }

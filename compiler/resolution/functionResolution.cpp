@@ -7749,6 +7749,8 @@ static void resolveExports() {
       squashCompilerMessages = true;
       if (evaluateWhereClause(fn)) {
         resolveSignatureAndFunction(fn);
+        fn->removeFlag(FLAG_RESOLVED);  // though we resolved it, pretend we
+        // didn't so it'll be dead-code eliminated
       }
       squashCompilerMessages = false;
     }

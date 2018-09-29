@@ -7707,7 +7707,9 @@ static void resolveExports() {
 
     if (fn->hasFlag(FLAG_EXPORT)) {
       SET_LINENO(fn);
-      resolveSignatureAndFunction(fn);
+      if (evaluateWhereClause(fn)) {
+        resolveSignatureAndFunction(fn);
+      }
     } else {
       if ((!fn->hasFlag(FLAG_GENERIC) &&
          fMinimalModules == false &&
@@ -7744,9 +7746,10 @@ static void resolveExports() {
         printf("---\n\n");
       }
 
-      assert(!inDynamicDispatchResolution);
       squashCompilerMessages = true;
-      resolveSignatureAndFunction(fn);
+      if (evaluateWhereClause(fn)) {
+        resolveSignatureAndFunction(fn);
+      }
       squashCompilerMessages = false;
     }
   }

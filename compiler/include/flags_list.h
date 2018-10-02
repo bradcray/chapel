@@ -39,6 +39,7 @@
 symbolFlag( FLAG_ALLOCATOR , ypr, "allocator" , "allocates heap storage" )
 symbolFlag( FLAG_ALLOW_REF , ypr, "allow ref" , ncm )
 symbolFlag( FLAG_ALWAYS_PROPAGATE_LINE_FILE_INFO , ypr, "always propagate line file info" , "counterpart to INSERT_LINE_FILE_INFO" )
+symbolFlag( FLAG_ALWAYS_RVF, ypr, "always RVF", "attach to a type to force RVF for objects of that type" )
 symbolFlag( FLAG_DONT_ALLOW_REF , ypr, "do not allow ref" , ncm )
 symbolFlag( FLAG_ARG_THIS, npr, "arg this", "the hidden object argument")
 symbolFlag( FLAG_ARRAY , ypr, "array" , ncm )
@@ -137,6 +138,7 @@ symbolFlag( FLAG_FUNCTION_TERMINATES_PROGRAM, ypr, "function terminates program"
 // but has unspecified type.
 symbolFlag( FLAG_GENERIC , npr, "generic" , "generic types, functions and arguments" )
 symbolFlag( FLAG_DELAY_GENERIC_EXPANSION, npr, "delay instantiation", "generics instances whose instantiation  will be determined shortly")
+symbolFlag( FLAG_GEN_MAIN_FUNC, npr, "generated main", "compiler generated main function")
 symbolFlag( FLAG_GLOBAL_TYPE_SYMBOL, npr, "global type symbol", "is accessible through a global type variable")
 symbolFlag( FLAG_HAS_RUNTIME_TYPE , ypr, "has runtime type" , "type that has an associated runtime type" )
 symbolFlag( FLAG_RVV, npr, "RVV", "variable is the return value variable" )
@@ -174,7 +176,9 @@ symbolFlag( FLAG_LAST_RESORT , ypr, "last resort" , "overload of last resort in 
 
 // Tells resolution to use this function's line number even if that function
 // has FLAG_COMPILER_GENERATED.
-symbolFlag( FLAG_LINE_NUMBER_OK, npr, "lineno ok", ncm )
+symbolFlag( FLAG_LINE_NUMBER_OK, ypr, "lineno ok", ncm )
+
+symbolFlag( FLAG_LLVM_READNONE , ypr, "llvm readnone" , ncm )
 
 symbolFlag( FLAG_LOCALE_MODEL_ALLOC , ypr, "locale model alloc" , "locale model specific alloc" )
 symbolFlag( FLAG_LOCALE_MODEL_FREE , ypr, "locale model free" , "locale model specific free" )
@@ -278,7 +282,6 @@ symbolFlag( FLAG_POD , ypr, "plain old data" , "data can be bit copied")
 symbolFlag( FLAG_PRIMITIVE_TYPE , ypr, "primitive type" , "attached to primitive types to keep them from being deleted" )
 symbolFlag( FLAG_PRINT_MODULE_INIT_FN , ypr, "print module init fn" , ncm )
 symbolFlag( FLAG_PRINT_MODULE_INIT_INDENT_LEVEL , ypr, "print module init indent level" , ncm )
-symbolFlag( FLAG_PRIVATIZED_CLASS , ypr, "privatized class" , "privatized array or domain class" )
 symbolFlag( FLAG_PRIVATE, npr, "private", ncm )
 symbolFlag( FLAG_PROMOTION_WRAPPER , npr, "promotion wrapper" , ncm )
 symbolFlag( FLAG_PROTOTYPE_MODULE , npr, "prototype module" , ncm )
@@ -333,7 +336,6 @@ symbolFlag( FLAG_UNALIAS_FN,  ypr, "unalias fn" , "function to copy array slices
 symbolFlag( FLAG_UNCHECKED_THROWS,  ypr, "unchecked throws" , "function throws but handling the errors is not required even in strict mode")
 symbolFlag( FLAG_UNREF_FN,  ypr, "unref fn" , "function to remove reference fields from tuples or copy array slices when returning")
 symbolFlag( FLAG_UNSAFE,  ypr, "unsafe" , "unsafe (disable lifetime checking)")
-symbolFlag( FLAG_USE_DEFAULT_INIT, ypr, "use default init", "generate default initializer instead of constructor")
 symbolFlag( FLAG_VECTORIZE_YIELDING_LOOPS, ypr, "vectorize yielding loops", "used to explicitly vectorize yielding loops in iterators" )
 symbolFlag( FLAG_VIRTUAL , npr, "virtual" , ncm )
 symbolFlag( FLAG_VOID_NO_RETURN_VALUE, npr, "no return value for void", "function does not return a value if the return type is void" )

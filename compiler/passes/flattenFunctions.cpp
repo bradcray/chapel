@@ -282,10 +282,7 @@ replaceVarUsesWithFormals(FnSymbol* fn, SymbolMap* vars) {
           if (type == sym->type) {
             se->setSymbol(arg);
 
-          } else {
-            CallExpr* call        = toCallExpr(se->parentExpr);
-            INT_ASSERT(call);
-
+          } else if (CallExpr* call = toCallExpr(se->parentExpr)) {
             FnSymbol* fnc         = call->resolvedFunction();
             bool      canPassToFn = false;
 
@@ -327,6 +324,13 @@ replaceVarUsesWithFormals(FnSymbol* fn, SymbolMap* vars) {
 
               se->setSymbol(tmp);
             }
+
+          } else {
+            // So far, the only other known case is when 'se' is some
+            // shadow variable's outer sym. If so, just replace the symbol.
+            ShadowVarSymbol* svar = toShadowVarSymbol(se->parentSymbol);
+            INT_ASSERT(svar && se == svar->outerVarSE);
+            se->setSymbol(arg);
           }
         }
       }
@@ -340,21 +344,7 @@ addVarsToActuals(CallExpr* call, SymbolMap* vars, bool outerCall) {
   form_Map(SymbolMapElem, e, *vars) {
     if (Symbol* sym = e->key) {
       SET_LINENO(sym);
-      if (!outerCall && passByRef(sym)) {
-        // This is only a performance issue.
-        INT_ASSERT(!sym->hasFlag(FLAG_SHOULD_NOT_PASS_BY_REF));
-        /* NOTE: See note above in addVarsToFormals() */
-        if (sym->isRef())
-          call->insertAtTail(sym);
-        else {
-          VarSymbol* tmp = newTemp(sym->type->getValType()->refType);
-          call->getStmtExpr()->insertBefore(new DefExpr(tmp));
-          call->getStmtExpr()->insertBefore(new CallExpr(PRIM_MOVE, tmp, new CallExpr(PRIM_ADDR_OF, sym)));
-          call->insertAtTail(tmp);
-        }
-      } else {
-        call->insertAtTail(sym);
-      }
+      call->insertAtTail(sym);
     }
   }
 }

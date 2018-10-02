@@ -378,6 +378,30 @@ void EnumType::replaceChild(BaseAST* old_ast, BaseAST* new_ast) {
 }
 
 
+bool EnumType::isAbstract() {
+  for_enums(constant, this) {
+    if (constant->init) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool EnumType::isConcrete() {
+  // if the first constant has an initializer, it's concrete;
+  // otherwise, it's not.  This loop with a guaranteed return is a
+  // lazy way of getting that first constant.
+  for_enums(constant, this) {
+    if (constant->init) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+
+
 PrimitiveType* EnumType::getIntegerType() {
   INT_ASSERT(integerType);
   return integerType;
@@ -1025,7 +1049,7 @@ Type* getManagedPtrBorrowType(const Type* t) {
 
   INT_ASSERT(at);
 
-  Type* ret = at->getField("t")->type;
+  Type* ret = at->getField("chpl_t")->type;
   Type* borrow = canonicalClassType(ret);
   return borrow;
 }
@@ -1462,7 +1486,6 @@ bool isRecordWithInitializers(Type* type) {
 
   if (AggregateType* at = toAggregateType(type)) {
     if (at->isRecord()                   == true  &&
-        at->symbol->hasFlag(FLAG_EXTERN) == false &&
         (at->initializerStyle == DEFINES_INITIALIZER ||
          at->wantsDefaultInitializer())) {
       retval = true;

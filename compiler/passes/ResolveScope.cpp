@@ -43,7 +43,6 @@
 
 #include "ResolveScope.h"
 
-#include "ForallStmt.h"
 #include "LoopExpr.h"
 #include "scopeResolve.h"
 
@@ -486,7 +485,7 @@ Symbol* ResolveScope::lookupWithUses(UnresolvedSymExpr* usymExpr) const {
     // Do not use for_vector(); it terminates on a NULL
     for (size_t i = 0; i < useList.size(); i++) {
       if (const UseStmt* use = useList[i]) {
-        if (use->skipSymbolSearch(name) == false) {
+        if (use->skipSymbolSearch(name, true) == false) {
           BaseAST*    scopeToUse = use->getSearchScope();
           const char* nameToUse  = name;
 
@@ -663,6 +662,18 @@ void ResolveScope::getFields(const char* fieldName,
       INT_ASSERT(false);
     }
   }
+
+  if (symbols.size() > 0) {
+    for (std::vector<Symbol*>::iterator it = symbols.begin();
+         it != symbols.end();
+         it++) {
+      if (*it == mAstRef) {
+        // Only and except lists should not return the original module name.
+        symbols.erase(it);
+        break;
+      }
+    }
+  }
 }
 
 bool ResolveScope::getFieldsWithUses(const char* fieldName,
@@ -681,7 +692,7 @@ bool ResolveScope::getFieldsWithUses(const char* fieldName,
         const UseStmt* use = useList[i];
 
         if (use != NULL) {
-          if (use->skipSymbolSearch(fieldName) == false) {
+          if (use->skipSymbolSearch(fieldName, true) == false) {
             BaseAST*    scopeToUse = use->getSearchScope();
             const char* nameToUse  = NULL;
 

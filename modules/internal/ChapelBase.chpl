@@ -36,11 +36,6 @@ module ChapelBase {
       compilerError("illegal use of '", op, "' on operands of type uint(64) and signed integer");
   }
 
-  inline proc _throwPVFCError() {
-    halt("Pure virtual function called.");
-  }
-
-
   //
   // compile-time diagnostics
   //
@@ -765,11 +760,10 @@ module ChapelBase {
       }
     }
 
-    // need a real `here` since it's used in the range parallel iters
-    if initMethod == ArrayInit.parallelInit {
-      if here == dummyLocale {
-        initMethod = ArrayInit.serialInit;
-      }
+    // The parallel range iter uses 'here`/rootLocale, so fallback to serial
+    // initialization if the root locale hasn't been setup
+    if initMethod == ArrayInit.parallelInit && !rootLocaleInitialized {
+      initMethod = ArrayInit.serialInit;
     }
 
     // Q: why is the declaration of 'y' in the following loops?
@@ -897,9 +891,8 @@ module ChapelBase {
   // to add non-generic fields here.
   // And to get 'errors' field from any generic instantiation.
   pragma "no default functions"
-  pragma "use default init"
   class _EndCountBase {
-    var errors: unmanaged chpl_TaskErrors;
+    var errors: chpl_TaskErrors;
     var taskList: c_void_ptr = _defaultOf(c_void_ptr);
   }
 
@@ -930,11 +923,11 @@ module ChapelBase {
     type taskCntType = if !forceLocalTypes && useAtomicTaskCnt then atomic int
                                            else int;
     if forceLocalTypes {
-      return new _EndCount(iType=chpl__processorAtomicType(int),
-                           taskType=taskCntType);
+      return new unmanaged _EndCount(iType=chpl__processorAtomicType(int),
+                                     taskType=taskCntType);
     } else {
-      return new _EndCount(iType=chpl__atomicType(int),
-                           taskType=taskCntType);
+      return new unmanaged _EndCount(iType=chpl__atomicType(int),
+                                     taskType=taskCntType);
     }
   }
 
@@ -946,7 +939,7 @@ module ChapelBase {
   // on statement needed.
   pragma "dont disable remote value forwarding"
   inline proc _endCountFree(e: _EndCount) {
-    delete e;
+    delete _to_unmanaged(e);
   }
 
   // This function is called by the initiating task once for each new
@@ -1072,10 +1065,19 @@ module ChapelBase {
       throw new unmanaged TaskErrors(e.errors);
   }
 
+  proc _do_command_line_cast(type t, x:c_string) throws {
+    var str = x:string;
+    if t == string {
+      return str;
+    } else {
+      return str:t;
+    }
+  }
+  // param s is used for error reporting
   pragma "command line setting"
-  proc _command_line_cast(param s: c_string, type t, x) {
+  proc _command_line_cast(param s: c_string, type t, x:c_string) {
     try! {
-      return _cast(t, x:string);
+      return _do_command_line_cast(t, x);
     }
   }
 
@@ -1115,6 +1117,8 @@ module ChapelBase {
     return x: int: bool;
   // _cast(type t:integral, x:enumerated)
   // is generated for each enum in buildDefaultFunctions
+  inline proc _cast(type t:enumerated, x:enumerated) where x.type == t
+    return x;
   inline proc _cast(type t:chpl_anyreal, x:enumerated)
     return x: int: real;
 
@@ -1372,14 +1376,19 @@ module ChapelBase {
 
 
   // implements 'delete' statement
+  pragma "no borrow convert"
   inline proc chpl__delete(arg)
-    where isClassType(arg.type) || isExternClassType(arg.type) {
+    where isClassType(arg.type) {
 
     if chpl_isDdata(arg.type) then
       compilerError("cannot delete data class");
 
     if arg.type == _nilType then
       compilerError("should not delete 'nil'");
+
+    // TODO - this should be an error after 1.18
+    if !isSubtype(arg.type, _unmanaged) then
+      compilerWarning("'delete' can only be applied to unmanaged classes");
 
     if (arg != nil) {
       arg.deinit();
@@ -1395,8 +1404,13 @@ module ChapelBase {
   }
 
   // report an error when 'delete' is inappropriate
+  pragma "no borrow convert"
   proc chpl__delete(arg) {
-    if isRecord(arg) then
+    if isSubtype(arg.type, _owned) then
+      compilerError("'delete' is not allowed on an owned class type");
+    else if isSubtype(arg.type, _shared) then
+      compilerError("'delete' is not allowed on a shared class type");
+    else if isRecord(arg) then
       // special case for records as a more likely occurrence
       compilerError("'delete' is not allowed on records");
     else
@@ -1877,32 +1891,6 @@ module ChapelBase {
 
   proc isRefIterType(type t) param return __primitive("is ref iter type", t);
 
-  proc isExternClassType(type t) param return __primitive("is extern class type", t);
-
-  // extern class operations
-  inline proc =(ref a, b: a.type) where isExternClassType(a.type)
-  { __primitive("=", a, b); }
-
-  // analogously to proc =(ref a, b:_nilType) where isClassType(a.type)
-  pragma "compiler generated"
-  pragma "last resort"
-  inline proc =(ref a, b:_nilType) where isExternClassType(a.type)
-  { __primitive("=", a, nil); }
-
-  inline proc ==(a, b: a.type) where isExternClassType(a.type)
-    return __primitive("ptr_eq", a, b);
-  inline proc ==(a, b: _nilType) where isExternClassType(a.type)
-    return __primitive("ptr_eq", a, b);
-  inline proc ==(a: _nilType, b) where isExternClassType(b.type)
-    return __primitive("ptr_eq", a, b);
-
-  inline proc !=(a, b: a.type) where isExternClassType(a.type)
-    return __primitive("ptr_neq", a, b);
-  inline proc !=(a, b: _nilType) where isExternClassType(a.type)
-    return __primitive("ptr_neq", a, b);
-  inline proc !=(a: _nilType, b) where isExternClassType(b.type)
-    return __primitive("ptr_neq", a, b);
-
   // These style element #s are used in the default Writer and Reader.
   // and in e.g. implementations of those in Tuple.
   extern const QIO_STYLE_ELEMENT_STRING:int;
@@ -1927,7 +1915,6 @@ module ChapelBase {
   extern const QIO_TUPLE_FORMAT_JSON:int;
 
   // Support for module deinit functions.
-  pragma "use default init"
   class chpl_ModuleDeinit {
     const moduleName: c_string;          // for debugging; non-null, not owned
     const deinitFun:  c_fn_ptr;          // module deinit function
@@ -2004,4 +1991,11 @@ module ChapelBase {
   inline proc _cast(type t:borrowed, x:_unmanaged) where isSubtype(_to_borrowed(x.type),t) {
     return __primitive("cast", t, x);
   }
+
+  pragma "no borrow convert"
+  inline proc _removed_cast(in x) {
+    return x;
+  }
+
+  proc chpl_checkCopyInit(lhs, rhs) param { }
 }

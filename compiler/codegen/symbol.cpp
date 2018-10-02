@@ -38,6 +38,7 @@
 #include "intlimits.h"
 #include "iterator.h"
 #include "LayeredValueTable.h"
+#include "library.h"
 #include "llvmDebug.h"
 #include "llvmExtractIR.h"
 #include "llvmUtil.h"
@@ -874,6 +875,94 @@ GenRet ArgSymbol::codegen() {
   return ret;
 }
 
+// If there is a known .pxd file translation for this type, use that.
+// Otherwise, use the normal cname
+static std::string getPythonTypeName(Type* type, PythonFileType pxd) {
+  std::pair<std::string, std::string> tNames = pythonNames[type->symbol];
+  if (pxd == C_PXD && tNames.first != "") {
+    return tNames.first;
+  } else if (pxd == PYTHON_PYX && tNames.second != "") {
+    return tNames.second;
+  } else if (pxd == C_PYX && (tNames.second != "" || tNames.first != "")) {
+    std::string res = tNames.second;
+    if (strncmp(res.c_str(), "numpy", strlen("numpy")) == 0) {
+      res += "_t";
+    } else {
+      res = getPythonTypeName(type, C_PXD);
+    }
+    return res;
+  } else {
+    return transformTypeForPointer(type);
+  }
+}
+
+std::string ArgSymbol::getPythonType(PythonFileType pxd) {
+  Type* t = getArgSymbolCodegenType(this);
+
+  if (t->symbol->hasFlag(FLAG_REF) &&
+      t->getValType() == dtExternalArray &&
+      (pxd == PYTHON_PYX || pxd == C_PYX)
+      && exportedArrayElementType[this] != NULL) {
+    // Allow python declarations to accept anything iterable to translate to
+    // an array, instead of limiting to a specific Python type
+    return "";
+  } else {
+    return getPythonTypeName(t, pxd) + " ";
+  }
+}
+
+// Some Python type instances need to be translated into C level type instances.
+// Generate code to perform that translation when this is the case
+std::string ArgSymbol::getPythonArgTranslation() {
+  Type* t = getArgSymbolCodegenType(this);
+
+  if (t == dtStringC) {
+    std::string res = "\tcdef const char* chpl_";
+    res += cname;
+    res += " = ";
+    res += cname;
+    res += "\n";
+    return res;
+  } else if (t->symbol->hasFlag(FLAG_REF) &&
+             t->getValType() == dtExternalArray) {
+    // Handle arrays
+    if (Symbol* eltType = exportedArrayElementType[this]) {
+      // The element type will be recorded in the exportedArrayElementType map
+      // if this arg's type was originally a Chapel array instead of explicitly
+      // an external array.  If we have the element type, that means we need to
+      // do a translation in the python wrapper.
+      std::string typeStr = getPythonTypeName(eltType->type, PYTHON_PYX);
+      std::string typeStrCDefs = getPythonTypeName(eltType->type, C_PYX);
+
+      // Create the memory needed to store the contents of what was passed to us
+      // E.g. cdef chpl_external_array chpl_foo =
+      //          chpl_make_external_array(sizeof(element type), len(foo))
+      std::string res = "\tcdef chpl_external_array chpl_";
+      res += cname;
+      res += " = chpl_make_external_array(sizeof(";
+      res += typeStrCDefs;
+      res += "), len(";
+      res += cname;
+      res += "))\n";
+
+      // Copy the contents over.
+      // E.g. for i in range(len(foo)):
+      //         (<element type*>chpl_foo.elts)[i] = foo[i]
+      res += "\tfor i in range(len(";
+      res += cname;
+      res += ")):\n";
+      res += "\t\t(<" + typeStrCDefs + "*>chpl_";
+      res += cname;
+      res += ".elts)[i] = ";
+      res += cname;
+      res += "[i]\n";
+
+      return res;
+    }
+  }
+  return "";
+}
+
 /******************************** | *********************************
 *                                                                   *
 *                                                                   *
@@ -1506,6 +1595,9 @@ void FnSymbol::codegenDef() {
     if (fNoInline)
       func->addFnAttr(llvm::Attribute::NoInline);
 
+    if (this->hasFlag(FLAG_LLVM_READNONE))
+      func->addFnAttr(llvm::Attribute::ReadNone);
+
     llvm::BasicBlock *block =
       llvm::BasicBlock::Create(info->module->getContext(), "entry", func);
 
@@ -1546,6 +1638,19 @@ void FnSymbol::codegenDef() {
       ArgNo++;
     }
 
+    // if --gen-ids is enabled, add metadata mapping the
+    // function back to Chapel AST id
+    if (fGenIDS) {
+      llvm::LLVMContext& ctx = info->llvmContext;
+
+      llvm::Type *int64Ty = llvm::Type::getInt64Ty(ctx);
+      llvm::Constant* c = llvm::ConstantInt::get(int64Ty, this->id);
+      llvm::ConstantAsMetadata* aid = llvm::ConstantAsMetadata::get(c);
+
+      llvm::MDNode* node = llvm::MDNode::get(ctx, aid);
+
+      func->setMetadata("chpl.ast.id", node);
+    }
 #endif
   }
 
@@ -1627,6 +1732,174 @@ GenRet FnSymbol::codegen() {
 #endif
   }
   return ret;
+}
+
+// Supports the creation of a python module with --library-python
+void FnSymbol::codegenPython(PythonFileType pxd) {
+  GenInfo *info = gGenInfo;
+
+  if (!hasFlag(FLAG_EXPORT)) return;
+  if (hasFlag(FLAG_NO_PROTOTYPE)) return;
+  if (hasFlag(FLAG_NO_CODEGEN)) return;
+
+  // Should I add the break-on-codegen-id stuff here?
+
+  if (info->cfile) {
+    FILE* outfile = info->cfile;
+    if (fGenIDS)
+      fprintf(outfile, "%s", idCommentTemp(this));
+
+    if (pxd == C_PXD) {
+      fprintf(outfile, "\t%s;\n", codegenPXDType().c.c_str());
+    } else if (pxd == PYTHON_PYX) {
+      fprintf(outfile, "\n%s", codegenPYXType().c.c_str());
+    } else {
+      INT_FATAL("python file type not handled");
+    }
+  } else {
+    // TODO: LLVM stuff
+  }
+}
+
+// Supports the creation of a python module with --library-python
+GenRet FnSymbol::codegenPXDType() {
+  GenInfo* info = gGenInfo;
+  GenRet ret;
+
+  ret.chplType = typeInfo();
+
+  if (info->cfile) {
+    // Cast to right function type.
+    std::string str;
+
+    std::string retString = getPythonTypeName(retType, C_PXD);
+    str += retString.c_str();
+    str += " ";
+    str += cname;
+    str += "(";
+
+    if (numFormals() != 0) {
+      int count = 0;
+      for_formals(formal, this) {
+        if (formal->hasFlag(FLAG_NO_CODEGEN))
+          continue; // do not print locale argument, end count, dummy class
+        if (count > 0)
+          str += ", ";
+        str += formal->getPythonType(C_PXD);
+        str += formal->cname;
+        if (fGenIDS) {
+          str += " ";
+          str += idCommentTemp(formal);
+        }
+        count++;
+      }
+    } // pxd files do not take void as an argument list, just close the parens
+    str += ")";
+    ret.c = str;
+
+  } else {
+    // TODO: LLVM stuff
+  }
+
+  return ret;
+}
+
+// Supports the creation of a python module with --library-python
+GenRet FnSymbol::codegenPYXType() {
+  GenRet ret;
+
+  ret.chplType = typeInfo();
+
+  // Function header
+  std::string header = "def ";
+  header += cname;
+  header += "(";
+
+  // Translation of any arguments with Python-specific types
+  std::string argTranslate = "";
+  // Call to the wrapped function
+  std::string funcCall = "\t";
+  // Return statement, if applicable
+  std::string returnStmt = "";
+  if (retType != dtVoid) {
+    if (retType == dtExternalArray &&
+        exportedArrayElementType[this] != NULL) {
+      funcCall += "cdef chpl_external_array ret_arr = ";
+      returnStmt += getPythonArrayReturnStmts();
+    } else {
+      funcCall += "ret = ";
+    }
+    returnStmt += "\treturn ret\n";
+  }
+  funcCall += "chpl_";
+  funcCall += cname;
+  funcCall += "(";
+
+  if (numFormals() != 0) {
+    int count = 0;
+    for_formals(formal, this) {
+      if (formal->hasFlag(FLAG_NO_CODEGEN))
+        continue; // do not print locale argument, end count, dummy class
+      if (count > 0) {
+        header += ", ";
+        funcCall += ", ";
+      }
+
+      std::string argType = formal->getPythonType(C_PYX);
+      header += argType;
+      header += formal->cname;
+      if (fGenIDS) {
+        header += " ";
+        header += idCommentTemp(formal);
+      }
+
+      std::string curArgTranslate = formal->getPythonArgTranslation();
+      if (curArgTranslate != "") {
+        argTranslate += curArgTranslate;
+        if (argType == "") {
+          // Happens when the argument type is an array
+          // We need to send in the wrapper we created by reference
+          funcCall += "&";
+          // And we need to clean it up when we are done with it
+          std::string oldRetStmt = returnStmt;
+          returnStmt = "\tchpl_free_external_array(chpl_";
+          returnStmt += formal->cname;
+          returnStmt += ")\n" + oldRetStmt;
+        }
+        funcCall += "chpl_";
+      }
+
+      funcCall += formal->cname;
+      count++;
+    }
+
+  } // pyx files do not take void as an argument list, just close the parens
+  header += "):\n";
+  funcCall += ")\n";
+  ret.c = header + argTranslate + funcCall + returnStmt;
+
+  return ret;
+}
+
+std::string FnSymbol::getPythonArrayReturnStmts() {
+  INT_ASSERT(retType == dtExternalArray);
+  Symbol* eltType = exportedArrayElementType[this];
+  std::string typeStr = getPythonTypeName(eltType->type, PYTHON_PYX);
+  std::string typeStrCDefs = getPythonTypeName(eltType->type, C_PYX);
+  // Create the numpy array to return
+  // E.g. cdef numpy.ndarray [C element type, ndim=1] ret =
+  //          numpy.zeros(shape = ret_arr.size, dtype = Python element type)
+  std::string res = "\tcdef numpy.ndarray [" + typeStrCDefs + ", ndim=1] ret";
+  res += " = numpy.zeros(shape = ret_arr.size, dtype = " + typeStr + ")\n";
+
+  // Populate it with the contents we return (which translated C types into
+  // Python types)
+  res += "\tfor i in range(ret_arr.size):\n";
+  res += "\t\tret[i] = (<" + typeStrCDefs + "*>ret_arr.elts)[i]\n";
+
+  // Free the returned array now that its contents have been stored elsewhere
+  res += "\tchpl_free_external_array(ret_arr)\n";
+  return res;
 }
 
 /******************************** | *********************************

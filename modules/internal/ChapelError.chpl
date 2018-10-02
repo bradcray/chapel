@@ -55,7 +55,7 @@ module ChapelError {
        show information about the error including the result
        of calling :proc:`Error.message`.
      */
-    proc writeThis(f) {
+    override proc writeThis(f) {
       var description = chpl_describe_error(this);
       f <~> description;
     }
@@ -65,7 +65,6 @@ module ChapelError {
      If a `nil` :class:`Error` is thrown, :class:`NilThrownError`
      will be thrown instead.
    */
-  pragma "use default init"
   class NilThrownError : Error {
     pragma "no doc"
     override proc message() {
@@ -106,7 +105,7 @@ module ChapelError {
   pragma "no doc"
   record chpl_TaskErrors {
     var _head: unmanaged Error;
-    var _errorsLock: atomicbool;
+    var _errorsLock: chpl__processorAtomicType(bool);
     // this atomic controls:
     //  - _head
     //  - all list elements ->_next
@@ -335,6 +334,7 @@ module ChapelError {
   }
   pragma "no doc"
   pragma "insert line file info"
+  pragma "always propagate line file info"
   // TODO -- deprecate this version
   proc chpl_fix_thrown_error(err: borrowed Error): unmanaged Error {
     return chpl_fix_thrown_error(_to_unmanaged(err));
@@ -348,6 +348,7 @@ module ChapelError {
 
   pragma "no doc"
   pragma "insert line file info"
+  pragma "always propagate line file info"
   proc chpl_fix_thrown_error(err: unmanaged Error): unmanaged Error {
     var fixErr: unmanaged Error = err;
     if fixErr == nil then
@@ -362,7 +363,8 @@ module ChapelError {
   }
   pragma "no doc"
   pragma "insert line file info"
-  proc chpl_fix_thrown_error(ref err: Owned(Error)): unmanaged Error {
+  pragma "always propagate line file info"
+  proc chpl_fix_thrown_error(ref err: owned Error): unmanaged Error {
     return chpl_fix_thrown_error(err.release());
   }
 
@@ -373,6 +375,7 @@ module ChapelError {
   pragma "no doc"
   pragma "function terminates program"
   pragma "insert line file info"
+  pragma "always propagate line file info"
   proc chpl_uncaught_error(err: unmanaged Error) {
     extern proc chpl_error_preformatted(c_string);
 

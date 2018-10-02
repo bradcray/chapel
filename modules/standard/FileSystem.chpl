@@ -578,7 +578,7 @@ proc locale.cwd(): string throws {
     var tmp:c_string;
     // c_strings can't cross on statements.
     err = chpl_fs_cwd(tmp);
-    ret = tmp: string;
+    ret = new string(tmp, isowned=true, needToCopy=false);
   }
   if err != ENOERR then try ioerror(err, "in cwd");
   return ret;
@@ -613,6 +613,13 @@ proc locale.cwd(out error: syserr): string {
 */
 proc exists(name: string): bool throws {
   extern proc chpl_fs_exists(ref result:c_int, name: c_string): syserr;
+
+  if (name.isEmptyString()) {
+    // chpl_fs_exists uses stat to determine if a file exists, which throws an
+    // error when "" is passed to it.  Check it here early and return false
+    // like Python does
+    return false;
+  }
 
   var ret:c_int;
   var err = chpl_fs_exists(ret, name.localize().c_str());
@@ -830,7 +837,6 @@ private module GlobWrappers {
 
   // glob wrapper that takes care of casting and error checking
   inline proc glob_w(pattern: string, ref ret_glob:glob_t): void {
-    use ChapelHaltWrappers;
     extern proc chpl_glob(pattern: c_string, flags: c_int,
                           ref ret_glob: glob_t): c_int;
 
@@ -843,7 +849,7 @@ private module GlobWrappers {
     // convert that into an out of memory error.
     assert (err == 0 || err == GLOB_NOMATCH || err == GLOB_NOSPACE);
     if err == GLOB_NOSPACE then
-      outOfMemoryHalt("glob()");
+      HaltWrappers.outOfMemoryHalt("glob()");
   }
 
   // glob_num wrapper that takes care of casting
@@ -932,7 +938,6 @@ iter glob(pattern: string = "*", param tag: iterKind)
 pragma "no doc"
 iter glob(pattern: string = "*", followThis, param tag: iterKind): string
        where tag == iterKind.follower {
-  use ChapelHaltWrappers;
   use GlobWrappers;
   var glb : glob_t;
   if (followThis.size != 1) then
@@ -942,7 +947,7 @@ iter glob(pattern: string = "*", followThis, param tag: iterKind): string
   glob_w(pattern, glb);
   const num = glob_num_w(glb);
   if (r.high >= num) then
-    zipLengthHalt("glob() is being zipped with something too big; it only has " + num + " matches");
+    HaltWrappers.zipLengthHalt("glob() is being zipped with something too big; it only has " + num + " matches");
 
   for i in r do
     yield glob_index_w(glb, i);
@@ -1041,6 +1046,13 @@ proc isFile(out error:syserr, name:string):bool {
 */
 proc isLink(name: string): bool throws {
   extern proc chpl_fs_is_link(ref result:c_int, name: c_string): syserr;
+
+  if (name.isEmptyString()) {
+    // chpl_fs_is_link uses lstat to determine if a path is a link, which throws
+    // an error when "" is passed to it.  Check it here early and return false
+    // like Python does
+    return false;
+  }
 
   var ret:c_int;
   var err = chpl_fs_is_link(ret, name.localize().c_str());

@@ -44,6 +44,7 @@ static int isDefinedAllPaths(Expr* expr, Symbol* ret, RefSet& refs);
 static void checkReturnPaths(FnSymbol* fn);
 static void checkCalls();
 static void checkExternProcs();
+static void checkExportedProcs();
 
 
 static void
@@ -94,6 +95,7 @@ checkResolved() {
   checkCalls();
   checkConstLoops();
   checkExternProcs();
+  checkExportedProcs();
 }
 
 
@@ -151,19 +153,6 @@ isDefinedAllPaths(Expr* expr, Symbol* ret, RefSet& refs)
               (arg->intent == INTENT_OUT ||
                arg->intent == INTENT_INOUT ||
                arg->intent == INTENT_REF))
-            return 1;
-
-          // Treat all (non-const) refs as definitions, until we know better.
-          // TODO: This may not be needed after moving insertReferenceTemps()
-          // after this pass.
-
-          // Commenting out debugging output
-          //for (RefSet::iterator i = refs.begin();
-          //     i != refs.end(); ++i)
-          //  printf("%d\n", (*i)->id);
-
-          if (refs.find(se->symbol()) != refs.end() &&
-              arg->intent == INTENT_REF)
             return 1;
         }
       }
@@ -513,4 +502,21 @@ static void checkExternProcs() {
   }
 }
 
+static void checkExportedProcs() {
+  forv_Vec(FnSymbol, fn, gFnSymbols) {
+    if (!fn->hasFlag(FLAG_EXPORT))
+      continue;
 
+    for_formals(formal, fn) {
+      if (formal->typeInfo() == dtString) {
+        USR_FATAL_CONT(fn, "exported procedures should not take arguments of "
+                       "type string, use c_string instead");
+      }
+    }
+
+    if (fn->retType == dtString) {
+      USR_FATAL_CONT(fn, "exported procedures should not return strings, use "
+                     "c_strings instead");
+    }
+  }
+}

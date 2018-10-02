@@ -21,8 +21,10 @@ proc testRangeAPI(lbl, r: range(?), idx, subr) {
   writeln("alignedLow       = ", r.alignedLow);
   writeln("alignedHigh      = ", r.alignedHigh);
   writeln("isEmpty()        = ", r.isEmpty());
-  writeln("size             = ", r.size);
-  writeln("length           = ", r.length);
+  if (isBoundedRange(r)) {
+    writeln("size             = ", r.size);
+    writeln("length           = ", r.length);
+  }
   writeln("hasFirst()       = ", r.hasFirst());
   writeln("hasLast()        = ", r.hasLast());
   writeln("isNat.Algned()   = ", r.isNaturallyAligned());
@@ -34,23 +36,46 @@ proc testRangeAPI(lbl, r: range(?), idx, subr) {
   writeln("boundsCheck(", idx, ") = ", r.boundsCheck(idx));
   writeln("boundsCheck(", subr, ") = ", r.boundsCheck(subr));
   writeln("indexOrder(", idx, ") = ", r.indexOrder(idx));
-  writeln("orderToIndex(3)  = ", r.orderToIndex(3));
+  if (r.hasFirst()) then
+    writeln("orderToIndex(3)  = ", r.orderToIndex(3));
+  if (isBoundedRange(r)) {
+    writeln("expand(2)        = ", r.expand(2));
+    writeln("offset(1)        = ", r.offset(1));
+  }
   writeln("translate(2)     = ", r.translate(2));
   writeln("translate(-2)    = ", r.translate(-2));
-  writeln("interior(2)      = ", r.interior(2));
-  writeln("interior(-2)     = ", r.interior(-2));
-  writeln("exterior(2)      = ", r.exterior(2));
-  writeln("exterior(-2)     = ", r.exterior(-2));
-  writeln("expand(2)        = ", r.expand(2));
-  writeln("offset(1)        = ", r.offset(1));
+  if (isBoundedRange(r)) {
+    writeln("exterior(2)      = ", r.exterior(2));
+    writeln("exterior(-2)     = ", r.exterior(-2));
+    writeln("interior(2)      = ", r.interior(2));
+    writeln("interior(-2)     = ", r.interior(-2));
+  }
           
   writeln("serial iteration = ");
-  for i in r do
-    write(i, " ");
+  if (isBoundedRange(r)) {
+    for i in r do
+      write(i, " ");
+  } else {
+    if r.hasFirst() {
+      var count = 1;
+      for i in r {
+        count += 1;
+        if (count == 5) then
+          break;
+        writeln(i, " ");
+      }
+      writeln("...");
+    } else {
+      writeln("<can't be done>");
+    }
+  }
+        
   writeln();
 
-  writeln("r#2               = ", r#2);
-  writeln("r#-2              = ", r#-2);
+  if r.hasFirst() then
+    writeln("r#2               = ", r#2);
+  if r.hasLast() then
+    writeln("r#-2              = ", r#-2);
   writeln("r == subr         = ", r == subr);
   writeln("r != subr         = ", r != subr);
   writeln("r[subr]           = ", r[subr]);
@@ -58,4 +83,5 @@ proc testRangeAPI(lbl, r: range(?), idx, subr) {
   
   var r2 = r;
   writeln("Copying...        = ", r2);
+  writeln();
 }

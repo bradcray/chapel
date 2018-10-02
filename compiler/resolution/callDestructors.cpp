@@ -342,7 +342,7 @@ ReturnByRef::transformableFunctionKind(FnSymbol* fn)
 
   // Task functions within iterators can yield and so also need
   // this transformation.
-  // Reasonable alternative: update insertYieldTemps to handle
+  // Reasonable alternative: update insertCopiesForYields to handle
   // yielding a PRIM_DEREF or yielding a reference argument.
   if (fn->hasFlag(FLAG_TASK_FN_FROM_ITERATOR_FN)) {
     if (isUserDefinedRecord(fn->iteratorInfo->yieldedType))
@@ -749,8 +749,11 @@ void ReturnByRef::transformMove(CallExpr* moveExpr)
 
   // Ignore a CondStmt containing a PRIM_CHECK_ERROR
   // so that we can still detect initCopy after a call that can throw
-  if (isCheckErrorStmt(nextExpr))
-      nextExpr = nextExpr->next;
+  //
+  // Also ignore a DefExpr which might e.g. define a user variable
+  // which is = initCopy(call_tmp).
+  while (nextExpr && (isCheckErrorStmt(nextExpr) || isDefExpr(nextExpr)))
+    nextExpr = nextExpr->next;
 
   CallExpr* copyExpr  = NULL;
 
@@ -759,10 +762,11 @@ void ReturnByRef::transformMove(CallExpr* moveExpr)
   // Noakes 2017/03/04
   // Cannot use the qualified-type here.  The formal may be still a _ref(type)
   // and using a qualified-type generates yet another temp.
-  Symbol*   tmpVar    = newTemp("ret_tmp",             useLhs->type);
-  Symbol*   refVar    = newTemp("ret_to_arg_ref_tmp_", useLhs->type->refType);
+  Symbol*   tmpVar    = newTemp("ret_tmp", useLhs->type);
 
   FnSymbol* unaliasFn = NULL;
+
+  bool copiesToNoDestroy = false;
 
   // Determine if
   //   a) current call is not a PRIMOP
@@ -786,23 +790,33 @@ void ReturnByRef::transformMove(CallExpr* moveExpr)
               (rhsFn->hasFlag(FLAG_AUTO_COPY_FN) == true ||
                rhsFn->hasFlag(FLAG_INIT_COPY_FN) == true))
           {
-            ArgSymbol* formalArg  = rhsFn->getFormal(1);
-            Type*      formalType = formalArg->type;
-            Type*      actualType = rhsCall->get(1)->getValType();
-            Type*      returnType = rhsFn->retType->getValType();
+            SymExpr* copiedSe = toSymExpr(rhsCall->get(1));
+            INT_ASSERT(copiedSe);
+            SymExpr* dstSe = toSymExpr(callNext->get(1));
+            INT_ASSERT(dstSe);
 
-            unaliasFn = getUnalias(useLhs->type);
+            // check that the initCopy is copying the variable we just set
+            if (copiedSe->symbol() == useLhs) {
+              ArgSymbol* formalArg  = rhsFn->getFormal(1);
+              Type*      formalType = formalArg->type;
+              Type*      actualType = copiedSe->symbol()->getValType();
+              Type*      returnType = rhsFn->retType->getValType();
 
-            // Cannot reduce initCopy/autoCopy when types differ
-            //   (unless there is an unaliasFn available)
-            // Cannot reduce initCopy/autoCopy for sync variables
-            bool typesOK = unaliasFn != NULL || actualType == returnType;
+              unaliasFn = getUnalias(useLhs->type);
 
-            if (typesOK                  == true  &&
-                isSyncType(formalType)   == false &&
-                isSingleType(formalType) == false)
-            {
-              copyExpr = rhsCall;
+              // Cannot reduce initCopy/autoCopy when types differ
+              //   (unless there is an unaliasFn available)
+              // Cannot reduce initCopy/autoCopy for sync variables
+              bool typesOK = unaliasFn != NULL || actualType == returnType;
+
+              if (typesOK                  == true  &&
+                  isSyncType(formalType)   == false &&
+                  isSingleType(formalType) == false)
+              {
+                copyExpr = rhsCall;
+                if (dstSe->symbol()->hasFlag(FLAG_NO_AUTO_DESTROY))
+                  copiesToNoDestroy = true;
+              }
             }
           }
         }
@@ -810,35 +824,31 @@ void ReturnByRef::transformMove(CallExpr* moveExpr)
     }
   }
 
-  // Introduce a tmpVar and a reference to the tmpVar
-  CallExpr* addrOfTmp = new CallExpr(PRIM_ADDR_OF, tmpVar);
-
-  moveExpr->insertBefore(new DefExpr(tmpVar));
-  moveExpr->insertBefore(new DefExpr(refVar));
-  moveExpr->insertBefore(new CallExpr(PRIM_MOVE, refVar, addrOfTmp));
-
   // Convert the by-value call to a void call with an additional formal
   moveExpr->replace(callExpr->remove());
 
-  callExpr->insertAtTail(refVar);
+  callExpr->insertAtTail(tmpVar);
+
+  callExpr->insertBefore(new DefExpr(tmpVar));
   callExpr->insertAfter(new CallExpr(PRIM_MOVE, useLhs, tmpVar));
 
   // Possibly reduce a copy operation to a simple move
+  // the copyExpr might be a copy added when normalizing initialization
+  // of user variables. *or* it might come from handling `in` intent.
   if (copyExpr) {
     FnSymbol* rhsFn = copyExpr->resolvedFunction();
 
-    // If replacing an init copy, we got to a user variable.
     // Use an unalias call if possible
     if (rhsFn->hasFlag(FLAG_INIT_COPY_FN) && unaliasFn != NULL) {
       // BHARSH: It seems important that there's a temporary to store the
       // result of the unaliasFn call. Otherwise we'll move into a variable
-      // that has multiplie uses, which seems to cause a variety of problems.
+      // that has multiple uses, which seems to cause a variety of problems.
       //
       // In particular, I noticed that `changeRetToArgAndClone` generates
       // bad AST if I simply did this:
       //   copyExpr->replace(new CallExpr(unaliasFn, refVar));
       VarSymbol* unaliasTemp = newTemp("unaliasTemp", unaliasFn->retType);
-      CallExpr*  unaliasCall = new CallExpr(unaliasFn, refVar);
+      CallExpr*  unaliasCall = new CallExpr(unaliasFn, tmpVar);
 
       callExpr->insertBefore(new DefExpr(unaliasTemp));
       callExpr->insertAfter(new CallExpr(PRIM_MOVE, unaliasTemp, unaliasCall));
@@ -846,6 +856,19 @@ void ReturnByRef::transformMove(CallExpr* moveExpr)
       copyExpr->replace(new SymExpr(unaliasTemp));
     } else {
       copyExpr->replace(copyExpr->get(1)->remove());
+    }
+
+    if (copiesToNoDestroy) {
+      useLhs->addFlag(FLAG_NO_AUTO_DESTROY);
+      // and remove any auto destroy calls we just added
+      // (since ReturnByRef runs after addAutoDestroyCalls)
+      for_SymbolSymExprs(se, useLhs) {
+        if (CallExpr* call = toCallExpr(se->parentExpr)) {
+          FnSymbol* calledFn = call->resolvedFunction();
+          if (calledFn && calledFn->hasFlag(FLAG_AUTO_DESTROY_FN))
+            call->remove();
+        }
+      }
     }
   }
 }
@@ -1074,6 +1097,30 @@ static void insertGlobalAutoDestroyCalls() {
 }
 
 
+static void lowerAutoDestroyRuntimeType(CallExpr* call) {
+ if (SymExpr* rttSE = toSymExpr(call->get(1)))
+  // toAggregateType() filters out calls in unresolved generic functions.
+  if (AggregateType* rttAG = toAggregateType(rttSE->symbol()->type))
+   if (rttAG->symbol->hasFlag(FLAG_RUNTIME_TYPE_VALUE))
+    // Todo: the same for the element type component and
+    // for the case of a runtime type for a domain.
+    // Todo: avoid hard-coding the field names.
+    if (Symbol* domField = rttAG->getField("dom", false))
+     if (FnSymbol* destroyFn = autoDestroyMap.get(domField->getValType()))
+      {
+       // Invoke destroyFn on rttSE->dom.
+       INT_ASSERT(call->getStmtExpr() == call);
+       SET_LINENO(call);
+       VarSymbol* domTemp = newTemp("domTemp", domField->getValType());
+       call->insertBefore(new DefExpr(domTemp));
+       call->insertBefore("'move'(%S,'.v'(%E,%S))", domTemp,
+                          rttSE->remove(), domField);
+       call->insertBefore(new CallExpr(destroyFn, domTemp));
+      }
+ // Whether we expanded it above or it is a no-op, we are done with it.
+ call->remove();
+}
+
 static void insertDestructorCalls() {
   forv_Vec(CallExpr, call, gCallExprs) {
     if (call->isPrimitive(PRIM_CALL_DESTRUCTOR)) {
@@ -1087,6 +1134,8 @@ static void insertDestructorCalls() {
         call->replace(new CallExpr(type->getDestructor(),
                                    call->get(1)->remove()));
       }
+    } else if (call->isPrimitive(PRIM_AUTO_DESTROY_RUNTIME_TYPE)) {
+      lowerAutoDestroyRuntimeType(call);
     }
   }
 }
@@ -1108,7 +1157,7 @@ static void insertDestructorCalls() {
 //
 // Note that for parallel iterators, yields can occur in task
 // functions (that aren't iterators themselves).
-static void insertYieldTemps()
+static void insertCopiesForYields()
 {
   // Examine all calls.
   forv_Vec(CallExpr, call, gCallExprs)
@@ -1164,42 +1213,6 @@ static void insertYieldTemps()
 
         foundSe->replace(new SymExpr(tmp));
       }
-    }
-  }
-}
-
-/************************************* | **************************************
-*                                                                             *
-* Insert reference temps for function arguments that expect them.             *
-*                                                                             *
-************************************** | *************************************/
-
-static void insertReferenceTemps() {
-  forv_Vec(CallExpr, call, gCallExprs) {
-    // Is call in the tree?
-    if (call->inTree()) {
-      if (call->isResolved() || call->isPrimitive(PRIM_VIRTUAL_METHOD_CALL)) {
-        insertReferenceTemps(call);
-      }
-    }
-  }
-}
-
-void insertReferenceTemps(CallExpr* call) {
-  for_formals_actuals(formal, actual, call) {
-    if (formal->type == actual->typeInfo()->refType) {
-      SET_LINENO(call);
-
-      VarSymbol* tmp    = newTemp("_ref_tmp_", formal->qualType());
-
-      tmp->addFlag(FLAG_REF_TEMP);
-      actual->replace(new SymExpr(tmp));
-
-      Expr*      stmt   = call->getStmtExpr();
-      CallExpr*  addrOf = new CallExpr(PRIM_ADDR_OF, actual);
-
-      stmt->insertBefore(new DefExpr(tmp));
-      stmt->insertBefore(new CallExpr(PRIM_MOVE, tmp, addrOf));
     }
   }
 }
@@ -1381,14 +1394,13 @@ void callDestructors() {
 
   ReturnByRef::apply();
 
-  insertYieldTemps();
+  insertCopiesForYields();
 
   checkLifetimes();
 
   lateConstCheck(NULL);
 
   insertGlobalAutoDestroyCalls();
-  insertReferenceTemps();
 
   checkForErroneousInitCopies();
 

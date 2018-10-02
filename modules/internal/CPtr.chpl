@@ -107,6 +107,9 @@ module CPtr {
   inline proc =(ref a:c_ptr, b:c_ptr) { __primitive("=", a, b); }
 
   pragma "no doc"
+  inline proc =(ref a: c_ptr, b: c_void_ptr) { __primitive("=", a, b); }
+
+  pragma "no doc"
   inline proc =(ref a:c_ptr, b:_nilType) { __primitive("=", a, c_nil); }
 
   pragma "no doc"
@@ -133,11 +136,11 @@ module CPtr {
   }
   pragma "no doc"
   inline proc _cast(type t:string, x:c_void_ptr) {
-    return __primitive("ref to string", x):string;
+    return new string(__primitive("ref to string", x), needToCopy=false);
   }
   pragma "no doc"
   inline proc _cast(type t:string, x:c_ptr) {
-    return __primitive("ref to string", x):string;
+    return new string(__primitive("ref to string", x), needToCopy=false);
   }
   pragma "no doc"
   inline proc _cast(type t:borrowed, x:c_void_ptr) {

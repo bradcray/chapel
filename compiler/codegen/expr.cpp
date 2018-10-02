@@ -411,7 +411,7 @@ GenRet codegenWideAddrWithAddr(GenRet base, GenRet newAddr, Type* wideType = NUL
 #define USE_TBAA 1
 
 static
-void codegenInvariantStart(llvm::Value *val, llvm::Value *addr)
+void codegenInvariantStart(llvm::Type *valType, llvm::Value *addr)
 {
   GenInfo *info = gGenInfo;
 
@@ -425,8 +425,8 @@ void codegenInvariantStart(llvm::Value *val, llvm::Value *addr)
   const llvm::DataLayout& dataLayout = info->module->getDataLayout();
 
   uint64_t sizeInBytes;
-  if(val->getType()->isSized())
-    sizeInBytes = dataLayout.getTypeSizeInBits(val->getType())/8;
+  if(valType->isSized())
+    sizeInBytes = dataLayout.getTypeSizeInBits(valType)/8;
   else
     return;
 
@@ -477,7 +477,7 @@ llvm::StoreInst* codegenStoreLLVM(llvm::Value* val,
   }
 
   if(addInvariantStart)
-    codegenInvariantStart(val, ptr);
+    codegenInvariantStart(val->getType(), ptr);
 
   return ret;
 }
@@ -2279,7 +2279,9 @@ GenRet codegenArgForFormal(GenRet arg,
     // We need to pass a reference in these cases
     // Don't pass a reference to extern functions
     // Do if requiresCPtr or the argument is of reference type
-    if (isExtern) {
+    if (isExtern &&
+        (!(formal->intent & INTENT_FLAG_REF) ||
+         formal->type->getValType()->symbol->hasFlag(FLAG_TUPLE))) {
       // Don't pass by reference to extern functions
     } else if (formal->requiresCPtr() ||
                formal->isRef() || formal->isWideRef()) {
@@ -2795,6 +2797,21 @@ void codegenCallMemcpy(GenRet dest, GenRet src, GenRet size,
 
     llvm::Function *func = llvm::Intrinsic::getDeclaration(info->module, llvm::Intrinsic::memcpy, types);
     //llvm::FunctionType *fnType = func->getFunctionType();
+
+#if HAVE_LLVM_VER >= 70
+    // LLVM 7 and later: memcpy has no alignment argument
+    llvm::Value* llArgs[4];
+
+    llArgs[0] = convertValueToType(dest.val, types[0], false);
+    llArgs[1] = convertValueToType(src.val, types[1], false);
+    llArgs[2] = convertValueToType(size.val, types[2], false);
+
+    // LLVM memcpy intrinsic has additional argument isvolatile
+    // isVolatile?
+    llArgs[3] = llvm::ConstantInt::get(llvm::Type::getInt1Ty(info->module->getContext()), 0, false);
+
+#else
+    // LLVM 6 and earlier: memcpy had alignment argument
     llvm::Value* llArgs[5];
 
     llArgs[0] = convertValueToType(dest.val, types[0], false);
@@ -2806,6 +2823,7 @@ void codegenCallMemcpy(GenRet dest, GenRet src, GenRet size,
     llArgs[3] = llvm::ConstantInt::get(llvm::Type::getInt32Ty(info->module->getContext()), 0, false);
     // isVolatile?
     llArgs[4] = llvm::ConstantInt::get(llvm::Type::getInt1Ty(info->module->getContext()), 0, false);
+#endif
 
     // We can't use IRBuilder::CreateMemCpy because that adds
     //  a cast to i8 (in address space 0).
@@ -3492,19 +3510,61 @@ GenRet CallExpr::codegen() {
           ret.val = converted;
         }
       }
+
+      // Handle setting LLVM invariant on const records after
+      // they are initialized
+      if (fn->isInitializer()) {
+        if (isUserDefinedRecord(get(1)->typeInfo())) {
+          if (SymExpr* initedSe = toSymExpr(get(1))) {
+            if (initedSe->symbol()->isConstValWillNotChange()) {
+              GenRet genSe = args[0];
+              llvm::Value* ptr = genSe.val;
+              INT_ASSERT(ptr);
+              llvm::Type* ptrTy = ptr->getType();
+              INT_ASSERT(ptrTy && ptrTy->isPointerTy());
+              llvm::Type* eltTy = ptrTy->getPointerElementType();
+              codegenInvariantStart(eltTy, ptr);
+            }
+          }
+        }
+      }
+
 #endif
     }
   }
 
+  // When generating LLVM value, if --gen-ids is on,
+  // add metadata nodes that have the Chapel AST ids
+#ifdef HAVE_LLVM
+  if (gGenInfo->cfile == NULL && ret.val && fGenIDS) {
+    if (llvm::Instruction* insn = llvm::dyn_cast<llvm::Instruction>(ret.val)) {
+      llvm::LLVMContext& ctx = gGenInfo->llvmContext;
+
+      llvm::Type *int64Ty = llvm::Type::getInt64Ty(ctx);
+      llvm::Constant* c = llvm::ConstantInt::get(int64Ty, this->id);
+      llvm::ConstantAsMetadata* aid = llvm::ConstantAsMetadata::get(c);
+
+      llvm::MDNode* node = llvm::MDNode::get(ctx, aid);
+
+      insn->setMetadata("chpl.ast.id", node);
+    }
+  }
+#endif
+
   return ret;
 }
 
+// to define a primitive's code generation method
 #define DEFINE_PRIM(NAME) \
   void CallExpr::codegen ## NAME (CallExpr* call, GenRet &ret)
 
+// to call a primitive's code generation method
+#define CODEGEN_PRIM(NAME, call, ret) \
+  codegen ## NAME (call, ret);
+
 // to call another primitive's DEFINE_PRIM
 #define FORWARD_PRIM(NAME) \
-  codegen ## NAME (call, ret);
+  CODEGEN_PRIM(NAME, call, ret);
 
 DEFINE_PRIM(PRIM_UNKNOWN) {
     // This is handled separately
@@ -3515,8 +3575,6 @@ DEFINE_PRIM(PRIM_ARRAY_SET) {
     // get(1): (wide?) base pointer
     // get(2): index
     // get(3): value
-    // get(4): src-line
-    // get(5): src-file
 
     // Used to handle FLAG_WIDE_CLASS/FLAG_STAR_TUPLE specially,
     // but these should be taken care of by codegenElementPtr and
@@ -3617,13 +3675,12 @@ DEFINE_PRIM(PRIM_ARRAY_FREE) {
 DEFINE_PRIM(PRIM_NOOP) {
 }
 DEFINE_PRIM(PRIM_MOVE) {
-    ret = call->codegenPrimMove();
+    INT_FATAL("Handled in switch");
 }
 
 DEFINE_PRIM(PRIM_DEREF) { codegenIsSpecialPrimitive(NULL, call, ret); }
 DEFINE_PRIM(PRIM_GET_SVEC_MEMBER_VALUE) { codegenIsSpecialPrimitive(NULL, call, ret); }
 DEFINE_PRIM(PRIM_GET_MEMBER_VALUE) { codegenIsSpecialPrimitive(NULL, call, ret); }
-DEFINE_PRIM(PRIM_GET_PRIV_CLASS) { codegenIsSpecialPrimitive(NULL, call, ret); }
 DEFINE_PRIM(PRIM_ARRAY_GET) { codegenIsSpecialPrimitive(NULL, call, ret); }
 DEFINE_PRIM(PRIM_ARRAY_GET_VALUE) { codegenIsSpecialPrimitive(NULL, call, ret); }
 DEFINE_PRIM(PRIM_ON_LOCALE_NUM) { codegenIsSpecialPrimitive(NULL, call, ret); }
@@ -4138,9 +4195,7 @@ DEFINE_PRIM(PRIM_SETCID) {
     //  wide=get(1),
     //  local=chpl__cid_<type>,
     //  stype=dtObject->typeInfo(),
-    //  sfield=chpl__cid,
-    //  ln=get(2),
-    //  fn=get(3))
+    //  sfield=chpl__cid)
     //
     if (call->get(1)->typeInfo()->symbol->hasFlag(FLAG_NO_OBJECT)    == true &&
         call->get(1)->typeInfo()->symbol->hasFlag(FLAG_OBJECT_CLASS) == false) {
@@ -4258,8 +4313,8 @@ DEFINE_PRIM(PRIM_CHECK_NIL) {
 
     codegenCall("chpl_check_nil",
                 ptr,
-                gGenInfo->lineno,
-                gFilenameLookupCache[gGenInfo->filename]);
+                call->get(2),
+                call->get(3));
 }
 DEFINE_PRIM(PRIM_LOCAL_CHECK) {
     // arguments are (wide ptr, line, function/file, error string)
@@ -4956,53 +5011,64 @@ DEFINE_PRIM(PRIM_LOOKUP_FILENAME) {
     ret = call->codegenBasicPrimitiveExpr();
 }
 
+DEFINE_PRIM(PRIM_INVARIANT_START) {
 
-GenRet CallExpr::codegenPrimitive() {
-  SET_LINENO(this);
+  GenInfo* info = gGenInfo;
+  if (info->cfile) {
+    // do nothing for the C backend
+  } else {
+#ifdef HAVE_LLVM
+    GenRet ptr = codegenValue(call->get(1));
+    llvm::Value* val = ptr.val;
+    llvm::Type* ty = val->getType()->getPointerElementType();
+    codegenInvariantStart(ty, val);
+#endif
+  }
+}
 
-  static bool codegenPrimitivesRegistered = false;
-  if (!codegenPrimitivesRegistered) {
-
-    // The following macros call registerPrimitiveCodegen for
-    // the DEFINE_PRIM routines above for each primitive labelled
-    // as PRIMITIVE_G (i.e. as needing code generation)
+void CallExpr::registerPrimitivesForCodegen() {
+  // The following macros call registerPrimitiveCodegen for
+  // the DEFINE_PRIM routines above for each primitive labelled
+  // as PRIMITIVE_G (i.e. as needing code generation)
 #define PRIMITIVE_G(NAME) \
-  if (NAME!=PRIM_UNKNOWN) registerPrimitiveCodegen(NAME, codegen ## NAME );
+if (NAME!=PRIM_UNKNOWN) registerPrimitiveCodegen(NAME, codegen ## NAME );
 #define PRIMITIVE_R(NAME)
 #include "primitive_list.h"
 
 #undef PRIMITIVE_G
 #undef PRIMITIVE_R
+}
 
-  }
+GenRet CallExpr::codegenPrimitive() {
+  SET_LINENO(this);
 
   GenRet ret;
 
-  switch (primitive->tag) {
-  case PRIM_UNKNOWN:
+  PrimitiveTag tag = primitive->tag;
+  void (*codegenFn)(CallExpr*, GenRet&);
+  codegenFn = primitive->codegenFn;
+
+  if (tag == PRIM_MOVE) {
+    // PRIM_MOVE is the most common by far
+    ret = this->codegenPrimMove();
+  } else if (tag == PRIM_UNKNOWN) {
+    // PRIM_UNKNOWN won't have a codegenFn
     ret = codegenBasicPrimitiveExpr();
-    break;
-  case PRIM_WARNING:
-    INT_ASSERT(0);
-    break;
-  case NUM_KNOWN_PRIMS:
-    INT_FATAL(this, "impossible");
-    break;
-  default:
-    if (primitive->codegenFn != NULL) {
-      primitive->codegenFn(this, ret);
-    } else {
-      INT_FATAL(this, "primitive codegen fail; should it still be in the AST?");
+  } else if (codegenFn != NULL) {
+    // use a registered DEFINE_PRIM function from above
+    codegenFn(this, ret);
+  } else {
+    // otherwise, error
+    INT_FATAL(this, "primitive codegen fail; should it still be in the AST?");
 
-      if (gGenInfo->cfile) {
-        std::string stmt;
+    if (gGenInfo->cfile) {
+      std::string stmt;
 
-        stmt += "/* ERR ";
-        stmt += primitive->name;
-        stmt += "*/";
+      stmt += "/* ERR ";
+      stmt += primitive->name;
+      stmt += "*/";
 
-        gGenInfo->cStatements.push_back(stmt);
-      }
+      gGenInfo->cStatements.push_back(stmt);
     }
   }
 
@@ -5234,7 +5300,7 @@ static bool codegenIsSpecialPrimitive(BaseAST* target, Expr* e, GenRet& ret) {
       SymExpr* se = toSymExpr(call->get(2));
 
       // Invalid AST to use PRIM_GET_MEMBER with a ref field
-      INT_ASSERT(!call->get(2)->isRef());
+      INT_ASSERT(!call->get(2)->isRefOrWideRef());
 
       if (call->get(1)->typeInfo()->symbol->hasFlag(FLAG_WIDE_CLASS) ||
           call->get(1)->isWideRef()   ||
@@ -5392,6 +5458,7 @@ static bool codegenIsSpecialPrimitive(BaseAST* target, Expr* e, GenRet& ret) {
         ret = codegenAddrOf(tmp);
         retval = true;
       }
+      // Should this handle target being wide?
 
       break;
     }
@@ -5414,19 +5481,6 @@ static bool codegenIsSpecialPrimitive(BaseAST* target, Expr* e, GenRet& ret) {
         retval = true;
       }
 
-      break;
-    }
-
-    case PRIM_GET_PRIV_CLASS: {
-      GenRet r = codegenCallExpr("chpl_getPrivatizedClass", call->get(2));
-
-      if (target && (target->typeInfo()->symbol->hasFlag(FLAG_WIDE_CLASS))) {
-        r = codegenAddrOf(codegenWideHere(r, target->typeInfo()));
-      }
-
-      ret = r;
-
-      retval = true;
       break;
     }
 

@@ -1,7 +1,4 @@
-#include "testing.h"
-
-extern void chpl_library_init(int argc, char* argv[]);
-extern void chpl_library_finalize(void);
+#include "lib/testing.h"
 
 // Test of calling an exported Chapel library.
 int main(int argc, char* argv[]) {

@@ -929,7 +929,6 @@ ShadowVarSymbol::ShadowVarSymbol(ForallIntentTag iIntent,
   specBlock(NULL),
   svInitBlock(new BlockStmt()),
   svDeinitBlock(new BlockStmt()),
-  reduceGlobalOp(NULL),
   pruneit(false)
 {
   if (intentsResolved)
@@ -947,9 +946,7 @@ void ShadowVarSymbol::verify() {
   Symbol::verify();
   if (astTag != E_ShadowVarSymbol)
     INT_FATAL(this, "Bad ShadowVarSymbol::astTag");
-  if (intent != TFI_REDUCE && intent != TFI_IN_OUTERVAR &&
-      intent != TFI_TASK_PRIVATE)
-    INT_ASSERT(!normalized || outerVarSE); // non-NULL already after scopeResolve
+
   if (outerVarSE && outerVarSE->parentSymbol != this)
     INT_FATAL(this, "Bad ShadowVarSymbol::outerVarSE::parentSymbol");
   if (specBlock && specBlock->parentSymbol != this)
@@ -1014,13 +1011,15 @@ bool ShadowVarSymbol::isConstant() const {
     case TFI_CONST:
     case TFI_CONST_IN:
     case TFI_CONST_REF:
-    case TFI_IN_OUTERVAR:
-    case TFI_REDUCE_OP:
+    case TFI_IN_PARENT:
       return true;
 
     case TFI_IN:
     case TFI_REF:
     case TFI_REDUCE:
+    case TFI_REDUCE_OP:
+    case TFI_REDUCE_PARENT_AS:
+    case TFI_REDUCE_PARENT_OP:
       return false;
 
     case TFI_TASK_PRIVATE:
@@ -1038,14 +1037,16 @@ bool ShadowVarSymbol::isConstValWillNotChange() {
       return false;
 
     case TFI_CONST_IN:
-    case TFI_IN_OUTERVAR: // should these two be here?
-    case TFI_REDUCE_OP:
+    case TFI_IN_PARENT: // should this be here?
       return true;
 
     case TFI_CONST_REF:
     case TFI_IN:
     case TFI_REF:
     case TFI_REDUCE:
+    case TFI_REDUCE_OP:
+    case TFI_REDUCE_PARENT_AS:
+    case TFI_REDUCE_PARENT_OP:
       return false;
 
     case TFI_TASK_PRIVATE:
@@ -1059,13 +1060,15 @@ const char* ShadowVarSymbol::intentDescrString() const {
   switch (intent) {
     case TFI_DEFAULT:       return "default intent";
     case TFI_CONST:         return "'const' intent";
-    case TFI_IN_OUTERVAR:   return "outer-var intent";
+    case TFI_IN_PARENT:     return "parent-in intent";
     case TFI_IN:            return "'in' intent";
     case TFI_CONST_IN:      return "'const in' intent";
     case TFI_REF:           return "'ref' intent";
     case TFI_CONST_REF:     return "'const ref' intent";
     case TFI_REDUCE:        return "'reduce' intent";
-    case TFI_REDUCE_OP:     return "reduceOp intent";
+    case TFI_REDUCE_OP:        return "reduce-Op intent";
+    case TFI_REDUCE_PARENT_AS: return "parent-reduce-AS intent";
+    case TFI_REDUCE_PARENT_OP: return "parent-reduce-Op intent";
     case TFI_TASK_PRIVATE:  return "task-private intent";
   }
   INT_FATAL(this, "unknown intent");
@@ -1083,15 +1086,15 @@ Expr* ShadowVarSymbol::reduceOpExpr() const {
   return specBlock->body.head;
 }
 
-ShadowVarSymbol* ShadowVarSymbol::OutervarForIN() const {
+ShadowVarSymbol* ShadowVarSymbol::ParentvarForIN() const {
   const ShadowVarSymbol* SI = this;
   DefExpr* soDef = toDefExpr(SI->defPoint->prev);
   ShadowVarSymbol* SO = toShadowVarSymbol(soDef->sym);
-  INT_ASSERT(SO->intent == TFI_IN_OUTERVAR);
+  INT_ASSERT(SO->intent == TFI_IN_PARENT);
   return SO;
 }
 
-ShadowVarSymbol* ShadowVarSymbol::INforOutervar() const {
+ShadowVarSymbol* ShadowVarSymbol::INforParentvar() const {
   const ShadowVarSymbol* SO = this;
   DefExpr* siDef = toDefExpr(SO->defPoint->next);
   ShadowVarSymbol* SI = toShadowVarSymbol(siDef->sym);
@@ -1110,6 +1113,22 @@ ShadowVarSymbol* ShadowVarSymbol::ReduceOpForAccumState() const {
 ShadowVarSymbol* ShadowVarSymbol::AccumStateForReduceOp() const {
   const ShadowVarSymbol* RP = this;
   DefExpr* asDef = toDefExpr(RP->defPoint->next);
+  ShadowVarSymbol* AS = toShadowVarSymbol(asDef->sym);
+  INT_ASSERT(AS->intent == TFI_REDUCE);
+  return AS;
+}
+
+ShadowVarSymbol* ShadowVarSymbol::ReduceOpForParentRP() const {
+  const ShadowVarSymbol* PRP = this;
+  DefExpr* rpDef = toDefExpr(PRP->defPoint->next->next);
+  ShadowVarSymbol* RP = toShadowVarSymbol(rpDef->sym);
+  INT_ASSERT(RP->intent == TFI_REDUCE_OP);
+  return RP;
+}
+
+ShadowVarSymbol* ShadowVarSymbol::AccumStateForParentAS() const {
+  const ShadowVarSymbol* PAS = this;
+  DefExpr* asDef = toDefExpr(PAS->defPoint->next->next);
   ShadowVarSymbol* AS = toShadowVarSymbol(asDef->sym);
   INT_ASSERT(AS->intent == TFI_REDUCE);
   return AS;
@@ -1903,6 +1922,10 @@ FlagSet getRecordWrappedFlags(Symbol* s) {
 
 const char* astrSdot = NULL;
 const char* astrSequals = NULL;
+const char* astrSgt = NULL;
+const char* astrSgte = NULL;
+const char* astrSlt = NULL;
+const char* astrSlte = NULL;
 const char* astr_cast = NULL;
 const char* astr_defaultOf = NULL;
 const char* astrInit = NULL;
@@ -1910,6 +1933,8 @@ const char* astrNew = NULL;
 const char* astrDeinit = NULL;
 const char* astrTag = NULL;
 const char* astrThis = NULL;
+const char* astr_chpl_cname = NULL;
+const char* astr_chpl_forward_tgt = NULL;
 const char* astr_chpl_manager = NULL;
 const char* astr_forallexpr = NULL;
 const char* astr_forexpr = NULL;
@@ -1918,6 +1943,10 @@ const char* astr_loopexpr_iter = NULL;
 void initAstrConsts() {
   astrSdot    = astr(".");
   astrSequals = astr("=");
+  astrSgt = astr(">");
+  astrSgte = astr(">=");
+  astrSlt = astr("<");
+  astrSlte = astr("<=");
   astr_cast   = astr("_cast");
   astr_defaultOf = astr("_defaultOf");
   astrInit    = astr("init");
@@ -1925,6 +1954,8 @@ void initAstrConsts() {
   astrDeinit  = astr("deinit");
   astrTag     = astr("tag");
   astrThis    = astr("this");
+  astr_chpl_cname = astr("_chpl_cname");
+  astr_chpl_forward_tgt = astr("_chpl_forward_tgt");
   astr_chpl_manager = astr("_chpl_manager");
 
   astr_forallexpr    = astr("chpl__forallexpr");

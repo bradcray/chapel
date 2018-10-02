@@ -12,6 +12,7 @@ Initializing Modules:
     ChapelThreads
     ChapelTuple
     ChapelRange
+     HaltWrappers
     ChapelTaskDataHelp
     LocaleModel
      LocaleModelHelpFlat
@@ -29,12 +30,11 @@ Initializing Modules:
     LocalesArray
     ChapelDistribution
      List
-      ChapelHaltWrappers
-       ChapelIO
-        IO
-         SysError
-         FormattedIO
-          Regexp
+    ChapelIO
+     IO
+      SysError
+      FormattedIO
+       Regexp
     LocaleTree
     DefaultAssociative
     ExternalArray

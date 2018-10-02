@@ -654,7 +654,7 @@ AggregateType* AggregateType::generateType(SymbolMap& subs) {
   AggregateType* retval = this;
 
   // Determine if there is a generic parent class
-  if (isClass() == true) {
+  if (isClass() == true && symbol->hasFlag(FLAG_NO_OBJECT) == false) {
     AggregateType* parent = dispatchParents.v[0];
 
     // Is the parent generic?
@@ -1782,8 +1782,9 @@ void AggregateType::buildConstructor() {
 }
 
 void AggregateType::buildDefaultInitializer() {
-  if (defaultInitializer                       == NULL ||
-      strcmp(defaultInitializer->name, "init") !=    0) {
+  if ((defaultInitializer                       == NULL ||
+      strcmp(defaultInitializer->name, "init") !=    0) &&
+      symbol->hasFlag(FLAG_REF) == false) {
     SET_LINENO(this);
     FnSymbol*  fn    = new FnSymbol("init");
     ArgSymbol* _mt   = new ArgSymbol(INTENT_BLANK, "_mt",  dtMethodToken);
@@ -1825,6 +1826,13 @@ void AggregateType::buildDefaultInitializer() {
       fn->addFlag(FLAG_METHOD_PRIMARY);
 
       preNormalizeInitMethod(fn);
+
+      if (this->isUnion()) {
+        fn->insertAtTail(new CallExpr(PRIM_SET_UNION_ID,
+                                      fn->_this,
+                                      new_IntSymbol(0)));
+      }
+
       normalize(fn);
 
       // BHARSH INIT TODO: Should this be part of normalize(fn)? If we did that
@@ -2133,6 +2141,11 @@ void AggregateType::buildCopyInitializer() {
     preNormalizeInitMethod(fn);
     normalize(fn);
 
+    // Generate a bit-copy for extern records in order to copy unknown fields.
+    if (symbol->hasFlag(FLAG_EXTERN)) {
+      fn->insertAtHead(new CallExpr(PRIM_ASSIGN, fn->_this, other));
+    }
+
     methods.add(fn);
   }
 }
@@ -2146,31 +2159,28 @@ void AggregateType::buildCopyInitializer() {
 // generate default initializers for types where neither an initializer nor a
 // constructor has been defined.
 bool AggregateType::needsConstructor() const {
-  // Temporarily only generate default initializers for classes and records
-  if (isUnion())
-    return true;
-
-  // We don't want a default constructor if the type has been explicitly marked
-  if (symbol->hasFlag(FLAG_USE_DEFAULT_INIT))
-    return false;
 
   if (hasPostInitializer() == true) {
     return false;
   }
 
   AggregateType* thisNC = const_cast<AggregateType*>(this);
-  ModuleSymbol* mod = thisNC->getModule();
 
-  // For now, always generate a default constructor for types in the internal
-  // and library modules
-  if (mod && (mod->modTag == MOD_INTERNAL || mod->modTag == MOD_STANDARD))
+  if (initializerStyle == DEFINES_CONSTRUCTOR) {
     return true;
-  else if (initializerStyle == DEFINES_CONSTRUCTOR)
-    return true;
-  else if (fUserDefaultInitializers)
+  } else if (fUserDefaultInitializers == false) {
+    // Don't allow constructors for internal/standard types, except for object
+    ModuleSymbol* mod = thisNC->getModule();
+    if (this == dtObject) {
+      return true;
+    } else if (mod->modTag == MOD_INTERNAL || mod->modTag == MOD_STANDARD) {
+      return false;
+    }
+  } else if (fUserDefaultInitializers && this != dtObject) {
     // Don't generate a default constructor when --force-initializers is true,
     // we want to generate a default initializer or fail.
     return false;
+  }
 
   if (initializerStyle == DEFINES_INITIALIZER) {
     // Defining an initializer means we don't need a default constructor
@@ -2238,33 +2248,19 @@ bool AggregateType::parentDefinesInitializer() const {
 // when the type has defined an initializer both methods will return false.
 bool AggregateType::wantsDefaultInitializer() const {
   AggregateType* nonConstHole = (AggregateType*) this;
-  ModuleSymbol*  mod          = nonConstHole->getModule();
   bool           retval       = true;
 
-  // We want a default initializer if the type has been explicitly marked
-  if (symbol->hasFlag(FLAG_USE_DEFAULT_INIT) == true) {
-    retval = true;
+  if (symbol->hasFlag(FLAG_TUPLE)) {
+    return false;
 
-  // For now, no default initializers for library and internal types
-  } else if (mod         == NULL         ||
-             mod->modTag == MOD_INTERNAL ||
-             mod->modTag == MOD_STANDARD) {
-    retval = false;
-
-  // No default initializers if the --force-initializers flag is not used
-  } else if (fUserDefaultInitializers == false) {
+  // Allow constructors in user code if --no-force-initializers is thrown
+  } else if (fUserDefaultInitializers == false &&
+             nonConstHole->getModule()->modTag == MOD_USER) {
     retval = false;
 
   // Only want a default initializer when no
   // initializer or constructor is defined
   } else if (initializerStyle != DEFINES_NONE_USE_DEFAULT) {
-    retval = false;
-
-  // For now, no default initializers for unions
-  } else if (isUnion()  == true) {
-    retval = false;
-
-  } else if (symbol->hasFlag(FLAG_REF) == true) {
     retval = false;
 
   // Iterator classes and records want neither default constructors nor
@@ -2490,12 +2486,6 @@ void AggregateType::setCreationStyle(TypeSymbol* t, FnSymbol* fn) {
       USR_FATAL(fn,
                 "a%s cannot be declared without parentheses",
                 isCtor ? " constructor" : "n initializer");
-    }
-
-    if (ct->symbol->hasFlag(FLAG_USE_DEFAULT_INIT)) {
-      USR_FATAL_CONT(fn, "cannot apply 'use default init' to type '%s', it"
-                     " defines a%s here", ct->symbol->name,
-                     isCtor ? " constructor" : "n initializer");
     }
 
     if (fn->hasFlag(FLAG_METHOD_PRIMARY) == false &&

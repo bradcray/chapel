@@ -36,8 +36,40 @@ module DefaultRectangular {
   config param defaultDoRADOpt = true;
   config param defaultDisableLazyRADOpt = false;
   config param earlyShiftData = true;
+  config param usePollyArrayIndex = false;
 
-  pragma "use default init"
+  // A function which help to compute the final index
+  // to be used for DefaultRectangularArr access. This function
+  // helps Polly to effectively communicate the array dimension
+  // sizes and the index subscripts to Polly.
+  pragma "lineno ok"
+  pragma "llvm readnone"
+  proc polly_array_index(arguments:int ...):int {
+    param rank = (arguments.size - 1) / 2;
+    param blkStart = 2;
+    param blkEnd = 2 + rank - 1;
+    param indStart = blkEnd + 1;
+    param indEnd = indStart + rank - 1;
+    var offset = arguments(1);
+    var blk:rank*int;
+    var ind:rank*int;
+
+    blk(rank) = 1;
+    for param i in 1..(rank-1) by -1 do
+      blk(i) = blk(i+1) * arguments(blkStart+i);
+
+    for param j in 1..rank {
+      ind(j) = arguments(indStart+j-1);
+    }
+
+    var ret:int = offset;
+    for param i in 1..rank {
+      ret += ind(i) * blk(i);
+    }
+
+    return ret;
+  }
+
   class DefaultDist: BaseDist {
     override proc dsiNewRectangularDom(param rank: int, type idxType, param stridable: bool, inds) {
       const dom = new unmanaged DefaultRectangularDom(rank, idxType, stridable, _to_unmanaged(this));
@@ -69,6 +101,8 @@ module DefaultRectangular {
     override proc dsiTrackDomains()    return false;
 
     proc singleton() param return true;
+
+    proc dsiIsLayout() param return true;
   }
 
   //
@@ -882,8 +916,7 @@ module DefaultRectangular {
     var targetLocDom: domain(rank);
     var RAD: [targetLocDom] _remoteAccessData(eltType, rank, idxType,
                                               stridable);
-    var RADLocks: [targetLocDom] atomicbool; // only accessed locally
-                                             // force processor atomics
+    var RADLocks: [targetLocDom] chpl__processorAtomicType(bool); // only accessed locally
 
     proc init(type eltType, param rank: int, type idxType,
               param stridable: bool, newTargetLocDom: domain(rank)) {
@@ -918,6 +951,7 @@ module DefaultRectangular {
                                            stridable=stridable);
     var off: rank*idxType;
     var blk: rank*chpl__idxTypeToIntIdxType(idxType);
+    var sizesPerDim: rank*chpl__idxTypeToIntIdxType(idxType);
     var str: rank*idxSignedType;
     var factoredOffs: chpl__idxTypeToIntIdxType(idxType);
 
@@ -1090,6 +1124,12 @@ module DefaultRectangular {
       computeFactoredOffs();
       const size = blk(1) * dom.dsiDim(1).length;
 
+      if usePollyArrayIndex {
+        for param dim in 1..rank {
+         sizesPerDim(dim) = dom.dsiDim(dim).length;
+        }
+      }
+
       // Allow DR array initialization to pass in existing data
       if data == nil {
         if !localeModelHasSublocales {
@@ -1127,14 +1167,31 @@ module DefaultRectangular {
           return chpl__idxToInt(ind(1));
         } else {
           var sum = 0:intIdxType;
+          var useInd = ind;
+          var useOffset:int = 0;
+          var useSizesPerDim = sizesPerDim;
 
-          for param i in 1..rank-1 {
-            sum += chpl__idxToInt(ind(i)) * blk(i);
+          if usePollyArrayIndex {
+            // Polly works better if we provide 0-based indices from the start.
+            // So instead of using factoredOffs at the end, we initially subtract
+            // the dimension offsets from the index subscripts beforehand.
+            if !wantShiftedIndex {
+             for param i in 1..rank do {
+                useInd(i) = chpl__idxToInt(useInd(i)) - chpl__idxToInt(off(i));
+             }
+
+           }
+           return polly_array_index(useOffset, (...useSizesPerDim), (...useInd));
           }
-          sum += chpl__idxToInt(ind(rank));
+          else {
+            for param i in 1..rank-1 {
+              sum += chpl__idxToInt(ind(i)) * blk(i);
+            }
+            sum += chpl__idxToInt(ind(rank));
 
-          if !wantShiftedIndex then sum -= factoredOffs;
-          return sum;
+            if !wantShiftedIndex then sum -= factoredOffs;
+            return sum;
+          }
         }
       }
     }
@@ -1228,47 +1285,90 @@ module DefaultRectangular {
       }
     }
 
-    // TODO
-    override proc dsiReallocate(bounds:rank*range(idxType,BoundedRangeType.bounded,stridable)) {
-      //if (d._value.type == dom.type) {
-
+    override proc dsiReallocate(allocBound: range(idxType,
+                                                  BoundedRangeType.bounded,
+                                                  stridable),
+                                arrayBound: range(idxType,
+                                                  BoundedRangeType.bounded,
+                                                  stridable)) where rank == 1 {
       on this {
-        var d = {(...bounds)};
-        var copy = new unmanaged DefaultRectangularArr(eltType=eltType, rank=rank,
-                                            idxType=idxType,
-                                            stridable=d._value.stridable,
-                                            dom=d._value);
+        const allocD = {allocBound};
+        var copy = new unmanaged DefaultRectangularArr(eltType=eltType,
+                                                       rank=rank,
+                                                       idxType=idxType,
+                                                       stridable=allocD._value.stridable,
+                                                       dom=allocD._value);
 
-        forall i in d((...dom.ranges)) do
+        forall i in arrayBound(dom.ranges(1)) do
           copy.dsiAccess(i) = dsiAccess(i);
+
         off = copy.off;
         blk = copy.blk;
         str = copy.str;
         factoredOffs = copy.factoredOffs;
+
         dsiDestroyArr();
         data = copy.data;
         // We can't call initShiftedData here because the new domain
         // has not yet been updated (this is called from within the
         // = function for domains.
-        if earlyShiftData && !d._value.stridable {
+        if earlyShiftData && !allocD._value.stridable {
           // Lydia note 11/04/15: a question was raised as to whether this
           // check on numIndices added any value.  Performance results
           // from removing this line seemed inconclusive, which may indicate
           // that the check is not necessary, but it seemed like unnecessary
           // work for something with no immediate reward.
-          if d.numIndices > 0 {
+          if allocD.numIndices > 0 {
             shiftedData = copy.shiftedData;
           }
         }
-        // also set dataAllocRange
         dataAllocRange = copy.dataAllocRange;
-        //numelm = copy.numelm;
         delete copy;
       }
-      //} else {
-      //  halt("illegal reallocation");
-      //}
     }
+
+
+    // Reallocate the array to have space for elements specified by `bounds`
+    override proc dsiReallocate(bounds: rank*range(idxType,
+                                                   BoundedRangeType.bounded,
+                                                   stridable)) {
+      on this {
+        const allocD = {(...bounds)};
+
+        var copy = new unmanaged DefaultRectangularArr(eltType=eltType,
+                                            rank=rank,
+                                            idxType=idxType,
+                                            stridable=allocD._value.stridable,
+                                            dom=allocD._value);
+
+        forall i in allocD((...dom.ranges)) do
+          copy.dsiAccess(i) = dsiAccess(i);
+
+        off = copy.off;
+        blk = copy.blk;
+        str = copy.str;
+        factoredOffs = copy.factoredOffs;
+
+        dsiDestroyArr();
+        data = copy.data;
+        // We can't call initShiftedData here because the new domain
+        // has not yet been updated (this is called from within the
+        // = function for domains.
+        if earlyShiftData && !allocD._value.stridable {
+          // Lydia note 11/04/15: a question was raised as to whether this
+          // check on numIndices added any value.  Performance results
+          // from removing this line seemed inconclusive, which may indicate
+          // that the check is not necessary, but it seemed like unnecessary
+          // work for something with no immediate reward.
+          if allocD.numIndices > 0 {
+            shiftedData = copy.shiftedData;
+          }
+        }
+        dataAllocRange = copy.dataAllocRange;
+        delete copy;
+      }
+    }
+
     override proc dsiPostReallocate() {
       // No action necessary here
     }
@@ -1401,6 +1501,15 @@ module DefaultRectangular {
     chpl_serialReadWriteRectangular(f, arr, arr.dom);
   }
 
+  // ReplicatedDist declares a version of this method with a 'where'
+  // clause, but current resolution rules prefer the more visible
+  // function (rather than the one with a 'where' clause) and this
+  // call is more visible (e.g. ArrayViewSlice uses DefaultRectangular
+  // but not ReplicatedDist). Applying "last resort" to this function
+  // requests the compiler prefer another overload if one is applicable.
+  // Overload sets (or a similar idea) would be a better user-facing
+  // way to solve this problem (see CHIP 20).
+  pragma "last resort"
   proc chpl_serialReadWriteRectangular(f, arr, dom) {
     chpl_serialReadWriteRectangularHelper(f, arr, dom);
   }

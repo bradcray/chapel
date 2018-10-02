@@ -68,6 +68,9 @@
   "75f1ecaa-1d83-11e6-a3a6-10ddb1d4c3d5": [
     "compiler/codegen/codegen.cpp"
   ],
+  "6de8d7ca-9c7b-11e8-b963-10ddb1d4c3d5": [
+    "compiler/codegen/library.cpp"
+  ],
   "d20c5afc-1d7e-11e6-a3a6-10ddb1d4c3d5": [
     "compiler/ifa/num.cpp"
   ],
@@ -85,6 +88,9 @@
   ],
   "dbbd3434-ca86-11e7-8b8c-10ddb1d4c3d5": [
     "compiler/include/expr.h"
+  ],
+  "9de1a12a-8644-11e8-ad82-10ddb1d4c3d5": [
+    "compiler/include/files.h"
   ],
   "e1293828-ca86-11e7-8b8c-10ddb1d4c3d5": [
     "compiler/include/implementForallIntents.h"
@@ -118,6 +124,9 @@
     "compiler/main/commonFlags.cpp",
     "compiler/main/commonFlags.h",
     "compiler/main/driver.cpp"
+  ],
+  "a52d3b2e-8644-11e8-ad82-10ddb1d4c3d5": [
+    "compiler/main/docsDriver.cpp"
   ],
   "4171383e-1d81-11e6-a3a6-10ddb1d4c3d5": [
     "compiler/optimizations/copyPropagation.cpp"
@@ -211,6 +220,9 @@
   ],
   "ebe3ea10-ca86-11e7-8b8c-10ddb1d4c3d5": [
     "compiler/resolution/preFold.cpp"
+  ],
+  "f203530c-8644-11e8-ad82-10ddb1d4c3d5": [
+    "compiler/resolution/tuples.cpp"
   ],
   "e95fef8a-2015-11e7-980e-10ddb1d4c3d5": [
     "compiler/resolution/virtualDispatch.cpp"
@@ -371,6 +383,9 @@
     "modules/dists/BlockCycDist.chpl",
     "modules/dists/DSIUtil.chpl"
   ],
+  "e22d9978-8645-11e8-ad82-10ddb1d4c3d5": [
+    "modules/dists/BlockDist.chpl"
+  ],
   "f705d2b6-1f0e-11e6-a3a6-10ddb1d4c3d5": [
     "modules/dists/CyclicDist.chpl"
   ],
@@ -404,8 +419,14 @@
   "5010068a-0c15-11e7-980e-10ddb1d4c3d5": [
     "modules/internal/ChapelArray.chpl"
   ],
+  "ce35097e-8645-11e8-ad82-10ddb1d4c3d5": [
+    "modules/internal/ChapelBase.chpl"
+  ],
   "6f2ab8ea-83ce-11e7-ad1f-10ddb1d4c3d5": [
     "modules/internal/ChapelError.chpl"
+  ],
+  "dc718a6c-ab57-11e8-b963-10ddb1d4c3d5": [
+    "modules/internal/ChapelIteratorSupport.chpl"
   ],
   "47cb0e3c-1f14-11e6-a3a6-10ddb1d4c3d5": [
     "modules/internal/ChapelRange.chpl"
@@ -422,6 +443,12 @@
   "c3b7f950-1f15-11e6-a3a6-10ddb1d4c3d5": [
     "modules/internal/DefaultRectangular.chpl"
   ],
+  "c3e70026-8645-11e8-ad82-10ddb1d4c3d5": [
+    "modules/internal/ExternalArray.chpl"
+  ],
+  "e6ecf3ae-9c7b-11e8-b963-10ddb1d4c3d5": [
+    "modules/internal/String.chpl"
+  ],
   "5cb0944a-0c15-11e7-980e-10ddb1d4c3d5": [
     "modules/internal/localeModels/knl/LocaleModel.chpl"
   ],
@@ -436,6 +463,9 @@
   ],
   "527abebe-9db6-11e7-a204-10ddb1d4c3d5": [
     "modules/packages/Crypto.chpl"
+  ],
+  "d91ef3d6-ab57-11e8-b963-10ddb1d4c3d5": [
+    "modules/packages/CryptoHandlers/openssl_c_support.h"
   ],
   "2127a88e-1f1a-11e6-a3a6-10ddb1d4c3d5": [
     "modules/packages/Curl.chpl"
@@ -511,6 +541,9 @@
   "d41572f2-1f2c-11e6-a3a6-10ddb1d4c3d5": [
     "modules/standard/SysBasic.chpl"
   ],
+  "f5a43844-9c7b-11e8-b963-10ddb1d4c3d5": [
+    "modules/standard/Time.chpl"
+  ],
   "e9347814-1f30-11e6-a3a6-10ddb1d4c3d5": [
     "modules/standard/Types.chpl"
   ],
@@ -581,6 +614,9 @@
   ],
   "c9f78ff4-2403-11e6-a3a6-10ddb1d4c3d5": [
     "runtime/src/threads/pthreads/threads-pthreads.c"
+  ],
+  "203d644e-8648-11e8-ad82-10ddb1d4c3d5": [
+    "runtime/src/topo/hwloc/topo-hwloc.c"
   ],
   "6d1ff4ac-2952-11e6-a3a6-10ddb1d4c3d5": [
     "spec/Arrays.tex"

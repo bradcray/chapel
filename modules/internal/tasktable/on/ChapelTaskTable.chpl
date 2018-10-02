@@ -55,7 +55,6 @@ module ChapelTaskTable {
   // test to work: parallel/begin/stonea/reports.chpl
   //
   pragma "plain old data"
-  pragma "use default init"
   record chpldev_Task {
     var state     : taskState;
     var lineno    : uint(32);
@@ -63,14 +62,13 @@ module ChapelTaskTable {
     var tl_info   : uint(64);
   }
   
-  pragma "use default init"
   class chpldev_taskTable_t {
     var dom : domain(chpl_taskID_t, parSafe=false);
     var map : [dom] chpldev_Task;
   }
   
   pragma "locale private"
-  var chpldev_taskTable : chpldev_taskTable_t;
+  var chpldev_taskTable : unmanaged chpldev_taskTable_t;
   
   //----------------------------------------------------------------------{
   //- Code to initialize the task table on each locale.
@@ -80,7 +78,7 @@ module ChapelTaskTable {
     // initialized late (after DefaultRectangular and most other
     // internal modules are already initialized)
     coforall loc in Locales with (ref chpldev_taskTable) do on loc {
-      chpldev_taskTable = new chpldev_taskTable_t();
+      chpldev_taskTable = new unmanaged chpldev_taskTable_t();
     }
   }
 

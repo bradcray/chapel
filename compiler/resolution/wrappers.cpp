@@ -88,8 +88,8 @@ static void       coerceActuals(FnSymbol* fn,
 static void       handleInIntents(FnSymbol* fn,
                                   CallInfo& info);
 
-static bool       isPromotionRequired(FnSymbol* fn, CallInfo& info,
-                                std::vector<ArgSymbol*>& actualIdxToFormal);
+bool       isPromotionRequired(FnSymbol* fn, CallInfo& info,
+                               std::vector<ArgSymbol*>& actualIdxToFormal);
 
 static FnSymbol*  promotionWrap(FnSymbol* fn,
                                 CallInfo& info,
@@ -345,7 +345,7 @@ static void addDefaultsAndReorder(FnSymbol *fn,
 
   // Create a Block to store the default values
   // We'll flatten this back out again in a minute.
-  BlockStmt* body = new BlockStmt();
+  BlockStmt* body = new BlockStmt(BLOCK_SCOPELESS);
   call->getStmtExpr()->insertBefore(body);
 
   // Fill in the NULLs in newActuals with the appropriate default argument.
@@ -489,7 +489,7 @@ static DefaultExprFnEntry buildDefaultedActualFn(FnSymbol*  fn,
     wrapper->addFlag(FLAG_METHOD_PRIMARY);
   }
 
-  wrapper->instantiationPoint = fn->instantiationPoint;
+  wrapper->setInstantiationPoint(fn->instantiationPoint());
 
   if (fn->hasFlag(FLAG_LAST_RESORT)) {
     wrapper->addFlag(FLAG_LAST_RESORT);
@@ -616,7 +616,7 @@ static DefaultExprFnEntry buildDefaultedActualFn(FnSymbol*  fn,
   wrapper->insertAtTail(new DefExpr(rvv));
 
   // This is the block we'll resolve to compute the return intent
-  BlockStmt* block = new BlockStmt();
+  BlockStmt* block = new BlockStmt(BLOCK_SCOPELESS);
   wrapper->insertAtTail(block);
 
   wrapper->insertAtTail(new CallExpr(PRIM_RETURN, rvv));
@@ -856,7 +856,7 @@ static FnSymbol* buildWrapperForDefaultedFormals(FnSymbol*     fn,
   SymbolMap copyMap;
   CallExpr* call    = new CallExpr(fn);
   FnSymbol* retval  = buildEmptyWrapper(fn);
-  retval->instantiationPoint = getVisibilityBlock(info.call);
+  retval->setInstantiationPoint(info.call);
 
   retval->cname = astr("_default_wrap_", fn->cname);
 
@@ -1777,7 +1777,7 @@ static void insertRuntimeTypeDefaultWrapper(FnSymbol* fn,
     i++;
   }
 
-  BlockStmt* body = new BlockStmt();
+  BlockStmt* body = new BlockStmt(BLOCK_SCOPELESS);
   call->getStmtExpr()->insertBefore(body);
 
   Symbol* newSym = insertRuntimeTypeDefault(fn, formal, call, body, copyMap, curActual->symbol());
@@ -1991,22 +1991,22 @@ namespace {
 }
 
 static FnSymbol*  buildPromotionWrapper(PromotionInfo& promotion,
-                                        BlockStmt* visibilityBlock,
+                                        BlockStmt* instantiationPt,
                                         CallInfo&  info,
                                         bool       fastFollowerChecks);
 
 static BlockStmt* buildPromotionLoop(PromotionInfo& promotion,
-                                     BlockStmt* visibilityBlock,
+                                     BlockStmt* instantiationPt,
                                      CallInfo&  info,
                                      bool       fastFollowerChecks);
 
 static void       buildLeaderIterator(FnSymbol* wrapFn,
-                                      BlockStmt* visibilityBlock,
+                                      BlockStmt* instantiationPt,
                                       Expr*     iterator,
                                       bool      zippered);
 
 static void       buildFollowerIterator(PromotionInfo& promotion,
-                                        BlockStmt* visibilityBlock,
+                                        BlockStmt* instantiationPt,
                                         Expr*     indices,
                                         Expr*     iterator,
                                         CallExpr* wrapCall);
@@ -2025,7 +2025,7 @@ static BlockStmt* followerForLoop(PromotionInfo& promotion,
                                   CallExpr* wrapCall);
 
 static void initPromotionWrapper(PromotionInfo& promotion,
-                                 BlockStmt* visibilityBlock);
+                                 BlockStmt* instantiationPt);
 
 static Expr*      getIndices(PromotionInfo& promotion);
 
@@ -2047,8 +2047,40 @@ static void       buildFastFollowerCheck(bool                  isStatic,
                                          FnSymbol*             wrapper,
                                          std::set<ArgSymbol*>& formals);
 
-static bool isPromotionRequired(FnSymbol* fn, CallInfo& info,
-                                std::vector<ArgSymbol*>& actualFormals) {
+// insert PRIM_ITERATOR_RECORD_SET_SHAPE(iterRecord,shapeSource)
+static void addSetIteratorShape(PromotionInfo& promotion, CallExpr* call) {
+  CallExpr* move = toCallExpr(call->parentExpr);
+  // If call's result is not used, do not insert.
+  // This happens, for example, during resolveSerializeDeserialize().
+  if (move == NULL) return;
+  INT_ASSERT(move->isPrimitive(PRIM_MOVE));
+  Symbol* irTemp = toSymExpr(move->get(1))->symbol();
+
+  // Which of call's arguments determines the shape?
+  Symbol* shapeSource = NULL;
+  int i = 0;
+  for_actuals(actual, call) {
+    if (promotion.promotedType[i++] != NULL) {
+      SymExpr* se = NULL;
+      if (NamedExpr* ne = toNamedExpr(actual)) {
+        se = toSymExpr(ne->actual);
+      } else {
+        se = toSymExpr(actual);
+      }
+      shapeSource = se->symbol();
+      break;
+    }
+  }
+
+  Symbol* fromForExpr =
+    checkIteratorFromForExpr(move, shapeSource) ? gTrue : gFalse;
+
+  move->insertAfter(new CallExpr(PRIM_ITERATOR_RECORD_SET_SHAPE,
+                                 irTemp, shapeSource, fromForExpr));
+}
+
+bool isPromotionRequired(FnSymbol* fn, CallInfo& info,
+                         std::vector<ArgSymbol*>& actualFormals) {
   bool retval = false;
 
   if (fn->name != astrSequals && fn->hasFlag(FLAG_TYPE_CONSTRUCTOR) == false) {
@@ -2096,9 +2128,9 @@ static FnSymbol* promotionWrap(FnSymbol* fn,
 
   if (retval == NULL) {
     SET_LINENO(info.call);
-    BlockStmt* visibilityBlock = getVisibilityBlock(info.call);
+    BlockStmt* instantiationPt = getInstantiationPoint(info.call);
     retval = buildPromotionWrapper(promotion,
-                                   visibilityBlock,
+                                   instantiationPt,
                                    info,
                                    fastFollowerChecks);
 
@@ -2106,6 +2138,8 @@ static FnSymbol* promotionWrap(FnSymbol* fn,
 
     addCache(promotionsCache, promotion.fn, promotion.wrapperFn, &promotion.subs);
   }
+
+  addSetIteratorShape(promotion, info.call);
 
   return retval;
 }
@@ -2176,12 +2210,12 @@ PromotionInfo::PromotionInfo(FnSymbol* fn,
 }
 
 static FnSymbol* buildPromotionWrapper(PromotionInfo& promotion,
-                                       BlockStmt* visibilityBlock,
+                                       BlockStmt* instantiationPt,
                                        CallInfo&  info,
                                        bool       fastFollowerChecks) {
 
   BlockStmt* loop       = NULL;
-  initPromotionWrapper(promotion, visibilityBlock);
+  initPromotionWrapper(promotion, instantiationPt);
   FnSymbol*  retval     = promotion.wrapperFn;
   FnSymbol*  fn         = promotion.fn;
 
@@ -2197,7 +2231,7 @@ static FnSymbol* buildPromotionWrapper(PromotionInfo& promotion,
     // Save the wrapCall to adjust it later
     promotion.wrapCalls.push_back(wrapCall);
   } else {
-    loop = buildPromotionLoop(promotion, visibilityBlock, info, fastFollowerChecks);
+    loop = buildPromotionLoop(promotion, instantiationPt, info, fastFollowerChecks);
   }
 
   retval->insertAtTail(new BlockStmt(loop));
@@ -2214,7 +2248,7 @@ static FnSymbol* buildPromotionWrapper(PromotionInfo& promotion,
 }
 
 static BlockStmt* buildPromotionLoop(PromotionInfo& promotion,
-                                     BlockStmt* visibilityBlock,
+                                     BlockStmt* instantiationPt,
                                      CallInfo&  info,
                                      bool       fastFollowerChecks) {
   FnSymbol*  wrapFn     = promotion.wrapperFn;
@@ -2231,9 +2265,9 @@ static BlockStmt* buildPromotionLoop(PromotionInfo& promotion,
 
   yieldTmp->addFlag(FLAG_EXPR_TEMP);
 
-  buildLeaderIterator(wrapFn, visibilityBlock, iterator, zippered);
+  buildLeaderIterator(wrapFn, instantiationPt, iterator, zippered);
 
-  buildFollowerIterator(promotion, visibilityBlock, indices, iterator, wrapCall);
+  buildFollowerIterator(promotion, instantiationPt, indices, iterator, wrapCall);
 
   if (fNoFastFollowers == false && fastFollowerChecks == true) {
     std::set<ArgSymbol*> requiresPromotion;
@@ -2260,7 +2294,7 @@ static BlockStmt* buildPromotionLoop(PromotionInfo& promotion,
 }
 
 static void buildLeaderIterator(FnSymbol* wrapFn,
-                                BlockStmt* visibilityBlock,
+                                BlockStmt* instantiationPt,
                                 Expr*     iterator,
                                 bool      zippered) {
   SymbolMap   leaderMap;
@@ -2283,8 +2317,6 @@ static void buildLeaderIterator(FnSymbol* wrapFn,
 
   INT_ASSERT(liFn->hasFlag(FLAG_RESOLVED) == false);
 
-  iteratorLeaderMap.put(wrapFn, liFn);
-
   form_Map(SymbolMapElem, e, leaderMap) {
     if (Symbol* s = paramMap.get(e->key)) {
       paramMap.put(e->value, s);
@@ -2303,6 +2335,7 @@ static void buildLeaderIterator(FnSymbol* wrapFn,
 
   liFn->addFlag(FLAG_INLINE_ITERATOR);
   liFn->addFlag(FLAG_GENERIC);
+  liFn->removeFlag(FLAG_INVISIBLE_FN);
 
   liFn->insertFormalAtTail(liFnTag);
 
@@ -2322,11 +2355,11 @@ static void buildLeaderIterator(FnSymbol* wrapFn,
 
   normalize(liFn);
 
-  liFn->instantiationPoint = visibilityBlock;
+  liFn->setInstantiationPoint(instantiationPt);
 }
 
 static void buildFollowerIterator(PromotionInfo& promotion,
-                                  BlockStmt* visibilityBlock,
+                                  BlockStmt* instantiationPt,
                                   Expr*     indices,
                                   Expr*     iterator,
                                   CallExpr* wrapCall) {
@@ -2344,8 +2377,6 @@ static void buildFollowerIterator(PromotionInfo& promotion,
 
   FnSymbol*  fiFn             = wrapFn->copy(&followerMap);
 
-  iteratorFollowerMap.put(wrapFn, fiFn);
-
   form_Map(SymbolMapElem, e, followerMap) {
     if (Symbol* s = paramMap.get(e->key)) {
       paramMap.put(e->value, s);
@@ -2361,6 +2392,7 @@ static void buildFollowerIterator(PromotionInfo& promotion,
   fastFollower = new ArgSymbol(INTENT_PARAM, "fast", dtBool, NULL, symFalse);
 
   fiFn->addFlag(FLAG_GENERIC);
+  fiFn->removeFlag(FLAG_INVISIBLE_FN);
 
   fiFn->insertFormalAtTail(fiFnTag);
   fiFn->insertFormalAtTail(fiFnFollower);
@@ -2387,7 +2419,7 @@ static void buildFollowerIterator(PromotionInfo& promotion,
 
   normalize(fiFn);
 
-  fiFn->instantiationPoint = visibilityBlock;
+  fiFn->setInstantiationPoint(instantiationPt);
 
   fixUnresolvedSymExprsForPromotionWrapper(fiFn, fn);
 }
@@ -2451,14 +2483,23 @@ static BlockStmt* followerForLoop(PromotionInfo& promotion,
                                isCallExpr(iterator) ? true : false);
 }
 
+// The returned string is canonical ie from astr().
+const char* unwrapFnName(FnSymbol* fn) {
+  INT_ASSERT(! strncmp(fn->name, "chpl_promo", 10));
+  const char* uscore = strchr(fn->name+11, '_');
+  return astr(uscore+1);
+}
+
 static void initPromotionWrapper(PromotionInfo& promotion,
-                                 BlockStmt* visibilityBlock) {
+                                 BlockStmt* instantiationPoint) {
 
   FnSymbol* fn = promotion.fn;
   FnSymbol* retval = buildEmptyWrapper(fn);
-  retval->instantiationPoint = visibilityBlock;
+  retval->setInstantiationPoint(instantiationPoint);
 
-  retval->cname = astr("_promotion_wrap_", fn->cname);
+  static int wrapId = 0;
+  retval->name = astr("chpl_promo", istr(++wrapId), "_", fn->name);
+  retval->cname = retval->name;
 
   retval->addFlag(FLAG_PROMOTION_WRAPPER);
   retval->addFlag(FLAG_FN_RETURNS_ITERATOR);
@@ -2797,7 +2838,7 @@ static void buildFastFollowerCheck(bool                  isStatic,
 
   normalize(checkFn);
 
-  checkFn->instantiationPoint = getVisibilityBlock(info.call);
+  checkFn->setInstantiationPoint(info.call);
 }
 
 /************************************* | **************************************
@@ -2810,83 +2851,36 @@ static FnSymbol* buildEmptyWrapper(FnSymbol* fn) {
   FnSymbol* wrapper = new FnSymbol(fn->name);
 
   wrapper->addFlag(FLAG_WRAPPER);
-
   wrapper->addFlag(FLAG_INVISIBLE_FN);
-
   wrapper->addFlag(FLAG_INLINE);
-
-  if (fn->hasFlag(FLAG_INIT_COPY_FN)) {
-    wrapper->addFlag(FLAG_INIT_COPY_FN);
-  }
-
-  if (fn->hasFlag(FLAG_AUTO_COPY_FN)) {
-    wrapper->addFlag(FLAG_AUTO_COPY_FN);
-  }
-
-  if (fn->hasFlag(FLAG_AUTO_DESTROY_FN)) {
-    wrapper->addFlag(FLAG_AUTO_DESTROY_FN);
-  }
-
-  if (fn->hasFlag(FLAG_NO_PARENS)) {
-    wrapper->addFlag(FLAG_NO_PARENS);
-  }
-
-  if (fn->hasFlag(FLAG_CONSTRUCTOR)) {
-    wrapper->addFlag(FLAG_CONSTRUCTOR);
-  }
-
-  if (fn->hasFlag(FLAG_FIELD_ACCESSOR)) {
-    wrapper->addFlag(FLAG_FIELD_ACCESSOR);
-  }
-
-  if (fn->hasFlag(FLAG_REF_TO_CONST)) {
-    wrapper->addFlag(FLAG_REF_TO_CONST);
-  }
-
-  if (!fn->isIterator()) { // getValue is var, not iterator
-    wrapper->retTag = fn->retTag;
-  }
-
-  if (fn->isMethod() == true) {
-    wrapper->setMethod(true);
-  }
-
-  if (fn->hasFlag(FLAG_METHOD_PRIMARY)) {
-    wrapper->addFlag(FLAG_METHOD_PRIMARY);
-  }
-
-  if (fn->hasFlag(FLAG_ASSIGNOP)) {
-    wrapper->addFlag(FLAG_ASSIGNOP);
-  }
-
-  if (fn->hasFlag(FLAG_DEFAULT_CONSTRUCTOR)) {
-    wrapper->addFlag(FLAG_DEFAULT_CONSTRUCTOR);
-  }
-
-  if (fn->hasFlag(FLAG_LAST_RESORT)) {
-    wrapper->addFlag(FLAG_LAST_RESORT);
-  }
-
-  if (fn->hasFlag(FLAG_COMPILER_GENERATED)) {
-    wrapper->addFlag(FLAG_WAS_COMPILER_GENERATED);
-  }
-
-  if (fn->hasFlag(FLAG_VOID_NO_RETURN_VALUE)) {
-    wrapper->addFlag(FLAG_VOID_NO_RETURN_VALUE);
-  }
-
-  if (fn->hasFlag(FLAG_FN_RETURNS_ITERATOR)) {
-    wrapper->addFlag(FLAG_FN_RETURNS_ITERATOR);
-  }
-
-  if (fn->hasFlag(FLAG_SUPPRESS_LVALUE_ERRORS)) {
-    wrapper->addFlag(FLAG_SUPPRESS_LVALUE_ERRORS);
-  }
-
   wrapper->addFlag(FLAG_COMPILER_GENERATED);
 
-  if (fn->throwsError())
-    wrapper->throwsErrorInit();
+  if (fn->hasFlag(FLAG_INIT_COPY_FN))   wrapper->addFlag(FLAG_INIT_COPY_FN);
+  if (fn->hasFlag(FLAG_AUTO_COPY_FN))   wrapper->addFlag(FLAG_AUTO_COPY_FN);
+  if (fn->hasFlag(FLAG_AUTO_DESTROY_FN))wrapper->addFlag(FLAG_AUTO_DESTROY_FN);
+  if (fn->hasFlag(FLAG_NO_PARENS))      wrapper->addFlag(FLAG_NO_PARENS);
+  if (fn->hasFlag(FLAG_CONSTRUCTOR))    wrapper->addFlag(FLAG_CONSTRUCTOR);
+  if (fn->hasFlag(FLAG_FIELD_ACCESSOR)) wrapper->addFlag(FLAG_FIELD_ACCESSOR);
+  if (fn->hasFlag(FLAG_REF_TO_CONST))   wrapper->addFlag(FLAG_REF_TO_CONST);
+  if (fn->hasFlag(FLAG_METHOD_PRIMARY)) wrapper->addFlag(FLAG_METHOD_PRIMARY);
+  if (fn->hasFlag(FLAG_ASSIGNOP))       wrapper->addFlag(FLAG_ASSIGNOP);
+  if (fn->hasFlag(FLAG_LAST_RESORT))    wrapper->addFlag(FLAG_LAST_RESORT);
+
+  if (   fn->hasFlag(FLAG_DEFAULT_CONSTRUCTOR))
+    wrapper->addFlag(FLAG_DEFAULT_CONSTRUCTOR);
+  if (   fn->hasFlag(FLAG_VOID_NO_RETURN_VALUE))
+    wrapper->addFlag(FLAG_VOID_NO_RETURN_VALUE);
+  if (   fn->hasFlag(FLAG_FN_RETURNS_ITERATOR))
+    wrapper->addFlag(FLAG_FN_RETURNS_ITERATOR);
+  if (   fn->hasFlag(FLAG_SUPPRESS_LVALUE_ERRORS))
+    wrapper->addFlag(FLAG_SUPPRESS_LVALUE_ERRORS);
+  if (   fn->hasFlag(FLAG_COMPILER_GENERATED))
+    wrapper->addFlag(FLAG_WAS_COMPILER_GENERATED); // note "was"
+
+  // getValue is var, not iterator
+  if (!fn->isIterator()) wrapper->retTag = fn->retTag;
+  if (fn->isMethod())    wrapper->setMethod(true);
+  if (fn->throwsError()) wrapper->throwsErrorInit();
 
   return wrapper;
 }

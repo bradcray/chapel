@@ -1,10 +1,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-#include "returnArrayTakesArrayArg2.h"
-
-extern void chpl_library_init(int argc, char* argv[]);
-extern void chpl_library_finalize(void);
+#include "lib/returnArrayTakesArrayArg2.h"
 
 // Test of calling an exported function that returns an array
 int main(int argc, char* argv[]) {

@@ -211,7 +211,7 @@ module BigInteger {
     pragma "no doc"
     proc deinit() {
       if _local || this.localeId == chpl_nodeID {
-        //        mpz_clear(this.mpz);
+        mpz_clear(this.mpz);
       }
     }
 

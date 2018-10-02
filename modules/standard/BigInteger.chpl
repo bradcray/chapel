@@ -4665,4 +4665,27 @@ When ``n/d`` does not produce an integer, this method may produce incorrect resu
   {
     return (a + b);
   }
+
+  proc chpl_need_to_check_step(step, type strType:bigint) param {
+    return false;
+  }
+
+  proc chpl__diffMod(minuend : bigint,
+                     subtrahend : bigint,
+                     in modulus : bigint) : bigint {
+    type minType = minuend.type;
+
+    modulus = abs(modulus);
+
+    var minMod = minuend % modulus;
+    var subMod = subtrahend % modulus;
+
+    return if minMod < subMod
+      then modulus  - (subMod - minMod)
+      else minMod - subMod;
+  }
+
+  proc chpl__mod(x: bigint, y: bigint) {
+    return x % y;
+  }
 }

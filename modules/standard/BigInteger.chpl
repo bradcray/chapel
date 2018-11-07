@@ -172,6 +172,9 @@ module BigInteger {
     UP   =  1
   }
 
+  require "BigInteger.h";
+  extern proc print_mpz_loc(x:mpz_t);
+
   pragma "ignore noinit"
   record bigint {
     /* The underlying GMP C structure */
@@ -181,20 +184,25 @@ module BigInteger {
     var localeId : chpl_nodeID_t;      // The locale id for the GMP state
 
     proc init() {
+      write("In init() 1: ");
       this.complete();
       mpz_init(this.mpz);
+      print_mpz_loc(this.mpz);
 
       this.localeId = chpl_nodeID;
     }
 
     proc init(const ref num: bigint) {
+      write("In init() 2: ");
       this.complete();
       if _local || num.localeId == chpl_nodeID {
         mpz_init_set(this.mpz, num.mpz);
+        print_mpz_loc(this.mpz);
       } else {
         var mpz_struct = num.mpzStruct();
 
         mpz_init(this.mpz);
+        print_mpz_loc(this.mpz);
 
         chpl_gmp_get_mpz(this.mpz, num.localeId, mpz_struct);
       }
@@ -203,13 +211,16 @@ module BigInteger {
     }
 
     proc init(num: int) {
+      write("In init() 3: ");
       this.complete();
       mpz_init_set_si(this.mpz, num.safeCast(c_long));
+      print_mpz_loc(this.mpz);
 
       this.localeId = chpl_nodeID;
     }
 
     proc init(num: uint) {
+      writeln("In init() 4");
       this.complete();
       mpz_init_set_ui(this.mpz, num.safeCast(c_ulong));
 
@@ -217,6 +228,7 @@ module BigInteger {
     }
 
     proc init(str: string, base: int = 0) {
+      writeln("In init() 5");
       this.complete();
       const str_  = str.localize().c_str();
       const base_ = base.safeCast(c_int);
@@ -231,6 +243,7 @@ module BigInteger {
     }
 
     proc init(str: string, base: int = 0, out error: syserr) {
+      writeln("In init() 6");
       this.complete();
       const str_  = str.localize().c_str();
       const base_ = base.safeCast(c_int);
@@ -254,7 +267,10 @@ module BigInteger {
     // is meaningless.
     pragma "no doc"
     proc deinit() {
+      write("In BigInteger deinit(): ");
+      print_mpz_loc(this.mpz);
       if _local || this.localeId == chpl_nodeID {
+        writeln("Calling mpz_clear()");
         mpz_clear(this.mpz);
       }
     }
@@ -514,6 +530,8 @@ module BigInteger {
 
     if _local {
       mpz_set(lhs.mpz, rhs.mpz);
+      write("After assignment: ");
+      print_mpz_loc(lhs.mpz);
 
     } else if lhs.localeId == chpl_nodeID {
       helper();
@@ -1728,6 +1746,8 @@ module BigInteger {
   proc *=(ref a: bigint, const ref b: bigint) {
     if _local {
       mpz_mul(a.mpz, a.mpz, b.mpz);
+      writeln("After mult: ");
+      print_mpz_loc(a.mpz);
 
     } else if a.localeId == chpl_nodeID && b.localeId == chpl_nodeID {
       mpz_mul(a.mpz, a.mpz, b.mpz);

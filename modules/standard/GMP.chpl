@@ -127,6 +127,7 @@ module GMP {
   }
 
   proc chpl_gmp_free(ptr:c_void_ptr, old_size:size_t) {
+    writeln("In chpl_gmp_free()");
     pragma "insert line file info"
       extern proc chpl_mem_free(ptr:c_void_ptr) : void;
     chpl_mem_free(ptr);

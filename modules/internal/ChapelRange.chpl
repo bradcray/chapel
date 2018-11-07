@@ -198,7 +198,7 @@ module ChapelRange {
   // I think the record itself should not be documented, but the above comment
   // should be moved to the top-level module documentation.
   pragma "no doc"
-  pragma "plain old data"
+//  pragma "plain old data"
   pragma "range"
   record range
   {
@@ -286,6 +286,16 @@ module ChapelRange {
     this.complete();
     if stridable then
       compilerError("non-stridable range initializer called with stridable=true");
+  }
+
+  pragma "no doc"
+  proc range.init(r: range) {
+    this.idxType = r.idxType;
+    this.boundedType = r.boundedType;
+    this.stridable   = r.stridable;
+    this._low        = r._low;
+    this._high       = r._high;
+    this.complete();
   }
 
   /////////////////////////////////
@@ -1103,7 +1113,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
   //#
 
   // Assignment
-  pragma "compiler generated"
+//  pragma "compiler generated"
     // The "compiler generated" flag is added so this explicit definition
     // of assignment does not disable the POD optimization.
     // Although provided explicitly, this function is effectively trivial,

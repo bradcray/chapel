@@ -1247,10 +1247,12 @@ static void addArgCoercion(FnSymbol*  fn,
 
     // MPF: I'm adding this assert in order to reduce my level
     // of concern about this code.
+    /*
     AggregateType* at = toAggregateType(ats->getValType());
     if (isUserDefinedRecord(at))
       if (propagateNotPOD(at))
         INT_FATAL("would add problematic deref");
+    */
 
     //
     // dereference a reference actual

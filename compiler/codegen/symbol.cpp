@@ -546,7 +546,7 @@ GenRet VarSymbol::codegen() {
 
 void VarSymbol::codegenDefC(bool global, bool isHeader) {
   GenInfo* info = gGenInfo;
-  if (this->hasFlag(FLAG_EXTERN))
+  if (this->hasFlag(FLAG_EXTERN) && !this->hasFlag(FLAG_GENERATE_SIGNATURE))
     return;
 
   if (type == dtVoid)
@@ -578,7 +578,8 @@ void VarSymbol::codegenDefC(bool global, bool isHeader) {
   //
   std::string str;
 
-  if(fIncrementalCompilation) {
+  if(fIncrementalCompilation || (this->hasFlag(FLAG_EXTERN) &&
+                                 this->hasFlag(FLAG_GENERATE_SIGNATURE))) {
     bool addExtern =  global && isHeader;
     str = (addExtern ? "extern " : "") + typestr + " " + cname;
   } else {
@@ -908,6 +909,15 @@ std::string ArgSymbol::getPythonType(PythonFileType pxd) {
     return "";
   } else {
     return getPythonTypeName(t, pxd) + " ";
+  }
+}
+
+std::string ArgSymbol::getPythonDefaultValue() {
+  std::string defaultVal = exportedDefaultValues[this];
+  if (defaultVal != "") {
+    return "= " + defaultVal;
+  } else {
+    return "";
   }
 }
 
@@ -1464,7 +1474,7 @@ GenRet FnSymbol::codegenCast(GenRet fnPtr) {
 void FnSymbol::codegenPrototype() {
   GenInfo *info = gGenInfo;
 
-  if (hasFlag(FLAG_EXTERN))       return;
+  if (hasFlag(FLAG_EXTERN) && !hasFlag(FLAG_GENERATE_SIGNATURE)) return;
   if (hasFlag(FLAG_NO_PROTOTYPE)) return;
   if (hasFlag(FLAG_NO_CODEGEN))   return;
 
@@ -1852,6 +1862,8 @@ GenRet FnSymbol::codegenPYXType() {
         header += " ";
         header += idCommentTemp(formal);
       }
+
+      header += formal->getPythonDefaultValue();
 
       std::string curArgTranslate = formal->getPythonArgTranslation();
       if (curArgTranslate != "") {

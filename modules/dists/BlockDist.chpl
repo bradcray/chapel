@@ -736,9 +736,8 @@ iter BlockDom.these(param tag: iterKind) where tag == iterKind.leader {
       locOffset(i) = tmpBlock.dim(i).first / stride:idxType;
     }
     // Forward to defaultRectangular
-    for followThis in tmpBlock._value.these(iterKind.leader, maxTasks,
-                                            myIgnoreRunning, minSize,
-                                            locOffset) do
+    for followThis in tmpBlock.these(iterKind.leader, maxTasks,
+                                     myIgnoreRunning, minSize, locOffset) do
       yield followThis;
   }
 }
@@ -874,7 +873,7 @@ override proc BlockDom.dsiDestroyDom() {
 }
 
 proc BlockDom.dsiMember(i) {
-  return whole.member(i);
+  return whole.contains(i);
 }
 
 proc BlockDom.dsiIndexOrder(i) {
@@ -884,7 +883,7 @@ proc BlockDom.dsiIndexOrder(i) {
 //
 // Added as a performance stopgap to avoid returning a domain
 //
-proc LocBlockDom.member(i) return myBlock.member(i);
+proc LocBlockDom.contains(i) return myBlock.contains(i);
 
 override proc BlockArr.dsiDisplayRepresentation() {
   for tli in dom.dist.targetLocDom {
@@ -956,7 +955,7 @@ inline proc BlockArr.dsiLocalAccess(i: rank*idxType) ref {
 //
 inline proc BlockArr.dsiAccess(const in idx: rank*idxType) ref {
   local {
-    if myLocArr != nil && myLocArr.locDom.member(idx) then
+    if myLocArr != nil && myLocArr.locDom.contains(idx) then
       return myLocArr.this(idx);
   }
   return nonLocalAccess(idx);

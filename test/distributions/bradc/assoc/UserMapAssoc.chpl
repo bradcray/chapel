@@ -182,7 +182,7 @@ class UserMapAssoc : BaseDist {
   proc indexToLocaleIndex(ind: idxType) {
     const locIdx = mapper.indexToLocaleIndex(ind, targetLocales);
     if boundsChecking then
-      if !targetLocDom.member(locIdx) then
+      if !targetLocDom.contains(locIdx) then
         halt("mapper provided invalid locale index: ",
              locIdx,
              " is not in domain ",
@@ -310,7 +310,7 @@ class UserMapAssocDom: BaseAssociativeDom {
   }
 
   proc dsiMember(i: idxType) {
-    return locDoms(dist.indexToLocaleIndex(i)).member(i);
+    return locDoms(dist.indexToLocaleIndex(i)).contains(i);
   }
 
   proc dsiClear() {
@@ -396,11 +396,11 @@ class UserMapAssocDom: BaseAssociativeDom {
         // redirect to the DefaultAssociative's leader
         // note that DefaultAssociative's leader returns (lo..hi, this)
         // ie. a range of table slots and then the DefaultAssociativeDom.
-        for follow in locDom.myInds._value.these(tag) do
+        for follow in locDom.myInds.these(tag) do
           yield (follow, localeIndex);
-        //  for followThis in tmpBlock._value.these(iterKind.leader, maxTasks,
-        //                                           myIgnoreRunning, minSize,
-        //                                           locOffset)
+        //  for followThis in tmpBlock.these(iterKind.leader, maxTasks,
+        //                                   myIgnoreRunning, minSize,
+        //                                   locOffset)
         //yield locDom;
       }
     }
@@ -412,14 +412,14 @@ class UserMapAssocDom: BaseAssociativeDom {
 
     var locDom = locDoms[localeIndex];
 
-    for i in locDom.myInds._value.these(tag, locFollowThis) do
+    for i in locDom.myInds.these(tag, locFollowThis) do
       yield i;
   }
 
   iter these(param tag: iterKind) where tag == iterKind.standalone {
     coforall locDom in locDoms do on locDom {
       // Forward to associative domain standalone iterator
-      for i in locDom.myInds._value.these(tag) {
+      for i in locDom.myInds.these(tag) {
         yield i;
       }
     }
@@ -487,7 +487,7 @@ class UserMapAssocDom: BaseAssociativeDom {
   }
 
   proc setup() {
-    for localeIdx in dist.targetLocDom do
+    coforall localeIdx in dist.targetLocDom do
       on dist.targetLocales(localeIdx) do
         if (locDoms(localeIdx) == nil) then
           locDoms(localeIdx) = new unmanaged LocUserMapAssocDom(idxType=idxType,
@@ -507,6 +507,12 @@ class UserMapAssocDom: BaseAssociativeDom {
   }
   proc dsiReprivatize(other) {
     locDoms = other.locDoms;
+  }
+
+  proc dsiDestroyDom() {
+    coforall localeIdx in dist.targetLocDom do
+      on dist.targetLocales(localeIdx) do
+        delete locDoms(localeIdx);
   }
 }
 
@@ -557,8 +563,8 @@ class LocUserMapAssocDom {
     return myInds.remove(i);
   }
 
-  proc member(i: idxType) {
-    return myInds.member(i);
+  proc contains(i: idxType) {
+    return myInds.contains(i);
   }
 
   proc clear() {
@@ -657,6 +663,12 @@ class UserMapAssocArr: BaseArr {
     }
   }
 
+  proc dsiDestroyArr() {
+    coforall localeIdx in dom.dist.targetLocDom do
+      on dom.dist.targetLocales(localeIdx) do
+        delete locArrs(localeIdx);
+  }
+
   proc dsiSupportsPrivatization() param return true;
   proc dsiGetPrivatizeData() return 0;
   proc dsiPrivatize(privatizeData) {
@@ -741,14 +753,14 @@ class UserMapAssocArr: BaseArr {
     var locArr = locArrs[localeIndex];
 
     // forward to locArr
-    for i in locArr.myElems._value.these(tag, locFollowThis) do
+    for i in locArr.myElems.these(tag, locFollowThis) do
       yield i;
   }
 
   iter these(param tag: iterKind) ref where tag == iterKind.standalone {
     coforall locArr in locArrs do on locArr {
       // Forward to associative array standalone iterator
-      for i in locArr.myElems._value.these(tag) {
+      for i in locArr.myElems.these(tag) {
         yield i;
       }
     }

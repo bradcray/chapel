@@ -389,6 +389,7 @@ public:
   GenRet          codegenType();
 
   std::string     getPythonType(PythonFileType pxd);
+  std::string     getPythonDefaultValue();
   std::string     getPythonArgTranslation();
 
   IntentTag       intent;
@@ -743,6 +744,8 @@ extern VarSymbol *gModuleInitIndentLevel;
 
 extern Symbol *gSyncVarAuxFields;
 extern Symbol *gSingleVarAuxFields;
+
+extern FnSymbol* chplUserMain;
 
 #define FUNC_NAME_MAX 256
 extern char llvmPrintIrName[FUNC_NAME_MAX+1];

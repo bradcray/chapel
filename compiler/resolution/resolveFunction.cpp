@@ -48,6 +48,8 @@
 
 static void resolveFormals(FnSymbol* fn);
 
+std::map<ArgSymbol*, std::string> exportedDefaultValues;
+
 static void markIterator(FnSymbol* fn);
 
 static void insertUnrefForArrayOrTupleReturn(FnSymbol* fn);
@@ -106,6 +108,8 @@ static bool recordContainingCopyMutatesField(Type* at);
 
 static void handleParamCNameFormal(FnSymbol* fn, ArgSymbol* formal);
 
+static void storeDefaultValuesForPython(FnSymbol* fn, ArgSymbol* formal);
+
 static void resolveFormals(FnSymbol* fn) {
   for_formals(formal, fn) {
     if (formal->type == dtUnknown) {
@@ -122,6 +126,7 @@ static void resolveFormals(FnSymbol* fn) {
     if (formal->name == astr_chpl_cname) {
       handleParamCNameFormal(fn, formal);
       formal->defPoint->remove();
+      continue;
     }
 
     if (formal->type->symbol->hasFlag(FLAG_REF) == false) {
@@ -143,6 +148,67 @@ static void resolveFormals(FnSymbol* fn) {
       if ((useIntent & INTENT_FLAG_IN))
         formal->intent = useIntent;
     }
+
+    if (formal->defaultExpr != NULL && fn->hasFlag(FLAG_EXPORT)) {
+      storeDefaultValuesForPython(fn, formal);
+    }
+  }
+}
+
+// When compiling for Python interoperability, default values for arguments
+// should get propagated to the generated Python files.
+static void storeDefaultValuesForPython(FnSymbol* fn, ArgSymbol* formal) {
+  if (fLibraryPython) {
+    Expr* end = formal->defaultExpr->body.tail;
+
+    if (SymExpr* sym = toSymExpr(end)) {
+      VarSymbol* var = toVarSymbol(sym->symbol());
+
+      // Might be an ArgSymbol instead of a VarSymbol
+      if (var && var->isImmediate()) {
+        Immediate* imm = var->immediate;
+        switch (imm->const_kind) {
+        case NUM_KIND_INT:
+        case NUM_KIND_BOOL:
+        case NUM_KIND_UINT:
+        case NUM_KIND_REAL:
+          {
+          exportedDefaultValues[formal] = imm->to_string();
+          break;
+        }
+
+        case CONST_KIND_STRING: {
+          // Want to maintain the appearance of string-ness
+          exportedDefaultValues[formal] = "\"" + imm->to_string() + "\"";
+          break;
+        }
+
+        case NUM_KIND_COMPLEX: {
+          // Complex immediates only come up for the type's default value, since
+          // all other bits that could be literals also could be computations
+          // involving variables named i (so we need to resolve it).
+          INT_FATAL("Complex literals were not expected as a default value");
+        }
+
+        default: {
+          INT_FATAL("Unexpected literal type for default value");
+          break;
+        }
+        } // closes switch statement
+      } else {
+        USR_WARN(formal, "Non-literal default values are ignored in "
+                 "exported functions, argument '%s' must always be "
+                 "provided", formal->name);
+      }
+    } else {
+      USR_WARN(formal, "Non-literal default values are ignored in exported"
+               " functions, argument '%s' must always be provided",
+               formal->name);
+    }
+  } else if (fLibraryCompile) {
+      USR_WARN(formal, "Default values aren't applicable in C, argument '%s'"
+               " for exported function '%s' must always be provided",
+               formal->name, fn->name);
   }
 }
 
@@ -279,8 +345,6 @@ static bool shouldUpdateAtomicFormalToRef(FnSymbol* fn, ArgSymbol* formal) {
 
          fn->name                              != astrSequals  &&
 
-         fn->hasFlag(FLAG_DEFAULT_CONSTRUCTOR) == false        &&
-         fn->hasFlag(FLAG_CONSTRUCTOR)         == false        &&
          fn->hasFlag(FLAG_BUILD_TUPLE)         == false;
 }
 
@@ -633,8 +697,7 @@ static void insertUnrefForArrayOrTupleReturn(FnSymbol* fn) {
 }
 
 static bool doNotUnaliasArray(FnSymbol* fn) {
-  return (fn->hasFlag(FLAG_CONSTRUCTOR) ||
-          fn->hasFlag(FLAG_NO_COPY_RETURN) ||
+  return (fn->hasFlag(FLAG_NO_COPY_RETURN) ||
           fn->hasFlag(FLAG_UNALIAS_FN) ||
           fn->hasFlag(FLAG_RUNTIME_TYPE_INIT_FN) ||
           fn->hasFlag(FLAG_INIT_COPY_FN) ||
@@ -649,14 +712,9 @@ static bool doNotUnaliasArray(FnSymbol* fn) {
 // This function returns true for exceptional FnSymbols
 // where tuples containing refs can be returned.
 //
-// The 'FLAG_CONSTRUCTOR' case can prevent additional copies/leaks in the case
-// that a class/field has a tuple field. See the following test:
-//     types/records/ferguson/tuples/class-tuple-record
-//
 static
 bool doNotChangeTupleTypeRefLevel(FnSymbol* fn, bool forRet) {
   if (fn->hasFlag(FLAG_TYPE_CONSTRUCTOR)         || // _type_construct__tuple
-      fn->hasFlag(FLAG_CONSTRUCTOR)              || // any constructor
       fn->hasFlag(FLAG_INIT_TUPLE)               || // chpl__init_tuple
       fn->hasFlag(FLAG_BUILD_TUPLE)              || // _build_tuple(_allow_ref)
       fn->hasFlag(FLAG_BUILD_TUPLE_TYPE)         || // _build_tuple_type
@@ -918,7 +976,7 @@ static void resolveTypeConstructor(FnSymbol* fn) {
   if (at->instantiatedFrom == NULL) {
     instantiateDefaultConstructor(fn);
 
-  } else if (at->initializerStyle          != DEFINES_INITIALIZER &&
+  } else if (at->hasUserDefinedInit        == false &&
              at->wantsDefaultInitializer() == false) {
     instantiateDefaultConstructor(fn);
   }
@@ -1142,7 +1200,7 @@ void resolveReturnTypeAndYieldedType(FnSymbol* fn, Type** yieldedType) {
   Vec<Type*>   retTypes;
   Vec<Symbol*> retSymbols;
 
-  if (retType == dtUnknown) {
+  if (isUnresolvedOrGenericReturnType(retType)) {
 
     computeReturnTypeParamVectors(fn, ret, retTypes, retSymbols);
 
@@ -1375,16 +1433,11 @@ bool formalRequiresTemp(ArgSymbol* formal, FnSymbol* fn) {
 
 bool shouldAddFormalTempAtCallSite(ArgSymbol* formal, FnSymbol* fn) {
   if (isRecord(formal->getValType())) {
-    // For now, rule out default ctor/init/_new
-    if (fn->hasFlag(FLAG_DEFAULT_CONSTRUCTOR))
-      return false; // old strategy for old-path in wrapAndCleanUpActuals
-    else {
-      if (formal->intent == INTENT_IN ||
-          formal->intent == INTENT_CONST_IN ||
-          formal->originalIntent == INTENT_IN ||
-          formal->originalIntent == INTENT_CONST_IN)
-        return true;
-    }
+    if (formal->intent == INTENT_IN ||
+        formal->intent == INTENT_CONST_IN ||
+        formal->originalIntent == INTENT_IN ||
+        formal->originalIntent == INTENT_CONST_IN)
+      return true;
   }
 
   return false;
@@ -1675,8 +1728,10 @@ void insertAndResolveCasts(FnSymbol* fn) {
 }
 
 static void insertCasts(BaseAST* ast, FnSymbol* fn, Vec<CallExpr*>& casts) {
+  if (isSymbol(ast) && ! isShadowVarSymbol(ast))
+    return; // do not descend into nested symbols
+
   if (CallExpr* call = toCallExpr(ast)) {
-    if (call->parentSymbol == fn) {
       if (call->isPrimitive(PRIM_MOVE)) {
         if (SymExpr* lhs = toSymExpr(call->get(1))) {
           Type* lhsType = lhs->symbol()->type;
@@ -1928,7 +1983,6 @@ static void insertCasts(BaseAST* ast, FnSymbol* fn, Vec<CallExpr*>& casts) {
           }
         }
       }
-    }
   }
 
   AST_CHILDREN_CALL(ast, insertCasts, fn, casts);

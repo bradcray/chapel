@@ -289,7 +289,7 @@ module ChapelRange {
   }
 
   pragma "no doc"
-  proc range.init(r: range) {
+  proc range.init(r: range(?)) {
     this.idxType = r.idxType;
     this.boundedType = r.boundedType;
     this.stridable   = r.stridable;
@@ -2370,6 +2370,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
   pragma "no doc"
   proc range.writeThis(f)
   {
+    /*
     // a range with a more normalized alignment
     // a separate variable so 'this' can be const
     var alignCheckRange = this;
@@ -2377,18 +2378,19 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
       alignCheckRange.normalizeAlignment();
     }
 
-    if hasLowBound() then
+    if hasLowBound() then*/
       f <~> low;
     f <~> new ioLiteral("..");
-    if hasHighBound() then
+    //    if hasHighBound() then
       f <~> high;
-    if stride != 1 then
+      /*    if stride != 1 then
       f <~> new ioLiteral(" by ") <~> stride;
 
     // Write out the alignment only if it differs from natural alignment.
     // We take alignment modulo the stride for consistency.
     if ! alignCheckRange.isNaturallyAligned() && aligned then
       f <~> new ioLiteral(" align ") <~> chpl_intToIdx(chpl__mod(chpl__idxToInt(alignment), stride));
+*/
   }
   pragma "no doc"
   proc ref range.readThis(f)

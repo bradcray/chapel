@@ -195,9 +195,11 @@ void AutoDestroyScope::variablesDestroy(Expr*      refStmt,
 
           INT_ASSERT(autoDestroyFn->hasFlag(FLAG_AUTO_DESTROY_FN));
 
-          CallExpr* autoDestroy = new CallExpr(autoDestroyFn, var);
+          if (!var->type->symbol->hasFlag(FLAG_RANGE)) {
+            CallExpr* autoDestroy = new CallExpr(autoDestroyFn, var);
 
-          insertBeforeStmt->insertBefore(autoDestroy);
+            insertBeforeStmt->insertBefore(autoDestroy);
+          }
         }
       }
 

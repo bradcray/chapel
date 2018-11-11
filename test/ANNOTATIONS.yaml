@@ -348,6 +348,9 @@ all:
   08/15/18:
     - text: Revert to stack-allocated rfDone indicators. (#10728)
       config: 16 node XC
+  09/25/18:
+    - text: Optimize blocking puts/gets and fetching network AMOs (#11176)
+      config: 16 node XC
 
 
 AllCompTime:
@@ -365,6 +368,12 @@ AllCompTime:
     - Loop over Defs and Uses with SymbolSymExprs (#5285)
   05/23/18:
     - Fix problems with tuples (#9572)
+  06/01/18:
+    - Represent if-expressions with IfExpr node instead of if-functions (#9649)
+  10/05/18:
+    - Compiler error for dereferencing a nil value (#11238)
+  10/19/18:
+    - Fix compiler performance issues in nilChecking (#11396)
 
 arguments:
   09/20/17:
@@ -432,6 +441,10 @@ binary-trees: &binary-trees-base
     - Updated to n=21 problem size and new rules (#5907)
   06/23/18:
     - Update more tests to compile with --warn-unstable (#9986)
+  09/06/18:
+    - Make performance tests make better use of managed classes (#10945)
+  09/19/18:
+    - Switch study version of binary trees from owned to unmanaged (#11128)
 binarytrees-submitted:
   <<: *binary-trees-base
 
@@ -452,6 +465,8 @@ chameneos-redux:
     - altered output order for chameneos data, old data incompatible
   09/15/17:
     - Chameneos initializer updates (#7328)
+  10/31/18:
+    - Enable parallelism for shape-ful expressions over ranges (#11501)
 
 CoMD:
   07/26/17:
@@ -475,6 +490,8 @@ compSampler-timecomp: &timecomp-base
     - Refactor codegenPrimitive, add limit to denormalize (#10187)
   07/14/18:
     - Improve the speed of codegenPrimitive (#10321)
+  10/19/18:
+    - Fix compiler performance issues in nilChecking (#11396)
 
 
 cg:
@@ -711,6 +728,8 @@ jacobi:
     - use isSubtype in preference to ':' in where clauses (#10143)
   07/19/18:
     - Do not introduce ref temps (#10010)
+  10/16/18:
+    - No-alias hints for LLVM (#11324)
 
 knucleotide:
   10/17/15:
@@ -841,6 +860,12 @@ memleaks:
     - Initializers on by default (#10459)
   07/25/18:
     - Fix size of loop expr in LCALS (#10499)
+  09/06/18:
+    - Enable usage of LinearAlgebra without BLAS/LAPACK (#10929)
+  09/19/18:
+    - Use runtime type field in chpl__distributed for sparse domains (#11140)
+  10/09/18:
+    - Resolve some global array-of-array leaks (#11307)
 
 memleaksfull:
   07/08/14:
@@ -932,6 +957,21 @@ memleaksfull:
     - Fix leak in cast to string from c_ptr (#10523)
   08/01/18:
     - Additional SparseBlockDom/Arr dsi methods to support bale-toposort (#10604)
+  09/06/18:
+    - Enable usage of LinearAlgebra without BLAS/LAPACK (#10929)
+  09/19/18:
+    - Use runtime type field in chpl__distributed for sparse domains (#11140)
+  09/27/18:
+    - Fix some SparseBlockDist leaks (#11227)
+  10/09/18:
+    - Resolve some global array-of-array leaks (#11307)
+  10/11/18:
+    - Resolve some leaks in user code (#11321)
+    - Free the result of '_build_tuple_always_allow_ref' for index vars (#11334)
+  10/16/18:
+    - Adding an exercise about finding duplicate files (#11358)
+  10/25/18:
+    - Fix reduction leak for identity() method (#11458)
 
 meteor:
   12/18/13:
@@ -939,7 +979,7 @@ meteor:
   08/10/16:
     - Updated meteor's lock to yield less frequently (#4300)
 
-mg-b:
+mg: &mg-base
   05/23/17:
     - Fix NPB MG (#6284)
   06/13/17:
@@ -948,6 +988,12 @@ mg-b:
     - Only perform packed updateFluff when there are multiple locales (#6512)
   06/22/18:
     - Make 'for' loop in dsiReallocate parallel (#9895)
+  09/20/18:
+    -  Move strided bulk transfer into common code (#11197)
+  09/21/18:
+    -  Restore comm=none performance lost in PR 11197 (#11206)
+mg-b:
+  <<: *mg-base
 
 mg.ml-time:
   05/11/17:
@@ -1002,6 +1048,8 @@ nbody:
     - upgrade jemalloc to 4.2.0 (#3919)
   04/19/18:
     - Use zero-arg initializer in BaseDom (#9250)
+  08/31/18:
+    - Refactor PRIM_NEW resolution to enable promotion (#10919)
 
 no-op:
   02/24/17:
@@ -1151,6 +1199,8 @@ revcomp:
     - Update revcomp problem size; filenames for fasta-based inputs (#9043)
   04/19/18:
     - Use zero-arg initializer in BaseDom (#9250)
+  10/30/18:
+    - Improve string comparisons (#11479)
 
 sad:
   05/03/16:
@@ -1249,7 +1299,7 @@ testSerialReductions:
   08/16/14:
     - result of Greg's commit to let the tasking layer determine parallelism
 
-thread-ring: &thread-ring-base
+thread-ring:
   03/19/15:
     - text: memory related, qthreads memory pool bug fix
       config: chap03
@@ -1259,6 +1309,8 @@ thread-ring: &thread-ring-base
     - Enforce qualified refs after inlining (#7906)
   06/07/18:
     - Prevent serialization from qthread sync vars (#9737)
+  08/30/18:
+    - Reduce hugepage waste from call stacks (#10254)
 
 time_array_vs_ddata:
   05/31/14:
@@ -1317,6 +1369,8 @@ timeVectorArray:
     - Make 'for' loop in dsiReallocate parallel (#9895)
   08/17/18:
     - Add a new dsiReallocate that is aware of allocated size (#10793)
+  09/07/18:
+    - Fix performance regression in pop_front/pop_back from PR 10793 (#11017)
 
 views-forall-iter:
   10/12/17:

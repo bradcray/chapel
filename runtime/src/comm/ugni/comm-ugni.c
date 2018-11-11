@@ -56,8 +56,10 @@
 #include "chpl-comm-diags.h"
 #include "chpl-comm-callbacks.h"
 #include "chpl-comm-callbacks-internal.h"
+#include "chpl-comm-strd-xfer.h"
 #include "chpl-env.h"
 #include "chplexit.h"
+#include "chpl-format.h"
 #include "chpl-mem.h"
 #include "chpl-mem-desc.h"
 #include "chpl-mem-sys.h"
@@ -224,11 +226,9 @@ static uint64_t debug_stats_flag = 0;
         MACRO(put_cnt)                                                  \
         MACRO(put_byte_cnt)                                             \
         MACRO(put_strd_cnt)                                             \
-        MACRO(put_strd_byte_cnt)                                        \
         MACRO(get_cnt)                                                  \
         MACRO(get_byte_cnt)                                             \
         MACRO(get_strd_cnt)                                             \
-        MACRO(get_strd_byte_cnt)                                        \
         MACRO(get_nb_cnt)                                               \
         MACRO(get_nb_b_cnt)                                             \
         MACRO(test_nb_cnt)                                              \
@@ -1418,10 +1418,6 @@ static pthread_mutex_t shutdown_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t shutdown_cond = PTHREAD_COND_INITIALIZER;
 
 
-static chpl_atomic_commDiagnostics comm_diagnostics;
-static chpl_bool comm_diags_disabled_temporarily = false;
-
-
 //
 // Specialized argument type and values for the may_remote_proxy
 // argument to do_remote_put() and ..._get().
@@ -1531,7 +1527,6 @@ static chpl_bool reacquire_comm_dom(int);
 static int       post_fma(c_nodeid_t, gni_post_descriptor_t*);
 static void      post_fma_and_wait(c_nodeid_t, gni_post_descriptor_t*,
                                    chpl_bool);
-static void      post_fma_and_wait_amo(c_nodeid_t, gni_post_descriptor_t*);
 #if HAVE_GNI_FMA_CHAIN_TRANSACTIONS
 static int       post_fma_ct(c_nodeid_t*, gni_post_descriptor_t*);
 static void      post_fma_ct_and_wait(c_nodeid_t*, gni_post_descriptor_t*);
@@ -1550,8 +1545,6 @@ static void      local_yield(void);
 static void dbg_init(void);
 static void dbg_init(void)
 {
-  const char* ev;
-
   atomic_init_uint_least32_t(&next_thread_idx, 0);
   proc_thread_id = pthread_self();
 
@@ -1599,9 +1592,10 @@ static void dbg_init(void)
 
   debug_stats_flag = chpl_env_rt_get_int("COMM_UGNI_DEBUG_STATS", 0);
 
-  if ((ev = chpl_env_rt_get("COMM_UGNI_FORK_REQ_BUFS_PER_CD", NULL)) != NULL) {
-    FORK_REQ_BUFS_PER_CD = chpl_env_str_to_int(ev, 1);
-  }
+#ifdef DEBUG
+  FORK_REQ_BUFS_PER_CD =
+      chpl_env_rt_get_int("COMM_UGNI_FORK_REQ_BUFS_PER_CD", 1);
+#endif
 }
 
 
@@ -1911,21 +1905,19 @@ void chpl_comm_post_task_init(void)
       chpl_warning("without hugepages, communication performance will suffer",
                    0, 0);
     }
-  } else {
-    if (chpl_nodeID == 0
-        && getenv("HUGETLB_NO_RESERVE") == NULL) {
-      chpl_warning("HUGETLB_NO_RESERVE should be set to something "
-                   "when using hugepages",
-                   0, 0);
-    }
+  } else if (chpl_comm_getenvMaxHeapSize() == 0) {
+    if (chpl_nodeID == 0) {
+      if (getenv("HUGETLB_NO_RESERVE") == NULL) {
+        chpl_warning("dynamic heap on hugepages "
+                     "needs HUGETLB_NO_RESERVE set to something",
+                     0, 0);
+      }
 
-    if (strcmp(CHPL_MEM, "jemalloc") == 0
-        && chpl_comm_getenvMaxHeapSize() == 0
-        && getenv(chpl_comm_ugni_jemalloc_conf_ev_name()) == NULL) {
-      if (chpl_nodeID == 0) {
+      if (strcmp(CHPL_MEM, "jemalloc") == 0
+          && getenv(chpl_comm_ugni_jemalloc_conf_ev_name()) == NULL) {
         char buf[100];
         (void) snprintf(buf, sizeof(buf),
-                        "%s should be set when using hugepages",
+                        "dynamic heap on hugepages needs %s set properly",
                         chpl_comm_ugni_jemalloc_conf_ev_name());
         chpl_warning(buf, 0, 0);
       }
@@ -2660,7 +2652,9 @@ gni_return_t register_mem_region(uint64_t addr, uint64_t len,
   if ((gni_rc = GNI_MemRegister(comm_doms[0].nih, addr, len,
                                 NULL, flags, -1, mdh))
       != GNI_RC_SUCCESS) {
-    if (!allow_failure)
+    if (allow_failure)
+      DBG_P_L(DBGF_MEMREG, "GNI_MemRegister(): %d", (int) gni_rc);
+    else
       GNI_FAIL(gni_rc, "GNI_MemRegister()");
   }
 
@@ -2923,7 +2917,7 @@ void set_up_for_polling(void)
 void chpl_comm_rollcall(void)
 {
   // Initialize diags
-  chpl_comm_diags_init(&comm_diagnostics);
+  chpl_comm_diags_init();
 
   chpl_msg(2, "executing on node %d of %d node(s): %s\n", chpl_nodeID,
            chpl_numNodes, chpl_nodeName());
@@ -2964,9 +2958,8 @@ void make_registered_heap(void)
   // it up.  (If it's to be dynamically extensible, that's handled
   // separately through chpl_comm_impl_regMem*().)
   //
-  const size_t nic_max_pages = (size_t) 1 << 14; // not publicly defined
-  const size_t nic_max_mem = nic_max_pages * page_size;
-  size_t nic_allowed_mem;
+  size_t nic_mem_map_limit;
+  size_t nic_max_mem;
   size_t max_heap_size;
   size_t size;
   size_t decrement;
@@ -2978,10 +2971,15 @@ void make_registered_heap(void)
   // TLB.  Except on Gemini only, aim for only 95% of what will fit
   // because there we'll get an error if we go over.
   //
-  if (nic_type == GNI_DEVICE_GEMINI)
-    nic_allowed_mem = ALIGN_DN((size_t) (0.95 * nic_max_mem), page_size);
-  else
-    nic_allowed_mem = nic_max_mem;
+  if (nic_type == GNI_DEVICE_GEMINI) {
+    const size_t nic_max_pages = (size_t) 1 << 14; // not publicly defined
+    nic_max_mem = nic_max_pages * page_size;
+    nic_mem_map_limit = ALIGN_DN((size_t) (0.95 * nic_max_mem), page_size);
+  } else {
+    const size_t nic_TLB_cache_pages = 512; // not publicly defined
+    nic_max_mem = nic_TLB_cache_pages * page_size;
+    nic_mem_map_limit = nic_max_mem;
+  }
 
   {
     uint64_t  addr;
@@ -2992,58 +2990,41 @@ void make_registered_heap(void)
     while (get_next_rw_memory_range(&addr, &len, NULL, 0))
       data_size += ALIGN_UP(len, page_size);
 
-    if (data_size >= nic_allowed_mem)
+    if (data_size >= nic_mem_map_limit)
       max_heap_size = 0;
     else
-      max_heap_size = nic_allowed_mem - data_size;
+      max_heap_size = nic_mem_map_limit - data_size;
   }
 
   //
-  // Go with the user-specified size, but issue a warning from node 0
-  // if we can't fit all the registrations in the NIC TLB.  On Gemini
-  // only, reduce the heap size until we can fit in the NIC TLB, since
-  // otherwise we'll get GNI_RC_ERROR_RESOURCE when we try to register
-  // memory.
+  // As a hedge against silliness, first reduce any request so that it's
+  // no larger than the physical memory.  As a beneficial side effect
+  // when the user request is ridiculously large, this also causes the
+  // reduce-by-5% loop below to run faster and produce a final size
+  // closer to the maximum available.
   //
-  if ((size = size_from_env) > max_heap_size) {
+  size = size_from_env;
+  const size_t size_phys = ALIGN_DN(chpl_sys_physicalMemoryBytes(), page_size);
+  if (size > size_phys)
+    size = size_phys;
+  
+  //
+  // On Gemini-based systems, if necessary reduce the heap size until
+  // we can fit all the registered pages in the NIC TLB.  Otherwise,
+  // we'll get GNI_RC_ERROR_RESOURCE when we try to register memory.
+  // Warn about doing this.
+  //
+  if (nic_type == GNI_DEVICE_GEMINI && size > max_heap_size) {
     if (chpl_nodeID == 0) {
-      char nmmBuf[20];
-      char psBuf[20];
-      char hsBuf[20];
-      char msg[200];
-
-#define P_GMK_BASE(b, f, v, t)                                          \
-        ((v >= ((t) (1UL << 30)))                                       \
-         ? snprintf(b, sizeof(b), "%" f "G", v / ((t) (1UL << 30)))     \
-         : (v >= ((t) (1UL << 20)))                                     \
-         ? snprintf(b, sizeof(b), "%" f "M", v / ((t) (1UL << 20)))     \
-         : snprintf(b, sizeof(b), "%" f "K", v / ((t) (1UL << 10))))
-#define P_ZI_GMK(b, v) P_GMK_BASE(b, "zd", v, size_t)
-#define P_D_GMK(b, v)  P_GMK_BASE(b, ".1f", v, double)
-
-      P_ZI_GMK(nmmBuf, nic_max_mem);
-      P_ZI_GMK(psBuf, page_size);
-
-      if (nic_type == GNI_DEVICE_GEMINI) {
-        P_D_GMK(hsBuf, max_heap_size);
-        (void) snprintf(msg, sizeof(msg),
-                        "Gemini TLB can cover %s with %s pages; heap "
-                        "reduced to %s to fit",
-                        nmmBuf, psBuf, hsBuf);
-      } else {
-        P_ZI_GMK(hsBuf, size);
-        (void) snprintf(msg, sizeof(msg),
-                        "Aries TLB cache can cover %s with %s pages; "
-                        "with %s heap,\n"
-                        "         cache refills may reduce performance",
-                        nmmBuf, psBuf, hsBuf);
-      }
-
+      char buf1[20], buf2[20], buf3[20], msg[200];
+      chpl_snprintf_KMG_z(buf1, sizeof(buf1), nic_max_mem);
+      chpl_snprintf_KMG_z(buf2, sizeof(buf2), page_size);
+      chpl_snprintf_KMG_f(buf3, sizeof(buf3), max_heap_size);
+      (void) snprintf(msg, sizeof(msg),
+                      "Gemini TLB can cover %s with %s pages; heap "
+                      "reduced to %s to fit",
+                      buf1, buf2, buf3);
       chpl_warning(msg, 0, 0);
-
-#undef P_D_GMK
-#undef P_ZI_GMK
-#undef P_GMK_BASE
     }
 
     if (nic_type == GNI_DEVICE_GEMINI)
@@ -3074,6 +3055,26 @@ void make_registered_heap(void)
 
   DBG_P_LP(DBGF_HUGEPAGES, "HUGEPAGES allocated heap start=%p size=%#zx\n",
            start, size);
+
+  //
+  // On Aries-based systems, warn if the size is larger than what will
+  // fit in the TLB cache.  But since that may reduce performance but
+  // won't affect function, don't reduce the size to fit.
+  //
+  if (nic_type == GNI_DEVICE_ARIES && size > max_heap_size) {
+    if (chpl_nodeID == 0) {
+      char buf1[20], buf2[20], buf3[20], msg[200];
+      chpl_snprintf_KMG_z(buf1, sizeof(buf1), nic_max_mem);
+      chpl_snprintf_KMG_z(buf2, sizeof(buf2), page_size);
+      chpl_snprintf_KMG_f(buf3, sizeof(buf3), size);
+      (void) snprintf(msg, sizeof(msg),
+                      "Aries TLB cache can cover %s with %s pages; "
+                      "with %s heap,\n"
+                      "         cache refills may reduce performance",
+                      buf1, buf2, buf3);
+      chpl_warning(msg, 0, 0);
+    }
+  }
 
   registered_heap_size  = size;
   registered_heap_start = start;
@@ -3652,8 +3653,7 @@ void chpl_comm_barrier(const char *msg)
   if (chpl_numNodes == 1)
     return;
 
-  if (chpl_verbose_comm && !comm_diags_disabled_temporarily)
-    printf("%d: barrier for '%s'\n", chpl_nodeID, msg);
+  chpl_comm_diags_verbose_printf("barrier for '%s'", msg);
 
   //
   // If we can't communicate yet, just do a PMI barrier.
@@ -5027,11 +5027,9 @@ void chpl_comm_put(void* addr, c_nodeid_t locale, void* raddr,
       chpl_comm_do_callbacks (&cb_data);
   }
 
-  if (chpl_verbose_comm && !comm_diags_disabled_temporarily)
-    printf("%d: %s:%d: remote put to %d\n", chpl_nodeID,
-           chpl_lookupFilename(fn), ln, locale);
-  if (chpl_comm_diagnostics && !comm_diags_disabled_temporarily)
-    chpl_comm_diags_incr(&comm_diagnostics.put);
+  chpl_comm_diags_verbose_printf("%s:%d: remote put to %d, %zu bytes",
+                                 chpl_lookupFilename(fn), ln, locale, size);
+  chpl_comm_diags_incr(put);
 
   do_remote_put(addr, locale, raddr, size, NULL, may_proxy_true);
 }
@@ -5312,11 +5310,9 @@ void chpl_comm_get(void* addr, c_nodeid_t locale, void* raddr,
       chpl_comm_do_callbacks (&cb_data);
   }
 
-  if (chpl_verbose_comm && !comm_diags_disabled_temporarily)
-    printf("%d: %s:%d: remote get from %d\n", chpl_nodeID,
-           chpl_lookupFilename(fn), ln, locale);
-  if (chpl_comm_diagnostics && !comm_diags_disabled_temporarily)
-    chpl_comm_diags_incr(&comm_diagnostics.get);
+  chpl_comm_diags_verbose_printf("%s:%d: remote get from %d, %zu bytes",
+                                 chpl_lookupFilename(fn), ln, locale, size);
+  chpl_comm_diags_incr(get);
 
   do_remote_get(addr, locale, raddr, size, may_proxy_true);
 }
@@ -5582,354 +5578,35 @@ void do_nic_get(void* tgt_addr, c_nodeid_t locale, mem_region_t* remote_mr,
 static const size_t strd_maxHandles
                     = (20 < CD_ACTIVE_TRANS_MAX) ? 20 : CD_ACTIVE_TRANS_MAX;
 
-static inline
-void strd_nb_helper(chpl_comm_nb_handle_t (*xferFn)(void*, int32_t, void*,
-                                                    size_t,
-                                                    int32_t, int32_t,
-                                                    int, int32_t),
-                    void* localAddr, int32_t remoteLocale, void* remoteAddr,
-                    size_t cnt,
-                    chpl_comm_nb_handle_t* handles, size_t* pCurrHandles,
-                    int32_t typeIndex, int32_t commID, int ln, int32_t fn)
+void chpl_comm_put_strd(void* dstaddr_arg, size_t* dststrides,
+                        int32_t dstlocale,
+                        void* srcaddr_arg, size_t* srcstrides,
+                        size_t* count, int32_t stridelevels, size_t elemSize,
+                        int32_t typeIndex, int32_t commID, int ln, int32_t fn)
 {
-  size_t currHandles = *pCurrHandles;
-
-  if (currHandles >= strd_maxHandles) {
-    // reached max in flight -- retire some to make room
-    while (!chpl_comm_try_nb_some(handles, currHandles)) {
-      local_yield();
-    }
-
-    // compress retired transactions out of the list
-    {
-      size_t iOut, iIn;
-
-      for (iOut = iIn = 0; iIn < currHandles; ) {
-        if (handles[iIn] == NULL)
-          iIn++;
-        else
-          handles[iOut++] = handles[iIn++];
-      }
-
-      currHandles = iOut;
-    }
-  }
-
-  handles[currHandles] = (*xferFn)(localAddr, remoteLocale, remoteAddr, cnt,
-                                   typeIndex, commID, ln, fn);
-  if (handles[currHandles] != NULL)
-    currHandles++;
-
-  *pCurrHandles = currHandles;
-}
-
-
-void  chpl_comm_put_strd(void* dstaddr_arg, size_t* dststrides,
-                         int32_t dstlocale,
-                         void* srcaddr_arg, size_t* srcstrides,
-                         size_t* count, int32_t stridelevels, size_t elemSize,
-                         int32_t typeIndex, int32_t commID, int ln, int32_t fn)
-{
-  const size_t strlvls=(size_t)stridelevels;
-  size_t i,j,k,t,total,off,x,carry;
-
-  int8_t* dstaddr,*dstaddr1;
-  int8_t* srcaddr,*srcaddr1;
-
-  int *srcdisp, *dstdisp;
-
-  size_t dststr[strlvls];
-  size_t srcstr[strlvls];
-  size_t cnt[strlvls+1];
-
-  chpl_comm_nb_handle_t handles[strd_maxHandles];
-  size_t currHandles = 0;
-
   PERFSTATS_INC(put_strd_cnt);
-
-  // Communications callback support
-  if (chpl_comm_have_callbacks(chpl_comm_cb_event_kind_put_strd)) {
-      chpl_comm_cb_info_t cb_data =
-        {chpl_comm_cb_event_kind_put_strd, chpl_nodeID, dstlocale,
-         .iu.comm_strd={srcaddr_arg, srcstrides, dstaddr_arg, dststrides, count,
-                        stridelevels, elemSize, typeIndex, commID, ln, fn}};
-      chpl_comm_do_callbacks (&cb_data);
-  }
-
-  //Only count[0] and strides are measured in number of bytes.
-  cnt[0]= count[0] * elemSize;
-  if (strlvls>0) {
-    srcstr[0] = srcstrides[0] * elemSize;
-    dststr[0] = dststrides[0] * elemSize;
-    for (i=1;i<strlvls;i++)
-      {
-        srcstr[i] = srcstrides[i] * elemSize;
-        dststr[i] = dststrides[i] * elemSize;
-        cnt[i]=count[i];
-      }
-    cnt[strlvls]=count[strlvls];
-  }
-
-  switch (strlvls) {
-  case 0:
-    PERFSTATS_ADD(put_strd_byte_cnt, cnt[0]);
-    chpl_comm_put(srcaddr_arg, dstlocale, dstaddr_arg, cnt[0],
+  put_strd_common(dstaddr_arg, dststrides,
+                  dstlocale,
+                  srcaddr_arg, srcstrides,
+                  count, stridelevels, elemSize,
+                  strd_maxHandles, local_yield,
                   typeIndex, commID, ln, fn);
-    break;
-
-  case 1:
-    dstaddr=(int8_t*)dstaddr_arg;
-    srcaddr=(int8_t*)srcaddr_arg;
-    for(i=0; i<cnt[1]; i++) {
-      PERFSTATS_ADD(put_strd_byte_cnt, cnt[0]);
-      strd_nb_helper(chpl_comm_put_nb,
-                     srcaddr, dstlocale, dstaddr, cnt[0],
-                     handles, &currHandles,
-                     typeIndex, commID, ln, fn);
-      srcaddr+=srcstr[0];
-      dstaddr+=dststr[0];
-    }
-    break;
-
-  case 2:
-    for(i=0; i<cnt[2]; i++) {
-      srcaddr = (int8_t*)srcaddr_arg + srcstr[1]*i;
-      dstaddr = (int8_t*)dstaddr_arg + dststr[1]*i;
-      for(j=0; j<cnt[1]; j++) {
-        PERFSTATS_ADD(put_strd_byte_cnt, cnt[0]);
-        strd_nb_helper(chpl_comm_put_nb,
-                       srcaddr, dstlocale, dstaddr, cnt[0],
-                       handles, &currHandles,
-                       typeIndex, commID, ln, fn);
-        srcaddr+=srcstr[0];
-        dstaddr+=dststr[0];
-      }
-    }
-    break;
-
-  case 3:
-    for(i=0; i<cnt[3]; i++) {
-      srcaddr1 = (int8_t*)srcaddr_arg + srcstr[2]*i;
-      dstaddr1 = (int8_t*)dstaddr_arg + dststr[2]*i;
-      for(j=0; j<cnt[2]; j++) {
-        srcaddr = srcaddr1 + srcstr[1]*j;
-        dstaddr = dstaddr1 + dststr[1]*j;
-        for(k=0; k<cnt[1]; k++) {
-          PERFSTATS_ADD(put_strd_byte_cnt, cnt[0]);
-          strd_nb_helper(chpl_comm_put_nb,
-                         srcaddr, dstlocale, dstaddr, cnt[0],
-                         handles, &currHandles,
-                         typeIndex, commID, ln, fn);
-          srcaddr+=srcstr[0];
-          dstaddr+=dststr[0];
-        }
-      }
-    }
-    break;
-
-  default:
-    dstaddr=(int8_t*)dstaddr_arg;
-    srcaddr=(int8_t*)srcaddr_arg;
-
-    //Number of chpl_comm_put operations to do
-    total=1;
-    for (i=0; i<strlvls; i++)
-      total=total*cnt[i+1];
-
-    //displacement from the dstaddr and srcaddr start points
-    srcdisp=chpl_mem_allocMany(total,sizeof(int),CHPL_RT_MD_GETS_PUTS_STRIDES,0,0);
-    dstdisp=chpl_mem_allocMany(total,sizeof(int),CHPL_RT_MD_GETS_PUTS_STRIDES,0,0);
-
-    for (j=0; j<total; j++) {
-      carry=1;
-      for (t=1;t<=strlvls;t++) {
-        if (cnt[t]*carry>=j+1) {  //IF 1
-          x=j/carry;
-          off =j-(carry*x);
-
-          if (carry!=1) {  //IF 2
-            srcdisp[j]=srcstr[t-1]*x+srcdisp[off];
-            dstdisp[j]=dststr[t-1]*x+dstdisp[off];
-          } else {  //ELSE 2
-            srcdisp[j]=srcstr[t-1]*x;
-            dstdisp[j]=dststr[t-1]*x;
-          }
-          PERFSTATS_ADD(put_strd_byte_cnt, cnt[0]);
-          strd_nb_helper(chpl_comm_put_nb,
-                         srcaddr+srcdisp[j], dstlocale, dstaddr+dstdisp[j],
-                         cnt[0],
-                         handles, &currHandles,
-                         typeIndex, commID, ln, fn);
-          break;
-
-        } else { //ELSE 1
-          carry=carry*cnt[t];
-        }
-      }
-    } // for j
-    chpl_mem_free(srcdisp,0,0);
-    chpl_mem_free(dstdisp,0,0);
-    break;
-  }
-
-  if (currHandles > 0) {
-    (void) chpl_comm_wait_nb_some(handles, currHandles);
-  }
 }
 
 
-void  chpl_comm_get_strd(void* dstaddr_arg, size_t* dststrides,
-                         int32_t srclocale,
-                         void* srcaddr_arg, size_t* srcstrides,
-                         size_t* count, int32_t stridelevels, size_t elemSize,
-                         int32_t typeIndex, int32_t commID, int ln, int32_t fn)
+void chpl_comm_get_strd(void* dstaddr_arg, size_t* dststrides,
+                        int32_t srclocale,
+                        void* srcaddr_arg, size_t* srcstrides,
+                        size_t* count, int32_t stridelevels, size_t elemSize,
+                        int32_t typeIndex, int32_t commID, int ln, int32_t fn)
 {
-  const size_t strlvls=(size_t)stridelevels;
-  size_t i,j,k,t,total,off,x,carry;
-
-  int8_t* dstaddr,*dstaddr1;
-  int8_t* srcaddr,*srcaddr1;
-
-  int *srcdisp, *dstdisp;
-  size_t dststr[strlvls];
-  size_t srcstr[strlvls];
-  size_t cnt[strlvls+1];
-
-  chpl_comm_nb_handle_t handles[strd_maxHandles];
-  size_t currHandles = 0;
-
   PERFSTATS_INC(get_strd_cnt);
-
-  // Communications callback support
-  if (chpl_comm_have_callbacks(chpl_comm_cb_event_kind_get_strd)) {
-    chpl_comm_cb_info_t cb_data =
-      {chpl_comm_cb_event_kind_get_strd, chpl_nodeID, srclocale,
-       .iu.comm_strd={srcaddr_arg, srcstrides, dstaddr_arg, dststrides, count,
-                      stridelevels, elemSize, typeIndex, commID, ln, fn}};
-    chpl_comm_do_callbacks (&cb_data);
-  }
-
-  //Only count[0] and strides are measured in number of bytes.
-  cnt[0]=count[0] * elemSize;
-  if(strlvls>0){
-    srcstr[0] = srcstrides[0] * elemSize;
-    dststr[0] = dststrides[0] * elemSize;
-    for (i=1;i<strlvls;i++)
-      {
-        srcstr[i] = srcstrides[i] * elemSize;
-        dststr[i] = dststrides[i] * elemSize;
-        cnt[i]=count[i];
-      }
-    cnt[strlvls]=count[strlvls];
-  }
-
-  switch(strlvls) {
-  case 0:
-    dstaddr=(int8_t*)dstaddr_arg;
-    srcaddr=(int8_t*)srcaddr_arg;
-    PERFSTATS_ADD(get_strd_byte_cnt, cnt[0]);
-    chpl_comm_get(dstaddr, srclocale, srcaddr, cnt[0],
+  get_strd_common(dstaddr_arg, dststrides,
+                  srclocale,
+                  srcaddr_arg, srcstrides,
+                  count, stridelevels, elemSize,
+                  strd_maxHandles, local_yield,
                   typeIndex, commID, ln, fn);
-    break;
-
-  case 1:
-    dstaddr=(int8_t*)dstaddr_arg;
-    srcaddr=(int8_t*)srcaddr_arg;
-    for(i=0; i<cnt[1]; i++) {
-      PERFSTATS_ADD(get_strd_byte_cnt, cnt[0]);
-      strd_nb_helper(chpl_comm_get_nb,
-                     dstaddr, srclocale, srcaddr, cnt[0],
-                     handles, &currHandles,
-                     typeIndex, commID, ln, fn);
-      srcaddr+=srcstr[0];
-      dstaddr+=dststr[0];
-    }
-    break;
-
-  case 2:
-    for(i=0; i<cnt[2]; i++) {
-      srcaddr = (int8_t*)srcaddr_arg + srcstr[1]*i;
-      dstaddr = (int8_t*)dstaddr_arg + dststr[1]*i;
-      for(j=0; j<cnt[1]; j++) {
-        PERFSTATS_ADD(get_strd_byte_cnt, cnt[0]);
-        strd_nb_helper(chpl_comm_get_nb,
-                       dstaddr, srclocale, srcaddr, cnt[0],
-                       handles, &currHandles,
-                       typeIndex, commID, ln, fn);
-        srcaddr+=srcstr[0];
-        dstaddr+=dststr[0];
-      }
-    }
-    break;
-
-  case 3:
-    for(i=0; i<cnt[3]; i++) {
-      srcaddr1 = (int8_t*)srcaddr_arg + srcstr[2]*i;
-      dstaddr1 = (int8_t*)dstaddr_arg + dststr[2]*i;
-      for(j=0; j<cnt[2]; j++) {
-        srcaddr = srcaddr1 + srcstr[1]*j;
-        dstaddr = dstaddr1 + dststr[1]*j;
-        for(k=0; k<cnt[1]; k++) {
-          PERFSTATS_ADD(get_strd_byte_cnt, cnt[0]);
-          strd_nb_helper(chpl_comm_get_nb,
-                         dstaddr, srclocale, srcaddr, cnt[0],
-                         handles, &currHandles,
-                         typeIndex, commID, ln, fn);
-          srcaddr+=srcstr[0];
-          dstaddr+=dststr[0];
-        }
-      }
-    }
-    break;
-
-  default:
-    dstaddr=(int8_t*)dstaddr_arg;
-    srcaddr=(int8_t*)srcaddr_arg;
-
-    //Number of chpl_comm_get operations to do
-    total=1;
-    for (i=0; i<strlvls; i++)
-      total=total*cnt[i+1];
-
-    //displacement from the dstaddr and srcaddr start points
-    srcdisp=chpl_mem_allocMany(total,sizeof(int),CHPL_RT_MD_GETS_PUTS_STRIDES,0,0);
-    dstdisp=chpl_mem_allocMany(total,sizeof(int),CHPL_RT_MD_GETS_PUTS_STRIDES,0,0);
-
-    for (j=0; j<total; j++) {
-      carry=1;
-      for (t=1;t<=strlvls;t++) {
-        if (cnt[t]*carry>=j+1) {  //IF 1
-          x=j/carry;
-          off =j-(carry*x);
-
-          if (carry!=1) {  //IF 2
-            srcdisp[j]=srcstr[t-1]*x+srcdisp[off];
-            dstdisp[j]=dststr[t-1]*x+dstdisp[off];
-          } else {  //ELSE 2
-            srcdisp[j]=srcstr[t-1]*x;
-            dstdisp[j]=dststr[t-1]*x;
-          }
-          PERFSTATS_ADD(get_strd_byte_cnt, cnt[0]);
-          strd_nb_helper(chpl_comm_get_nb,
-                         dstaddr+dstdisp[j], srclocale, srcaddr+srcdisp[j],
-                         cnt[0],
-                         handles, &currHandles,
-                         typeIndex, commID, ln, fn);
-          break;
-
-        } else {  //ELSE 1
-          carry=carry*cnt[t];
-        }
-      }
-    }
-    chpl_mem_free(srcdisp,0,0);
-    chpl_mem_free(dstdisp,0,0);
-    break;
-  }
-
-  if (currHandles > 0) {
-    (void) chpl_comm_wait_nb_some(handles, currHandles);
-  }
 }
 
 
@@ -5972,11 +5649,9 @@ chpl_comm_nb_handle_t chpl_comm_get_nb(void* addr, c_nodeid_t locale,
     chpl_comm_do_callbacks (&cb_data);
   }
 
-  if (chpl_verbose_comm && !comm_diags_disabled_temporarily)
-    printf("%d: %s:%d: remote non-blocking get from %d\n",
-           chpl_nodeID, chpl_lookupFilename(fn), ln, locale);
-  if (chpl_comm_diagnostics && !comm_diags_disabled_temporarily)
-    chpl_comm_diags_incr(&comm_diagnostics.get_nb);
+  chpl_comm_diags_verbose_printf("%s:%d: remote non-blocking get from %d, %zu bytes",
+                                 chpl_lookupFilename(fn), ln, locale, size);
+  chpl_comm_diags_incr(get_nb);
 
   //
   // For now, if the local address isn't in a memory region known to the
@@ -6088,13 +5763,12 @@ chpl_comm_nb_handle_t chpl_comm_put_nb(void* addr, c_nodeid_t locale,
 
 int chpl_comm_test_nb_complete(chpl_comm_nb_handle_t h)
 {
-  if (chpl_verbose_comm && !comm_diags_disabled_temporarily) {
+  if (chpl_verbose_comm && chpl_comm_diags_is_enabled()) {
     int i, j;
     nb_desc_idx_decode(&i, &j, nb_desc_handle_2_idx(h));
-    printf("%d: test nb complete (%d, %d)\n", chpl_nodeID, i, j);
+    chpl_comm_diags_verbose_printf("test nb complete (%d, %d)", i, j);
   }
-  if (chpl_comm_diagnostics && !comm_diags_disabled_temporarily)
-    chpl_comm_diags_incr(&comm_diagnostics.test_nb);
+  chpl_comm_diags_incr(test_nb);
 
   PERFSTATS_INC(test_nb_cnt);
 
@@ -6104,17 +5778,16 @@ int chpl_comm_test_nb_complete(chpl_comm_nb_handle_t h)
 
 void chpl_comm_wait_nb_some(chpl_comm_nb_handle_t* h, size_t nhandles)
 {
-  if (chpl_verbose_comm && !comm_diags_disabled_temporarily) {
+  if (chpl_verbose_comm && chpl_comm_diags_is_enabled()) {
     if (nhandles == 1) {
       int i, j;
       nb_desc_idx_decode(&i, &j, nb_desc_handle_2_idx(h[0]));
-      printf("%d: wait nb (%d, %d)\n", chpl_nodeID, i, j);
+      chpl_comm_diags_verbose_printf("wait nb (%d, %d)", i, j);
     }
     else
-      printf("%d: wait nb (%zd handles)\n", chpl_nodeID, nhandles);
+      chpl_comm_diags_verbose_printf("wait nb (%zd handles)", nhandles);
   }
-  if (chpl_comm_diagnostics && !comm_diags_disabled_temporarily)
-    chpl_comm_diags_incr(&comm_diagnostics.wait_nb);
+  chpl_comm_diags_incr(wait_nb);
 
   PERFSTATS_INC(wait_nb_cnt);
 
@@ -6155,17 +5828,16 @@ int chpl_comm_try_nb_some(chpl_comm_nb_handle_t* h, size_t nhandles)
 {
   int rv = 0;
 
-  if (chpl_verbose_comm && !comm_diags_disabled_temporarily) {
+  if (chpl_verbose_comm && chpl_comm_diags_is_enabled()) {
     if (nhandles == 1) {
       int i, j;
       nb_desc_idx_decode(&i, &j, nb_desc_handle_2_idx(h[0]));
-      printf("%d: try nb (%d, %d)\n", chpl_nodeID, i, j);
+      chpl_comm_diags_verbose_printf("try nb (%d, %d)", i, j);
     }
     else
-      printf("%d: try nb (%zd handles)\n", chpl_nodeID, nhandles);
+      chpl_comm_diags_verbose_printf("try nb (%zd handles)", nhandles);
   }
-  if (chpl_comm_diagnostics && !comm_diags_disabled_temporarily)
-    chpl_comm_diags_incr(&comm_diagnostics.try_nb);
+  chpl_comm_diags_incr(try_nb);
 
   PERFSTATS_INC(try_nb_cnt);
 
@@ -7188,7 +6860,7 @@ void do_nic_amo_nf(void* opnd1, c_nodeid_t locale,
   //
   // Initiate the transaction and wait for it to complete.
   //
-  post_fma_and_wait_amo(locale, &post_desc);
+  post_fma_and_wait(locale, &post_desc, true);
 }
 
 
@@ -7198,9 +6870,9 @@ void do_nic_amo(void* opnd1, void* opnd2, c_nodeid_t locale,
                 gni_fma_cmd_type_t cmd, void* result,
                 mem_region_t* remote_mr)
 {
-  mem_region_t*         local_mr;
-  void*                 p_result = result;
-  fork_amo_data_t       tmp_result;
+  mem_region_t*         local_mr = NULL;
+  void*                 reg_result = result;
+  fork_amo_data_t       stack_result;
   gni_post_descriptor_t post_desc;
 
   check_nic_amo(size, object, remote_mr);
@@ -7210,15 +6882,13 @@ void do_nic_amo(void* opnd1, void* opnd2, c_nodeid_t locale,
   // Make sure that, if we need a result, it is in memory known to the
   // NIC.
   //
-  if (result == NULL)
-    local_mr = NULL;
-  else {
-    local_mr = mreg_for_local_addr(p_result);
+  if (result != NULL) {
+    local_mr = mreg_for_local_addr(reg_result);
     if (local_mr == NULL) {
-      p_result = &tmp_result;
-      local_mr = mreg_for_local_addr(p_result);
+      reg_result = &stack_result;
+      local_mr = mreg_for_local_addr(reg_result);
       if (local_mr == NULL) {
-        p_result = amo_res_alloc();
+        reg_result = amo_res_alloc();
         local_mr = gnr_mreg;
         if (local_mr == NULL)
           CHPL_INTERNAL_ERROR("do_nic_amo(): "
@@ -7235,32 +6905,31 @@ void do_nic_amo(void* opnd1, void* opnd2, c_nodeid_t locale,
   post_desc.dlvr_mode          = GNI_DLVMODE_PERFORMANCE;
   post_desc.rdma_mode          = 0;
   post_desc.src_cq_hndl        = 0;
-  post_desc.local_addr         = (uint64_t) (intptr_t) p_result;
-  if (p_result != NULL)
+  post_desc.local_addr         = (uint64_t) (intptr_t) reg_result;
+  if (reg_result != NULL)
     post_desc.local_mem_hndl   = local_mr->mdh;
   post_desc.remote_addr        = (uint64_t) (intptr_t) object;
   post_desc.remote_mem_hndl    = remote_mr->mdh;
   post_desc.length             = size;
   post_desc.amo_cmd            = cmd;
-  if (size == 4) {
-    post_desc.first_operand    = *(uint32_t*) opnd1;
-    if (opnd2 != NULL)
-      post_desc.second_operand = *(uint32_t*) opnd2;
-  } else {
-    post_desc.first_operand    = *(uint64_t*) opnd1;
-    if (opnd2 != NULL)
-      post_desc.second_operand = *(uint64_t*) opnd2;
-  }
+  post_desc.first_operand      = size == 4 ? *(uint32_t*) opnd1:
+                                             *(uint64_t*) opnd1;
+  if (opnd2 != NULL)
+    post_desc.second_operand   = size == 4 ? *(uint32_t*) opnd2:
+                                             *(uint64_t*) opnd2;
 
   //
   // Initiate the transaction and wait for it to complete.
   //
   post_fma_and_wait(locale, &post_desc, true);
 
-  if (p_result != result) {
-    memcpy(result, p_result, size);
-    if (p_result != &tmp_result)
-      amo_res_free(p_result);
+  //
+  // If the result wasn't registered, copy the trampoline memory to it
+  //
+  if (reg_result != result) {
+    memcpy(result, reg_result, size);
+    if (reg_result != &stack_result)
+      amo_res_free(reg_result);
   }
 }
 
@@ -7333,10 +7002,8 @@ void chpl_comm_execute_on(c_nodeid_t locale, c_sublocid_t subloc,
       chpl_comm_do_callbacks (&cb_data);
   }
 
-  if (chpl_verbose_comm && !comm_diags_disabled_temporarily)
-    printf("%d: remote task created on %d\n", chpl_nodeID, locale);
-  if (chpl_comm_diagnostics && !comm_diags_disabled_temporarily)
-    chpl_comm_diags_incr(&comm_diagnostics.execute_on);
+  chpl_comm_diags_verbose_printf("remote task created on %d", locale);
+  chpl_comm_diags_incr(execute_on);
 
   PERFSTATS_INC(fork_call_cnt);
   fork_call_common(locale, subloc, fid, arg, arg_size, false, true);
@@ -7361,11 +7028,9 @@ void chpl_comm_execute_on_nb(c_nodeid_t locale, c_sublocid_t subloc,
       chpl_comm_do_callbacks (&cb_data);
   }
 
-  if (chpl_verbose_comm && !comm_diags_disabled_temporarily)
-    printf("%d: remote non-blocking task created on %d\n", chpl_nodeID,
-           locale);
-  if (chpl_comm_diagnostics && !comm_diags_disabled_temporarily)
-    chpl_comm_diags_incr(&comm_diagnostics.execute_on_nb);
+  chpl_comm_diags_verbose_printf("remote non-blocking task created on %d",
+                                 locale);
+  chpl_comm_diags_incr(execute_on_nb);
 
   PERFSTATS_INC(fork_call_nb_cnt);
   fork_call_common(locale, subloc, fid, arg, arg_size, false, false);
@@ -7390,11 +7055,9 @@ void chpl_comm_execute_on_fast(c_nodeid_t locale, c_sublocid_t subloc,
       chpl_comm_do_callbacks (&cb_data);
   }
 
-  if (chpl_verbose_comm && !comm_diags_disabled_temporarily)
-    printf("%d: remote (no-fork) task created on %d\n",
-           chpl_nodeID, locale);
-  if (chpl_comm_diagnostics && !comm_diags_disabled_temporarily)
-    chpl_comm_diags_incr(&comm_diagnostics.execute_on_fast);
+  chpl_comm_diags_verbose_printf("remote (no-fork) task created on %d",
+                                 locale);
+  chpl_comm_diags_incr(execute_on_fast);
 
   //
   // Note: the rf_handler() logic assumes that fast implies blocking.
@@ -8025,32 +7688,6 @@ void post_fma_and_wait(c_nodeid_t locale, gni_post_descriptor_t* post_desc,
 {
   int cdi;
   atomic_bool post_done;
-
-  atomic_init_bool(&post_done, false);
-  post_desc->post_id = (uint64_t) (intptr_t) &post_done;
-
-  cdi = post_fma(locale, post_desc);
-
-  //
-  // Wait for the transaction to complete.  Yield initially; the
-  // minimum round-trip time on the network isn't small and maybe
-  // we can find something else to do in the meantime.
-  //
-  do {
-    if (do_yield) {
-      local_yield();
-    }
-    consume_all_outstanding_cq_events(cdi);
-  } while (!atomic_load_explicit_bool(&post_done, memory_order_acquire));
-
-  CQ_CNT_DEC(&comm_doms[cdi]);
-}
-
-static
-void post_fma_and_wait_amo(c_nodeid_t locale, gni_post_descriptor_t* post_desc)
-{
-  int cdi;
-  atomic_bool post_done;
   uint64_t iters = 0;
 
   atomic_init_bool(&post_done, false);
@@ -8061,11 +7698,12 @@ void post_fma_and_wait_amo(c_nodeid_t locale, gni_post_descriptor_t* post_desc)
   //
   // Wait for the transaction to complete.  Yield initially; the
   // minimum round-trip time on the network isn't small and maybe
-  // we can find something else to do in the meantime.  AMOs are
-  // fast so after initial yield, only yield every 64 attempts.
+  // we can find something else to do in the meantime.  FMA is only
+  // used for small transactions which will be relatively fast, so
+  // after the initial yield, only yield every 64 attempts.
   //
   do {
-    if ((iters & 0x3F) == 0) {
+    if (do_yield && (iters & 0x3F) == 0) {
       local_yield();
     }
     consume_all_outstanding_cq_events(cdi);
@@ -8074,7 +7712,6 @@ void post_fma_and_wait_amo(c_nodeid_t locale, gni_post_descriptor_t* post_desc)
 
   CQ_CNT_DEC(&comm_doms[cdi]);
 }
-
 
 #if HAVE_GNI_FMA_CHAIN_TRANSACTIONS
 
@@ -8237,20 +7874,20 @@ void local_yield(void)
 void chpl_startVerboseComm()
 {
   chpl_verbose_comm = 1;
-  comm_diags_disabled_temporarily = true;
+  chpl_comm_diags_disable();
   chpl_comm_broadcast_private(0 /* &chpl_verbose_comm */, sizeof(int),
                               -1 /*typeIndex: unused*/);
-  comm_diags_disabled_temporarily = false;
+  chpl_comm_diags_enable();
 }
 
 
 void chpl_stopVerboseComm()
 {
   chpl_verbose_comm = 0;
-  comm_diags_disabled_temporarily = true;
+  chpl_comm_diags_disable();
   chpl_comm_broadcast_private(0 /* &chpl_verbose_comm */, sizeof(int),
                               -1 /*typeIndex: unused*/);
-  comm_diags_disabled_temporarily = false;
+  chpl_comm_diags_enable();
 }
 
 
@@ -8269,20 +7906,20 @@ void chpl_stopVerboseCommHere()
 void chpl_startCommDiagnostics()
 {
   chpl_comm_diagnostics = 1;
-  comm_diags_disabled_temporarily = true;
+  chpl_comm_diags_disable();
   chpl_comm_broadcast_private(1 /* &chpl_comm_diagnostics */, sizeof(int),
                               -1 /*typeIndex: unused*/);
-  comm_diags_disabled_temporarily = false;
+  chpl_comm_diags_enable();
 }
 
 
 void chpl_stopCommDiagnostics()
 {
   chpl_comm_diagnostics = 0;
-  comm_diags_disabled_temporarily = true;
+  chpl_comm_diags_disable();
   chpl_comm_broadcast_private(1 /* &chpl_comm_diagnostics */, sizeof(int),
                               -1 /*typeIndex: unused*/);
-  comm_diags_disabled_temporarily = false;
+  chpl_comm_diags_enable();
 }
 
 
@@ -8300,7 +7937,7 @@ void chpl_stopCommDiagnosticsHere()
 
 void chpl_resetCommDiagnosticsHere()
 {
-  chpl_comm_diags_reset(&comm_diagnostics);
+  chpl_comm_diags_reset();
 
 #define _PSZM(psv) PERFSTATS_STZ(psv);
   PERFSTATS_DO_ALL(_PSZM);
@@ -8310,7 +7947,7 @@ void chpl_resetCommDiagnosticsHere()
 
 void chpl_getCommDiagnosticsHere(chpl_commDiagnostics *cd)
 {
-  chpl_comm_diags_copy(cd, &comm_diagnostics);
+  chpl_comm_diags_copy(cd);
 }
 
 void chpl_comm_ugni_help_register_global_var(int i, wide_ptr_t wide)

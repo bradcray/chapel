@@ -770,12 +770,10 @@ void ReturnByRef::transformMove(CallExpr* moveExpr)
 
   // Determine if
   //   a) current call is not a PRIMOP
-  //   a) current call is not to a constructor
-  //   c) the subsequent statement is PRIM_MOVE for an initCopy/autoCopy
-  //   d) the initCopy/autoCopy has the same argument and return type
+  //   b) the subsequent statement is PRIM_MOVE for an initCopy/autoCopy
+  //   c) the initCopy/autoCopy has the same argument and return type
   //      (this accounts for tuples containing refs)
   if (fn                            != NULL  &&
-      fn->hasFlag(FLAG_CONSTRUCTOR) == false &&
       nextExpr                      != NULL)
   {
     if (CallExpr* callNext = toCallExpr(nextExpr))
@@ -1076,17 +1074,14 @@ static void insertGlobalAutoDestroyCalls() {
       for_alist(expr, mod->block->body) {
         if (DefExpr* def = toDefExpr(expr)) {
           if (VarSymbol* var = toVarSymbol(def->sym)) {
-            if (!var->isParameter() && !var->isType()) {
-              if (!var->hasFlag(FLAG_NO_AUTO_DESTROY)) {
-                if (FnSymbol* autoDestroy = autoDestroyMap.get(var->type)) {
-                  SET_LINENO(var);
+            if (isAutoDestroyedVariable(var)) {
+              FnSymbol* autoDestroy = autoDestroyMap.get(var->type);
+              SET_LINENO(var);
 
-                  ensureModuleDeinitFnAnchor(mod, anchor);
+              ensureModuleDeinitFnAnchor(mod, anchor);
 
-                  // destroys go after anchor in reverse order of decls
-                  anchor->insertAfter(new CallExpr(autoDestroy, var));
-                }
-              }
+              // destroys go after anchor in reverse order of decls
+              anchor->insertAfter(new CallExpr(autoDestroy, var));
             }
           }
         }

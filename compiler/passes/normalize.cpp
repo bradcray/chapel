@@ -65,7 +65,6 @@ static void        fixupQueryFormals(FnSymbol* fn);
 
 static bool        isConstructor(FnSymbol* fn);
 
-static void        updateConstructor(FnSymbol* fn);
 static void        updateInitMethod (FnSymbol* fn);
 
 static void        checkUseBeforeDefs();
@@ -128,6 +127,8 @@ static void        updateVariableAutoDestroy(DefExpr* defExpr);
 
 static TypeSymbol* expandTypeAlias(SymExpr* se);
 
+static bool        firstConstructorWarning = true;
+
 /************************************* | **************************************
 *                                                                             *
 *                                                                             *
@@ -158,8 +159,7 @@ void normalize() {
       makeExportWrapper(fn);
     }
 
-    if (fn->hasFlag(FLAG_TYPE_CONSTRUCTOR)    == false &&
-        fn->hasFlag(FLAG_DEFAULT_CONSTRUCTOR) == false) {
+    if (fn->hasFlag(FLAG_TYPE_CONSTRUCTOR) == false) {
       fixupArrayFormals(fn);
     }
 
@@ -170,7 +170,12 @@ void normalize() {
       fixupQueryFormals(fn);
 
       if (isConstructor(fn) == true) {
-        updateConstructor(fn);
+        Type* ct = fn->_this->getValType();
+        if (firstConstructorWarning) {
+          USR_PRINT(fn, "Constructors have been deprecated as of Chapel 1.18. Please use initializers instead.");
+          firstConstructorWarning = false;
+        }
+        USR_FATAL_CONT(fn, "Type '%s' defines a constructor here", ct->symbol->name);
 
       } else if (fn->isInitializer() == true) {
         updateInitMethod(fn);
@@ -769,6 +774,8 @@ static Symbol* theDefinedSymbol(BaseAST* ast) {
 *                                                                             *
 ************************************** | *************************************/
 
+static std::set<VarSymbol*> globalTemps;
+
 static void moveGlobalDeclarationsToModuleScope() {
   bool move = false;
 
@@ -786,41 +793,11 @@ static void moveGlobalDeclarationsToModuleScope() {
       } else if (DefExpr* def = toDefExpr(expr)) {
         // Non-temporary variable declarations are moved out to module scope.
         if (VarSymbol* vs = toVarSymbol(def->sym)) {
-          // Ignore compiler-inserted temporaries.
-          // Only non-compiler-generated variables in the module init
-          // function are moved out to module scope.
-          //
-          // Make an exception for references to array slices.
-          if (vs->hasFlag(FLAG_TEMP) == true) {
-            // is this a call_tmp that is later stored in a ref variable?
-            // if so, move the call_tmp to global scope as well. E.g.
-            //   var MyArray:[1..20] int;
-            //   ref MySlice = MyArray[1..10];
-
-            // Look for global = PRIM_ADDR_OF var
-            //          global with flag FLAG_REF_VAR.
-            bool refToTempInGlobal = false;
-
-            for_SymbolSymExprs(se, vs) {
-              if (CallExpr* addrOf = toCallExpr(se->parentExpr)) {
-                if (addrOf->isPrimitive(PRIM_ADDR_OF) == true) {
-                  if (CallExpr* move = toCallExpr(addrOf->parentExpr)) {
-                    if (move->isPrimitive(PRIM_MOVE) == true) {
-                      SymExpr* lhs = toSymExpr(move->get(1));
-
-                      if (lhs->symbol()->hasFlag(FLAG_REF_VAR) == true) {
-                        refToTempInGlobal = true;
-                      }
-                    }
-                  }
-                }
-              }
-            }
-
-            if (refToTempInGlobal == false) {
-              continue;
-            }
-          }
+          // All var symbols are moved out to module scope,
+          // except for end counts (just so that parallel.cpp
+          // can find them)
+          if (vs->hasFlag(FLAG_END_COUNT))
+            continue;
 
           // If the var declaration is an extern, we want to move its
           // initializer block with it.
@@ -835,15 +812,26 @@ static void moveGlobalDeclarationsToModuleScope() {
             }
           }
 
+          // move the DefExpr
           mod->block->insertAtTail(def->remove());
-        }
-
-        // All type and function symbols are moved out to module scope.
-        if (isTypeSymbol(def->sym) == true || isFnSymbol(def->sym) == true) {
+        } else if (isTypeSymbol(def->sym) || isFnSymbol(def->sym)) {
+          // All type and function symbols are moved out to module scope.
           mod->block->insertAtTail(def->remove());
         }
       }
     }
+  }
+
+  // TODO: Can this transformation be done earlier without the aid of the
+  // 'globalTemps' set?
+  //
+  // Note: The temporary variable might not be in the module init function.
+  // This can happen if the temporary is in a loopexpr wrapper function that
+  // was hoisted out of the module init function.
+  for_set(VarSymbol, tmp, globalTemps) {
+    ModuleSymbol* mod = tmp->getModule();
+    if (tmp->defPoint->getFunction())
+      mod->block->insertAtTail(tmp->defPoint->remove());
   }
 }
 
@@ -1109,9 +1097,7 @@ static void normalizeReturns(FnSymbol* fn) {
   // Check if this function's returns are already normal.
   if (rets.size() == 1 && theRet == fn->body->body.last()) {
     if (SymExpr* se = toSymExpr(theRet->get(1))) {
-      if (fn->hasFlag(FLAG_CONSTRUCTOR)         == true ||
-          fn->hasFlag(FLAG_TYPE_CONSTRUCTOR)    == true ||
-          strncmp("_if_fn", fn->name, 6)        ==    0 ||
+      if (fn->hasFlag(FLAG_TYPE_CONSTRUCTOR)    == true ||
           strcmp ("=",      fn->name)           ==    0 ||
           strcmp ("_init",  fn->name)           ==    0||
           strcmp ("_ret",   se->symbol()->name) ==    0) {
@@ -1227,6 +1213,11 @@ static void fixupExportedArrayReturns(FnSymbol* fn) {
       if (TypeSymbol* eltType = toTypeSymbol(eltSym->symbol())) {
         exportedArrayElementType[fn] = eltType;
       }
+    }
+    if (exportedArrayElementType[fn] == NULL && fLibraryPython) {
+      USR_FATAL_CONT(fn,
+                     "Array return types must include an explicit element type"
+                     " for Python compilation");
     }
 
     fn->retExprType->replace(new BlockStmt(new SymExpr(dtExternalArray->symbol)));
@@ -1825,19 +1816,23 @@ static void evaluateAutoDestroy(CallExpr* call, VarSymbol* tmp) {
     tmp->addFlag(FLAG_INSERT_AUTO_DESTROY);
   }
 
-  // MPF 2016-10-20
-  // This is a workaround for a problem in
-  //   types/typedefs/bradc/arrayTypedef
-  //
-  // I'm sure that there is a better way to handle this either in the
-  // module init function or in a sequence of forall-expr functions
-  // computing an array type that are in a module init fn
+  FnSymbol* initFn = fn->getModule()->initFn;
 
-  while (fn->hasFlag(FLAG_MAYBE_ARRAY_TYPE) == true) {
-    fn = fn->defPoint->getFunction();
-  }
+  // Sometimes an array type is represented with a loop-expression, so we
+  // need to hoist the resulting runtime type into global scope so that it
+  // isn't destroyed at the end of the loop-expr wrapper function.
+  bool isGlobalLoopExpr = fn->hasFlag(FLAG_MAYBE_ARRAY_TYPE) &&
+                          fn->defPoint->getFunction() == initFn;
 
-  if (fn == fn->getModule()->initFn) {
+  // This code used to look at any call in the initFn, and could trigger for
+  // temporaries in nested scopes (e.g. a param for-loop). We should only look
+  // for top-level calls/temps.
+  bool isCandidateGlobal = fn == initFn &&
+                           fn->body == call->getStmtExpr()->parentExpr;
+
+  // TODO: globalTemps needs updating only for isGlobalLoopExpr
+  // once all temps are hoisted in this way.
+  if (isGlobalLoopExpr || isCandidateGlobal) {
     CallExpr* cur = parentCall;
     CallExpr* sub = call;
 
@@ -1859,7 +1854,9 @@ static void evaluateAutoDestroy(CallExpr* call, VarSymbol* tmp) {
     }
 
     if (cur) {
-      tmp->addFlag(FLAG_NO_AUTO_DESTROY);
+      // Add to a set of temps to be hoisted into module scope, and later
+      // auto-destroyed in the module deinit.
+      globalTemps.insert(tmp);
     }
   }
 }
@@ -2243,8 +2240,12 @@ static void normRefVar(DefExpr* defExpr) {
     }
 
     if (error == true) {
-      USR_FATAL_CONT(sym,
-                     "Cannot set a non-const reference to a const variable.");
+      SymExpr* initSym = toSymExpr(init);
+      if (initSym && initSym->symbol() == gNil)
+        USR_FATAL_CONT(sym, "Cannot create a non-const reference to nil");
+      else
+        USR_FATAL_CONT(sym,
+                       "Cannot set a non-const reference to a const variable.");
     }
   }
 
@@ -2441,33 +2442,9 @@ static void updateVariableAutoDestroy(DefExpr* defExpr) {
       fn->hasFlag(FLAG_INIT_COPY_FN)     == false && // Note 3.
       fn->hasFlag(FLAG_TYPE_CONSTRUCTOR) == false) {
 
-    // Variables in a module initializer need special attention
-    if (defExpr->parentExpr == fn->getModule()->initFn->body) {
-
-      // Noakes 2016/04/27
-      //
-      // Most variables in a module init function will become global and
-      // should not be auto destroyed.  The challenging case is
-      //
-      // var (a1, a2) = fnReturnTuple();
-      //
-      // The parser expands this as
-      //
-      // var tmp = fnReturnTuple();
-      // var a1  = tmp.x1;
-      // var a2  = tmp.x2;
-      //
-      // This pseudo-tuple must be auto-destroyed to ensure the components
-      // are managed correctly. However the AST doesn't provide us with a
-      // strong/easy way to determine that we're dealing with this case.
-      // In practice it appears to be sufficient to flag any TMP
-      if (var->hasFlag(FLAG_TEMP)) {
-        var->addFlag(FLAG_INSERT_AUTO_DESTROY);
-      }
-
-    } else {
-      var->addFlag(FLAG_INSERT_AUTO_DESTROY);
-    }
+    // Note that if the DefExpr is at module scope, the auto-destroy
+    // for it will end up in the module deinit function.
+    var->addFlag(FLAG_INSERT_AUTO_DESTROY);
   }
 }
 
@@ -3138,11 +3115,8 @@ static bool isGenericActual(Expr* expr) {
   if (SymExpr* se = toSymExpr(expr))
     if (TypeSymbol* ts = toTypeSymbol(se->symbol()))
       if (AggregateType* at = toAggregateType(canonicalClassType(ts->type)))
-        if (!at->needsConstructor())
-          // Ignore aggregate types with old-style constructors since
-          // it computes genericity in resolution (vs in scope resolve)
-          if (at->isGeneric() && !at->isGenericWithDefaults())
-            return true;
+        if (at->isGeneric() && !at->isGenericWithDefaults())
+          return true;
 
   return false;
 }
@@ -3480,85 +3454,6 @@ static bool isConstructor(FnSymbol* fn) {
   }
 
   return retval;
-}
-
-static bool firstConstructorWarning = true;
-
-static void updateConstructor(FnSymbol* fn) {
-  SymbolMap      map;
-  Type*          type = fn->getFormal(2)->type;
-  AggregateType* ct   = toAggregateType(type);
-
-  if (ct == NULL) {
-    if (type == dtUnknown) {
-      INT_FATAL(fn, "'this' argument has unknown type");
-    } else {
-      INT_FATAL(fn, "initializer on non-class type");
-    }
-  }
-
-  if (fn->hasFlag(FLAG_NO_PARENS)) {
-    USR_FATAL(fn, "a constructor cannot be declared without parentheses");
-  }
-
-  // Call the constructor, passing in just the generic arguments.
-  // This call ensures that the object is default-initialized before the
-  // user's constructor body is called.
-  // NOTE: This operation is not necessary for initializers, as Phase 1 of
-  // the initializer body is intended to perform this operation on its own.
-  CallExpr* call = new CallExpr(ct->defaultInitializer);
-
-  for_formals(typeConstructorArg, ct->typeConstructor) {
-    ArgSymbol* arg = NULL;
-
-    for_formals(methodArg, fn) {
-      if (typeConstructorArg->name == methodArg->name) {
-        arg = methodArg;
-      }
-    }
-
-    if (arg == NULL) {
-      if (typeConstructorArg->defaultExpr == NULL) {
-        USR_FATAL_CONT(fn,
-                       "constructor for class '%s' requires a generic "
-                       "argument called '%s'",
-                       ct->symbol->name,
-                       typeConstructorArg->name);
-      }
-    } else {
-      call->insertAtTail(new NamedExpr(arg->name, new SymExpr(arg)));
-    }
-  }
-
-  fn->_this = new VarSymbol("this");
-  fn->_this->addFlag(FLAG_ARG_THIS);
-
-  fn->insertAtHead(new CallExpr(PRIM_MOVE, fn->_this, call));
-
-  fn->insertAtHead(new DefExpr(fn->_this));
-  fn->insertAtTail(new CallExpr(PRIM_RETURN, new SymExpr(fn->_this)));
-
-  map.put(fn->getFormal(2), fn->_this);
-
-  fn->formals.get(2)->remove();
-  fn->formals.get(1)->remove();
-
-  update_symbols(fn, &map);
-
-  // The constructor's name is the name of the type.
-  // Replace it with _construct_typename
-  fn->name = ct->defaultInitializer->name;
-
-  if (fWarnConstructors) {
-    if (firstConstructorWarning == true) {
-      USR_PRINT(fn, "Constructors have been deprecated as of Chapel 1.18. Please use initializers instead.");
-      firstConstructorWarning = false;
-    }
-
-    USR_WARN(fn, "Type '%s' defines a constructor here", ct->symbol->name);
-  }
-
-  fn->addFlag(FLAG_CONSTRUCTOR);
 }
 
 static void updateInitMethod(FnSymbol* fn) {

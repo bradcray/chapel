@@ -524,17 +524,6 @@ static Expr* preFoldPrimOp(CallExpr* call) {
 
     call->replace(retval);
 
-  } else if (call->isPrimitive(PRIM_IS_EXTERN_CLASS_TYPE)) {
-    AggregateType* classtype = toAggregateType(call->get(1)->typeInfo());
-
-    if (isClass(classtype) && classtype->symbol->hasFlag(FLAG_EXTERN)) {
-      retval = new SymExpr(gTrue);
-    } else {
-      retval = new SymExpr(gFalse);
-    }
-
-    call->replace(retval);
-
   } else if (call->isPrimitive(PRIM_IS_POD)) {
     Type* t = call->get(1)->typeInfo();
 
@@ -963,6 +952,7 @@ static Expr* preFoldPrimOp(CallExpr* call) {
     }
 
   } else if (call->isPrimitive(PRIM_STATIC_TYPEOF) ||
+             call->isPrimitive(PRIM_STATIC_FIELD_TYPE) ||
              call->isPrimitive(PRIM_SCALAR_PROMOTION_TYPE)) {
 
     // Replace the type query call with a SymExpr of the type symbol
@@ -1615,6 +1605,8 @@ static bool isInstantiatedField(Symbol* field) {
   return retval;
 }
 
+static VarSymbol* dummyFcfError = NULL;
+
 /*
   Captures a function as a first-class value by creating an object that will
   represent the function.  The class is created at the same scope as the
@@ -1656,6 +1648,18 @@ static Expr* createFunctionAsValue(CallExpr *call) {
   }
 
   resolveSignature(captured_fn);
+
+  for_formals(formal, captured_fn) {
+    if (formal->type->symbol->hasFlag(FLAG_GENERIC)) {
+      USR_FATAL_CONT(call, "'%s' cannot be captured as a value because it is a generic function", captured_fn->name);
+      if (dummyFcfError == NULL) {
+        AggregateType* parent = createAndInsertFunParentClass(call, "_fcf_error");
+        dummyFcfError = newTemp(parent);
+        theProgram->block->body.insertAtTail(new DefExpr(dummyFcfError));
+      }
+      return new SymExpr(dummyFcfError);
+    }
+  }
 
   resolveFnForCall(captured_fn, call);
 
@@ -1719,8 +1723,7 @@ static Expr* createFunctionAsValue(CallExpr *call) {
 
   ct->fields.insertAtHead(new DefExpr(super));
 
-  // Builds type constructor
-  ct->buildConstructors();
+  ct->buildTypeConstructor();
 
   ct->buildDefaultInitializer();
 
@@ -1731,6 +1734,7 @@ static Expr* createFunctionAsValue(CallExpr *call) {
 
   thisMethod->addFlag(FLAG_FIRST_CLASS_FUNCTION_INVOCATION);
   thisMethod->addFlag(FLAG_COMPILER_GENERATED);
+  thisMethod->addFlag(FLAG_OVERRIDE);
 
   thisMethod->insertFormalAtTail(new ArgSymbol(INTENT_BLANK,
                                                "_mt",
@@ -1756,10 +1760,6 @@ static Expr* createFunctionAsValue(CallExpr *call) {
 
     DefExpr*   dExp = toDefExpr(formalExpr);
     ArgSymbol* fArg = toArgSymbol(dExp->sym);
-
-    if (fArg->type->symbol->hasFlag(FLAG_GENERIC)) {
-      USR_FATAL_CONT("Generic functions can't be captured as values");
-    }
 
     ArgSymbol* newFormal = new ArgSymbol(INTENT_BLANK, fArg->name, fArg->type);
 
@@ -1930,8 +1930,6 @@ static bool isNormalField(Symbol* field)
 {
   if( field->hasFlag(FLAG_IMPLICIT_ALIAS_FIELD) ) return false;
   if( field->hasFlag(FLAG_SUPER_CLASS) ) return false;
-  // TODO -- this will break user fields named outer!
-  if( 0 == strcmp("outer", field->name)) return false;
 
   return true;
 }
@@ -2021,8 +2019,7 @@ static AggregateType* createAndInsertFunParentClass(CallExpr*   call,
 
   parent->fields.insertAtHead(new DefExpr(parentSuper));
 
-  // Builds type constructor
-  parent->buildConstructors();
+  parent->buildTypeConstructor();
 
   parent->buildDefaultInitializer();
 

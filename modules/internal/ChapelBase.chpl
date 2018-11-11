@@ -1378,7 +1378,7 @@ module ChapelBase {
   // implements 'delete' statement
   pragma "no borrow convert"
   inline proc chpl__delete(arg)
-    where isClassType(arg.type) || isExternClassType(arg.type) {
+    where isClassType(arg.type) {
 
     if chpl_isDdata(arg.type) then
       compilerError("cannot delete data class");
@@ -1387,7 +1387,7 @@ module ChapelBase {
       compilerError("should not delete 'nil'");
 
     // TODO - this should be an error after 1.18
-    if !isExternClassType(arg.type) && !isSubtype(arg.type, _unmanaged) then
+    if !isSubtype(arg.type, _unmanaged) then
       compilerWarning("'delete' can only be applied to unmanaged classes");
 
     if (arg != nil) {
@@ -1803,8 +1803,11 @@ module ChapelBase {
 
   // non-param/param and param/non-param
   // non-param/param version not necessary since > above works fine for that
+  inline proc >(param a: uint(64), b: uint(64)) param where a == 0 {
+    return false;
+  }
   inline proc >(param a: uint(64), b: uint(64)) {
-    if a == 0 then return false; else return __primitive(">", a, b);
+    return __primitive(">", a, b);
   }
   inline proc >(param a: int(64), b: int(64)) {
     return __primitive(">", a, b);
@@ -1821,8 +1824,11 @@ module ChapelBase {
 
   // non-param/param and param/non-param
   // param/non-param version not necessary since < above works fine for that
+  inline proc <(a: uint(64), param b: uint(64)) param where b == 0 {
+    return false;
+  }
   inline proc <(a: uint(64), param b: uint(64)) {
-    if b == 0 then return false; else return __primitive("<", a, b);
+    return __primitive("<", a, b);
   }
   inline proc <(a: int(64), param b: int(64)) {
     return __primitive("<", a, b);
@@ -1839,8 +1845,11 @@ module ChapelBase {
   }
 
   // non-param/param and param/non-param
+  inline proc >=(a: uint(64), param b: uint(64)) param where b == 0 {
+    return true;
+  }
   inline proc >=(a: uint(64), param b: uint(64)) {
-    if b == 0 then return true; else return __primitive(">=", a, b);
+    return __primitive(">=", a, b);
   }
   inline proc >=(a: int(64), param b: int(64)) {
     return __primitive(">=", a, b);
@@ -1856,8 +1865,11 @@ module ChapelBase {
   }
 
   // non-param/param and param/non-param
+  inline proc <=(param a: uint(64), b: uint(64)) param where a == 0 {
+    return true;
+  }
   inline proc <=(param a: uint(64), b: uint(64)) {
-    if a == 0 then return true; else return __primitive("<=", a, b);
+    return __primitive("<=", a, b);
   }
   inline proc <=(param a: int(64), b: int(64)) {
     return __primitive("<=", a, b);
@@ -1890,32 +1902,6 @@ module ChapelBase {
   proc isAtomicType(type t) param return __primitive("is atomic type", t);
 
   proc isRefIterType(type t) param return __primitive("is ref iter type", t);
-
-  proc isExternClassType(type t) param return __primitive("is extern class type", t);
-
-  // extern class operations
-  inline proc =(ref a, b: a.type) where isExternClassType(a.type)
-  { __primitive("=", a, b); }
-
-  // analogously to proc =(ref a, b:_nilType) where isClassType(a.type)
-  pragma "compiler generated"
-  pragma "last resort"
-  inline proc =(ref a, b:_nilType) where isExternClassType(a.type)
-  { __primitive("=", a, nil); }
-
-  inline proc ==(a, b: a.type) where isExternClassType(a.type)
-    return __primitive("ptr_eq", a, b);
-  inline proc ==(a, b: _nilType) where isExternClassType(a.type)
-    return __primitive("ptr_eq", a, b);
-  inline proc ==(a: _nilType, b) where isExternClassType(b.type)
-    return __primitive("ptr_eq", a, b);
-
-  inline proc !=(a, b: a.type) where isExternClassType(a.type)
-    return __primitive("ptr_neq", a, b);
-  inline proc !=(a, b: _nilType) where isExternClassType(a.type)
-    return __primitive("ptr_neq", a, b);
-  inline proc !=(a: _nilType, b) where isExternClassType(b.type)
-    return __primitive("ptr_neq", a, b);
 
   // These style element #s are used in the default Writer and Reader.
   // and in e.g. implementations of those in Tuple.

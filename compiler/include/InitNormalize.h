@@ -109,9 +109,6 @@ private:
 
   DefExpr*        firstField(FnSymbol* fn)                               const;
 
-  bool            isOuterField(DefExpr* field)                           const;
-  void            makeOuterArg();
-
   Expr*            genericFieldInitTypeWoutInit(Expr*    insertBefore,
                                                 DefExpr* field)           const;
 
@@ -133,10 +130,6 @@ private:
   Expr*            fieldInitTypeInference(Expr*    insertBefore,
                                           DefExpr* field,
                                           Expr*    initExpr)              const;
-
-  void            updateFieldsMember(Expr* expr)                         const;
-
-  bool            isFieldAccess(CallExpr* callExpr)                      const;
 
 
   DefExpr*        toLocalField(SymExpr*  expr)                           const;

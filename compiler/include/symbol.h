@@ -221,6 +221,7 @@ public:
   // is useful for finding such cases.
   // This function finds the statement expression that is responsible
   // for initializing this symbol.
+  // It can return NULL if it's unable to make sense of the AST pattern.
   Expr*              getInitialization()                       const;
 
 protected:
@@ -389,6 +390,7 @@ public:
   GenRet          codegenType();
 
   std::string     getPythonType(PythonFileType pxd);
+  std::string     getPythonDefaultValue();
   std::string     getPythonArgTranslation();
 
   IntentTag       intent;
@@ -743,6 +745,8 @@ extern VarSymbol *gModuleInitIndentLevel;
 
 extern Symbol *gSyncVarAuxFields;
 extern Symbol *gSingleVarAuxFields;
+
+extern FnSymbol* chplUserMain;
 
 #define FUNC_NAME_MAX 256
 extern char llvmPrintIrName[FUNC_NAME_MAX+1];

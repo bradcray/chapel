@@ -17,6 +17,8 @@
  * limitations under the License.
  */
 
+extern bool squashCompilerMessages;
+
 #include "resolveFunction.h"
 
 #include "astutil.h"
@@ -466,7 +468,11 @@ void resolveFunction(FnSymbol* fn) {
       gdbShouldBreakHere();
     }
 
-    fn->addFlag(FLAG_RESOLVED);
+    if (squashCompilerMessages) {
+      fn->addFlag(FLAG_RESOLVED_NOT_CALLED);
+    } else {
+      fn->addFlag(FLAG_RESOLVED);
+    }
 
     if (strcmp(fn->name, "init") == 0 && fn->isMethod()) {
       AggregateType* at = toAggregateType(fn->_this->getValType());
@@ -510,6 +516,9 @@ void resolveFunction(FnSymbol* fn) {
         }
 
       } else {
+        if (squashCompilerMessages) {
+          printf("Removing resolved flag from %s\n", fn->name);
+        }
         fn->removeFlag(FLAG_RESOLVED);
       }
     }
@@ -934,7 +943,13 @@ static FnSymbol* makeIteratorMethod(IteratorInfo* ii,
 
   // Pretend that this function is already resolved.
   // Its body will be filled in during the lowerIterators pass.
-  fn->addFlag(FLAG_RESOLVED);
+  if (squashCompilerMessages) {
+    printf("Pretending lower iterators thingy is resolved for %s\n", fn->name);
+    fn->addFlag(FLAG_RESOLVED_NOT_CALLED);
+  } else {
+    fn->addFlag(FLAG_RESOLVED);
+  }
+
 
   return fn;
 }

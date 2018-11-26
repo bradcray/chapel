@@ -7393,8 +7393,10 @@ static void resolveExports() {
       squashCompilerMessages = true;
       if (evaluateWhereClause(fn)) {
         resolveSignatureAndFunction(fn);
+        /*
         fn->removeFlag(FLAG_RESOLVED);  // though we resolved it, pretend we
         // didn't so it'll be dead-code eliminated
+        */
       }
       squashCompilerMessages = false;
     }
@@ -8613,6 +8615,9 @@ static void removeUnusedTypes() {
         type->hasFlag(FLAG_RUNTIME_TYPE_VALUE) == false) {
       if (AggregateType* at = toAggregateType(type->type)) {
         if (isUnusedClass(at) == true) {
+          if (at->symbol->getModule()->modTag == MOD_USER) {
+            printf("Removing type %s\n", at->symbol->name);
+          }
           at->symbol->defPoint->remove();
         }
       } else if(UnmanagedClassType* mt = toUnmanagedClassType(type->type)) {
@@ -8697,6 +8702,8 @@ static bool do_isUnusedClass(Type* t) {
       }
     }
 
+  } else {
+    
   }
 
   return retval;

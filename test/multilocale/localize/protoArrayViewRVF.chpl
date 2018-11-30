@@ -30,6 +30,10 @@ proc _array.mySlice(ranges...rank) {
   return myNewArray(a);
 }  
 
+/* Return true if the argument ``a`` is an array with a rectangular
+   domain.  Otherwise return false. */
+proc isRectangularArr(a: myArray) param return isRectangularDom(a.domain);
+
 pragma "always RVF"
 pragma "array"
 pragma "ignore noinit"
@@ -55,6 +59,48 @@ record myArray {
 
   proc writeThis(f) {
     _value.dsiSerialWrite(f);
+  }
+
+  /* The type of elements contained in the array */
+  proc eltType type return _value.eltType;
+  /* The type of indices used in the array's domain */
+  proc idxType type return _value.idxType;
+  pragma "return not owned"
+  proc _dom return _getDomain(_value.dom);
+  /* The number of dimensions in the array */
+  proc rank param return this.domain.rank;
+
+  // array element access
+  // When 'this' is 'const', so is the returned l-value.
+  pragma "no doc" // ref version
+  pragma "reference to const when const this"
+  pragma "removable array access"
+  pragma "alias scope from this"
+  inline proc ref this(i: rank*_value.dom.idxType) ref {
+    if isRectangularArr(this) || isSparseArr(this) then
+      return _value.dsiAccess(i);
+    else
+      return _value.dsiAccess(i(1));
+  }
+  pragma "no doc" // value version, for POD types
+  pragma "alias scope from this"
+  inline proc const this(i: rank*_value.dom.idxType)
+  where shouldReturnRvalueByValue(_value.eltType)
+  {
+    if isRectangularArr(this) || isSparseArr(this) then
+      return _value.dsiAccess(i);
+    else
+      return _value.dsiAccess(i(1));
+  }
+  pragma "no doc" // const ref version, for not-POD types
+  pragma "alias scope from this"
+  inline proc const this(i: rank*_value.dom.idxType) const ref
+  where shouldReturnRvalueByConstRef(_value.eltType)
+  {
+    if isRectangularArr(this) || isSparseArr(this) then
+      return _value.dsiAccess(i);
+    else
+      return _value.dsiAccess(i(1));
   }
 }
 
@@ -202,8 +248,9 @@ proc myNewArray(value) {
 use BlockDist;
 use CommDiagnostics;
 
-var D = {1..10, 1..10} dmapped Block({1..10, 1..10});
+const D = {1..10, 1..10} dmapped Block({1..10, 1..10});
 var A: [D] real;
+const DInner = D[3..8, 3..8];
 
 forall a in A do
   a = here.id;
@@ -227,8 +274,8 @@ writeln("Negating B");
 writeln("----------");
 resetCommDiagnostics();
 startCommDiagnostics();
-forall b in B do
-  b = -b;
+forall ij in DInner do
+  B[ij] += 0.1;
 stopCommDiagnostics();
 // retrieve the counts and report the results
 writeln(getCommDiagnostics());
@@ -252,8 +299,8 @@ writeln("Negating C");
 writeln("----------");
 resetCommDiagnostics();
 startCommDiagnostics();
-forall c in C do
-  c = -c;
+forall ij in DInner do
+  C[ij] += 0.1;
 stopCommDiagnostics();
 // retrieve the counts and report the results
 writeln(getCommDiagnostics());

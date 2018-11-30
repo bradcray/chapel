@@ -5,7 +5,10 @@ proc _array.mySlice(ranges...rank) {
   if boundsChecking then
     checkSlice((... ranges));
 
-  pragma "no auto destroy" var d = _dom((...ranges));
+  // TODO: I removed the intersection from here to avoid communication;
+  // we should be using a local 'shape' query to do this slice
+  //     was: _dom((...ranges));
+  pragma "no auto destroy" var d = {(...ranges)};
   d._value._free_when_no_arrs = true;
 
   //

@@ -1,0 +1,44 @@
+* 10x10 array
+* slice/iterate 3..8, 3..8 using pre-distributed slice
+* 4 locales
+
+locale 0:
+=========
+
+flavor    op      approach  proc?  |  on  on_nb  on_fast get  put
+-----------------------------------+------------------------------------
+slice     incr.   access    yes    |        3
+slice     incr.   iter      yes    |        3
+                                   |
+sliceref  create                   |   4    3
+sliceref  incr.   access    no     |        3
+sliceref  incr.   iter      no     |        3
+sliceref  incr.   access    yes    |        3
+sliceref  incr.   iter      yes    |        3
+                                   |
+custom    create                   |   -    -      -      -    -
+custom    incr.   access    no     |        3
+custom    incr.   iter      no     |        3
+custom    incr.   access    yes    |        3
+custom    incr.   iter      yes    |        3
+
+
+
+locales 1-3:
+
+flavor    op      approach  proc?  |  on  on_nb  on_fast get  put
+-----------------------------------+------------------------------------
+slice     incr.   access    yes    |                1
+slice     incr.   iter      yes    |                1
+                                   |
+sliceref  create                   | 0-2            1     26   1
+sliceref  incr.   access    no     |                1     18
+sliceref  incr.   iter      no     |                1
+sliceref  incr.   access    yes    |                1
+sliceref  incr.   iter      yes    |                1
+                                   |
+custom    create                   |   -    -       -      -    -
+custom    incr.   access    no     |                1     27
+custom    incr.   iter      no     |                1     12
+custom    incr.   access    yes    |                1      9
+custom    incr.   iter      yes    |                1     12

@@ -2340,6 +2340,10 @@ module ChapelArray {
     pragma "reference to const when const this"
     pragma "fn returns aliasing array"
     proc this(d: domain) {
+      // TODO: If 'd' is already distributed, it's ridiculous to break it
+      // down into its component ranges and then re-compute a distribution
+      // for it.  Probably the range version should call this version rather
+      // than vice-versa?
       if d.rank == rank then
         return this((...d.getIndices()));
       else

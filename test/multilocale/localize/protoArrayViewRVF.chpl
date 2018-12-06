@@ -4,9 +4,100 @@ use myArrayStuff;
 
 config const printArray = true;
 
-const D = {1..10, 1..10} dmapped Block({1..10, 1..10});
-var A: [D] real;
-const DInner = D[3..8, 3..8];
+proc main() {
+  const D = {1..10, 1..10} dmapped Block({1..10, 1..10});
+  var A: [D] real;
+  const DInner = D[3..8, 3..8];
+
+  forall a in A do
+    a = here.id;
+
+  writeln("\nA is:\n", A);
+
+  writeln();
+  writeln("Incrementing A[Dinner] via routine:");
+  increment(A[DInner], DInner);
+
+  writeln();
+  writeln("Incrementing A[Dinner] via routine:");
+  increment(A[DInner]);
+
+
+  writeln();
+  writeln("Creating B (a normal slice)");
+  writeln("---------------------------");
+
+  startTrial();
+  ref B = A[DInner];
+  stopTrial();
+
+
+  writeln();
+  writeln("Incrementing B via access");
+  writeln("-------------------------");
+
+  startTrial();
+  forall ij in DInner do
+    B[ij] += 0.1;
+  stopTrial();
+
+
+  writeln();
+  writeln("Incrementing B via iteration");
+  writeln("----------------------------");
+
+  startTrial();
+  forall b in B do
+    b += 0.1;
+  stopTrial();
+
+
+  writeln();
+  writeln("Incrementing B via routine:");
+  increment(B, DInner);
+
+  writeln();
+  writeln("Incrementing B via routine:");
+  increment(B);
+
+
+  writeln();
+  writeln("Creating C (a custom slice)");
+  writeln("---------------------------");
+
+  startTrial();
+  ref C = A.mySlice(DInner);
+  stopTrial();
+
+
+  writeln();
+  writeln("Incrementing C");
+  writeln("--------------");
+
+  startTrial();
+  forall ij in DInner do
+    C[ij] += 0.1;
+  stopTrial();
+
+
+  writeln();
+  writeln("Incrementing C via iteration");
+  writeln("----------------------------");
+
+  startTrial();
+  forall c in C do
+    c += 0.1;
+  stopTrial();
+
+
+  writeln();
+  writeln("Incrementing C via routine:");
+  increment(C, DInner);
+
+
+  writeln();
+  writeln("Incrementing C via routine:");
+ increment(C);
 
 inline proc startTrial() {
   resetCommDiagnostics();
@@ -20,99 +111,6 @@ inline proc stopTrial() {
   if printArray then
     writeln("\nA is:\n", A);
 }
-
-forall a in A do
-  a = here.id;
-
-writeln("\nA is:\n", A);
-
-writeln();
-writeln("Incrementing A[Dinner] via routine:");
-increment(A[DInner], DInner);
-
-writeln();
-writeln("Incrementing A[Dinner] via routine:");
-increment(A[DInner]);
-
-
-writeln();
-writeln("Creating B (a normal slice)");
-writeln("---------------------------");
-
-startTrial();
-ref B = A[DInner];
-stopTrial();
-
-
-writeln();
-writeln("Incrementing B via access");
-writeln("-------------------------");
-
-startTrial();
-forall ij in DInner do
-  B[ij] += 0.1;
-stopTrial();
-
-
-writeln();
-writeln("Incrementing B via iteration");
-writeln("----------------------------");
-
-startTrial();
-forall b in B do
-  b += 0.1;
-stopTrial();
-
-
-writeln();
-writeln("Incrementing B via routine:");
-increment(B, DInner);
-
-writeln();
-writeln("Incrementing B via routine:");
-increment(B);
-
-
-writeln();
-writeln("Creating C (a custom slice)");
-writeln("---------------------------");
-
-startTrial();
-ref C = A.mySlice(DInner);
-stopTrial();
-
-
-writeln();
-writeln("Incrementing C");
-writeln("--------------");
-
-startTrial();
-forall ij in DInner do
-  C[ij] += 0.1;
-stopTrial();
-
-
-writeln();
-writeln("Incrementing C via iteration");
-writeln("----------------------------");
-
-startTrial();
-forall c in C do
-  c += 0.1;
-stopTrial();
-
-
-writeln();
-writeln("Incrementing C via routine:");
-increment(C, DInner);
-
-
-writeln();
-writeln("Incrementing C via routine:");
-increment(C);
-
-
-
 
 proc increment(X, D) {
   writeln("Incrementing in routine by access");
@@ -134,3 +132,10 @@ proc increment(X) {
     x += 0.1;
   stopTrial();
 }
+
+
+}
+
+
+
+

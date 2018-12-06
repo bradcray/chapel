@@ -1078,12 +1078,14 @@ module ChapelArray {
 
     forwarding _value;
 
+    /*
     pragma "no doc"
     proc chpl__serialize()
       where this._value.isDefaultRectangular() {
 
       return new _serialized_domain(rank, idxType, stridable, dims(), true);
     }
+    */
 
     /* Here is a draft at what chpl__serialize might look like to
        support non-DefaultRectangular domains.
@@ -1102,6 +1104,7 @@ module ChapelArray {
     // This function may not use any run-time type information passed to it
     // in the form of the 'this' argument. Static/param information is OK.
     // TODO: only consider DR case for now
+    /*
     pragma "no doc"
     proc type chpl__deserialize(data) {
       if data.isDefaultRectangular then
@@ -1119,6 +1122,7 @@ module ChapelArray {
                                                       data.dims,
                                                       data.privdata)); */
     }
+    */
 
     proc _do_destroy () {
       if ! _unowned {

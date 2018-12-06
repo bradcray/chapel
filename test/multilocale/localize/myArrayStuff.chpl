@@ -1,3 +1,5 @@
+use BlockDist;
+
 pragma "no doc"
 pragma "reference to const when const this"
 pragma "fn returns aliasing array"
@@ -38,7 +40,7 @@ proc _array.mySlice(d: domain) {
    domain.  Otherwise return false. */
 proc isRectangularArr(a: myArray) param return isRectangularDom(a.domain);
 
-//pragma "always RVF"
+pragma "always RVF"
 pragma "array"
 pragma "ignore noinit"
 pragma "default intent is ref if modified"
@@ -108,29 +110,40 @@ record myArray {
   }
 
   record mySliceHelper {
-    type eltType;
-    type domtype;
-    type arrtype;
     const dompid: int;
     const arrpid: int;
-    const thisun;
   }
 
   proc chpl__serialize() {
     var buff: chpl__inPlaceBuffer;
-    writeln("[", here.id, "] In serialize, sending ", (_value._DomPid, _value._ArrPid));
-    return new mySliceHelper(_value.eltType, _value.dom.type, _value._ArrInstance.type, _value._DomPid, _value._ArrPid, this);
+    //    writeln("[", here.id, "] In serialize, sending ", (_value._DomPid, _value._ArrPid));
+    return new mySliceHelper(_value._DomPid, _value._ArrPid);
   }
 
+  pragma "no copy return"  // this to avoid putting in chpl__unref calls
   proc type chpl__deserialize(data) {
-    writeln("[", here.id, "] in my deserialize routine, received", (data.dompid, data.arrpid));
-    return myNewArray(new unmanaged myArrayViewSlice(eltType=data.eltType,
-                                                         _DomPid=data.dompid,
-                                                         dom = chpl_getPrivatizedCopy(data.domtype, data.dompid),
-                                                         _ArrPid=data.arrpid,
-                                                         _ArrInstance = chpl_getPrivatizedCopy(data.arrtype, data.arrpid)
-                                                         ));
-    //    return data.thisun;
+    //    compilerWarning(this:string);
+    //    writeln("[", here.id, "] in my deserialize routine, received", (data.dompid, data.arrpid));
+    const dompid = data.dompid;
+    //    const dom = chpl_getPrivatizedCopy(BlockDom(rank=2, idxType=int, stridable=false, sparseLayoutType=unmanaged DefaultDist), dompid);
+    const dom = chpl_getPrivatizedCopy(unmanaged BlockDom(2, int, false, unmanaged DefaultDist), dompid);
+    const arrpid = data.arrpid;
+    const arr = chpl_getPrivatizedCopy(unmanaged BlockArr(rank=2, idxType=int, stridable=false, eltType=real, sparseLayoutType=unmanaged DefaultDist), arrpid);
+
+    // This is not so helpful because the "array" pragma causes us to sugar
+    // this thing's type in unfortunate ways...
+    //
+    // writeln(this:string);
+    
+    const dmapclass = new unmanaged myArrayViewSlice(eltType=real,
+                                                     _DomPid=data.dompid,
+                                                     dom = dom,
+                                                     _ArrPid=data.arrpid,
+                                                     _ArrInstance = arr);
+
+    const newarr = myNewArray(dmapclass);
+    
+    return newarr;
   }
 }
 

@@ -38,7 +38,7 @@ proc _array.mySlice(d: domain) {
    domain.  Otherwise return false. */
 proc isRectangularArr(a: myArray) param return isRectangularDom(a.domain);
 
-pragma "always RVF"
+//pragma "always RVF"
 pragma "array"
 pragma "ignore noinit"
 pragma "default intent is ref if modified"
@@ -106,6 +106,32 @@ record myArray {
     else
       return _value.dsiAccess(i(1));
   }
+
+  record mySliceHelper {
+    type eltType;
+    type domtype;
+    type arrtype;
+    const dompid: int;
+    const arrpid: int;
+    const thisun;
+  }
+
+  proc chpl__serialize() {
+    var buff: chpl__inPlaceBuffer;
+    writeln("[", here.id, "] In serialize, sending ", (_value._DomPid, _value._ArrPid));
+    return new mySliceHelper(_value.eltType, _value.dom.type, _value._ArrInstance.type, _value._DomPid, _value._ArrPid, this);
+  }
+
+  proc type chpl__deserialize(data) {
+    writeln("[", here.id, "] in my deserialize routine, received", (data.dompid, data.arrpid));
+    return myNewArray(new unmanaged myArrayViewSlice(eltType=data.eltType,
+                                                         _DomPid=data.dompid,
+                                                         dom = chpl_getPrivatizedCopy(data.domtype, data.dompid),
+                                                         _ArrPid=data.arrpid,
+                                                         _ArrInstance = chpl_getPrivatizedCopy(data.arrtype, data.arrpid)
+                                                         ));
+    //    return data.thisun;
+  }
 }
 
 private proc buildIndexCacheHelper(arr, dom) {
@@ -130,7 +156,7 @@ class myArrayViewSlice: BaseArr {
   const dom;
 
   const _ArrPid;
-  const _ArrInstance;
+  const _ArrInstance;;
 
   const indexCache = buildIndexCacheHelper(_ArrInstance, dom);;
 

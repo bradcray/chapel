@@ -120,14 +120,38 @@ record myArray {
     return new mySliceHelper(_value._DomPid, _value._ArrPid);
   }
 
+  proc type myArrayRank(type t) param {
+    var x: t;
+    return x.rank;
+  }
+
+  proc type myArrayIdxType(type t) type {
+    var x: t;
+    return x.idxType;
+  }
+  
+  proc type myArrayEltType(type t) type {
+    var x: t;
+    return x.eltType;
+  }
+  
   proc type chpl__deserialize(data) {
     //    compilerWarning(this:string);
+    param rank = myArrayRank(this);
+//    compilerWarning(rank:string);
+
+    type idxType = myArrayIdxType(this);
+//    compilerWarning(idxType:string);
+    
+    type eltType = myArrayEltType(this);
+//    compilerWarning(eltType:string);
+
     //    writeln("[", here.id, "] in my deserialize routine, received", (data.dompid, data.arrpid));
     const dompid = data.dompid;
     //    const dom = chpl_getPrivatizedCopy(BlockDom(rank=2, idxType=int, stridable=false, sparseLayoutType=unmanaged DefaultDist), dompid);
-    const dom = chpl_getPrivatizedCopy(unmanaged BlockDom(2, int, false, unmanaged DefaultDist), dompid);
+    const dom = chpl_getPrivatizedCopy(unmanaged BlockDom(rank, idxType, false, unmanaged DefaultDist), dompid);
     const arrpid = data.arrpid;
-    const arr = chpl_getPrivatizedCopy(unmanaged BlockArr(rank=2, idxType=int, stridable=false, eltType=real, sparseLayoutType=unmanaged DefaultDist), arrpid);
+    const arr = chpl_getPrivatizedCopy(unmanaged BlockArr(rank, idxType, stridable=false, eltType, sparseLayoutType=unmanaged DefaultDist), arrpid);
 
     // This is not so helpful because the "array" pragma causes us to sugar
     // this thing's type in unfortunate ways...

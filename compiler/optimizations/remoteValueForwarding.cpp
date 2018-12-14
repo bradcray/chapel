@@ -248,11 +248,11 @@ static void updateTaskFunctions(Map<Symbol*, Vec<SymExpr*>*>& defMap,
       // For each reference arg that is safe to dereference
       for_formals(arg, fn) {
         if (fn->getModule()->modTag == MOD_USER) {
-          USR_PRINT(arg, "Considering %s", arg->name);
+          //          USR_PRINT(arg, "Considering %s", arg->name);
         }
         if (canForwardValue(defMap, useMap, syncSet, fn, arg)) {
           if (fn->getModule()->modTag == MOD_USER) {
-            USR_PRINT(fn, "Forwarding %s", arg->name);
+///            USR_PRINT(fn, "Forwarding %s", arg->name);
           }
           if (shouldSerialize(arg)) {
             insertSerialization(fn, arg);

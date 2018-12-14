@@ -110,6 +110,15 @@ record myArray {
   }
 
   record mySliceHelper {
+    param domRank: int;
+    param domStridable: bool;
+    type domIdxType;
+
+    param arrRank: int;
+    param arrStridable: bool;
+    type arrIdxType;
+    type arrEltType;
+    
     const dompid: int;
     const arrpid: int;
   }
@@ -117,7 +126,7 @@ record myArray {
   proc chpl__serialize() {
     var buff: chpl__inPlaceBuffer;
     //    writeln("[", here.id, "] In serialize, sending ", (_value._DomPid, _value._ArrPid));
-    return new mySliceHelper(_value._DomPid, _value._ArrPid);
+    return new mySliceHelper(_value.privDom.rank, _value.privDom.stridable, _value.privDom.idxType, _value.arr.rank, _value.arr.stridable, _value.arr.idxType, _value.arr.eltType, _value._DomPid, _value._ArrPid);
   }
 
   proc type myArrayRank(type t) param {
@@ -134,7 +143,7 @@ record myArray {
     var x: t;
     return x.eltType;
   }
-  
+
   proc type chpl__deserialize(data) {
     //    compilerWarning(this:string);
     param rank = myArrayRank(this);
@@ -149,9 +158,9 @@ record myArray {
     //    writeln("[", here.id, "] in my deserialize routine, received", (data.dompid, data.arrpid));
     const dompid = data.dompid;
     //    const dom = chpl_getPrivatizedCopy(BlockDom(rank=2, idxType=int, stridable=false, sparseLayoutType=unmanaged DefaultDist), dompid);
-    const dom = chpl_getPrivatizedCopy(unmanaged BlockDom(rank, idxType, false, unmanaged DefaultDist), dompid);
+    const dom = chpl_getPrivatizedCopy(unmanaged BlockDom(data.domRank, data.domIdxType, data.domStridable, unmanaged DefaultDist), dompid);
     const arrpid = data.arrpid;
-    const arr = chpl_getPrivatizedCopy(unmanaged BlockArr(rank, idxType, stridable=false, eltType, sparseLayoutType=unmanaged DefaultDist), arrpid);
+    const arr = chpl_getPrivatizedCopy(unmanaged BlockArr(data.arrRank, data.arrIdxType, data.arrStridable, data.arrEltType, sparseLayoutType=unmanaged DefaultDist), arrpid);
 
     // This is not so helpful because the "array" pragma causes us to sugar
     // this thing's type in unfortunate ways...
@@ -199,6 +208,15 @@ class myArrayViewSlice: BaseArr {
   proc idxType type return dom.idxType;
   proc rank param return arr.rank;
 
+  /*
+  proc type chpl__deserialize(data) {
+    const dompid = data.dompid;
+    const dom = chpl_getPrivatizedCopy(unmanaged BlockDom(rank=2, idxType=int, false, unmanaged DefaultDist), dompid);
+    const arrpid = data.arrpid;
+    const arr = chpl_getPrivatizedCopy(unmanaged BlockArr(rank=2, idxType=int, stridable=false, eltType=real, sparseLayoutType=unmanaged DefaultDist), arrpid);
+  }
+  */
+  
   inline proc privDom {
     if _isPrivatized(dom) {
       return chpl_getPrivatizedCopy(dom.type, _DomPid);

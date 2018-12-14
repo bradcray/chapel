@@ -120,7 +120,6 @@ record myArray {
     return new mySliceHelper(_value._DomPid, _value._ArrPid);
   }
 
-  pragma "no copy return"  // this to avoid putting in chpl__unref calls
   proc type chpl__deserialize(data) {
     //    compilerWarning(this:string);
     //    writeln("[", here.id, "] in my deserialize routine, received", (data.dompid, data.arrpid));
@@ -285,4 +284,12 @@ proc myNewArray(value) {
     return new myArray(_newPrivatizedClass(value), value);
   else
     return new myArray(nullPid, value);
+}
+
+pragma "no copy return"
+pragma "unref fn"
+inline proc chpl__unref(x: myArray(?)) {
+  // intended to call initCopy
+  pragma "no auto destroy" var ret = x;
+  return ret;
 }

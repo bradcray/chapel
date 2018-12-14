@@ -247,13 +247,7 @@ static void updateTaskFunctions(Map<Symbol*, Vec<SymExpr*>*>& defMap,
 
       // For each reference arg that is safe to dereference
       for_formals(arg, fn) {
-        if (fn->getModule()->modTag == MOD_USER) {
-          //          USR_PRINT(arg, "Considering %s", arg->name);
-        }
         if (canForwardValue(defMap, useMap, syncSet, fn, arg)) {
-          if (fn->getModule()->modTag == MOD_USER) {
-///            USR_PRINT(fn, "Forwarding %s", arg->name);
-          }
           if (shouldSerialize(arg)) {
             insertSerialization(fn, arg);
           } else {
@@ -568,7 +562,7 @@ static void insertSerialization(FnSymbol*  fn,
   FnSymbol* deserializeFn = ser.deserializer;
   INT_ASSERT(serializeFn != NULL && deserializeFn != NULL);
 
-  bool needsRuntimeType = false;
+  bool needsRuntimeType = oldArgType->getValType()->symbol->hasFlag(FLAG_HAS_RUNTIME_TYPE);
 
   Type* dataType = NULL;
   if (serializeFn->hasFlag(FLAG_FN_RETARG)) {

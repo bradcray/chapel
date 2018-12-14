@@ -765,15 +765,37 @@ checkIndices(BaseAST* indices) {
     USR_FATAL(indices, "invalid index expression");
 }
 
+static Expr* destructureIndicesAfter(Expr* insertAfter,
+                                     BaseAST* indices,
+                                     Expr* init,
+                                     bool coforall);
 
-void
-destructureIndices(BlockStmt* block,
-                   BaseAST* indices,
-                   Expr* init,
-                   bool coforall) {
+void destructureIndices(BlockStmt* block,
+                        BaseAST* indices,
+                        Expr* init,
+                        bool coforall) {
+  Expr* insertPt = new CallExpr(PRIM_NOOP);
+  block->insertAtHead(insertPt);
+  destructureIndicesAfter(insertPt, indices, init, coforall);
+  insertPt->remove();
+}
+
+// Returns the next value for insertAfter
+static Expr* destructureIndicesAfter(Expr* insertAfter,
+                                     BaseAST* indices,
+                                     Expr* init,
+                                     bool coforall) {
   if (CallExpr* call = toCallExpr(indices)) {
     if (call->isNamed("_build_tuple")) {
       int i = 1;
+
+      // Add checks that the index has tuple type of the right shape.
+      CallExpr* checkCall = new CallExpr("_check_tuple_var_decl",
+                                         init->copy(),
+                                         new_IntSymbol(call->numActuals()));
+      insertAfter->insertAfter(checkCall);
+      insertAfter = checkCall;
+
       for_actuals(actual, call) {
         if (UnresolvedSymExpr* use = toUnresolvedSymExpr(actual)) {
           if (!strcmp(use->unresolved, "chpl__tuple_blank")) {
@@ -781,9 +803,10 @@ destructureIndices(BlockStmt* block,
             continue;
           }
         }
-        destructureIndices(block, actual,
-                           new CallExpr(init->copy(), new_IntSymbol(i)),
-                           coforall);
+
+        CallExpr* call = new CallExpr(init->copy(), new_IntSymbol(i));
+        insertAfter = destructureIndicesAfter(insertAfter, actual,
+                                              call, coforall);
         i++;
       }
     } else {
@@ -791,8 +814,11 @@ destructureIndices(BlockStmt* block,
     }
   } else if (UnresolvedSymExpr* sym = toUnresolvedSymExpr(indices)) {
     VarSymbol* var = new VarSymbol(sym->unresolved);
-    block->insertAtHead(new CallExpr(PRIM_MOVE, var, init));
-    block->insertAtHead(new DefExpr(var));
+    DefExpr* def = new DefExpr(var);
+    insertAfter->insertAfter(def);
+    CallExpr* move = new CallExpr(PRIM_MOVE, var, init);
+    def->insertAfter(move);
+    insertAfter = move;
     var->addFlag(FLAG_INDEX_VAR);
     if (coforall)
       var->addFlag(FLAG_COFORALL_INDEX_VAR);
@@ -800,7 +826,9 @@ destructureIndices(BlockStmt* block,
   } else if (SymExpr* sym = toSymExpr(indices)) {
     // BHARSH TODO: I think this should be a PRIM_ASSIGN. I've seen a case
     // where 'sym' becomes a reference.
-    block->insertAtHead(new CallExpr(PRIM_MOVE, sym->symbol(), init));
+    CallExpr* move = new CallExpr(PRIM_MOVE, sym->symbol(), init);
+    insertAfter->insertAfter(move);
+    insertAfter = move;
     sym->symbol()->addFlag(FLAG_INDEX_VAR);
     if (coforall)
       sym->symbol()->addFlag(FLAG_COFORALL_INDEX_VAR);
@@ -808,6 +836,7 @@ destructureIndices(BlockStmt* block,
   } else {
     INT_FATAL("Unexpected");
   }
+  return insertAfter;
 }
 
 
@@ -1985,6 +2014,50 @@ std::set<Flag>* buildVarDeclFlags(Flag flag1, Flag flag2) {
 }
 
 
+// look up cfgname and mark it as used if we find it
+static Expr* lookupConfigValHelp(const char* cfgname, VarSymbol* var) {
+  Expr* configInit = NULL;
+  configInit = getCmdLineConfig(cfgname);
+  if (configInit) {
+    if (VarSymbol* conflictingVar = isUsedCmdLineConfig(cfgname)) {
+      USR_FATAL_CONT(var, "ambiguous config name (%s)", cfgname);
+      USR_PRINT(conflictingVar, "also defined here");
+      USR_PRINT(conflictingVar, "(disambiguate using -s<modulename>.%s...)", cfgname);
+    } else {
+      useCmdLineConfig(cfgname, var);
+    }
+  }
+  return configInit;
+}
+
+// first try looking up cfgname;
+// if it fails, try looking up currentModuleName.cfgname
+static Expr* lookupConfigVal(VarSymbol* var) {
+  const char* cfgname = var->name;
+  Expr* configInit = NULL;
+  configInit = lookupConfigValHelp(astr(cfgname), var);
+  if (configInit == NULL) {
+    configInit = lookupConfigValHelp(astr(currentModuleName, ".", cfgname), var);
+  }
+  return configInit;
+}
+
+// take care of any config param, const, vars, overriding the expression
+// in the source code with what was provided on the command-line
+static void handleConfigVals(VarSymbol* var, DefExpr* defExpr, Expr* stmt) {
+  if (Expr *configInit = lookupConfigVal(var)) {
+    // config var initialized on the command line
+    // drop the original init expression on the floor
+    if (Expr* a = toExpr(configInit))
+      defExpr->init = a;
+    else if (Symbol* a = toSymbol(configInit))
+      defExpr->init = new SymExpr(a);
+    else
+      INT_FATAL(stmt, "DefExpr initialized with bad exprType config ast");
+  }
+}
+
+
 //
 // This helper function will return the string literal that a
 // cnameExpr evaluates to if it is one; otherwise, the expression
@@ -2032,23 +2105,9 @@ BlockStmt* buildVarDecls(BlockStmt* stmts, const char* docs,
         }
 
         if (var->hasFlag(FLAG_CONFIG)) {
-          if (Expr *configInit = getCmdLineConfig(var->name)) {
-            // config var initialized on the command line
-            if (!isUsedCmdLineConfig(var->name)) {
-              useCmdLineConfig(var->name);
-              // drop the original init expression on the floor
-              if (Expr* a = toExpr(configInit))
-                defExpr->init = a;
-              else if (Symbol* a = toSymbol(configInit))
-                defExpr->init = new SymExpr(a);
-              else
-                INT_FATAL(stmt, "DefExpr initialized with bad exprType config ast");
-            } else {
-              // name is ambiguous, must specify module name
-              USR_FATAL(var, "Ambiguous config param or type name (%s)", var->name);
-            }
-          }
+          handleConfigVals(var, defExpr, stmt);
         }
+
         var->doc = docs;
         firstvar = false;
         continue;
@@ -2066,17 +2125,9 @@ BlockStmt* buildVarDecls(BlockStmt* stmts, const char* docs,
   //
   if (stmts->blockInfoGet()) {
     INT_ASSERT(stmts->blockInfoGet()->isNamed("_check_tuple_var_decl"));
-    SymExpr* tuple = toSymExpr(stmts->blockInfoGet()->get(1));
-    Expr* varCount = stmts->blockInfoGet()->get(2);
-    tuple->symbol()->defPoint->insertAfter(
-      buildIfStmt(new CallExpr("!=", new CallExpr(".", tuple->remove(),
-                                                  new_CStringSymbol("size")),
-                               varCount->remove()),
-                  new CallExpr("compilerError", new_StringSymbol("tuple size must match the number of grouped variables"), new_IntSymbol(0))));
-
-    tuple->symbol()->defPoint->insertAfter(
-      buildIfStmt(new CallExpr("!", new CallExpr("isTuple", tuple->copy())),
-                  new CallExpr("compilerError", new_StringSymbol("illegal tuple variable declaration with non-tuple initializer"), new_IntSymbol(0))));
+    CallExpr* checkCall = stmts->blockInfoGet();
+    SymExpr* tuple = toSymExpr(checkCall->get(1));
+    tuple->symbol()->defPoint->insertAfter(checkCall);
     stmts->blockInfoSet(NULL);
   }
 
@@ -2914,21 +2965,15 @@ BlockStmt* handleConfigTypes(BlockStmt* blk) {
     if (DefExpr* defExpr = toDefExpr(node)) {
       if (VarSymbol* var = toVarSymbol(defExpr->sym)) {
         var->addFlag(FLAG_CONFIG);
-        if (Expr *configInit = getCmdLineConfig(var->name)) {
+        if (Expr *configInit = lookupConfigVal(var)) {
           // config var initialized on the command line
-          if (!isUsedCmdLineConfig(var->name)) {
-            useCmdLineConfig(var->name);
-            // drop the original init expression on the floor
-            if (Expr* a = toExpr(configInit))
-              defExpr->init = a;
-            else if (Symbol* a = toSymbol(configInit))
-              defExpr->init = new SymExpr(a);
-            else
-              INT_FATAL(node, "Type alias initialized to invalid exprType");
-          } else {
-            // name is ambiguous, must specify module name
-            USR_FATAL(var, "Ambiguous config param or type name (%s)", var->name);
-          }
+          // drop the original init expression on the floor
+          if (Expr* a = toExpr(configInit))
+            defExpr->init = a;
+          else if (Symbol* a = toSymbol(configInit))
+            defExpr->init = new SymExpr(a);
+          else
+            INT_FATAL(node, "Type alias initialized to invalid exprType");
         }
       }
     } else if (BlockStmt* innerBlk = toBlockStmt(node)) {

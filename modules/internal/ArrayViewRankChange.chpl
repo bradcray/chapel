@@ -411,6 +411,11 @@ module ArrayViewRankChange {
       downDomInst = reprivatizeData(3);
     }
 
+    iter dsiOwningLocales() {
+      for i in downDom.dsiOwningLocales() do
+        yield i;
+    }
+    
  } // end of class ArrayViewRankChangeDom
 
   private proc buildIndexCacheHelper(arr, dom, collapsedDim, idx) {

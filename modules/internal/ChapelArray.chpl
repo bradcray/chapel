@@ -1928,6 +1928,10 @@ module ChapelArray {
       else
         for d in _value.dsiLocalSubdomains() do yield d;
     }
+
+    iter owningLocales() {
+      for loc in _value.dsiOwningLocales() do yield loc;
+    }
   }  // record _domain
 
   /* Cast a rectangular domain to a new rectangular domain type.  If the old

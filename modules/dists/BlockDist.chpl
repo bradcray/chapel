@@ -1512,6 +1512,30 @@ proc BlockDom.numRemoteElems(viewDom, rlo, rid) {
   return (bhi - (rlo - 1):idxType);
 }
 
+proc chpl__tupsToDomain(loTup: _tuple, hiTup: _tuple) where isHomogeneousTuple(loTup) && isHomogeneousTuple(hiTup) {
+  if (loTup.size != hiTup.size) then
+    compilerError("Can't make a domain from tuples of different sizes");
+  if (loTup(1).type != hiTup(2).type) then
+    compilerError("Can't make a domain from tuples of mixed type");
+  var ranges: loTup.size*range(loTup(1).type);
+  for param d in 1..loTup.size do
+    ranges(d) = loTup(d)..hiTup(d);
+  return {(...ranges)};
+}
+
+iter BlockDom.dsiOwningLocales() {
+  const loLoc = dist.targetLocsIdx(whole.alignedLow);
+  const hiLoc = dist.targetLocsIdx(whole.alignedHigh);
+  const subLocs = chpl__tupsToDomain(loLoc, hiLoc);
+  for loc in subLocs do
+    yield dist.targetLocales[loc];
+}
+
+proc BlockDom.dsiOwningLocalesArr {
+}
+
+
+
 //Brad's utility function. It drops from Domain D the dimensions
 //indicated by the subsequent parameters dims.
 proc dropDims(D: domain, dims...) {

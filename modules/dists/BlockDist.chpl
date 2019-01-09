@@ -357,8 +357,19 @@ class LocBlock {
 class BlockDom: BaseRectangularDom {
   type sparseLayoutType;
   const dist: unmanaged Block(rank, idxType, sparseLayoutType);
+  var activeLocDom: domain(rank);
   var locDoms: [dist.targetLocDom] unmanaged LocBlockDom(rank, idxType, stridable);
   var whole: domain(rank=rank, idxType=idxType, stridable=stridable);
+
+  proc init(param rank: int,
+            type idxType = int,
+            param stridable = false,
+            type sparseLayoutType,
+            dist: unmanaged Block(rank, idxType, sparseLayoutType)) {
+    super.init(rank, idxType, stridable);
+    this.sparseLayoutType = sparseLayoutType;
+    this.dist = dist;
+  }
 }
 
 //
@@ -676,7 +687,7 @@ override proc BlockDom.dsiMyDist() return dist;
 
 override proc BlockDom.dsiDisplayRepresentation() {
   writeln("whole = ", whole);
-  for tli in dist.targetLocDom do
+  for tli in activeLocDom do
     writeln("locDoms[", tli, "].myBlock = ", locDoms[tli].myBlock);
 }
 
@@ -737,7 +748,8 @@ iter BlockDom.these(param tag: iterKind) where tag == iterKind.leader {
   const hereId = here.id;
   const hereIgnoreRunning = if here.runningTasks() == 1 then true
                             else ignoreRunning;
-  coforall locDom in locDoms do on locDom {
+  coforall locIdx in activeLocDom do on dist.targetLocales[locIdx] {
+    ref locDom = locDoms[locIdx];
     const myIgnoreRunning = if here.id == hereId then hereIgnoreRunning
       else ignoreRunning;
     // Use the internal function for untranslate to avoid having to do
@@ -868,22 +880,50 @@ proc BlockDom.dsiLocalSlice(param stridable: bool, ranges) {
 }
 
 proc BlockDom.setup() {
-  if locDoms(dist.targetLocDom.low) == nil {
-    coforall localeIdx in dist.targetLocDom do {
-      on dist.targetLocales(localeIdx) do
-        locDoms(localeIdx) = new unmanaged LocBlockDom(rank, idxType, stridable,
-                                             dist.getChunk(whole, localeIdx));
-    }
+  const prevActiveLocDom = activeLocDom;
+
+  writeln("target locale dom = ", dist.targetLocDom);
+  writeln("indices are: ", whole);
+  if (whole.size > 0) {
+    writeln("whole is nonempty");
+    const loLoc = dist.targetLocsIdx(whole.alignedLow);
+    const hiLoc = dist.targetLocsIdx(whole.alignedHigh);
+    //
+    // Note: If 'whole' is strided, it may be that not all locales
+    // between loLoc and hiLoc own a piece of the domain.  However,
+    // the interference pattern between whole's strided-ness and
+    // the block size of each locale may be such that it can't be
+    // expressed as a regular slice, so here we're assuming that
+    // most of the time enough of the intermediate locales will own
+    // something to use this simpler approach rather than storing
+    // an arbitrary collection of locales (with potential
+    // oversubscription).
+    //
+    activeLocDom = chpl__tupsToDomain(loLoc, hiLoc);
   } else {
-    coforall localeIdx in dist.targetLocDom do {
-      on dist.targetLocales(localeIdx) do
-        locDoms(localeIdx).myBlock = dist.getChunk(whole, localeIdx);
-    }
+    writeln("whole is empty");
+    activeLocDom.clear();
   }
+  writeln("active locales = ", activeLocDom);
+
+  // set up all locales in the active set
+  coforall localeIdx in activeLocDom do
+    on dist.targetLocales[localeIdx] do
+      if locDoms[localeIdx] == nil then
+        locDoms[localeIdx] = new unmanaged LocBlockDom(rank, idxType, stridable,
+                                             dist.getChunk(whole, localeIdx));
+      else
+        locDoms[localeIdx].myBlock = dist.getChunk(whole, localeIdx);
+
+  // clean up any that used to be in the active set but are no longer
+  coforall localeIdx in prevActiveLocDom do
+    if !activeLocDom.contains(localeIdx) then
+      on dist.targetLocales[localeIdx] do
+        delete locDoms[localeIdx];
 }
 
 override proc BlockDom.dsiDestroyDom() {
-  coforall localeIdx in dist.targetLocDom do {
+  coforall localeIdx in activeLocDom do {
     on locDoms(localeIdx) do
       delete locDoms(localeIdx);
   }
@@ -903,7 +943,7 @@ proc BlockDom.dsiIndexOrder(i) {
 proc LocBlockDom.contains(i) return myBlock.contains(i);
 
 override proc BlockArr.dsiDisplayRepresentation() {
-  for tli in dom.dist.targetLocDom {
+  for tli in dom.activeLocDom {
     writeln("locArr[", tli, "].myElems = ", for e in locArr[tli].myElems do e);
     if doRADOpt then
       writeln("locArr[", tli, "].locRAD = ", locArr[tli].locRAD.RAD);
@@ -917,7 +957,7 @@ override proc BlockArr.dsiGetBaseDom() return dom;
 // setting up the RAD cache.
 //
 proc BlockArr.setupRADOpt() {
-  for localeIdx in dom.dist.targetLocDom {
+  for localeIdx in dom.activeLocDom {
     on dom.dist.targetLocales(localeIdx) {
       const myLocArr = locArr(localeIdx);
       if myLocArr.locRAD != nil {
@@ -925,8 +965,8 @@ proc BlockArr.setupRADOpt() {
         myLocArr.locRAD = nil;
       }
       if disableBlockLazyRAD {
-        myLocArr.locRAD = new unmanaged LocRADCache(eltType, rank, idxType, stridable, dom.dist.targetLocDom);
-        for l in dom.dist.targetLocDom {
+        myLocArr.locRAD = new unmanaged LocRADCache(eltType, rank, idxType, stridable, dom.activeLocDom);
+        for l in dom.activeLocDom {
           if l != localeIdx {
             myLocArr.locRAD.RAD(l) = locArr(l).myElems._value.dsiGetRAD();
           }
@@ -937,9 +977,12 @@ proc BlockArr.setupRADOpt() {
 }
 
 proc BlockArr.setup() {
+  writeln("Setting up array");
+  writeln("active locales are: ", dom.activeLocDom);
   var thisid = this.locale.id;
-  coforall localeIdx in dom.dist.targetLocDom {
+  coforall localeIdx in dom.activeLocDom {
     on dom.dist.targetLocales(localeIdx) {
+      writeln("Setting up on locale ", here.id);
       const locDom = dom.getLocDom(localeIdx);
       locArr(localeIdx) = new unmanaged LocBlockArr(eltType, rank, idxType, stridable, locDom);
       if thisid == here.id then
@@ -951,7 +994,7 @@ proc BlockArr.setup() {
 }
 
 override proc BlockArr.dsiDestroyArr() {
-  coforall localeIdx in dom.dist.targetLocDom {
+  coforall localeIdx in dom.activeLocDom {
     on locArr(localeIdx) {
       delete locArr(localeIdx);
     }
@@ -989,7 +1032,7 @@ proc BlockArr.nonLocalAccess(i: rank*idxType) ref {
         if myLocArr.locRAD == nil {
           myLocArr.lockLocRAD();
           if myLocArr.locRAD == nil {
-            var tempLocRAD = new unmanaged LocRADCache(eltType, rank, idxType, stridable, dom.dist.targetLocDom);
+            var tempLocRAD = new unmanaged LocRADCache(eltType, rank, idxType, stridable, dom.activeLocDom);
             tempLocRAD.RAD.blk = SENTINEL;
             myLocArr.locRAD = tempLocRAD;
           }
@@ -1012,6 +1055,9 @@ proc BlockArr.nonLocalAccess(i: rank*idxType) ref {
       }
     }
   }
+  writeln("[", here.id, "] Trying to index into ", dom.dist.targetLocsIdx(i));
+  writeln("of ", locArr.domain);
+  writeln("locArr = ", locArr);
   return locArr(dom.dist.targetLocsIdx(i))(i);
 }
 
@@ -1285,7 +1331,7 @@ proc BlockDom.dsiPrivatize(privatizeData) {
   // in initializer we have to pass sparseLayoutType as it has no default value
   var c = new unmanaged BlockDom(rank=rank, idxType=idxType, stridable=stridable,
       sparseLayoutType=privdist.sparseLayoutType, dist=privdist);
-  for i in c.dist.targetLocDom do
+  for i in c.activeLocDom do
     c.locDoms(i) = locDoms(i);
   c.whole = {(...privatizeData.dims)};
   return c;
@@ -1294,7 +1340,7 @@ proc BlockDom.dsiPrivatize(privatizeData) {
 proc BlockDom.dsiGetReprivatizeData() return whole.dims();
 
 proc BlockDom.dsiReprivatize(other, reprivatizeData) {
-  for i in dist.targetLocDom do
+  for i in activeLocDom do
     locDoms(i) = other.locDoms(i);
   whole = {(...reprivatizeData)};
 }
@@ -1372,7 +1418,7 @@ private proc _doSimpleBlockTransfer(Dest, destDom, Src, srcDom) {
   // Use zippered iteration to piggyback data movement with the remote
   // fork.  This avoids remote gets for each access to Dest.locArr[i] and
   // Src.locArr[i]
-  coforall (i, destLocArr, srcLocArr, destLocDom, srcLocDom) in zip(Dest.dom.dist.targetLocDom,
+  coforall (i, destLocArr, srcLocArr, destLocDom, srcLocDom) in zip(Dest.dom.activeLocDom,
                                                                   Dest.locArr,
                                                                   Src.locArr,
                                                                   Dest.dom.locDoms,
@@ -1487,12 +1533,12 @@ proc BlockDom.numRemoteElems(viewDom, rlo, rid) {
   // NOTE: Not bothering to check to see if rid+1, length, or rlo-1 used
   //  below can fit into idxType
   var blo, bhi:dist.idxType;
-  if rid==(dist.targetLocDom.dim(rank).length - 1) then
+  if rid==(activeLocDom.dim(rank).length - 1) then
     bhi=viewDom.dim(rank).high;
   else {
       bhi = dist.boundingBox.dim(rank).low +
         intCeilXDivByY((dist.boundingBox.dim(rank).high - dist.boundingBox.dim(rank).low +1)*(rid+1):idxType,
-                       dist.targetLocDom.dim(rank).length:idxType) - 1:idxType;
+                       activeLocDom.dim(rank).length:idxType) - 1:idxType;
   }
 
   return (bhi - (rlo - 1):idxType);
@@ -1565,7 +1611,7 @@ where canDoAnyToBlock(this, destDom, Src, srcDom) {
   const Dest = this;
   type el    = Dest.idxType;
 
-  coforall i in Dest.dom.dist.targetLocDom {
+  coforall i in Dest.dom.activeLocDom {
     on Dest.dom.dist.targetLocales(i) {
       const regionDest = Dest.dom.locDoms(i).myBlock[destDom];
       const regionSrc  = Src.dom.locDoms(i).myBlock[srcDom];
@@ -1606,7 +1652,7 @@ where useBulkTransferDist {
   const Src = this;
   type el   = Src.idxType;
 
-  coforall j in Src.dom.dist.targetLocDom {
+  coforall j in Src.dom.activeLocDom {
     on Src.dom.dist.targetLocales(j) {
       const inters = Src.dom.locDoms(j).myBlock[srcDom];
       if inters.numIndices > 0 {
@@ -1644,7 +1690,7 @@ where useBulkTransferDist {
   const Dest = this;
   type el    = Dest.idxType;
 
-  coforall j in Dest.dom.dist.targetLocDom {
+  coforall j in Dest.dom.activeLocDom {
     on Dest.dom.dist.targetLocales(j) {
       const inters = Dest.dom.locDoms(j).myBlock[destDom];
       if inters.numIndices > 0 {

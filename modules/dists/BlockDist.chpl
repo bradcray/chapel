@@ -1314,10 +1314,11 @@ proc BlockDom.dsiSupportsPrivatization() param return true;
 record BlockDomPrvData {
   var distpid;
   var dims;
+  var activeLocDims;
 }
 
 proc BlockDom.dsiGetPrivatizeData() {
-  return new BlockDomPrvData(dist.pid, whole.dims());
+  return new BlockDomPrvData(dist.pid, whole.dims(), activeLocDom.dims());
 }
 
 proc BlockDom.dsiPrivatize(privatizeData) {
@@ -1325,18 +1326,21 @@ proc BlockDom.dsiPrivatize(privatizeData) {
   // in initializer we have to pass sparseLayoutType as it has no default value
   var c = new unmanaged BlockDom(rank=rank, idxType=idxType, stridable=stridable,
       sparseLayoutType=privdist.sparseLayoutType, dist=privdist);
+  // TODO: Or should we recompute this based on 'whole' to reduce comm?
+  c.activeLocDom = {(...privatizeData.activeLocDims)};
   for i in c.activeLocDom do
     c.locDoms(i) = locDoms(i);
   c.whole = {(...privatizeData.dims)};
   return c;
 }
 
-proc BlockDom.dsiGetReprivatizeData() return whole.dims();
+proc BlockDom.dsiGetReprivatizeData() return (whole.dims(), activeLocDom.dims());
 
 proc BlockDom.dsiReprivatize(other, reprivatizeData) {
+  activeLocDom = {(...reprivatizeData(2))};
   for i in activeLocDom do
     locDoms(i) = other.locDoms(i);
-  whole = {(...reprivatizeData)};
+  whole = {(...reprivatizeData(1))};
 }
 
 proc BlockArr.dsiSupportsPrivatization() param return true;

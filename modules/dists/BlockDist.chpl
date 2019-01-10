@@ -883,8 +883,8 @@ proc BlockDom.setup() {
   const prevActiveLocDom = activeLocDom;
 
   if (whole.size > 0) {
-    const loLoc = dist.targetLocsIdx(whole.alignedLow);
-    const hiLoc = dist.targetLocsIdx(whole.alignedHigh);
+    const loLoc = chpl__tuplify(dist.targetLocsIdx(whole.alignedLow));
+    const hiLoc = chpl__tuplify(dist.targetLocsIdx(whole.alignedHigh));
     //
     // Note: If 'whole' is strided, it may be that not all locales
     // between loLoc and hiLoc own a piece of the domain.  However,
@@ -1541,7 +1541,7 @@ proc BlockDom.numRemoteElems(viewDom, rlo, rid) {
 proc chpl__tupsToDomain(loTup: _tuple, hiTup: _tuple) where isHomogeneousTuple(loTup) && isHomogeneousTuple(hiTup) {
   if (loTup.size != hiTup.size) then
     compilerError("Can't make a domain from tuples of different sizes");
-  if (loTup(1).type != hiTup(2).type) then
+  if (loTup(1).type != hiTup(1).type) then
     compilerError("Can't make a domain from tuples of mixed type");
   var ranges: loTup.size*range(loTup(1).type);
   for param d in 1..loTup.size do

@@ -882,10 +882,7 @@ proc BlockDom.dsiLocalSlice(param stridable: bool, ranges) {
 proc BlockDom.setup() {
   const prevActiveLocDom = activeLocDom;
 
-  writeln("target locale dom = ", dist.targetLocDom);
-  writeln("indices are: ", whole);
   if (whole.size > 0) {
-    writeln("whole is nonempty");
     const loLoc = dist.targetLocsIdx(whole.alignedLow);
     const hiLoc = dist.targetLocsIdx(whole.alignedHigh);
     //
@@ -901,10 +898,8 @@ proc BlockDom.setup() {
     //
     activeLocDom = chpl__tupsToDomain(loLoc, hiLoc);
   } else {
-    writeln("whole is empty");
     activeLocDom.clear();
   }
-  writeln("active locales = ", activeLocDom);
 
   // set up all locales in the active set
   coforall localeIdx in activeLocDom do
@@ -977,12 +972,9 @@ proc BlockArr.setupRADOpt() {
 }
 
 proc BlockArr.setup() {
-  writeln("Setting up array");
-  writeln("active locales are: ", dom.activeLocDom);
   var thisid = this.locale.id;
   coforall localeIdx in dom.activeLocDom {
     on dom.dist.targetLocales(localeIdx) {
-      writeln("Setting up on locale ", here.id);
       const locDom = dom.getLocDom(localeIdx);
       locArr(localeIdx) = new unmanaged LocBlockArr(eltType, rank, idxType, stridable, locDom);
       if thisid == here.id then
@@ -1055,9 +1047,11 @@ proc BlockArr.nonLocalAccess(i: rank*idxType) ref {
       }
     }
   }
+  /*
   writeln("[", here.id, "] Trying to index into ", dom.dist.targetLocsIdx(i));
   writeln("of ", locArr.domain);
   writeln("locArr = ", locArr);
+  */
   return locArr(dom.dist.targetLocsIdx(i))(i);
 }
 

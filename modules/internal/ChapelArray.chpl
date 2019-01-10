@@ -1929,6 +1929,7 @@ module ChapelArray {
         for d in _value.dsiLocalSubdomains() do yield d;
     }
 
+    pragma "no doc"
     iter owningLocales() {
       for loc in _value.dsiOwningLocales() do yield loc;
     }

@@ -1550,10 +1550,7 @@ proc chpl__tupsToDomain(loTup: _tuple, hiTup: _tuple) where isHomogeneousTuple(l
 }
 
 iter BlockDom.dsiOwningLocales() {
-  const loLoc = dist.targetLocsIdx(whole.alignedLow);
-  const hiLoc = dist.targetLocsIdx(whole.alignedHigh);
-  const subLocs = chpl__tupsToDomain(loLoc, hiLoc);
-  for loc in subLocs do
+  for loc in activeLocDom do
     yield dist.targetLocales[loc];
 }
 

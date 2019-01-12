@@ -748,8 +748,7 @@ iter BlockDom.these(param tag: iterKind) where tag == iterKind.leader {
   const hereId = here.id;
   const hereIgnoreRunning = if here.runningTasks() == 1 then true
                             else ignoreRunning;
-  coforall locIdx in activeLocDom do on dist.targetLocales[locIdx] {
-    ref locDom = locDoms[locIdx];
+  coforall locDom in locDoms[activeLocDom] do on locDom {
     const myIgnoreRunning = if here.id == hereId then hereIgnoreRunning
       else ignoreRunning;
     // Use the internal function for untranslate to avoid having to do

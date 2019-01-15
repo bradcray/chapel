@@ -1,8 +1,13 @@
 use BlockDist;
 
+proc _array.mySlice(r: range(?)) {
+  var d = {r};
+  return this.mySlice(d);
+}
+
 pragma "no doc"
 pragma "reference to const when const this"
-pragma "fn returns aliasing array"
+//pragma "fn returns aliasing array"
 proc _array.mySlice(d: domain) {
   /* TODO: need to do something here
   if boundsChecking then
@@ -39,6 +44,138 @@ proc _array.mySlice(d: domain) {
 /* Return true if the argument ``a`` is an array with a rectangular
    domain.  Otherwise return false. */
 proc isRectangularArr(a: myArray) param return isRectangularDom(a.domain);
+
+proc =(ref a: myArray(?), b: myArray(?)) {
+      if a.rank != b.rank then
+      compilerError("rank mismatch in array assignment");
+
+    if b._value == nil then
+      // This happens e.g. for 'new' on a record with an array field whose
+      // default initializer is a forall expr. E.g. arrayInClassRecord.chpl.
+      return;
+
+    if a._value == b._value {
+      // Do nothing for A = A but we could generate a warning here
+      // since it is probably unintended. We need this check here in order
+      // to avoid memcpy(x,x) which happens inside doiBulkTransfer.
+      return;
+    }
+
+      /*
+    if a.size == 0 && b.size == 0 then
+      // Do nothing for zero-length assignments
+      return;
+      */
+
+    chpl__uncheckedArrayTransfer(a, b);
+}
+
+    inline proc chpl__uncheckedArrayTransfer(ref a: myArray(?), b:myArray(?)) {
+    if !chpl__serializeAssignment(a, b) && chpl__compatibleForBulkTransfer(a, b) {
+      if chpl__bulkTransferArray(a, b) == false {
+        chpl__transferArray(a, b);
+      }
+    } else {
+      chpl__transferArray(a, b);
+    }
+  }
+
+  proc chpl__compatibleForBulkTransfer(a:myArray(?), b:myArray(?)) param {
+    if !useBulkTransfer then return false;
+    if a.eltType != b.eltType then return false;
+    if !chpl__supportedDataTypeForBulkTransfer(a.eltType) then return false;
+    return true;
+  }
+
+
+inline proc chpl__bulkTransferArray(ref a: myArray(?), b : myArray(?)) {
+    const ref AD = a.domain;
+    const ref BD = b.domain;
+    return chpl__bulkTransferArray(a, AD, b, BD);
+  }
+  inline proc chpl__bulkTransferArray(ref a: myArray(?), AD : domain, const ref b: myArray(?), BD : domain) {
+    return chpl__bulkTransferArray(a._value, AD, b._value, BD);
+  }
+
+  inline proc chpl__bulkTransferArray(destClass, destDom : domain, srcClass, srcDom : domain) {
+    use Reflection;
+    var success = false;
+
+    inline proc bulkTransferDebug(msg:string) {
+      if debugBulkTransfer then chpl_debug_writeln("proc =(a:myArray(?),b:myArray(?)): ", msg);
+    }
+
+    bulkTransferDebug("in chpl__bulkTransferArray");
+
+    //
+    // BHARSH TODO: I would prefer to hoist these 'canResolveMethod' calls into
+    // param bools before the if/else chain, but the compiler complains about
+    // hitting the instantiation limit for 'canResolveMethod'...
+    //
+    // TODO: should we attempt other bulk transfer methods if one fails?
+    //
+    if canResolveMethod(destClass, "doiBulkTransferFromKnown", destDom, srcClass, srcDom) {
+      bulkTransferDebug("attempting doiBulkTransferFromKnown");
+      success = destClass.doiBulkTransferFromKnown(destDom, srcClass, srcDom);
+    } else if canResolveMethod(srcClass, "doiBulkTransferToKnown", srcDom, destClass, destDom) {
+      bulkTransferDebug("attempting doiBulkTransferToKnown");
+      success = srcClass.doiBulkTransferToKnown(srcDom, destClass, destDom);
+    } else if canResolveMethod(destClass, "doiBulkTransferFromAny", destDom, srcClass, srcDom) {
+      bulkTransferDebug("attempting doiBulkTransferFromAny");
+      success = destClass.doiBulkTransferFromAny(destDom, srcClass, srcDom);
+    } else if canResolveMethod(srcClass, "doiBulkTransferToAny", srcDom, destClass, destDom) {
+      bulkTransferDebug("attempting doiBulkTransferToAny");
+      success = srcClass.doiBulkTransferToAny(srcDom, destClass, destDom);
+    }
+
+    if success then
+      bulkTransferDebug("successfully completed bulk transfer");
+    else
+      bulkTransferDebug("bulk transfer did not happen");
+
+    return success;
+  }
+
+  inline proc chpl__transferArray(ref a: myArray(?), const ref b) {
+    if (a.eltType == b.type ||
+        _isPrimitiveType(a.eltType) && _isPrimitiveType(b.type)) {
+      forall aa in a do
+        aa = b;
+    } else if chpl__serializeAssignment(a, b) {
+      for (aa,bb) in zip(a,b) do
+        aa = bb;
+    } else if chpl__tryToken { // try to parallelize using leader and follower iterators
+      forall (aa,bb) in zip(a,b) do
+        aa = bb;
+    } else {
+      for (aa,bb) in zip(a,b) do
+        aa = bb;
+    }
+  }
+
+  // assigning from a param
+  inline proc chpl__transferArray(a: myArray(?), param b) {
+    forall aa in a do
+      aa = b;
+  }
+
+
+  proc chpl__serializeAssignment(a: myArray(?), b) param {
+    if a.rank != 1 && isRange(b) then
+      return true;
+
+    // Sparse and Opaque arrays do not yet support parallel iteration.  We
+    // could let them fall through, but then we get multiple warnings for a
+    // single assignment statement which feels like overkill
+    //
+    if ((!isRectangularArr(a) && !isAssociativeArr(a) && !isSparseArr(a)) ||
+        (isArray(b) &&
+         !isRectangularArr(b) && !isAssociativeArr(b) && !isSparseArr(b))) then
+      return true;
+    return false;
+  }
+
+
 
 pragma "always RVF"
 pragma "array"
@@ -144,6 +281,9 @@ record myArray {
     return x.eltType;
   }
 
+  // TODO: The following assumes that we're only slicing into Block-distributed arrays using Block domains, but ultimately, we need to
+  // be able to slice into them using DefaultRectangular domains as well...
+  
   proc type chpl__deserialize(data) {
     //    compilerWarning(this:string);
     param rank = myArrayRank(this);
@@ -167,7 +307,7 @@ record myArray {
     //
     // writeln(this:string);
     
-    const dmapclass = new unmanaged myArrayViewSlice(eltType=real,
+    const dmapclass = new unmanaged myArrayViewSlice(eltType=eltType,
                                                      _DomPid=data.dompid,
                                                      dom = dom,
                                                      _ArrPid=data.arrpid,

@@ -1,4 +1,5 @@
 
+use myArrayStuff;
 use BlockDist;
 use Barriers;
 use CommDiagnostics;
@@ -33,18 +34,18 @@ proc main() {
     ref dstSlice = A.localSlice(A.localSubdomain());
     for off in 1..(numLocales-1) {
       const srcID = (here.id + off) % numLocales;
-      const srcRange = (srcID   * numLocales * n + srcID * n)..#n;
-      const dstRange = (here.id * numLocales * n + srcID * n)..#n;
+      const srcRange = D[(srcID   * numLocales * n + srcID * n)..#n];
+      const dstRange = D[(here.id * numLocales * n + srcID * n)..#n];
 
       if !time then startCommDiagnosticsHere();
 
       if pat == Elegant {
         // Block = Block
-        A[dstRange] = A[srcRange];
+        A.mySlice[dstRange] = A.mySlice[srcRange];
 
       } else if pat == DestLocal {
         // DR = Block
-        dstSlice[dstRange] = A[srcRange];
+        dstSlice[dstRange] = A.mySlice[srcRange];
 
       } else {
         assert(pat == BothLocal);

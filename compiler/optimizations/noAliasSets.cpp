@@ -349,7 +349,7 @@ void addNoAliasSetsInFn(FnSymbol* fn) {
               } else {
                 FnSymbol* fn = call->resolvedOrVirtualFunction();
                 if (fn && fn->hasFlag(FLAG_RETURNS_ALIASING_ARRAY))
-                  INT_FATAL("Aliasing arrays should have different type");
+                  INT_FATAL(fn, "Aliasing arrays should have different type");
                   // Should have been ruled out by
                   // shouldAddNoAliasSetForVariable (check for array views)
               }

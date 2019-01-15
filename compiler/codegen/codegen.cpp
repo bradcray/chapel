@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -2111,6 +2111,9 @@ debug_data *debug_info=NULL;
 
 
 #ifdef HAVE_LLVM
+
+// handle e.g. chpl_clang_builtin_wrapper_cabs
+
 static bool hasWrapper(const char *name)
 {
   auto it = chplClangBuiltinWrappedFunctions.find(name);

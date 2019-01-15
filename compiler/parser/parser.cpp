@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -184,7 +184,7 @@ void setupModulePaths() {
                       "/standard/gen/",
                       CHPL_TARGET_PLATFORM,
                       "-",
-                      CHPL_TARGET_MACHINE,
+                      CHPL_TARGET_ARCH,
                       "-",
                       CHPL_TARGET_COMPILER));
 

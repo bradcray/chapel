@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -1504,6 +1504,7 @@ void prepareCodegenLLVM()
     FM.setUnsafeAlgebra();
 #else
     FM.setFast();
+    INT_ASSERT(FM.allowContract());
 #endif
   } else if (ffloatOpt == 0) {
     // default
@@ -1655,25 +1656,27 @@ void runClang(const char* just_parse_filename) {
     args.push_back(clang_opt);
 
   if (specializeCCode &&
-      CHPL_TARGET_ARCH_FLAG != NULL &&
-      CHPL_TARGET_BACKEND_ARCH != NULL &&
-      CHPL_TARGET_ARCH_FLAG[0] != '\0' &&
-      CHPL_TARGET_BACKEND_ARCH[0] != '\0' &&
-      0 != strcmp(CHPL_TARGET_ARCH_FLAG, "none") &&
-      0 != strcmp(CHPL_TARGET_BACKEND_ARCH, "none") &&
-      0 != strcmp(CHPL_TARGET_BACKEND_ARCH, "unknown")) {
+      CHPL_TARGET_CPU_FLAG != NULL &&
+      CHPL_TARGET_BACKEND_CPU != NULL &&
+      CHPL_TARGET_CPU_FLAG[0] != '\0' &&
+      CHPL_TARGET_BACKEND_CPU[0] != '\0' &&
+      0 != strcmp(CHPL_TARGET_CPU_FLAG, "none") &&
+      0 != strcmp(CHPL_TARGET_BACKEND_CPU, "none") &&
+      0 != strcmp(CHPL_TARGET_BACKEND_CPU, "unknown")) {
     std::string march = "-m";
-    march += CHPL_TARGET_ARCH_FLAG;
+    march += CHPL_TARGET_CPU_FLAG;
     march += "=";
-    march += CHPL_TARGET_BACKEND_ARCH;
+    march += CHPL_TARGET_BACKEND_CPU;
     args.push_back(march);
   }
 
-  if (ffloatOpt > 0)
-    args.push_back(clang_fast_float);
+  // Passing -ffast-math is important to get approximate versions
+  // of cabs but it appears to slow down simple complex multiplication.
+  if (ffloatOpt > 0) // --no-ieee-float
+    args.push_back(clang_fast_float); // --ffast-math
 
-  if (ffloatOpt < 0)
-    args.push_back(clang_ieee_float);
+  if (ffloatOpt < 0) // --ieee-float
+    args.push_back(clang_ieee_float); // -fno-fast-math
 
   // Gather information from readargsfrom into clangArgs.
 
@@ -2228,6 +2231,15 @@ void LayeredValueTable::getCDecl(StringRef name, TypeDecl** cTypeOut,
   }
 }
 
+bool LayeredValueTable::isCArray(StringRef cname) {
+  clang::TypeDecl* cType = NULL;
+  clang::ValueDecl* cValue = NULL;
+
+  this->getCDecl(cname, &cType, &cValue);
+
+  return (cValue && cValue->getType().getTypePtr()->isArrayType());
+}
+
 VarSymbol* LayeredValueTable::getVarSymbol(StringRef name) {
   if(Storage *store = get(name)) {
     if( store->u.chplVar && isVarSymbol(store->u.chplVar) ) {
@@ -2281,7 +2293,8 @@ void LayeredValueTable::swap(LayeredValueTable* other)
   this->layers.swap(other->layers);
 }
 
-int getCRecordMemberGEP(const char* typeName, const char* fieldName)
+int getCRecordMemberGEP(const char* typeName, const char* fieldName,
+                        bool& isCArrayField)
 {
   GenInfo* info = gGenInfo;
   INT_ASSERT(info);
@@ -2319,11 +2332,15 @@ int getCRecordMemberGEP(const char* typeName, const char* fieldName)
   }
   INT_ASSERT(field);
 
+  isCArrayField = field->getType()->isArrayType();
+
 #if HAVE_LLVM_VER >= 60
   ret = clang::CodeGen::getLLVMFieldNumber(cCodeGen->CGM(), rec, field);
 #else
   ret = cCodeGen->CGM().getTypes().getCGRecordLayout(rec).getLLVMFieldNo(field);
 #endif
+
+  INT_ASSERT(ret >= 0);
 
   return ret;
 }

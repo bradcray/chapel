@@ -3,7 +3,7 @@ import optparse
 import sys
 
 import chpl_comm, chpl_compiler, chpl_platform, overrides
-from compiler_utils import CompVersion, get_compiler_version
+from compiler_utils import CompVersion, get_compiler_version, has_std_atomics
 from utils import error, memoize
 
 
@@ -23,15 +23,25 @@ def get(flag='target'):
             compiler_val = chpl_compiler.get('target')
             platform_val = chpl_platform.get('target')
 
-            # we currently support intrinsics for gcc, intel, cray and clang.
-            # gcc added initial support in 4.1, and added support for 64 bit
-            # atomics on 32 bit platforms with 4.8. clang and intel also
-            # support 64 bit atomics on 32 bit platforms and the cray compiler
-            # will never run on a 32 bit machine. For pgi or 32 bit platforms
-            # with an older gcc, we fall back to locks
-            if compiler_val in ['gnu', 'cray-prgenv-gnu', 'mpi-gnu', 'aarch64-gnu']:
+            # We default to C standard atomics (cstdlib) for gcc 5 and newer.
+            # Some prior versions of gcc look like they support standard
+            # atomics, but have buggy or missing parts of the implementation,
+            # so we do not try to use cstdlib with gcc < 5.
+            # We also default to cstdlib for clang if support is detected.
+            #
+            # We support intrinsics for gcc, intel, cray and clang. gcc added
+            # initial support in 4.1, and added support for 64-bit atomics on
+            # 32-bit platforms with 4.8. clang and intel also support 64-bit
+            # atomics on 32-bit platforms and the cray compiler will never run
+            # on a 32-bit machine.
+            #
+            # For pgi or 32-bit platforms with an older gcc, we fall back to
+            # locks
+            if compiler_val in ['gnu', 'cray-prgenv-gnu', 'mpi-gnu']:
                 version = get_compiler_version('gnu')
-                if version >= CompVersion('4.8'):
+                if version >= CompVersion('5.0'):
+                    atomics_val = 'cstdlib'
+                elif version >= CompVersion('4.8'):
                     atomics_val = 'intrinsics'
                 elif version >= CompVersion('4.1') and not platform_val.endswith('32'):
                     atomics_val = 'intrinsics'
@@ -42,7 +52,10 @@ def get(flag='target'):
             elif compiler_val in ['allinea', 'cray-prgenv-allinea']:
                 atomics_val = 'cstdlib'
             elif compiler_val == 'clang':
-                atomics_val = 'intrinsics'
+                if has_std_atomics(compiler_val):
+                    atomics_val = 'cstdlib'
+                else:
+                    atomics_val = 'intrinsics'
             elif compiler_val == 'clang-included':
                 atomics_val = 'intrinsics'
 

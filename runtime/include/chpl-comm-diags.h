@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -89,6 +89,23 @@ void chpl_comm_diags_verbose_printf(const char* format, ...) {
     va_end(ap);
   }
 }
+
+#define chpl_comm_diags_verbose_rdma(op, node, size, ln, fn)            \
+  chpl_comm_diags_verbose_printf("%s:%d: remote %s, "                   \
+                                 "node %d, %zu bytes",                  \
+                                 chpl_lookupFilename(fn), ln, op,       \
+                                 (int) node, size)
+
+#define chpl_comm_diags_verbose_rdmaStrd(op, node, ln, fn)              \
+  chpl_comm_diags_verbose_printf("%s:%d: remote strided %s, node %d",   \
+                                 chpl_lookupFilename(fn), ln, op,       \
+                                 (int) node)
+
+#define chpl_comm_diags_verbose_executeOn(kind, node)                   \
+  chpl_comm_diags_verbose_printf("remote %-*sexecuteOn, node %d",       \
+                                 ((int) strlen(kind)                    \
+                                  + ((strlen(kind) == 0) ? 0 : 1)),     \
+                                 kind, (int) node)
 
 #define chpl_comm_diags_incr(_ctr)                                      \
   do {                                                                  \

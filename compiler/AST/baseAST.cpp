@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -226,10 +226,6 @@ void cleanAst() {
       }
 
       if (AggregateType* ct = toAggregateType(ts->type)) {
-        if (ct->defaultInitializer               != NULL &&
-            isAliveQuick(ct->defaultInitializer) == false) {
-          ct->defaultInitializer = NULL;
-        }
 
         if (ct->hasDestructor()                  == true &&
             isAliveQuick(ct->getDestructor())    == false) {

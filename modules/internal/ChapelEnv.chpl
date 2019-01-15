@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -44,8 +44,8 @@ module ChapelEnv {
   /* See :ref:`readme-chplenv.CHPL_HOST_PLATFORM` for more information. */
   param CHPL_HOST_PLATFORM:string   = __primitive("get compiler variable", "CHPL_HOST_PLATFORM");
 
-  /* See :ref:`readme-chplenv.CHPL_HOST_MACHINE` for more information. */
-  param CHPL_HOST_MACHINE:string   = __primitive("get compiler variable", "CHPL_HOST_MACHINE");
+  /* See :ref:`readme-chplenv.CHPL_HOST_ARCH` for more information. */
+  param CHPL_HOST_ARCH:string   = __primitive("get compiler variable", "CHPL_HOST_ARCH");
 
   /* See :ref:`readme-chplenv.CHPL_COMPILER` for more information. */
   param CHPL_HOST_COMPILER:string   = __primitive("get compiler variable", "CHPL_HOST_COMPILER");
@@ -53,11 +53,11 @@ module ChapelEnv {
   /* See :ref:`readme-chplenv.CHPL_COMPILER` for more information. */
   param CHPL_TARGET_COMPILER:string = __primitive("get compiler variable", "CHPL_TARGET_COMPILER");
 
-  /* See :ref:`readme-chplenv.CHPL_TARGET_MACHINE` for more information. */
-  param CHPL_TARGET_MACHINE:string     = __primitive("get compiler variable", "CHPL_TARGET_MACHINE");
-
   /* See :ref:`readme-chplenv.CHPL_TARGET_ARCH` for more information. */
   param CHPL_TARGET_ARCH:string     = __primitive("get compiler variable", "CHPL_TARGET_ARCH");
+
+  /* See :ref:`readme-chplenv.CHPL_TARGET_CPU` for more information. */
+  param CHPL_TARGET_CPU:string     = __primitive("get compiler variable", "CHPL_TARGET_CPU");
 
   /* See :ref:`readme-chplenv.CHPL_LOCALE_MODEL` for more information. */
   param CHPL_LOCALE_MODEL:string    = __primitive("get compiler variable", "CHPL_LOCALE_MODEL");

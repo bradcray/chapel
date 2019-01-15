@@ -1,4 +1,4 @@
-# Copyright 2004-2018 Cray Inc.
+# Copyright 2004-2019 Cray Inc.
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -71,17 +71,15 @@ parser: FORCE
 	cd compiler && $(MAKE) parser
 
 modules: FORCE
-	cd modules && $(MAKE)
+	cd modules && CHPL_LLVM_CODEGEN=0 $(MAKE)
 	-@if [ ! -z `${NEEDS_LLVM_RUNTIME}` ]; then \
-	. ${CHPL_MAKE_HOME}/util/config/set_clang_included.bash && \
-	cd modules && $(MAKE) ; \
+	cd modules && CHPL_LLVM_CODEGEN=1 $(MAKE) ; \
 	fi
 
 runtime: FORCE
-	cd runtime && $(MAKE)
+	cd runtime && CHPL_LLVM_CODEGEN=0 $(MAKE)
 	-@if [ ! -z `${NEEDS_LLVM_RUNTIME}` ]; then \
-	. ${CHPL_MAKE_HOME}/util/config/set_clang_included.bash && \
-	cd runtime && $(MAKE) ; \
+	cd runtime && CHPL_LLVM_CODEGEN=1 $(MAKE) ; \
 	fi
 
 third-party: FORCE
@@ -91,19 +89,17 @@ third-party-try-opt: third-party-try-re2 third-party-try-gmp
 
 third-party-try-re2: FORCE
 	-@if [ -z "$$CHPL_REGEXP" ]; then \
-	cd third-party && $(MAKE) try-re2; \
+	cd third-party && CHPL_LLVM_CODEGEN=0 $(MAKE) try-re2; \
 	if [ ! -z `${NEEDS_LLVM_RUNTIME}` ]; then \
-	. ${CHPL_MAKE_HOME}/util/config/set_clang_included.bash && \
-	$(MAKE) try-re2; \
+	CHPL_LLVM_CODEGEN=1 $(MAKE) try-re2; \
 	fi \
 	fi
 
 third-party-try-gmp: FORCE
 	-@if [ -z "$$CHPL_GMP" ]; then \
-	cd third-party && $(MAKE) try-gmp; \
+	cd third-party && CHPL_LLVM_CODEGEN=0 $(MAKE) try-gmp; \
 	if [ ! -z `${NEEDS_LLVM_RUNTIME}` ]; then \
-	. ${CHPL_MAKE_HOME}/util/config/set_clang_included.bash && \
-	$(MAKE) try-gmp; \
+	CHPL_LLVM_CODEGEN=1 $(MAKE) try-gmp; \
 	fi \
 	fi
 

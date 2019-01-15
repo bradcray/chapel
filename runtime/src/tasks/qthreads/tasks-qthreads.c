@@ -8,7 +8,7 @@
 //
 
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -540,7 +540,7 @@ static chpl_bool setupGuardPages(void) {
         guardPagesEnabled = false;
     } else if (chpl_getHeapPageSize() != chpl_getSysPageSize()) {
         guardPagesEnabled = false;
-    } else if (strncmp(armArch, CHPL_TARGET_ARCH, strlen(armArch)) == 0) {
+    } else if (strncmp(armArch, CHPL_TARGET_CPU, strlen(armArch)) == 0) {
         guardPagesEnabled = false;
     } else {
         guardPagesEnabled = chpl_qt_getenv_bool("GUARD_PAGES", defaultVal);

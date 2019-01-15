@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -581,9 +581,16 @@ GenRet VarSymbol::codegenVarSymbol(bool lhsInSetReference) {
       // check LVT for value
       GenRet got = info->lvt->getValue(cname);
       got.chplType = typeInfo();
-      if( got.val ) {
-        return got;
+      // handle extern C arrays
+      // these should generate a pointer to the first element
+      if (got.val && hasFlag(FLAG_EXTERN)) {
+        if (info->lvt->isCArray(cname)) {
+          got.val = info->irBuilder->CreateStructGEP(NULL, got.val, 0);
+          got.isLVPtr = GEN_VAL;
+        }
       }
+      if (got.val)
+        return got;
     }
 
     if(isImmediate()) {
@@ -1453,7 +1460,8 @@ void TypeSymbol::codegenAggMetadata() {
       INT_ASSERT(fieldType);
       uint64_t store_size = dl.getTypeStoreSize(fieldType);
       if (store_size > 0) {
-        unsigned fieldno = ct->getMemberGEP(field->cname);
+        bool unused;
+        unsigned fieldno = ct->getMemberGEP(field->cname, unused);
         uint64_t byte_offset =
           dl.getStructLayout(struct_type)->getElementOffset(fieldno);
         llvm::Constant *off = llvm::ConstantInt::get(int64Ty, byte_offset);
@@ -1959,7 +1967,7 @@ void FnSymbol::codegenFortran(int indent) {
   if (info->cfile) {
     FILE* outfile = info->cfile;
     if (fGenIDS)
-      fprintf(outfile, "%*s! %d", indent, "", this->id);
+      fprintf(outfile, "%*s! %d\n", indent, "", this->id);
     const char* subOrProc = retType != dtVoid ? "function" : "subroutine";
     fprintf(outfile, "%*s%s %s(", indent, "", subOrProc, this->cname);
     bool first = true;

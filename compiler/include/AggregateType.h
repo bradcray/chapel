@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -131,7 +131,8 @@ public:
   DefExpr*                    toSuperField(SymExpr*  expr)               const;
   DefExpr*                    toSuperField(CallExpr* expr)               const;
 
-  int                         getMemberGEP(const char* name);
+  int                         getMemberGEP(const char* name,
+                                           bool& isCArrayField);
 
   FnSymbol*                   buildTypeConstructor();
 
@@ -170,7 +171,7 @@ public:
 
   FnSymbol*                   typeConstructor;
 
-  FnSymbol*                   defaultInitializer;
+  bool                        builtDefaultInit;
 
   AggregateType*              instantiatedFrom;
 
@@ -199,6 +200,10 @@ public:
   Vec<AggregateType*>         dispatchChildren;   // dispatch hierarchy
 
 private:
+
+  // Only used for LLVM.
+  std::map<std::string, bool> isCArrayFieldMap;
+
   static ArgSymbol*           createGenericArg(VarSymbol* field);
 
   void                        insertImplicitThis(FnSymbol*         fn,

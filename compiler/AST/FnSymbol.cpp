@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -46,6 +46,7 @@ std::vector<FnSymbol*>    ftableVec;
 FnSymbol::FnSymbol(const char* initName) : Symbol(E_FnSymbol, initName) {
   retType            = dtUnknown;
   where              = NULL;
+  lifetimeConstraints= NULL;
   retExprType        = NULL;
   body               = new BlockStmt();
   thisTag            = INTENT_BLANK;
@@ -111,6 +112,10 @@ void FnSymbol::verify() {
     INT_FATAL(this, "Bad FnSymbol::where::parentSymbol");
   }
 
+  if (lifetimeConstraints && lifetimeConstraints->parentSymbol != this) {
+    INT_FATAL(this, "Bad FnSymbol::lifetimeConstraints::parentSymbol");
+  }
+
   if (retExprType && retExprType->parentSymbol != this) {
     INT_FATAL(this, "Bad FnSymbol::retExprType::parentSymbol");
   }
@@ -127,6 +132,7 @@ void FnSymbol::verify() {
   }
 
   verifyNotOnList(where);
+  verifyNotOnList(lifetimeConstraints);
   verifyNotOnList(retExprType);
   verifyNotOnList(body);
 
@@ -148,6 +154,7 @@ FnSymbol* FnSymbol::copyInner(SymbolMap* map) {
 
   // Copy members that weren't set by copyInnerCore.
   copy->where       = COPY_INT(this->where);
+  copy->lifetimeConstraints = COPY_INT(this->lifetimeConstraints);
   copy->body        = COPY_INT(this->body);
   copy->retExprType = COPY_INT(this->retExprType);
   copy->_this       = this->_this;
@@ -241,6 +248,13 @@ FnSymbol* FnSymbol::partialCopy(SymbolMap* map) {
     newFn->where = COPY_INT(this->where);
 
     insert_help(newFn->where, NULL, newFn);
+  }
+
+  // Copy and insert the lifetimeConstraints clause if it is present.
+  if (this->lifetimeConstraints != NULL) {
+    newFn->lifetimeConstraints = COPY_INT(this->lifetimeConstraints);
+
+    insert_help(newFn->lifetimeConstraints, NULL, newFn);
   }
 
   // Copy and insert the retExprType if it is present.
@@ -423,6 +437,9 @@ void FnSymbol::replaceChild(BaseAST* oldAst, BaseAST* newAst) {
 
   } else if (oldAst == where) {
     where = toBlockStmt(newAst);
+
+  } else if (oldAst == lifetimeConstraints) {
+    lifetimeConstraints = toBlockStmt(newAst);
 
   } else if (oldAst == retExprType) {
     retExprType = toBlockStmt(newAst);
@@ -825,6 +842,9 @@ void FnSymbol::accept(AstVisitor* visitor) {
     if (where)
       where->accept(visitor);
 
+    if (lifetimeConstraints)
+      lifetimeConstraints->accept(visitor);
+
     if (retExprType) {
       retExprType->accept(visitor);
     }
@@ -1072,7 +1092,6 @@ const char* toString(FnSymbol* fn) {
     }
 
   } else {
-    int  start      =     1;
     bool first      =  true;
     bool skipParens = false;
 
@@ -1090,21 +1109,9 @@ const char* toString(FnSymbol* fn) {
         INT_ASSERT(strncmp("_type_construct_", fn->name, 16) == 0);
         retval = astr(fn->name + 16);
 
-      } else if (fn->isPrimaryMethod() == true) {
-        Flag flag = FLAG_FIRST_CLASS_FUNCTION_INVOCATION;
-
-        if (fn->name == astrThis) {
-          INT_ASSERT(fn->hasFlag(flag) == true);
-
-          retval = astr(toString(fn->getFormal(2)->type));
-          start  = 2;
-
-        } else {
-          INT_ASSERT(fn->hasFlag(flag) == false);
-
-          retval = astr(toString(fn->getFormal(2)->type), ".", fn->name);
-          start  = 3;
-        }
+      } else if (fn->isMethod()) {
+        INT_ASSERT(fn->_this);
+        retval = astr(toString(fn->_this->type), ".", fn->name);
 
       } else if (fn->hasFlag(FLAG_MODULE_INIT) == true) {
         INT_ASSERT(strncmp("chpl__init_", fn->name, 11) == 0);
@@ -1132,8 +1139,20 @@ const char* toString(FnSymbol* fn) {
       retval     = astr(retval, "(");
     }
 
-    for (int i = start; i <= fn->numFormals(); i++) {
+    for (int i = 1; i <= fn->numFormals(); i++) {
       ArgSymbol* arg = fn->getFormal(i);
+
+      // skip method token etc
+      if (arg->type == dtMethodToken ||
+          arg->type == dtTypeDefaultToken ||
+          arg->type == dtModuleToken)
+        continue;
+
+      // skip _this formal for methods in non-developer mode
+      // because in non-developer mode it has already been printed
+      // along with the method name (e.g. C.mymethod).
+      if (developer == false && fn->isMethod() && arg == fn->_this)
+        continue;
 
       if (first == true) {
         first = false;

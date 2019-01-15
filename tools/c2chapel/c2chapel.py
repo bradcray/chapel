@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #
-# Copyright 2004-2018 Cray Inc.
+# Copyright 2004-2019 Cray Inc.
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -111,7 +111,7 @@ foundTypes = set()
 chapelKeywords = set(["align","as","atomic","begin","break","by","class",
     "cobegin","coforall","config","const","continue","delete","dmapped","do",
     "domain","else","enum","except","export","extern","for","forall","if",
-    "in","index","inline","inout","iter","label","let","local","module","new",
+    "in","index","inline","inout","iter","label","lambda","let","local","module","new",
     "nil","noinit","on","only","otherwise","out","param","private","proc",
     "public","record","reduce","ref","require","return","scan","select",
     "serial","single","sparse","subdomain","sync","then","type","union","use",
@@ -162,6 +162,8 @@ def getDeclName(decl):
         name = inner.name
     elif type(inner) == c_ast.Decl:
         name = inner.name
+    elif type(inner) == c_ast.Enum:
+        name = "c_int"
     else:
         raise Exception("Unhandled node type: " + str(type(inner)))
     return name

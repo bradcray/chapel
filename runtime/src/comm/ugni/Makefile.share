@@ -1,4 +1,4 @@
-# Copyright 2004-2018 Cray Inc.
+# Copyright 2004-2019 Cray Inc.
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -42,7 +42,7 @@ COMM_LAUNCHER_OBJS = \
 
 
 ifeq ($(CHPL_MAKE_COMPILER), clang-included)
-  ifneq (, $(filter cray-prgenv-%,$(CHPL_ORIG_TARGET_COMPILER)))
+  ifneq (, $(filter cray-prgenv-%,$(CHPL_MAKE_ORIG_TARGET_COMPILER)))
     # if we're clang-included for a cray-prgenv-* build,
     # gather some extra include paths
 

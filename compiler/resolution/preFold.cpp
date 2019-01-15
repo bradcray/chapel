@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -495,7 +495,14 @@ static Expr* preFoldPrimOp(CallExpr* call) {
     }
 
     call->replace(retval);
+  } else if (call->isPrimitive(PRIM_IS_EXTERN_TYPE)) {
+    if (call->get(1)->typeInfo()->symbol->hasFlag(FLAG_EXTERN)) {
+      retval = new SymExpr(gTrue);
+    } else {
+      retval = new SymExpr(gFalse);
+    }
 
+    call->replace(retval);
   } else if (call->isPrimitive(PRIM_IS_CLASS_TYPE)) {
     Type* t = call->get(1)->typeInfo();
 
@@ -1071,12 +1078,22 @@ static Expr* preFoldPrimOp(CallExpr* call) {
       call->insertAtTail(tmp);
     }
 
-  } else if (call->isPrimitive(PRIM_SIZEOF) == true) {
-    // Fix up arg to sizeof(), as we may not have known the type earlier
+  } else if (call->isPrimitive(PRIM_SIZEOF_BUNDLE) == true) {
+    // Fix up arg to sizeof_bundle(), as we may not have known the
+    // type earlier
     SymExpr* sizeSym  = toSymExpr(call->get(1));
     Type*    sizeType = sizeSym->symbol()->typeInfo();
 
-    retval = new CallExpr(PRIM_SIZEOF, sizeType->symbol);
+    retval = new CallExpr(PRIM_SIZEOF_BUNDLE, sizeType->symbol);
+    call->replace(retval);
+
+  } else if (call->isPrimitive(PRIM_SIZEOF_DDATA_ELEMENT) == true) {
+    // Fix up arg to sizeof_ddata_element(), as we may not have known
+    // the type earlier
+    SymExpr* sizeSym  = toSymExpr(call->get(1));
+    Type*    sizeType = sizeSym->symbol()->typeInfo();
+
+    retval = new CallExpr(PRIM_SIZEOF_DDATA_ELEMENT, sizeType->symbol);
     call->replace(retval);
 
   }
@@ -1827,19 +1844,12 @@ static Expr* createFunctionAsValue(CallExpr *call) {
 
   wrapper->addFlag(FLAG_INLINE);
 
-  if (ct->wantsDefaultInitializer()) {
-    wrapper->insertAtTail(new CallExpr(PRIM_RETURN,
-                                       new CallExpr(PRIM_CAST,
-                                                    parent->symbol,
-                                                    new CallExpr(PRIM_NEW,
-                                                                 new NamedExpr(astr_chpl_manager, new SymExpr(dtUnmanaged->symbol)),
-                                                                 new SymExpr(ct->symbol)))));
-  } else {
-    wrapper->insertAtTail(new CallExpr(PRIM_RETURN,
-                                       new CallExpr(PRIM_CAST,
-                                                    parent->symbol,
-                                                    new CallExpr(ct->defaultInitializer))));
-  }
+  wrapper->insertAtTail(new CallExpr(PRIM_RETURN,
+                                     new CallExpr(PRIM_CAST,
+                                                  parent->symbol,
+                                                  new CallExpr(PRIM_NEW,
+                                                               new NamedExpr(astr_chpl_manager, new SymExpr(dtUnmanaged->symbol)),
+                                                               new SymExpr(ct->symbol)))));
 
   call->getStmtExpr()->insertBefore(new DefExpr(wrapper));
 

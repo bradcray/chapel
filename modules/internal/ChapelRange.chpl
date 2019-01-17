@@ -314,7 +314,7 @@ module ChapelRange {
   proc chpl_build_bounded_range(low: bool, high: bool)
     return new range(bool, _low=low, _high=high);
   proc chpl_build_bounded_range(low, high) {
-    compilerError("Bounds of 'low..high' must be integers of compatible types.");
+    compilerError("ranges from type '", low.type:string, "' to '", high.type:string, "' are not supported");
   }
 
   // Range builders for low bounded ranges
@@ -325,7 +325,7 @@ module ChapelRange {
   proc chpl_build_low_bounded_range(low: bool)
     return new range(low.type, BoundedRangeType.boundedLow, _low=low);
   proc chpl_build_low_bounded_range(low) {
-    compilerError("Bound of 'low..' must be an integer");
+    compilerError("unbounded ranges of type '", low.type:string, "' are not supported");
   }
 
   // Range builders for high bounded ranges
@@ -336,7 +336,7 @@ module ChapelRange {
   proc chpl_build_high_bounded_range(high: bool)
     return new range(high.type, BoundedRangeType.boundedHigh, _high=high);
   proc chpl_build_high_bounded_range(high) {
-    compilerError("Bound of '..high' must be an integer.");
+    compilerError("unbounded ranges of type '", high.type:string, "' are not supported");
   }
 
   // Range builder for unbounded ranges
@@ -381,7 +381,7 @@ module ChapelRange {
 
   pragma "last resort"
   proc chpl_compute_low_param_loop_bound(param low, param high) param {
-    compilerError("Range bounds must be integers of compatible types");
+    compilerError("Range bounds must be of compatible types");
   }
 
   pragma "last resort"
@@ -971,9 +971,11 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
     return this + offset;
 
   pragma "no doc"
-  inline proc range.translate(i)
+  inline proc range.translate(offset)
   {
-    compilerError("offsets must be of integral type");
+    compilerError("ranges with idxType '", this.idxType:string,
+                  "' don't support translations by type '", offset.type:string,
+                  "'");
   }
 
   // Compute the alignment of the range returned by this.interior()
@@ -1779,7 +1781,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
 
   // case for when low and high aren't compatible types and can't be coerced
   iter chpl_direct_range_iter(low, high, stride) {
-    compilerError("Bounds of 'low..high' must be integers of compatible types.");
+    compilerError("ranges from type '", low.type:string, "' to '", high.type:string, "' are not supported");
   }
 
 
@@ -1830,7 +1832,7 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
   }
 
   iter chpl_direct_counted_range_iter(low, count) {
-    compilerError("Bound of 'low..' must be an integer");
+    compilerError("unbounded ranges of type '", low.type:string, "' are not supported");
   }
 
   // The "actual" counted range iter. Turn the bounds of a low bounded counted

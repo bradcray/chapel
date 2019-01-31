@@ -1006,8 +1006,9 @@ module ChapelBase {
   pragma "dont disable remote value forwarding"
   pragma "down end count fn"
   proc _downEndCount(e: _EndCount, err: unmanaged Error) {
-    // save the task error
     chpl_save_task_error(e, err);
+    extern proc chpl_comm_task_end(): void;
+    chpl_comm_task_end();
     // inform anybody waiting that we're done
     e.i.sub(1, memory_order_release);
   }
@@ -1040,7 +1041,7 @@ module ChapelBase {
 
     // Throw any error raised by a task this is waiting for
     if ! e.errors.empty() then
-      throw new unmanaged TaskErrors(e.errors);
+      throw new owned TaskErrors(e.errors);
   }
 
   // called for bounded coforalls and cobegins
@@ -1061,7 +1062,7 @@ module ChapelBase {
 
     // Throw any error raised by a task this is waiting for
     if ! e.errors.empty() then
-      throw new unmanaged TaskErrors(e.errors);
+      throw new owned TaskErrors(e.errors);
   }
 
   proc _upDynamicEndCount(param countRunningTasks=true) {
@@ -1084,7 +1085,7 @@ module ChapelBase {
 
     // Throw any error raised by a task this sync statement is waiting for
     if ! e.errors.empty() then
-      throw new unmanaged TaskErrors(e.errors);
+      throw new owned TaskErrors(e.errors);
   }
 
   proc _do_command_line_cast(type t, x:c_string) throws {

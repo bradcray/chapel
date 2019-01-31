@@ -119,6 +119,9 @@ isDefinedAllPaths(Expr* expr, Symbol* ret, RefSet& refs)
         call->resolvedFunction()->hasFlag(FLAG_FUNCTION_TERMINATES_PROGRAM))
       return 1;
 
+    if (call->isPrimitive(PRIM_RT_ERROR))
+      return 1;
+
     if (call->isPrimitive(PRIM_MOVE) ||
         call->isPrimitive(PRIM_ASSIGN))
     {
@@ -498,6 +501,10 @@ static void checkExternProcs() {
         break;
       }
     }
+
+    if (fn->retType->symbol->hasFlag(FLAG_C_ARRAY)) {
+      USR_FATAL_CONT(fn, "extern procedures should not return c_array");
+    }
   }
 }
 
@@ -516,6 +523,10 @@ static void checkExportedProcs() {
     if (fn->retType == dtString) {
       USR_FATAL_CONT(fn, "exported procedures should not return strings, use "
                      "c_strings instead");
+    }
+
+    if (fn->retType->symbol->hasFlag(FLAG_C_ARRAY)) {
+      USR_FATAL_CONT(fn, "exported procedures should not return c_array");
     }
   }
 }

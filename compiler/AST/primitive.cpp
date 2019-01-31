@@ -268,13 +268,14 @@ returnInfoNumericUp(CallExpr* call) {
 
 static QualifiedType
 returnInfoArrayIndexValue(CallExpr* call) {
-  Type* type = call->get(1)->typeInfo();
+  Type* type = call->get(1)->getValType();
   if (type->symbol->hasFlag(FLAG_WIDE_CLASS))
     type = type->getField("addr")->type;
   if (!type->substitutions.n)
     INT_FATAL(call, "bad primitive");
   // Is this conditional necessary?  Can just assume condition is true?
-  if (type->symbol->hasFlag(FLAG_DATA_CLASS)) {
+  if (type->symbol->hasFlag(FLAG_DATA_CLASS) ||
+      type->symbol->hasFlag(FLAG_C_ARRAY)) {
     return QualifiedType(toTypeSymbol(getDataClassType(type->symbol))->type, QUAL_VAL);
   }
   else {
@@ -404,6 +405,15 @@ returnInfoEndCount(CallExpr* call) {
     }
   }
   return QualifiedType(endCountType, QUAL_VAL);
+}
+
+static QualifiedType
+returnInfoError(CallExpr* call) {
+  AggregateType* at = toAggregateType(dtError);
+  INT_ASSERT(isClass(at));
+  UnmanagedClassType* unmanaged = at->getUnmanagedClass();
+  INT_ASSERT(unmanaged);
+  return QualifiedType(unmanaged, QUAL_VAL);
 }
 
 static QualifiedType
@@ -575,6 +585,12 @@ initPrimitive() {
   prim_def(PRIM_TRY_EXPR, "try-expr", returnInfoFirst);
   prim_def(PRIM_TRYBANG_EXPR, "try!-expr", returnInfoFirst);
   prim_def(PRIM_YIELD, "yield", returnInfoFirst, true);
+
+  // Represents a Chapel reduce expression "OP reduce DATA".
+  // Args: (OP, DATA, is zippered (gTrue/gFalse)).
+  // Lowered during resolution.
+  prim_def(PRIM_REDUCE, "reduce", returnInfoVoid, true);
+
   prim_def(PRIM_UNARY_MINUS, "u-", returnInfoFirstDeref);
   prim_def(PRIM_UNARY_PLUS, "u+", returnInfoFirstDeref);
   prim_def(PRIM_UNARY_NOT, "u~", returnInfoFirstDeref);
@@ -731,7 +747,7 @@ initPrimitive() {
 
   // Direct calls to the Chapel comm layer
   prim_def(PRIM_CHPL_COMM_GET, "chpl_comm_get", returnInfoVoid, true, true);
-  prim_def(PRIM_CHPL_COMM_BUFF_GET, "chpl_comm_buff_get", returnInfoVoid, true, true);
+  prim_def(PRIM_CHPL_COMM_GET_UNORDERED, "chpl_comm_get_unordered", returnInfoVoid, true, true);
   prim_def(PRIM_CHPL_COMM_PUT, "chpl_comm_put", returnInfoVoid, true, true);
   prim_def(PRIM_CHPL_COMM_ARRAY_GET, "chpl_comm_array_get", returnInfoVoid, true, true);
   prim_def(PRIM_CHPL_COMM_ARRAY_PUT, "chpl_comm_array_put", returnInfoVoid, true, true);
@@ -787,6 +803,10 @@ initPrimitive() {
   prim_def(PRIM_BLOCK_LOCAL, "local block", returnInfoVoid);
   // BlockStmt::blockInfo - unlocal local block
   prim_def(PRIM_BLOCK_UNLOCAL, "unlocal block", returnInfoVoid);
+
+  // The arg is an iterator record (or iterator class) temp or iterator call.
+  // Indicates whether the iterator has the corresponding leader iterator.
+  prim_def(PRIM_HAS_LEADER, "has leader", returnInfoBool);
 
   prim_def(PRIM_TO_LEADER, "to leader", returnInfoVoid);
   prim_def(PRIM_TO_FOLLOWER, "to follower", returnInfoVoid);
@@ -907,6 +927,8 @@ initPrimitive() {
 
   // used in error-handling conditional. args: error variable
   prim_def(PRIM_CHECK_ERROR, "check error", returnInfoVoid, false, false);
+  // used before error handling is lowered to represent the current error
+  prim_def(PRIM_CURRENT_ERROR, "current error", returnInfoError, false, false);
 
   prim_def(PRIM_TO_UNMANAGED_CLASS, "to unmanaged class", returnInfoToUnmanaged, false, false);
   prim_def(PRIM_TO_BORROWED_CLASS, "to borrowed class", returnInfoToBorrowed, false, false);

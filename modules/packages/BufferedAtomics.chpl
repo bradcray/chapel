@@ -75,8 +75,7 @@
      buffers are flushed, the operations are performed all at once. Cray Linux
      Environment (CLE) 5.2.UP04 or newer is required for best performance. In
      our experience, buffered atomics can achieve up to a 5X performance
-     improvement over non-buffered atomics for CLE 5.2UP04 or newer and up to a
-     2.5X improvement for older versions of CLE.
+     improvement over non-buffered atomics for CLE 5.2UP04 or newer.
  */
 module BufferedAtomics {
 
@@ -92,11 +91,11 @@ module BufferedAtomics {
   }
   pragma "no doc"
   inline proc RAtomicT.addBuff(value:T): void {
-    pragma "insert line file info" extern externFunc("add_buff", T)
-      proc atomic_add_buff(ref op:T, l:int(32), obj:c_void_ptr): void;
+    pragma "insert line file info" extern externFunc("add_unordered", T)
+      proc atomic_add_unordered(ref op:T, l:int(32), obj:c_void_ptr): void;
 
     var v = value;
-    atomic_add_buff(v, _localeid(), _addr());
+    atomic_add_unordered(v, _localeid(), _addr());
   }
 
   /* Buffered atomic sub. */
@@ -105,11 +104,11 @@ module BufferedAtomics {
   }
   pragma "no doc"
   inline proc RAtomicT.subBuff(value:T): void {
-    pragma "insert line file info" extern externFunc("sub_buff", T)
-      proc atomic_sub_buff(ref op:T, l:int(32), obj:c_void_ptr): void;
+    pragma "insert line file info" extern externFunc("sub_unordered", T)
+      proc atomic_sub_unordered(ref op:T, l:int(32), obj:c_void_ptr): void;
 
     var v = value;
-    atomic_sub_buff(v, _localeid(), _addr());
+    atomic_sub_unordered(v, _localeid(), _addr());
   }
 
   /* Buffered atomic or. */
@@ -119,11 +118,11 @@ module BufferedAtomics {
   pragma "no doc"
   inline proc RAtomicT.orBuff(value:T): void {
     if !isIntegral(T) then compilerError("or is only defined for integer atomic types");
-    pragma "insert line file info" extern externFunc("or_buff", T)
-      proc atomic_or_buff(ref op:T, l:int(32), obj:c_void_ptr): void;
+    pragma "insert line file info" extern externFunc("or_unordered", T)
+      proc atomic_or_unordered(ref op:T, l:int(32), obj:c_void_ptr): void;
 
     var v = value;
-    atomic_or_buff(v, _localeid(), _addr());
+    atomic_or_unordered(v, _localeid(), _addr());
   }
 
   /* Buffered atomic and. */
@@ -133,11 +132,11 @@ module BufferedAtomics {
   pragma "no doc"
   inline proc RAtomicT.andBuff(value:T): void {
     if !isIntegral(T) then compilerError("and is only defined for integer atomic types");
-    pragma "insert line file info" extern externFunc("and_buff", T)
-      proc atomic_and_buff(ref op:T, l:int(32), obj:c_void_ptr): void;
+    pragma "insert line file info" extern externFunc("and_unordered", T)
+      proc atomic_and_unordered(ref op:T, l:int(32), obj:c_void_ptr): void;
 
     var v = value;
-    atomic_and_buff(v, _localeid(), _addr());
+    atomic_and_unordered(v, _localeid(), _addr());
   }
 
   /* Buffered atomic xor. */
@@ -147,11 +146,11 @@ module BufferedAtomics {
   pragma "no doc"
   inline proc RAtomicT.xorBuff(value:T): void {
     if !isIntegral(T) then compilerError("xor is only defined for integer atomic types");
-    pragma "insert line file info" extern externFunc("xor_buff", T)
-      proc atomic_xor_buff(ref op:T, l:int(32), obj:c_void_ptr): void;
+    pragma "insert line file info" extern externFunc("xor_unordered", T)
+      proc atomic_xor_unordered(ref op:T, l:int(32), obj:c_void_ptr): void;
 
     var v = value;
-    atomic_xor_buff(v, _localeid(), _addr());
+    atomic_xor_unordered(v, _localeid(), _addr());
   }
 
   /*
@@ -161,9 +160,9 @@ module BufferedAtomics {
    */
   inline proc flushAtomicBuff(): void {
     if CHPL_NETWORK_ATOMICS != "none" {
-      extern proc chpl_comm_atomic_buff_flush();
+      extern proc chpl_comm_atomic_unordered_fence();
       coforall loc in Locales do on loc {
-        chpl_comm_atomic_buff_flush();
+        chpl_comm_atomic_unordered_fence();
       }
     }
   }

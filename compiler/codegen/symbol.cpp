@@ -392,6 +392,9 @@ GenRet VarSymbol::codegenVarSymbol(bool lhsInSetReference) {
   GenRet ret;
   ret.chplType = typeInfo();
 
+  if (id == breakOnCodegenID)
+    gdbShouldBreakHere();
+
   if( outfile ) {
     // dtString immediates don't actually codegen as immediates, we just use
     // them for param string functionality.
@@ -581,13 +584,15 @@ GenRet VarSymbol::codegenVarSymbol(bool lhsInSetReference) {
       // check LVT for value
       GenRet got = info->lvt->getValue(cname);
       got.chplType = typeInfo();
-      // handle extern C arrays
-      // these should generate a pointer to the first element
-      if (got.val && hasFlag(FLAG_EXTERN)) {
-        if (info->lvt->isCArray(cname)) {
-          got.val = info->irBuilder->CreateStructGEP(NULL, got.val, 0);
-          got.isLVPtr = GEN_VAL;
-        }
+      // extern C arrays might be declared with type c_ptr(eltType)
+      // (which is a lie but works OK in C). In that event, generate
+      // a pointer to the first element when the variable is used.
+      if (got.val &&
+          hasFlag(FLAG_EXTERN) &&
+          getValType()->symbol->hasFlag(FLAG_C_PTR_CLASS) &&
+          info->lvt->isCArray(cname)) {
+        got.val = info->irBuilder->CreateStructGEP(NULL, got.val, 0);
+        got.isLVPtr = GEN_VAL;
       }
       if (got.val)
         return got;
@@ -632,7 +637,7 @@ GenRet VarSymbol::codegenVarSymbol(bool lhsInSetReference) {
 #endif
   }
 
-  INT_FATAL("Could not code generate %s - "
+  USR_FATAL("Could not find C type %s - "
             "perhaps it is a complex macro?", cname);
   return ret;
 }
@@ -1054,6 +1059,10 @@ std::string ArgSymbol::getPythonType(PythonFileType pxd) {
     // Allow python declarations to accept anything iterable to translate to
     // an array, instead of limiting to a specific Python type
     return "";
+  } else if (t->symbol->hasFlag(FLAG_REF) &&
+             t->getValType() == dtOpaqueArray &&
+             (pxd == PYTHON_PYX || pxd == C_PYX)) {
+    return "ChplOpaqueArray ";
   } else {
     return getPythonTypeName(t, pxd) + " ";
   }
@@ -1105,6 +1114,13 @@ std::string ArgSymbol::getPythonArgTranslation() {
 
       return res;
     }
+  } else if (t->symbol->hasFlag(FLAG_REF) &&
+             t->getValType() == dtOpaqueArray) {
+    // Opaque arrays have a Python representation that stores the C contents in
+    // a field named val
+    std::string res = "\tchpl_" + strname + " = &" + strname + ".val\n";
+    return res;
+
   } else if (t->symbol->hasEitherFlag(FLAG_C_PTR_CLASS, FLAG_REF)) {
     // Lydia TODO 12/04/18: Might be good to use a template where we can
     // replace all instances of a placeholder with the argument name instead of
@@ -1189,8 +1205,7 @@ void TypeSymbol::codegenDef() {
     llvm::Type *type = info->lvt->getType(cname);
 
     if(type == NULL) {
-      printf("No type '%s'/'%s' found\n", cname, name);
-      INT_FATAL(this, "No type found");
+      USR_FATAL(this, "Could not find C type for %s", cname);
     }
 
     llvmType = type;
@@ -2154,6 +2169,9 @@ GenRet FnSymbol::codegenPYXType() {
         exportedArrayElementType[this] != NULL) {
       funcCall += "cdef chpl_external_array ret_arr = ";
       returnStmt += getPythonArrayReturnStmts();
+    } else if (retType == dtOpaqueArray) {
+      funcCall += "ret = ChplOpaqueArray()\n\t";
+      funcCall += "ret.setVal(";
     } else {
       funcCall += "ret = ";
     }
@@ -2204,6 +2222,8 @@ GenRet FnSymbol::codegenPYXType() {
 
   } // pyx files do not take void as an argument list, just close the parens
   header += "):\n";
+  if (retType == dtOpaqueArray)
+    funcCall += ")";
   funcCall += ")\n";
   ret.c = header + argTranslate + funcCall + returnStmt;
 
@@ -2217,13 +2237,13 @@ std::string FnSymbol::getPythonArrayReturnStmts() {
   std::string typeStrCDefs = getPythonTypeName(eltType->type, C_PYX);
   // Create the numpy array to return
   // E.g. cdef numpy.ndarray [C element type, ndim=1] ret =
-  //          numpy.zeros(shape = ret_arr.size, dtype = Python element type)
+  //          numpy.zeros(shape = ret_arr.num_elts, dtype = Python element type)
   std::string res = "\tcdef numpy.ndarray [" + typeStrCDefs + ", ndim=1] ret";
-  res += " = numpy.zeros(shape = ret_arr.size, dtype = " + typeStr + ")\n";
+  res += " = numpy.zeros(shape = ret_arr.num_elts, dtype = " + typeStr + ")\n";
 
   // Populate it with the contents we return (which translated C types into
   // Python types)
-  res += "\tfor i in range(ret_arr.size):\n";
+  res += "\tfor i in range(ret_arr.num_elts):\n";
   res += "\t\tret[i] = (<" + typeStrCDefs + "*>ret_arr.elts)[i]\n";
 
   // Free the returned array now that its contents have been stored elsewhere

@@ -1,10 +1,12 @@
 Initializing Modules:
    ChapelStandard
     CPtr
+     HaltWrappers
     CString
     String
      SysCTypes
      StringCasts
+    OwnedObject
     ChapelDebugPrint
     ChapelBase
     MemConsistency
@@ -12,7 +14,6 @@ Initializing Modules:
     ChapelThreads
     ChapelTuple
     ChapelRange
-     HaltWrappers
     ChapelTaskDataHelp
     LocaleModel
      LocaleModelHelpFlat

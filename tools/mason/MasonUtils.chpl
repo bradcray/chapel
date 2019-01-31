@@ -84,7 +84,7 @@ proc stripExt(toStrip: string, ext: string) : string {
 proc runCommand(cmd, quiet=false) : string throws {
   var ret : string;
   try {
-    
+
     var splitCmd = cmd.split();
     var process = spawn(splitCmd, stdout=PIPE);
 
@@ -97,7 +97,7 @@ proc runCommand(cmd, quiet=false) : string throws {
     process.wait();
   }
   catch {
-    throw new MasonError("Internal mason error");
+    throw new owned MasonError("Internal mason error");
   }
   return ret;
 }
@@ -122,6 +122,14 @@ proc runWithStatus(command, show=true): int {
   }
 }
 
+proc SPACK_ROOT : string {
+  const envHome = getEnv("SPACK_ROOT");
+  const default = MASON_HOME + "/spack";
+
+  const spackRoot = if !envHome.isEmptyString() then envHome else default;
+
+  return spackRoot;
+}
 
 /* uses spawnshell and the prefix to setup Spack before
    calling the spack command. This also returns the stdout
@@ -132,12 +140,12 @@ proc getSpackResult(cmd, quiet=false) : string throws {
   try {
 
 
-    var prefix = "export SPACK_ROOT=" + MASON_HOME + "/spack" +
-    " && export PATH=$SPACK_ROOT/bin:$PATH" +
-    " && source $SPACK_ROOT/share/spack/setup-env.sh && ";
+    var prefix = "export SPACK_ROOT=" + SPACK_ROOT +
+    " && export PATH=\"$SPACK_ROOT/bin:$PATH\"" +
+    " && . $SPACK_ROOT/share/spack/setup-env.sh && ";
     var splitCmd = prefix + cmd;
-    var process = spawnshell(splitCmd, stdout=PIPE);
-    
+    var process = spawnshell(splitCmd, stdout=PIPE, executable="bash");
+
     for line in process.stdout.lines() {
       ret += line;
       if quiet == false {
@@ -147,7 +155,7 @@ proc getSpackResult(cmd, quiet=false) : string throws {
     process.wait();
   }
   catch {
-    throw new MasonError("Internal mason error");
+    throw new owned MasonError("Internal mason error");
   }
   return ret;
 }
@@ -158,12 +166,12 @@ proc getSpackResult(cmd, quiet=false) : string throws {
    TODO: get to work with Spawn */
 proc runSpackCommand(command) {
 
-  var prefix = "export SPACK_ROOT=" + MASON_HOME + "/spack" +
-    " && export PATH=$SPACK_ROOT/bin:$PATH" +
-    " && source $SPACK_ROOT/share/spack/setup-env.sh && ";
+  var prefix = "export SPACK_ROOT=" + SPACK_ROOT +
+    " && export PATH=\"$SPACK_ROOT/bin:$PATH\"" +
+    " && . $SPACK_ROOT/share/spack/setup-env.sh && ";
 
   var cmd = (prefix + command);
-  var sub = spawnshell(cmd, stderr=PIPE);
+  var sub = spawnshell(cmd, stderr=PIPE, executable="bash");
   sub.wait();
 
   for line in sub.stderr.lines() {
@@ -277,7 +285,7 @@ proc getChapelVersionInfo() {
       } else if release.search(output, semver) {
         ret(4) = false;
       } else {
-        throw new MasonError("Failed to match output of 'chpl --version':\n" + output);
+        throw new owned MasonError("Failed to match output of 'chpl --version':\n" + output);
       }
 
       const split = semver.split(".");
@@ -325,7 +333,7 @@ proc developerMode: bool {
 proc getProjectHome(cwd: string, tomlName="Mason.toml") : string throws {
   const (dirname, basename) = splitPath(cwd);
   if dirname == '/' {
-    throw new MasonError("Mason could not find your configuration file (Mason.toml)");
+    throw new owned MasonError("Mason could not find your configuration file (Mason.toml)");
   }
   const tomlFile = joinPath(cwd, tomlName);
   if exists(tomlFile) {
@@ -359,7 +367,7 @@ proc getLastModified(filename: string) : int {
 proc projectModified(projectHome, projectName, binLocation) : bool {
   const binaryPath = joinPath(projectHome, "target", binLocation, projectName);
   const tomlPath = joinPath(projectHome, "Mason.toml");
-   
+
   if isFile(binaryPath) {
     const binModTime = getLastModified(binaryPath);
     for file in listdir(joinPath(projectHome, "src")) {

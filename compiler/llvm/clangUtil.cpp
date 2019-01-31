@@ -1610,7 +1610,9 @@ void runClang(const char* just_parse_filename) {
   sysroot_arguments += "/configured-clang-sysroot-arguments";
 
   // read arguments from configured-clang-sysroot-arguments
+  // these might include a key -isysroot argument on Mac OS X
   readArgsFromFile(sysroot_arguments, args);
+
   // read arguments that we captured at compile time
   readArgsFromString(get_clang_sysroot_args(), args);
 
@@ -2967,13 +2969,6 @@ void makeBinaryLLVM(void) {
   for_vector(const char, libName, libFiles) {
     command += " -l";
     command += libName;
-  }
-
-  // Clang doesn't automatically link against GNU's libatomic, so we need to
-  // bring it in. If we start using compiler-rt, this shouldn't be needed
-  if (strcmp(CHPL_ATOMICS, "cstdlib") == 0 &&
-      strcmp(CHPL_TARGET_PLATFORM, "darwin") != 0) {
-    command += " -latomic";
   }
 
   if( printSystemCommands ) {

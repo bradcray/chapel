@@ -60,10 +60,10 @@ endif
 #
 BUILD_VERSION_FILE = $(COMPILER_ROOT)/main/BUILD_VERSION
 # configured prefix file
-CONFIGURED_PREFIX_FILE = $(COMPILER_ROOT)/main/CONFIGURED_PREFIX
+CONFIGURED_PREFIX_FILE = $(COMPILER_BUILD)/CONFIGURED_PREFIX
 # file storing the names of clang, clang++ for CHPL_LLVM=system
 # also stores the clang-sysroot-arguments
-CLANG_SETTINGS_FILE = $(COMPILER_ROOT)/main/CLANG_SETTINGS
+CLANG_SETTINGS_FILE = $(COMPILER_BUILD)/CLANG_SETTINGS
 
 #
 # include source subdirectories here
@@ -141,10 +141,10 @@ $(BUILD_VERSION_FILE): FORCE
 $(CHPL_MAKE_HOME)/configured-prefix:
 	echo > $(CHPL_MAKE_HOME)/configured-prefix
 
-$(CONFIGURED_PREFIX_FILE): $(CHPL_MAKE_HOME)/configured-prefix
+$(CONFIGURED_PREFIX_FILE): $(COMPILER_BUILD) $(CHPL_MAKE_HOME)/configured-prefix
 	echo '"'`cat $(CHPL_MAKE_HOME)/configured-prefix`'"' \ > $(CONFIGURED_PREFIX_FILE)
 
-$(CLANG_SETTINGS_FILE):
+$(CLANG_SETTINGS_FILE): $(COMPILER_BUILD)
 	echo '{"'$(CLANG_CC)'","'$(CLANG_CXX)'","'`$(CHPL_MAKE_HOME)/util/config/gather-clang-sysroot-arguments $(CLANG_CC)`'"}' | $(FIXPATH_CMD) > $(CLANG_SETTINGS_FILE)
 
 $(CHPL_CONFIG_CHECK): | $(CHPL_BIN_DIR)
@@ -170,6 +170,9 @@ chpldoc: $(CHPLDOC)
 parser: FORCE
 	$(MAKE) -C parser parser
 
+$(COMPILER_BUILD):
+	mkdir -p $@
+
 $(CHPL_BIN_DIR):
 	mkdir -p $@
 
@@ -187,7 +190,7 @@ $(CHPL_OLD_BIN_DIR):
 #	done
 
 llvm: FORCE
-	$(MAKE) -C $(THIRD_PARTY_DIR)/llvm $(CHPL_MAKE_LLVM)
+	$(MAKE) -C $(THIRD_PARTY_DIR) llvm
 
 #
 # include standard footer for compiler

@@ -38,6 +38,11 @@ module ChapelReduce {
     return arr;
   }
 
+  proc chpl__scanSupportsPar(data, op) param {
+    var tmp = data;
+    return canResolveMethod(tmp, "_scan", op);
+  }
+
   proc chpl__scanIterator(op, data) {
     use Reflection;
     param supportsPar = isArray(data) && canResolveMethod(data, "_scan", op);
@@ -47,6 +52,12 @@ module ChapelReduce {
       compilerWarning("scan has been serialized (see issue #5760)");
       if (supportsPar) {
         compilerWarning("(recompile with -senableParScan to enable a prototype parallel implementation)");
+      } else {
+        compilerWarning(data.type:string);
+        compilerWarning(canResolveMethod(data, "_scan", op):string);
+        var tmp = data;
+        compilerWarning(tmp.type:string);
+        compilerWarning(canResolveMethod(tmp, "_scan", op):string);
       }
       var arr = for d in data do chpl__accumgen(op, d);
 

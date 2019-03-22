@@ -9,10 +9,9 @@ record myR {
   proc deinit() { delete c; }
 }
 
-inline proc chpl__autoDestroy(x: myR) { }
-
 proc =(ref a: myR, b: myR) {
-  a.c = new unmanaged myC(); // leak memory here.
+  delete a.c;
+  a.c = new unmanaged myC();
   a.c.i = b.c.i;
 }
 

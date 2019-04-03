@@ -24,10 +24,27 @@ module ChapelReduce {
 
   config param enableParScan = false;
 
-  proc chpl__scanStateResTypesMatch(op) param {
-    type resType = op.generate().type;
-    type stateType = op.identity.type;
-    return (resType == stateType);
+  private proc chpl__hasDomain(data: []) param {
+    return true;
+  }
+
+  private proc chpl__hasDomain(data: _iteratorRecord) param {
+    return chpl_iteratorHasShape(data);
+  }
+
+  private proc chpl__hasDomain(data) param {
+    return false;
+  }
+
+  private proc chpl__getDomain(data: [?D]) {
+    return D;
+  }
+
+  private proc chpl__getDomain(data: _iteratorRecord) {
+    if chpl_iteratorHasDomainShape(data) then
+      return _newDomain(data._shape_);
+    else
+      return {data._shape_};
   }
 
   proc chpl__scanIteratorZip(op, data) {
@@ -40,14 +57,25 @@ module ChapelReduce {
 
   proc chpl__scanIterator(op, data) {
     use Reflection;
-    param supportsPar = isArray(data) && canResolveMethod(data, "_scan", op);
-    if (enableParScan && supportsPar) {
-      return data._scan(op);
-    } else {
-      compilerWarning("scan has been serialized (see issue #5760)");
-      if (supportsPar) {
-        compilerWarning("(recompile with -senableParScan to enable a prototype parallel implementation)");
+
+    if (chpl__hasDomain(data)) {
+      type resType = op.generate().type;
+      var res: [chpl__getDomain(data)] resType;
+      res = data;
+      param supportsPar = canResolveMethod(res, "_scan");
+      if enableParScan && supportsPar {
+        if (supportsPar) then
+          compilerWarning("(recompile with -senableParScan to enable a prototype parallel implementation)");
+
+        res._scan();
+      } else {
+        compilerWarning("scan has been serialized (see issue #5760): A");
+        res = for d in data do chpl__accumgen(op, d);
       }
+      return res;
+    } else {
+      compilerWarning("scan has been serialized (see issue #5760): B");
+
       var arr = for d in data do chpl__accumgen(op, d);
 
       delete op;

@@ -2177,22 +2177,17 @@ module DefaultRectangular {
   config param debugDRScan = false;
 
   /* This computes a 1D scan in parallel on the array, for 1D arrays only */
-  proc DefaultRectangularArr.doiScan(op, dom) where (rank == 1) &&
-                                                chpl__scanStateResTypesMatch(op) {
+  proc DefaultRectangularArr.doiScan(op) where (rank == 1) {
     use RangeChunk;
 
-    type resType = op.generate().type;
-    var res: [dom] resType;
-
     // Take first pass, computing per-task partial scans, stored in 'state'
-    var (numTasks, rngs, state, _) = this.chpl__preScan(op, res);
+    var (numTasks, rngs, state, _) = this.chpl__preScan(op);
 
     // Take second pass updating result based on the scanned 'state'
-    this.chpl__postScan(op, res, numTasks, rngs, state);
+    this.chpl__postScan(op, numTasks, rngs, state);
 
     // Clean up and return
     delete op;
-    return res;
   }
 
   // A helper routine to take the first parallel scan over a vector
@@ -2200,9 +2195,9 @@ module DefaultRectangular {
   // task, and the scanned results of each task's scan.  This is
   // broken out into a helper function in order to be made use of by
   // distributed array scans.
-  proc DefaultRectangularArr.chpl__preScan(op, res: [] ?resType) {
+  proc DefaultRectangularArr.chpl__preScan(op, data) {
     // Compute who owns what
-    const rng = dom.dsiDim(1);
+    const rng = this.dsiDim(1);
     const numTasks = if __primitive("task_get_serial") then
                       1 else _computeNumChunks(rng.size);
     const rngs = RangeChunk.chunks(rng, numTasks);
@@ -2211,28 +2206,28 @@ module DefaultRectangular {
       writeln("Whose chunks are: ", rngs);
     }
 
-    var state: [1..numTasks] resType;
+    var state: [1..numTasks] this.eltType;
 
     // Take first pass over data doing per-chunk scans
     coforall tid in 1..numTasks {
-      const current: resType;
+      const current: this.eltType;
       const myop = op.clone();
       for i in rngs[tid] {
         ref elem = dsiAccess(i);
         myop.accumulate(elem);
-        res[i] = myop.generate();
+        this.dsiAccess[i] = myop.generate();
       }
-      state[tid] = res[rngs[tid].high];
+      state[tid] = this.dsiAccess[rngs[tid].high];
       delete myop;
     }
     if debugDRScan {
-      writeln("res = ", res);
+      writeln("res = ", this.dsiSerialWrite(stdout));
       writeln("state = ", state);
     }
 
     // Scan state vector itself
     const metaop = op.clone();
-    var next: resType = metaop.identity;
+    var next: this.eltType = metaop.identity;
     for i in 1..numTasks {
       state[i] <=> next;
       metaop.accumulateOntoState(next, state[i]);
@@ -2248,15 +2243,15 @@ module DefaultRectangular {
   // the result vector adding the prefix state computed by the earlier
   // tasks.  This is broken out into a helper function in order to be
   // made use of by distributed array scans.
-  proc DefaultRectangularArr.chpl__postScan(op, res, numTasks, rngs, state) {
+  proc DefaultRectangularArr.chpl__postScan(op, numTasks, rngs, state) {
     coforall tid in 1..numTasks {
       const myadjust = state[tid];
       for i in rngs[tid] {
-        op.accumulateOntoState(res[i], myadjust);
+        op.accumulateOntoState(this.dsiAccess[i], myadjust);
       }
     }
     if debugDRScan then
-      writeln("res = ", res);
+      writeln("res = ", this.dsiSerialWrite());
   }
 
 

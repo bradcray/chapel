@@ -336,7 +336,7 @@ static void addModulePaths() {
 
       if (char* lastSlash = strrchr(dirName, '/')) {
         *lastSlash = '\0';
-        addUsrDirToModulePath(dirName);
+        //        addUsrDirToModulePath(dirName);
 
       } else {
         addUsrDirToModulePath(".");

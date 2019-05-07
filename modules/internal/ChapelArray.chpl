@@ -2415,8 +2415,10 @@ module ChapelArray {
                                                     ranges=ranges,
                                                     sliceePid = slicedompid,
                                                     sliceeInst = slicedom);
+      /*
       pragma "no auto destroy" var d = _newDomain(dom);
       d._value._free_when_no_arrs = true;
+*/
 
       //
       // If this is already a slice array view, we can short-circuit
@@ -2427,16 +2429,16 @@ module ChapelArray {
                               else (this._value, this._pid);
 
       var a = new unmanaged ArrayViewSliceArr(eltType=this.eltType,
-                                    _DomPid=d._pid,
-                                    dom=d._instance,
-                                    _ArrPid=arrpid,
-                                    _ArrInstance=arr);
+                                              _DomPid=nullPid,
+                                              dom=dom,
+                                              _ArrPid=arrpid,
+                                              _ArrInstance=arr);
 
       // this doesn't need to lock since we just created the domain d
       // don't add this array to the domain's list of arrays since
       // resizing a slice's domain shouldn't generate a reallocate
       // call for the underlying array
-      d._value.add_arr(a, locking=false, addToList=false);
+      dom.add_arr(a, locking=false, addToList=false);
       return _newArray(a);
     }
 
@@ -3966,13 +3968,17 @@ module ChapelArray {
   }
 
   inline proc chpl__bulkTransferArray(ref a: [?AD], b : [?BD]) {
-    return chpl__bulkTransferArray(a, AD, b, BD);
+    return false;
+    //    return chpl__bulkTransferArray(a, AD, b, BD);
   }
   inline proc chpl__bulkTransferArray(ref a: [], AD : domain, const ref b: [], BD : domain) {
-    return chpl__bulkTransferArray(a._value, AD, b._value, BD);
+    return false;
+    //    return chpl__bulkTransferArray(a._value, AD, b._value, BD);
   }
 
   inline proc chpl__bulkTransferArray(destClass, destDom : domain, srcClass, srcDom : domain) {
+    return false;
+    /*
     use Reflection;
     var success = false;
 
@@ -4009,6 +4015,7 @@ module ChapelArray {
       bulkTransferDebug("bulk transfer did not happen");
 
     return success;
+*/
   }
 
   inline proc chpl__transferArray(ref a: [], const ref b) {
@@ -4212,7 +4219,7 @@ module ChapelArray {
 
   // This implementation of arrays and domains can create aliases
   // of domains and arrays. Additionally, array aliases are possible
-  // in the language with the => operator.
+  // in the language using 'ref' declarations.
   //
   // A call to the chpl__unalias function is added by the compiler when a user
   // variable is initialized from an expression that would normally not require

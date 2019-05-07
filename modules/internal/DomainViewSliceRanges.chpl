@@ -64,7 +64,9 @@ module DomainViewSliceRanges {
     }
 
     proc dsiDims() {
-      var inds = dsiDim(1..rank);
+      var inds: rank*range;
+      for i in 1..rank do
+        inds(i) = dsiDim(i);
       return inds;
     }
 
@@ -88,7 +90,7 @@ module DomainViewSliceRanges {
     }
 
     proc dsiGetIndices() {
-      return (0..1)**2;
+      return dsiDims();
     }
 
     proc dsiAssignDomain(rhs: domain, lhsPrivate: bool) {
@@ -96,30 +98,39 @@ module DomainViewSliceRanges {
     }
 
     iter these() {
-      halt("Have not implemented iterators yet");
+      const ranges = dsiDims();
+      for i in ranges(1) {
+        for j in ranges(2) {
+          yield (i,j);
+        }
+      }
     }
 
     iter these(param tag: iterKind) where tag == iterKind.standalone
       && !localeModelHasSublocales
       && chpl__isDROrDRView(slicee)
     {
-      halt("Have not implemented iterators yet");
+      for inds in these() do
+        yield inds();
     }
 
     iter these(param tag: iterKind) where tag == iterKind.standalone
       && !localeModelHasSublocales
       && !chpl__isDROrDRView(slicee)
     {
-      halt("Have not implemented iterators yet");
+      for inds in these() do
+        yield inds();
     }
 
+
     iter these(param tag: iterKind) where tag == iterKind.leader {
-      halt("Have not implemented iterators yet");
+      yield dsiDims();
     }
 
     iter these(param tag: iterKind, followThis)
       where tag == iterKind.follower {
-      halt("Have not implemented iterators yet");
+      for inds in these() do
+        yield inds;
     }
 
     // TODO: Is there something we can re-use here?

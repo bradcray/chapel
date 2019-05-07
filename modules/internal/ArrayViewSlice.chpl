@@ -325,15 +325,18 @@ module ArrayViewSlice {
     }
 
     proc doiCanBulkTransferRankChange() param {
-      return arr.doiCanBulkTransferRankChange();
+      return false;
+      //      return arr.doiCanBulkTransferRankChange();
     }
 
     proc doiBulkTransferFromKnown(destDom, srcClass, srcDom) : bool {
-      return chpl__bulkTransferArray(this.arr, destDom, srcClass, srcDom);
+      return false;
+      //      return chpl__bulkTransferArray(this.arr, destDom, srcClass, srcDom);
     }
 
     proc doiBulkTransferToKnown(srcDom, destClass, destDom) : bool {
-      return chpl__bulkTransferArray(destClass, destDom, this.arr, srcDom);
+      return false;
+      //      return chpl__bulkTransferArray(destClass, destDom, this.arr, srcDom);
     }
   }
 }

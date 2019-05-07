@@ -717,7 +717,8 @@ inline proc integral.safeCast(type T) : T where isIntType(T) {
 
 pragma "no doc" // documented with the other safeCast above
 proc integral.safeCast(type T) {
-  compilerError("safeCast is only supported between integral types");
+  compilerError("safeCast is only supported between integral types, not " +
+                T:string);
 }
 
 //

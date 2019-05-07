@@ -166,6 +166,7 @@ module ChapelArray {
   use ArrayViewSlice;
   use ArrayViewRankChange;
   use ArrayViewReindex;
+  use DomainViewSliceRanges;
 
   // Explicitly use a processor atomic, as most calls to this function are
   // likely be on locale 0
@@ -2405,7 +2406,16 @@ module ChapelArray {
       if boundsChecking then
         checkSlice((... ranges));
 
-      pragma "no auto destroy" var d = _dom((...ranges));
+      const thisDomClass = this._value.dom;
+      const (slicedom, slicedompid) = (thisDomClass, thisDomClass.pid);
+
+      var dom = new unmanaged DomainViewSliceRanges(rank=rank,
+                                                    idxType=idxType,
+                                                    stridable=slicedom.stridable,
+                                                    ranges=ranges,
+                                                    sliceePid = slicedompid,
+                                                    sliceeInst = slicedom);
+      pragma "no auto destroy" var d = _newDomain(dom);
       d._value._free_when_no_arrs = true;
 
       //

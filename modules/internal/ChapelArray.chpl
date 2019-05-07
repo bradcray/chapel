@@ -4182,6 +4182,7 @@ module ChapelArray {
     // but that makes an infinite loop.
   }
 
+  /*
   pragma "init copy fn"
   proc chpl__initCopy(const ref a: domain) {
     var b: a.type;
@@ -4192,11 +4193,14 @@ module ChapelArray {
 
     return b;
   }
+  */
 
+  /*
   pragma "auto copy fn" proc chpl__autoCopy(const ref x: domain) {
     pragma "no copy" var b = chpl__initCopy(x);
     return b;
   }
+  */
 
   // This implementation of arrays and domains can create aliases
   // of domains and arrays. Additionally, array aliases are possible

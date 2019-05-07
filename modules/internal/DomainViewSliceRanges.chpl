@@ -46,23 +46,45 @@ module DomainViewSliceRanges {
     }
 
     proc dsiBuildArray(type eltType) {
-      halt("Can't build arrays from sliced domains yet");
-      /*
       pragma "no auto destroy"
-      const downarr = _newArray(slicee.dsiBuildArray(eltType));
-      return new unmanaged ArrayViewRankChangeArr(eltType  =eltType,
-                                        _DomPid = this.pid,
-                                        dom = _to_unmanaged(this),
-                                        _ArrPid=downarr._pid,
-                                        _ArrInstance=downarr._instance,
-                                        collapsedDim=collapsedDim,
-                                        idx=idx,
-                                        ownsArrInstance=true);
-      */
+      const newarr = _newArray(slicee.dsiBuildArray(eltType));
+      return new unmanaged ArrayViewSliceArr(eltType  =eltType,
+                                             _DomPid = this.pid,
+                                             dom = _to_unmanaged(this),
+                                             _ArrPid=newarr._pid,
+                                             _ArrInstance=newarr._instance);
     }
 
     proc dsiSetIndices(inds) {
       compilerError("indices of range-sliced domains can't be changed");
+    }
+
+    proc dsiDim(dim: int) {
+      return (slicee.dsiDim(dim))[ranges(dim)];
+    }
+
+    proc dsiDims() {
+      var inds = dsiDim(1..rank);
+      return inds;
+    }
+
+    proc dsiNumIndices {
+      var tot = 0;
+      for i in 1..rank do
+        tot += dsiDim(i).size;
+      return tot;
+    }
+
+    proc dsiLow {
+      if rank == 1 {
+        return dsiDim(1).low;
+      } else {
+        var result: rank*idxType;
+        for param i in 1..rank do
+          result(i) = dsiDim(i).low;
+        return result;
+      }
+
     }
 
     proc dsiGetIndices() {
@@ -70,7 +92,7 @@ module DomainViewSliceRanges {
     }
 
     proc dsiAssignDomain(rhs: domain, lhsPrivate: bool) {
-      compilerError("range-sliced domains can't be assigned");
+      this.ranges = rhs._value.ranges;
     }
 
     iter these() {

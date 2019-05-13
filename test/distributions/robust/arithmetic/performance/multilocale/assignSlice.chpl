@@ -13,4 +13,39 @@ B = A[1..n4,1..n4,1..n4,1..n4];
 if doVerboseComm then stopVerboseComm();
 stopCommDiagnostics();
 writeln(getCommDiagnostics());
+
+resetCommDiagnostics();
+startCommDiagnostics();
+if doVerboseComm then startVerboseComm();
+ref AS = A[1..n4,1..n4,1..n4,1..n4];
+if doVerboseComm then stopVerboseComm();
+stopCommDiagnostics();
+writeln("setup slice: ", getCommDiagnostics());
+
+resetCommDiagnostics();
+startCommDiagnostics();
+if doVerboseComm then startVerboseComm();
+forall a in AS do
+  ;
+if doVerboseComm then stopVerboseComm();
+stopCommDiagnostics();
+writeln("iterate over slice: ", getCommDiagnostics());
+
+resetCommDiagnostics();
+startCommDiagnostics();
+if doVerboseComm then startVerboseComm();
+forall b in B do
+  ;
+if doVerboseComm then stopVerboseComm();
+stopCommDiagnostics();
+writeln("iterate over B: ", getCommDiagnostics());
+
+resetCommDiagnostics();
+startCommDiagnostics();
+if doVerboseComm then startVerboseComm();
+B = AS;
+if doVerboseComm then stopVerboseComm();
+stopCommDiagnostics();
+writeln("use slice: ", getCommDiagnostics());
+
 for i in Dom4D do if B[i]!=i then writeln("ERROR: B[", i, "]==", B[i]);

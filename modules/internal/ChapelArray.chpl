@@ -3907,6 +3907,8 @@ module ChapelArray {
   }
 
   inline proc =(ref a: [], b:[]) {
+    extern proc printf(x...);
+    printf("In array, array assign\n");
     if a.rank != b.rank then
       compilerError("rank mismatch in array assignment");
 
@@ -3933,11 +3935,15 @@ module ChapelArray {
   }
 
   inline proc chpl__uncheckedArrayTransfer(ref a: [], b:[]) {
+    extern proc printf(x...);
     if !chpl__serializeAssignment(a, b) && chpl__compatibleForBulkTransfer(a, b) {
+      printf("In true path\n");
       if chpl__bulkTransferArray(a, b) == false {
+        printf("But couldn't bulk transfer\n");
         chpl__transferArray(a, b);
       }
     } else {
+      printf("In transfer array path\n");
       chpl__transferArray(a, b);
     }
   }
@@ -3989,14 +3995,18 @@ module ChapelArray {
   }
 
   inline proc chpl__transferArray(ref a: [], const ref b) {
+    extern proc printf(x...);
     if (a.eltType == b.type ||
         _isPrimitiveType(a.eltType) && _isPrimitiveType(b.type)) {
+      printf("case 1\n");
       forall aa in a do
         aa = b;
     } else if chpl__serializeAssignment(a, b) {
+      printf("case 2\n");
       for (aa,bb) in zip(a,b) do
         aa = bb;
     } else {
+      printf("case 3\n");
       [ (aa,bb) in zip(a,b) ]
         aa = bb;
     }

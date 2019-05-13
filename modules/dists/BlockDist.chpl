@@ -773,9 +773,12 @@ iter BlockDom.these(param tag: iterKind) where tag == iterKind.leader {
       locOffset(i) = tmpBlock.dim(i).first / stride:idxType;
     }
     // Forward to defaultRectangular
+    writeln(here.id, ": following ", tmpBlock);
     for followThis in tmpBlock.these(iterKind.leader, maxTasks,
-                                     myIgnoreRunning, minSize, locOffset) do
+                                     myIgnoreRunning, minSize, locOffset) do {
+      writeln(here.id, ": followThis = ", followThis);
       yield followThis;
+    }
   }
 }
 

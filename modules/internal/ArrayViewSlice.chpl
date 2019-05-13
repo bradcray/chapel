@@ -157,6 +157,8 @@ module ArrayViewSlice {
     //
 
     iter these() ref {
+      extern proc printf(x...);
+      printf("In default iterator\n");
       for elem in chpl__serialViewIter(this, privDom) do
         yield elem;
     }
@@ -164,10 +166,14 @@ module ArrayViewSlice {
     iter these(param tag: iterKind) ref
       where tag == iterKind.standalone && !localeModelHasSublocales &&
            __primitive("method call resolves", privDom, "these", tag) {
+      extern proc printf(x...);
+      printf("In where iterator\n");
       forall i in privDom do yield arr.dsiAccess(i);
     }
 
     iter these(param tag: iterKind) where tag == iterKind.leader {
+      extern proc printf(x...);
+      printf("In leader iterator\n");
       for followThis in privDom.these(tag) do {
         yield followThis;
       }

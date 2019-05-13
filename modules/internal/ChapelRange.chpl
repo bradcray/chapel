@@ -1290,6 +1290,8 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
   // stride rather than waiting until runtime.
   pragma "no doc"
   inline proc by(r : range(?), param step) {
+    extern proc printf(x...);
+    //    printf("In by()\n");
     chpl_range_check_stride(step, r.idxType);
     return chpl_by_help(r, step:r.strType);
   }
@@ -1873,6 +1875,8 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
   // are the same same type, stride is valid, etc.)
   iter chpl_direct_pos_stride_range_iter(low: ?t, high, stride) {
     if (useOptimizedRangeIterators) {
+      extern proc printf(x...);
+      //      printf("In chpl_direct_pos_stride_range_iter()\n");
       chpl_range_check_stride(stride, t);
 
       if boundsChecking then
@@ -1892,6 +1896,8 @@ proc _cast(type t, r: range(?)) where isRangeType(t) {
 
   iter chpl_direct_param_stride_range_iter(low: ?t, high, param stride) {
     if (useOptimizedRangeIterators) {
+      extern proc printf(x...);
+      //      printf("In chpl_direct_param_stride_range_iter()\n");
       chpl_range_check_stride(stride, t);
 
       var i: t;

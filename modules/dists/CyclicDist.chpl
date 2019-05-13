@@ -585,6 +585,63 @@ iter CyclicDom.these(param tag: iterKind) where tag == iterKind.leader {
   const ignoreRunning = dist.dataParIgnoreRunningTasks;
   const minSize = dist.dataParMinGranularity;
   const wholeLow = whole.low;
+
+  // If this is the only task running on this locale, we don't want to
+  // count it when we try to determine how many tasks to use.  Here we
+  // check if we are the only one running, and if so, use
+  // ignoreRunning=true for this locale only.  Obviously there's a bit
+  // of a race condition if some other task starts after we check, but
+  // in that case there is no correct answer anyways.
+  //
+  // Note that this code assumes that any locale will only be in the
+  // targetLocales array once.  If this is not the case, then the
+  // tasks on this locale will *all* ignoreRunning, which may have
+  // performance implications.
+  const hereId = here.id;
+  const hereIgnoreRunning = if here.runningTasks() == 1 then true
+                            else ignoreRunning;
+  //  writeln("here: ", (hereId, hereIgnoreRunning));
+  coforall locDom in locDoms do on locDom {
+    const myIgnoreRunning = if here.id == hereId then hereIgnoreRunning
+      else ignoreRunning;
+    // Use the internal function for untranslate to avoid having to do
+    // extra work to negate the offset
+    type strType = chpl__signedType(idxType);
+    const tmpBlock = locDom.myBlock.chpl__unTranslate(wholeLow);
+    var locOffset: rank*idxType;
+    for param i in 1..tmpBlock.rank {
+      const stride = tmpBlock.dim(i).stride;
+      if stride < 0 && strType != idxType then
+        halt("negative stride not supported with unsigned idxType");
+        // (since locOffset is unsigned in that case)
+      locOffset(i) = tmpBlock.dim(i).first / stride:idxType;
+    }
+    // Forward to defaultRectangular
+    //    writeln(here.id, ": following ", tmpBlock);
+    for followThis in tmpBlock.these(iterKind.leader, maxTasks,
+                                     myIgnoreRunning, minSize, locOffset) do {
+      const stride = tmpBlock.stride;
+      //      writeln(here.id, ": stride is ", stride);
+      //      writeln(here.id, ": followThis = ", followThis);
+      const newFollowThis = chpl__followThisToOrig(idxType, followThis, tmpBlock);
+      /*
+      const newFollowThis = if (rank == 1) then ((followThis(1).low*stride..followThis(1).high*stride by stride)+tmpBlock.low,)
+        else if (rank == 2) then ((followThis(1).low*stride(1)..followThis(1).high*stride(1) by stride(1))+tmpBlock.low(1),
+              (followThis(2).low*stride(2)..followThis(2).high*stride(2) by stride(2))+tmpBlock.low(2)) else
+                                   ((followThis(1).low*stride(1)..followThis(1).high*stride(1) by stride(1))+tmpBlock.low(1),
+                                    (followThis(2).low*stride(2)..followThis(2).high*stride(2) by stride(2))+tmpBlock.low(2),
+                                    (followThis(3).low*stride(3)..followThis(3).high*stride(3) by stride(3))+tmpBlock.low(3),
+                                    (followThis(4).low*stride(4)..followThis(4).high*stride(4) by stride(4))+tmpBlock.low(4));
+      */
+                                    
+      
+      //      writeln(here.id, ": yielding ", newFollowThis);
+      yield newFollowThis;
+      //      yield followThis;
+    }
+  }
+  return;
+  /*
   coforall locDom in locDoms do on locDom {
     const (numTasks, parDim) = _computeChunkStuff(maxTasks, ignoreRunning,
                                                   minSize,
@@ -632,18 +689,25 @@ iter CyclicDom.these(param tag: iterKind) where tag == iterKind.leader {
       }
     }
   }
+  */
 }
 
-iter CyclicDom.these(param tag: iterKind, followThis) where tag == iterKind.follower {
+private proc chpl__followThisToOrig(type idxType, followThis, whole) {
+  param rank = followThis.size;
   var t: rank*range(idxType, stridable=true);
-  if debugCyclicDist then
-    writeln(here.id, ": follower whole is: ", whole,
-                     " follower is: ", followThis);
   for param i in 1..rank {
     // NOTE: unsigned idxType with negative stride will not work
     const wholestride = whole.dim(i).stride:chpl__signedType(idxType);
     t(i) = ((followThis(i).low*wholestride:idxType)..(followThis(i).high*wholestride:idxType) by (followThis(i).stride*wholestride)) + whole.dim(i).alignedLow;
   }
+  return t;
+}
+
+iter CyclicDom.these(param tag: iterKind, followThis) where tag == iterKind.follower {
+  if debugCyclicDist then
+    writeln(here.id, ": follower whole is: ", whole,
+                     " follower is: ", followThis);
+  const t = chpl__followThisToOrig(idxType, followThis, whole);
   if debugCyclicDist then
     writeln(here.id, ": follower maps to: ", t);
   for i in {(...t)} do

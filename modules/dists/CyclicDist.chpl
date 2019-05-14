@@ -617,14 +617,15 @@ iter CyclicDom.these(param tag: iterKind) where tag == iterKind.leader {
       locOffset(i) = tmpBlock.dim(i).first / stride:idxType;
     }
     // Forward to defaultRectangular
+    writeln(here.id, ": locOffset = ", locOffset);
     writeln(here.id, ": following ", tmpBlock);
     for followThis in tmpBlock.these(iterKind.leader, maxTasks,
-                                     myIgnoreRunning, minSize, locOffset) do {
+                                     myIgnoreRunning, minSize /*, locOffset*/) do {
       const stride = tmpBlock.stride;
       //      writeln(here.id, ": stride is ", stride);
       writeln(here.id, ": followThis = ", followThis);
-      //      const newFollowThis = chpl__followThisToOrig(idxType, followThis, tmpBlock);
-      const newFollowThis = followThis;
+      const newFollowThis = chpl__followThisToOrig(idxType, followThis, tmpBlock);
+      //      const newFollowThis = followThis;
       /*
       const newFollowThis = if (rank == 1) then ((followThis(1).low*stride..followThis(1).high*stride by stride)+tmpBlock.low,)
         else if (rank == 2) then ((followThis(1).low*stride(1)..followThis(1).high*stride(1) by stride(1))+tmpBlock.low(1),
@@ -699,7 +700,7 @@ private proc chpl__followThisToOrig(type idxType, followThis, whole) {
   for param i in 1..rank {
     // NOTE: unsigned idxType with negative stride will not work
     const wholestride = whole.dim(i).stride:chpl__signedType(idxType);
-    t(i) = ((followThis(i).low*wholestride:idxType)..(followThis(i).high*wholestride:idxType) by (followThis(i).stride*wholestride));
+    t(i) = ((followThis(i).low*wholestride:idxType)..(followThis(i).high*wholestride:idxType) by (followThis(i).stride*wholestride)) + whole.dim(i).alignedLow;
   }
   //  writeln(here.id, ": Converted ", followThis, " to ", t, " using ", whole);
   return t;

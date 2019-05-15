@@ -1256,6 +1256,8 @@ proc Block.dsiReprivatize(other, reprivatizeData) {
 }
 
 proc BlockDom.chpl__serialize() {
+  extern proc printf(x...);
+  printf("serializing a BlockDom on %d\n", here.id:c_int);
   return pid;
 }
 
@@ -1264,6 +1266,8 @@ proc BlockDom.chpl__serialize() {
 // be a way to lazily privatize by also making the originating locale part
 // of the 'data'?
 proc type BlockDom.chpl__deserialize(data) {
+  extern proc printf(x...);
+  printf("deserializing a BlockDom on %d\n", here.id:c_int);
   return chpl_getPrivatizedCopy(
            unmanaged BlockDom(rank=this.rank,
                               idxType=this.idxType,
@@ -1303,10 +1307,14 @@ proc BlockDom.dsiReprivatize(other, reprivatizeData) {
 }
 
 proc BlockArr.chpl__serialize() {
+  extern proc printf(x...);
+  printf("serializing a BlockArr on %d\n", here.id:c_int);
   return pid;
 }
 
 proc type BlockArr.chpl__deserialize(data) {
+  extern proc printf(x...);
+  printf("deserializing a BlockArr on %d\n", here.id:c_int);
   return chpl_getPrivatizedCopy(
            unmanaged BlockArr(rank=this.rank,
                               idxType=this.idxType,

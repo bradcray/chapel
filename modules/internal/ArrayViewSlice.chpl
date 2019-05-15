@@ -25,6 +25,8 @@
 module ArrayViewSlice {
   use ChapelStandard;
 
+  config param chpl_debugSliceSerialize = true;
+
   private proc buildIndexCacheHelper(arr, dom) {
     param isRankChangeReindex = arr.isRankChangeArrayView() ||
                                 arr.isReindexArrayView() ||
@@ -100,6 +102,10 @@ module ArrayViewSlice {
     // domain and array
     //
     proc chpl__serialize() where chpl__rvfMe() {
+      if chpl_debugSliceSerialize {
+        extern proc printf(x...);
+        printf("serializing a slice on locale %d\n", here.id:c_int);
+      }
       return (_to_borrowed(dom).chpl__serialize(),
               _to_borrowed(arr).chpl__serialize());
     }
@@ -110,6 +116,10 @@ module ArrayViewSlice {
     // to them.
     //
     proc type chpl__deserialize(data) {
+      if chpl_debugSliceSerialize {
+        extern proc printf(x...);
+        printf("deserializing a slice on locale %d\n", here.id:c_int);
+      }
       type domType = __primitive("static field type", this, "dom");
       type arrType = __primitive("static field type", this, "_ArrInstance");
       const dom = _to_borrowed(domType).chpl__deserialize(data(1));

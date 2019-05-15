@@ -60,6 +60,15 @@ proc main() {
   writeln("Incrementing B via routine:");
   increment(B);
 
+  writeln();
+  writeln("Assigning from slice");
+  writeln("--------------------");
+  var C = B + 0.1;
+
+  startTrial();
+  B = C;
+  stopTrial();
+
 
   inline proc startTrial() {
     resetCommDiagnostics();

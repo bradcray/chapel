@@ -345,6 +345,10 @@ module DefaultRectangular {
       }
     }
 
+    // TODO: We're missing a standalone iterator for
+    // DefaultRectangular.  Once we have one, we should make Block and
+    // Cyclic use it as well.
+
     iter these(param tag: iterKind,
                tasksPerLocale = dataParTasksPerLocale,
                ignoreRunning = dataParIgnoreRunningTasks,

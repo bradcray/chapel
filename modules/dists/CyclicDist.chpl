@@ -577,6 +577,34 @@ iter CyclicDom.these() {
     yield i;
 }
 
+iter CyclicDom.these(param tag: iterKind) where tag == iterKind.standalone {
+  const maxTasks = dist.dataParTasksPerLocale;
+  const ignoreRunning = dist.dataParIgnoreRunningTasks;
+  const minSize = dist.dataParMinGranularity;
+
+  // If this is the only task running on this locale, we don't want to
+  // count it when we try to determine how many tasks to use.  Here we
+  // check if we are the only one running, and if so, use
+  // ignoreRunning=true for this locale only.  Obviously there's a bit
+  // of a race condition if some other task starts after we check, but
+  // in that case there is no correct answer anyways.
+  //
+  // Note that this code assumes that any locale will only be in the
+  // targetLocales array once.  If this is not the case, then the
+  // tasks on this locale will *all* ignoreRunning, which may have
+  // performance implications.
+  const hereId = here.id;
+  const hereIgnoreRunning = if here.runningTasks() == 1 then true
+                            else ignoreRunning;
+  coforall locDom in locDoms do on locDom {
+    const myIgnoreRunning = if here.id == hereId then hereIgnoreRunning
+                                                 else ignoreRunning;
+    for i in locDom.myBlock.these(iterKind.standalone, maxTasks,
+                                  myIgnoreRunning, minSize) do
+      yield i;
+  }
+}
+
 iter CyclicDom.these(param tag: iterKind) where tag == iterKind.leader {
   const maxTasks = dist.dataParTasksPerLocale;
   const ignoreRunning = dist.dataParIgnoreRunningTasks;
@@ -857,6 +885,14 @@ proc CyclicArr.dsiAccess(i: idxType...rank) ref
 iter CyclicArr.these() ref {
   for i in dom do
     yield dsiAccess(i);
+}
+
+iter CyclicArr.these(param tag: iterKind) where tag == iterKind.standalone {
+  // TODO: This should really call into the local array's standalone
+  // iterator to avoid the need to random access, but at present,
+  // DefaultRectangular arrays don't have one (?!?)
+  forall i in dom do
+    yield dsiLocalAccess(i);
 }
 
 iter CyclicArr.these(param tag: iterKind) where tag == iterKind.leader {

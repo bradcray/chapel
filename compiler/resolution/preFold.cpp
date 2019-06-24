@@ -20,6 +20,7 @@
 #include "preFold.h"
 
 #include "astutil.h"
+#include "build.h"
 #include "DecoratedClassType.h"
 #include "driver.h"
 #include "ForallStmt.h"
@@ -33,6 +34,7 @@
 #include "stlUtil.h"
 #include "stringutil.h"
 #include "typeSpecifier.h"
+#include "view.h"
 #include "visibleFunctions.h"
 
 #ifndef __STDC_FORMAT_MACROS
@@ -1946,6 +1948,43 @@ static Expr* createFunctionAsValue(CallExpr *call) {
 
   functionCaptureMap[captured_fn] = wrapper;
 
+  {
+    FnSymbol* fn = new FnSymbol("name");
+
+    fn->addFlag(FLAG_COMPILER_GENERATED);
+    fn->addFlag(FLAG_LAST_RESORT);
+    //    fn->addFlag(FLAG_NO_PARENS);
+    fn->retTag = RET_PARAM;
+
+    fn->_this = new ArgSymbol(INTENT_BLANK, "this", ct);
+    fn->_this->addFlag(FLAG_ARG_THIS);
+
+    fn->setMethod(true);
+
+    fn->insertFormalAtTail(new ArgSymbol(INTENT_BLANK, "_mt", dtMethodToken));
+    fn->insertFormalAtTail(fn->_this);
+
+    fn->retType = dtString;
+
+    // when printing out a FCF, print out the function's name
+    fn->insertAtTail(new CallExpr(PRIM_RETURN, buildStringLiteral(flname)));
+
+    DefExpr* def = new DefExpr(fn);
+
+    ct->symbol->defPoint->insertBefore(def);
+
+    fn->setMethod(true);
+    fn->addFlag(FLAG_METHOD_PRIMARY);
+
+    reset_ast_loc(def, ct->symbol);
+
+    ct->methods.add(fn);
+
+    list_view(fn);
+    normalize(fn);
+
+  }
+  
   return callWrapper;
 }
 

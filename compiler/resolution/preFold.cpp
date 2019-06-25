@@ -1815,6 +1815,7 @@ static Expr* createFunctionAsValue(CallExpr *call) {
   fcf_name << "_chpl_fcf_" << unique_fcf_id++ << "_" << flname;
 
   TypeSymbol *ts = new TypeSymbol(astr(fcf_name.str().c_str()), ct);
+  ts->addFlag(FLAG_FUNCTION_CLASS);
 
   // Allow a use of a FCF to appear at the statement level i.e.
   //    nameOfFunc;

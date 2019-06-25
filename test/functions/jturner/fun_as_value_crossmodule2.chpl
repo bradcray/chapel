@@ -6,7 +6,7 @@ module mod1 {
   }
 
   proc dothat() {
-    var s = subtractme;
+    var s: func(int, int, int) = subtractme;
     s = addme;
 
     return s(1, 2);
@@ -21,7 +21,7 @@ module mod2 {
   }
 
   proc main() {
-    var a = addme;
+    var a: func(int, int, int) = addme;
     a = subtractme;
 
     writeln(a(10,5));

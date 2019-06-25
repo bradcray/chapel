@@ -9,7 +9,7 @@ proc fun2(i:int) {
 //writeln(b2());
 
 var f1 = fun1;
-var f2 = fun2;
+var f2: func(int, int) = fun2;
 
 writeln(f1(1));
 writeln(f2(1));
@@ -28,7 +28,7 @@ proc fun4(i:int) {
 }
 
 var f3 = fun3;
-var f4 = fun4;
+var f4: func(int, void) = fun4;
 
 f3(2);
 f4(2);

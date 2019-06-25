@@ -1934,11 +1934,11 @@ static Expr* createFunctionAsValue(CallExpr *call) {
   wrapper->addFlag(FLAG_INLINE);
 
   wrapper->insertAtTail(new CallExpr(PRIM_RETURN,
-                                     new CallExpr(PRIM_CAST,
-                                                  parent->symbol,
+                                     //                                     new CallExpr(PRIM_CAST,
+                                     //                                                  parent->symbol,
                                                   new CallExpr(PRIM_NEW,
                                                                new NamedExpr(astr_chpl_manager, new SymExpr(dtUnmanaged->symbol)),
-                                                               new SymExpr(ct->symbol)))));
+                                                               new SymExpr(ct->symbol))));
 
   call->getStmtExpr()->insertBefore(new DefExpr(wrapper));
 
@@ -1980,7 +1980,7 @@ static Expr* createFunctionAsValue(CallExpr *call) {
 
     ct->methods.add(fn);
 
-    list_view(fn);
+    //    list_view(fn);
     normalize(fn);
 
   }

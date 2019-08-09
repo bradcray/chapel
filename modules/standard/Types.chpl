@@ -453,6 +453,7 @@ proc isDmap(e)      param  return isDmapValue(e);
 /* Returns `true` if the argument is a domain or a domain type. */
 proc isDomain(e)    param  return isDomainValue(e);
 /* Returns `true` if the argument is an array or an array type. */
+pragma "no instantiation limit"
 proc isArray(e)     param  return isArrayValue(e);
 pragma "no doc"
 proc isSync(e: sync)     param  return true; // workaround: not isSyncValue

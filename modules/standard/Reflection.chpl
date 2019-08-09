@@ -192,12 +192,14 @@ proc hasField(type t, param s:string) param : bool
 /* Returns true if a function named `fname` taking no arguments
    could be called in the current scope.
    */
+pragma "no instantiation limit"
 proc canResolve(param fname : string) param : bool
   return __primitive("call resolves", fname);
 
 /* Returns true if a function named `fname` taking the arguments in `args`
    could be called in the current scope.
    */
+pragma "no instantiation limit"
 proc canResolve(param fname : string, args ...) param : bool
   return __primitive("call resolves", fname, (...args));
 
@@ -206,12 +208,14 @@ proc canResolve(param fname : string, args ...) param : bool
 /* Returns true if a method named `fname` taking no arguments
    could be called on `obj` in the current scope.
    */
+pragma "no instantiation limit"
 proc canResolveMethod(obj, param fname : string) param : bool
   return __primitive("method call resolves", obj, fname);
 
 /* Returns true if a method named `fname` taking the arguments in `args`
    could be called on `obj` in the current scope.
    */
+pragma "no instantiation limit"
 proc canResolveMethod(obj, param fname : string, args ...) param : bool
   return __primitive("method call resolves", obj, fname, (...args));
 

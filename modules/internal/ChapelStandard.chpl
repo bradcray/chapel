@@ -24,25 +24,25 @@ module ChapelStandard {
   use startInitCommDiags;  // Internal, but uses standard/CommDiagnostics
 
   // Internal modules.
-  use CPtr;
+  //  use CPtr;
   use CString;
   use Bytes;
   use String;
   use OwnedObject;
   use SharedObject;
-  use ChapelDebugPrint;
+  //  use ChapelDebugPrint;
   use ChapelEnv;
   use ChapelBase;
-  use MemConsistency;
+  //  use MemConsistency;
   use Atomics;
   use NetworkAtomics;
   use NetworkAtomicTypes;
   use AtomicsCommon;
-  use ChapelLocks;
+  //  use ChapelLocks;
   use ChapelIteratorSupport;
   use ChapelThreads;
-  use ChapelThreadsInternal;
-  use ChapelTasksInternal;
+  //  use ChapelThreadsInternal;
+  //  use ChapelTasksInternal;
   use ChapelTuple;
   use ChapelRange;
   use ChapelReduce;
@@ -64,14 +64,14 @@ module ChapelStandard {
   use MemTracking;
   use ChapelUtil;
   use ChapelError;
-  use ChapelDynDispHack;
+  //  use ChapelDynDispHack;
   use ChapelTaskData;
   use ChapelSerializedBroadcast;
   use ExternalString;
 
   // Standard modules.
   use Assert;
-  use HaltWrappers only ;
+  //  use HaltWrappers only ;
   use Types;
   use Math;
 

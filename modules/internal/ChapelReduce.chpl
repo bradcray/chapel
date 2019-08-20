@@ -132,6 +132,8 @@ module ChapelReduce {
    }
   }
 
+  private use ChapelLocks;
+
   pragma "ReduceScanOp"
   class ReduceScanOp {
     var l: chpl_LocalSpinlock;

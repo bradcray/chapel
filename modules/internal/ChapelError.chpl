@@ -110,6 +110,8 @@ module ChapelError {
     }
   }
 
+  private use ChapelLocks;
+  
   // Used by the runtime to accumulate errors. This type
   // supports adding errors concurrently but need not support
   // iterating over the errors concurrently. Errors

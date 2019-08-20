@@ -973,6 +973,8 @@ proc CyclicArr.setRADOpt(val=true) {
   if doRADOpt then setupRADOpt();
 }
 
+private use ChapelLocks;
+
 class LocCyclicArr {
   type eltType;
   param rank: int;

@@ -72,6 +72,7 @@
 */
 module Random {
 
+  private use ChapelLocks;
   use RandomSupport;
   use NPBRandom;
   use PCGRandom;

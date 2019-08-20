@@ -30,7 +30,7 @@ module DefaultRectangular {
   use DSIUtil, ChapelArray;
   private use ChapelDistribution, ChapelRange, SysBasic, SysError;
   private use ChapelDebugPrint, ChapelLocks, OwnedObject, IO;
-  private use DefaultSparse, DefaultAssociative, DefaultOpaque;
+  //  private use DefaultSparse; //, DefaultAssociative; // , DefaultOpaque;
   use ExternalArray;
 
   config param debugDefaultDist = false;
@@ -89,15 +89,6 @@ module DefaultRectangular {
       dom.dsiSetIndices(inds);
       return dom;
     }
-
-    override proc dsiNewAssociativeDom(type idxType, param parSafe: bool)
-      return new unmanaged DefaultAssociativeDom(idxType, parSafe, _to_unmanaged(this));
-
-    override proc dsiNewOpaqueDom(type idxType, param parSafe: bool)
-      return new unmanaged DefaultOpaqueDom(_to_unmanaged(this), parSafe);
-
-    override proc dsiNewSparseDom(param rank: int, type idxType, dom: domain)
-      return new unmanaged DefaultSparseDom(rank, idxType, _to_unmanaged(this), dom);
 
     proc dsiIndexToLocale(ind) return this.locale;
 
@@ -1945,8 +1936,6 @@ module DefaultRectangular {
 
 
   private proc complexTransferCore(LHS, LViewDom, RHS, RViewDom) {
-    use Lists;
-
     param minRank = min(LHS.rank, RHS.rank);
     type  idxType = LHS.idxType;
     type  intIdxType = LHS.intIdxType;
@@ -1961,10 +1950,10 @@ module DefaultRectangular {
 
     const (LeftActives, RightActives, inferredRank) = bulkCommComputeActiveDims(LeftDims, RightDims);
 
-    var DimSizes = new list(LeftDims(1).size.type);
+    var DimSizes: [1..inferredRank] LeftDims(1).size.type;
     for i in 1..inferredRank {
       const dimIdx = LeftActives(i);
-      DimSizes.append(LeftDims(dimIdx).size);
+      DimSizes[i] = LeftDims(dimIdx).size;
     }
 
     if debugDefaultDistBulkTransfer {

@@ -754,6 +754,9 @@ module Lists {
       return result;
     }
 
+    // TODO: Should this be moved to the `Sort` module?  Replaced with
+    // a standalone `sort()` routine/iterator that handles any iterable?
+    private use Sort;
     /*
       Sort the items of this list in place using a comparator. If no comparator
       is provided, sort this list using the default sort order of its elements.

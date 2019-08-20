@@ -22,6 +22,9 @@
 module DefaultOpaque {
   use ChapelStandard;
 
+  override proc DefaultDist.dsiNewOpaqueDom(type idxType, param parSafe: bool)
+    return new unmanaged DefaultOpaqueDom(_to_unmanaged(this), parSafe);
+  
   // record _OpaqueIndex is defined in ChapelArray
 
   pragma "no doc"

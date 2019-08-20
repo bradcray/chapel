@@ -464,6 +464,34 @@ proc sort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparator) {
   }
 }
 
+    // associative array interface
+    /* Yield the domain indices in sorted order */
+    iter _domain.sorted(comparator:?t = chpl_defaultComparator()) {
+      for i in _value.dsiSorted(comparator) {
+        yield i;
+      }
+    }
+
+        /* Yield the array elements in sorted order. */
+    iter _array.sorted(comparator:?t = chpl_defaultComparator()) {
+      use Reflection;
+      if canResolveMethod(_value, "dsiSorted", comparator) {
+        for i in _value.dsiSorted(comparator) {
+          yield i;
+        }
+      } else if canResolveMethod(_value, "dsiSorted") {
+        compilerError(_value.type:string + " does not support dsiSorted(comparator)");
+      } else {
+        use Sort;
+        var copy = this;
+        sort(copy, comparator=comparator);
+        for ind in copy do
+          yield ind;
+      }
+    }
+
+
+
 
 pragma "no doc"
 /* Error message for multi-dimension arrays */

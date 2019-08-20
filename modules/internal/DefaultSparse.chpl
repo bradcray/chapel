@@ -25,6 +25,9 @@ module DefaultSparse {
 
   config param debugDefaultSparse = false;
 
+  override proc DefaultDist.dsiNewSparseDom(param rank: int, type idxType, dom: domain)
+    return new unmanaged DefaultSparseDom(rank, idxType, _to_unmanaged(this), dom);
+
   class DefaultSparseDom: BaseSparseDomImpl {
     var dist: unmanaged DefaultDist;
     var _nnz = 0;
@@ -247,6 +250,7 @@ module DefaultSparse {
 
     override proc bulkAdd_help(inds: [?indsDom] index(rank, idxType),
         dataSorted=false, isUnique=false, addOn=nil:locale?){
+      private use BulkAddHelp;
 
       if addOn != nil {
         if addOn != this.locale {

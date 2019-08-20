@@ -28,6 +28,9 @@ module DefaultAssociative {
   config param debugDefaultAssoc = false;
   config param debugAssocDataPar = false;
 
+  override proc DefaultDist.dsiNewAssociativeDom(type idxType, param parSafe: bool)
+    return new unmanaged DefaultAssociativeDom(idxType, parSafe, _to_unmanaged(this));
+  
   // TODO: make the domain parameterized by this?
   type chpl_table_index_type = int;
 

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+grep DefaultSparse $2 > out.tmp
+grep Sort $2 >> out.tmp
+grep Hello $2 >> out.tmp
+mv out.tmp $2

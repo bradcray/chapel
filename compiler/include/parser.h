@@ -37,6 +37,8 @@ extern int         yystartlineno;
 extern const char* yyfilename;
 extern BlockStmt*  yyblock;
 
+extern int         parseSparse;
+
 void               parse();
 
 void addInternalModulePath(const ArgumentDescription* desc,

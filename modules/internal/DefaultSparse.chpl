@@ -245,6 +245,37 @@ module DefaultSparse {
       }
     }
 
+    // (1) sorts indices if !dataSorted
+    // (2) verifies the flags are set correctly if boundsChecking
+    // (3) checks OOB if boundsChecking
+    proc bulkAdd_prepareInds(inds, dataSorted, isUnique, cmp) {
+      use Sort;
+      if !dataSorted then sort(inds, comparator=cmp);
+
+      //verify sorted and no duplicates if not --fast
+      if boundsChecking {
+        if dataSorted && !isSorted(inds, comparator=cmp) then
+          halt("bulkAdd: Data not sorted, call the function with \
+              dataSorted=false");
+
+        //check duplicates assuming sorted
+        if isUnique {
+          const indsStart = inds.domain.low;
+          const indsEnd = inds.domain.high;
+          var lastInd = inds[indsStart];
+          for i in indsStart+1..indsEnd {
+            if inds[i] == lastInd then
+              halt("bulkAdd: There are duplicates, call the function \
+                  with isUnique=false");
+            else lastInd = inds[i];
+          }
+        }
+
+        //check OOB
+        for i in inds do boundsCheck(i);
+      }
+    }
+
     override proc bulkAdd_help(inds: [?indsDom] index(rank, idxType),
         dataSorted=false, isUnique=false, addOn=nil:locale?){
 
@@ -577,4 +608,8 @@ module DefaultSparse {
     }
   }
 
+  override proc DefaultDist.dsiNewSparseDom(param rank: int, type idxType, dom: domain)
+    return new unmanaged DefaultSparseDom(rank, idxType, _to_unmanaged(this), dom);
+
+  
 }

@@ -48,6 +48,7 @@ Expr* buildSquareCallExpr(Expr* base, CallExpr* args);
 Expr* buildNamedActual(const char* name, Expr* expr);
 
 Expr* buildFormalArrayType(Expr* iterator, Expr* eltType, Expr* index = NULL);
+Expr* buildSparseSubdomain(Expr* parentDom);
 
 Expr* buildIntLiteral(const char* pch, const char* file = NULL, int line = -1);
 Expr* buildRealLiteral(const char* pch);

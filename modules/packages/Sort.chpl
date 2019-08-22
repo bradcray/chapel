@@ -3216,5 +3216,52 @@ record ReverseComparator {
   }
 }
 
+ iter DefaultAssociativeDom.dsiSorted(comparator) {
+   var tableCopy: [0..#numEntries.read()] idxType;
+  
+   for (tmp, slot) in zip(tableCopy.domain, _fullSlots()) do
+     tableCopy(tmp) = table[slot].idx;
+  
+   sort(tableCopy, comparator=comparator);
+  
+   for ind in tableCopy do
+     yield ind;
+ }
+ 
+ iter _domain.sorted(comparator:?t = defaultComparator) {
+   for i in _value.dsiSorted(comparator) {
+     yield i;
+   }
+ }
+
+ iter DefaultAssociativeArr.dsiSorted(comparator) {
+   use Sort;
+   var tableCopy: [0..dom.dsiNumIndices-1] eltType;
+   for (copy, slot) in zip(tableCopy.domain, dom._fullSlots()) do
+     tableCopy(copy) = data(slot);
+
+   sort(tableCopy, comparator=comparator);
+  
+   for elem in tableCopy do
+     yield elem;
+ }
+
+ iter _array.sorted(comparator:?t = defaultComparator) {
+   compilerError("sorted() has moved to standard module 'Sort' — please `use Sort;` to access");
+   use Reflection;
+   if canResolveMethod(_value, "dsiSorted", comparator) {
+     for i in _value.dsiSorted(comparator) {
+       yield i;
+     }
+   } else if canResolveMethod(_value, "dsiSorted") {
+     compilerError(_value.type:string + " does not support dsiSorted(comparator)");
+   } else {
+     var copy = this;
+     sort(copy, comparator=comparator);
+     for ind in copy do
+       yield ind;
+   }
+ }
+
 
 } // Sort Module

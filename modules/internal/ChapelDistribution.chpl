@@ -452,37 +452,6 @@ module ChapelDistribution {
       return dupCount;
     }
 
-    // (1) sorts indices if !dataSorted
-    // (2) verifies the flags are set correctly if boundsChecking
-    // (3) checks OOB if boundsChecking
-    proc bulkAdd_prepareInds(inds, dataSorted, isUnique, cmp) {
-      use Sort;
-      if !dataSorted then sort(inds, comparator=cmp);
-
-      //verify sorted and no duplicates if not --fast
-      if boundsChecking {
-        if dataSorted && !isSorted(inds, comparator=cmp) then
-          halt("bulkAdd: Data not sorted, call the function with \
-              dataSorted=false");
-
-        //check duplicates assuming sorted
-        if isUnique {
-          const indsStart = inds.domain.low;
-          const indsEnd = inds.domain.high;
-          var lastInd = inds[indsStart];
-          for i in indsStart+1..indsEnd {
-            if inds[i] == lastInd then
-              halt("bulkAdd: There are duplicates, call the function \
-                  with isUnique=false");
-            else lastInd = inds[i];
-          }
-        }
-
-        //check OOB
-        for i in inds do boundsCheck(i);
-      }
-    }
-
     // this is a helper function for bulkAdd functions in sparse subdomains.
     // NOTE:it assumes that nnz array of the sparse domain has non-negative
     // indices. If, for some reason it changes, this function and bulkAdds have to

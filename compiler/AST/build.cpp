@@ -255,6 +255,15 @@ Expr* buildFormalArrayType(Expr* iterator, Expr* eltType, Expr* index) {
   }
 }
 
+Expr* buildSparseSubdomain(Expr* parentDom) {
+  Expr* retval = new CallExpr("chpl__buildSparseDomainRuntimeType", buildDotExpr(parentDom->copy(), "defaultSparseDist"), parentDom);
+  standardModule->block->appendChapelStmt(buildUseStmt(new CallExpr(PRIM_ACTUALS_LIST, new UnresolvedSymExpr("DefaultSparse")), false));
+  if (parseSparse == 0) {
+    parseSparse = 1;
+  }
+  return retval;
+}
+
 Expr* buildIntLiteral(const char* pch, const char* file, int line) {
   uint64_t ull;
   int len = strlen(pch);

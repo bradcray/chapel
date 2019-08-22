@@ -80,6 +80,11 @@ static const char*   searchThePath(const char*      modName,
 *                                                                             *
 ************************************** | *************************************/
 
+// 0 = not needed
+// 1 = needed, but not yet parsed
+// 2 = parsed
+int parseSparse = 0;
+
 void parse() {
   yydebug = debugParserLevel;
 
@@ -90,6 +95,10 @@ void parse() {
   parseInternalModules();
 
   parseCommandLineFiles();
+
+  if (parseSparse == 1) {
+    parseMod("DefaultSparse", true);
+  }
 
   checkConfigs();
 
@@ -482,6 +491,10 @@ static ModuleSymbol* parseMod(const char* modName, bool isInternal) {
   const char* path   = NULL;
   ModTag      modTag = MOD_INTERNAL;
 
+  if (strcmp(modName, "DefaultSparse") == 0) {
+    parseSparse = 2;
+  }
+  
   if (isInternal == true) {
     path   = searchThePath(modName, true, sIntModPath);
     modTag = MOD_INTERNAL;

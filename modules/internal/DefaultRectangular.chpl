@@ -30,7 +30,7 @@ module DefaultRectangular {
   use DSIUtil, ChapelArray;
   private use ChapelDistribution, ChapelRange, SysBasic, SysError;
   private use ChapelDebugPrint, ChapelLocks, OwnedObject, IO;
-  private use DefaultSparse, DefaultAssociative, DefaultOpaque;
+  private use DefaultAssociative, DefaultOpaque;
   use ExternalArray;
 
   config param debugDefaultDist = false;
@@ -95,9 +95,6 @@ module DefaultRectangular {
 
     override proc dsiNewOpaqueDom(type idxType, param parSafe: bool)
       return new unmanaged DefaultOpaqueDom(_to_unmanaged(this), parSafe);
-
-    override proc dsiNewSparseDom(param rank: int, type idxType, dom: domain)
-      return new unmanaged DefaultSparseDom(rank, idxType, _to_unmanaged(this), dom);
 
     proc dsiIndexToLocale(ind) return this.locale;
 

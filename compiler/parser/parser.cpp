@@ -97,7 +97,9 @@ void parse() {
   parseCommandLineFiles();
 
   if (parseSparse == 1) {
+    printf("Parsing DefaultSparse\n");
     parseMod("DefaultSparse", true);
+    parseDependentModules(true);
   }
 
   checkConfigs();
@@ -491,13 +493,23 @@ static ModuleSymbol* parseMod(const char* modName, bool isInternal) {
   const char* path   = NULL;
   ModTag      modTag = MOD_INTERNAL;
 
+  /*
   if (strcmp(modName, "DefaultSparse") == 0) {
     parseSparse = 2;
   }
-  
+  */
   if (isInternal == true) {
     path   = searchThePath(modName, true, sIntModPath);
     modTag = MOD_INTERNAL;
+
+    if (strcmp(modName, "DefaultSparse") == 0) {
+      printf("setting parse sparse to 2\n");
+      parseSparse = 2;
+      if (path == NULL) {
+        printf("path is NULL\n");
+      }
+      printf("isInternal = %d\n", isInternal);
+    }
 
   } else {
     bool isStandard = false;

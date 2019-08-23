@@ -259,6 +259,7 @@ Expr* buildSparseSubdomain(Expr* parentDom) {
   Expr* retval = new CallExpr("chpl__buildSparseDomainRuntimeType", buildDotExpr(parentDom->copy(), "defaultSparseDist"), parentDom);
   standardModule->block->appendChapelStmt(buildUseStmt(new CallExpr(PRIM_ACTUALS_LIST, new UnresolvedSymExpr("DefaultSparse")), false));
   if (parseSparse == 0) {
+    printf("Setting parseSparse to 1\n");
     parseSparse = 1;
   }
   return retval;

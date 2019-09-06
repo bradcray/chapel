@@ -458,8 +458,10 @@ proc sort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparator) {
     return;
 
   if radixSortOk(Data, comparator) {
+    use MSBRadixSort only ;
     MSBRadixSort.msbRadixSort(Data, comparator=comparator);
   } else {
+    use QuickSort only ;
     QuickSort.quickSort(Data, comparator=comparator);
   }
 }
@@ -559,6 +561,7 @@ iter sorted(x, comparator:?rec=defaultComparator) {
  */
 proc bubbleSort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparator) {
   compilerWarning("bubbleSort is deprecated - please use sort");
+  use BubbleSort only ;
   BubbleSort.bubbleSort(Data, comparator);
 }
 
@@ -575,6 +578,7 @@ proc bubbleSort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparator) {
  */
 proc heapSort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparator) {
   compilerWarning("heapSort is deprecated - please use sort");
+  use HeapSort only ;
   HeapSort.heapSort(Data, comparator);
 }
 
@@ -592,6 +596,7 @@ proc heapSort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparator) {
  */
 proc insertionSort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparator, lo:int=Dom.alignedLow, hi:int=Dom.alignedHigh) {
   compilerWarning("insertionSort is deprecated - please use sort");
+  use InsertionSort only ;
   InsertionSort.insertionSort(Data, comparator, lo, hi);
 }
 
@@ -610,6 +615,7 @@ proc insertionSort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparator, lo:
  */
 proc binaryInsertionSort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparator) {
   compilerWarning("binaryInsertionSort is deprecated - please use sort");
+  use BinaryInsertionSort only ;
   BinaryInsertionSort.binaryInsertionSort(Data, comparator);
 }
 
@@ -627,6 +633,7 @@ proc binaryInsertionSort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparato
  */
 proc mergeSort(Data: [?Dom] ?eltType, minlen=16, comparator:?rec=defaultComparator) {
   compilerWarning("mergeSort is deprecated - please use sort");
+  use MergeSort only ;
   MergeSort.mergeSort(Data, minlen, comparator);
 }
 
@@ -645,6 +652,7 @@ proc mergeSort(Data: [?Dom] ?eltType, minlen=16, comparator:?rec=defaultComparat
  */
 proc quickSort(Data: [?Dom] ?eltType, minlen=16, comparator:?rec=defaultComparator) {
   compilerWarning("quickSort is deprecated - please use sort");
+  use QuickSort only ;
   QuickSort.quickSort(Data, minlen, comparator);
 }
 
@@ -662,6 +670,7 @@ proc quickSort(Data: [?Dom] ?eltType, minlen=16, comparator:?rec=defaultComparat
  */
 proc selectionSort(Data: [?Dom] ?eltType, comparator:?rec=defaultComparator) {
   compilerWarning("selectionSort is deprecated - please use sort");
+  use SelectionSort only ;
   SelectionSort.selectionSort(Data, comparator);
 }
 
@@ -904,6 +913,8 @@ module MergeSort {
 
   private proc _MergeSort(Data: [?Dom], lo:int, hi:int, minlen=16, comparator:?rec=defaultComparator)
     where Dom.rank == 1 {
+    use InsertionSort only ;
+
     if (hi-lo < minlen) {
       InsertionSort.insertionSort(Data, comparator=comparator, lo, hi);
       return;
@@ -980,6 +991,8 @@ module QuickSort {
 
    */
   proc quickSort(Data: [?Dom] ?eltType, minlen=16, comparator:?rec=defaultComparator) {
+    use InsertionSort only ;
+
     chpl_check_comparator(comparator, eltType);
     if Dom.rank != 1 {
       compilerError("quickSort() requires 1-D array");
@@ -1036,6 +1049,7 @@ module QuickSort {
   /* Non-stridable quickSort */
   proc quickSort(Data: [?Dom] ?eltType, minlen=16, comparator:?rec=defaultComparator)
     where !Dom.stridable {
+    use InsertionSort only ;
 
     chpl_check_comparator(comparator, eltType);
 
@@ -2111,6 +2125,7 @@ module TwoArrayPartitioning {
       return;
 
     if end_n - start_n < state.baseCaseSize {
+      use ShellSort only ;
       ShellSort.shellSort(A, criterion, start=start_n, end=end_n);
       return;
     }
@@ -2703,6 +2718,8 @@ module MSBRadixSort {
                     startbit:int, endbit:int,
                     settings /* MSBRadixSortSettings */)
   {
+    use ShellSort only ;
+
     if startbit > endbit then
       return;
 

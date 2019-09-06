@@ -654,7 +654,7 @@ Symbol* ResolveScope::lookupNameLocally(const char* name, bool isUse) const {
     Symbol* sym = it->second;
 
     // don't consider top-level modules to be visible unless this is a use
-    if (toModuleSymbol(sym) == NULL || this != rootScope || isUse) {
+    if (toModuleSymbol(sym) == NULL || isUse) {
       retval = sym;
     }
   }

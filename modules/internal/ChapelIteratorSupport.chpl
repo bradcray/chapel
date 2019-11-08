@@ -280,7 +280,7 @@ module ChapelIteratorSupport {
     if hasField(ir, "_shape_") then
       return __primitive("static field type", ir, "_shape_");
     else
-      return none;
+      return nothing;
   }
 
   proc chpl_iteratorFromForExpr(ir: _iteratorRecord) param {

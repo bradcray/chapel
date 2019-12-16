@@ -57,6 +57,7 @@ proc main(args: [] string) {
       // chars to rewind past: 1 for '\n' and 1 for '>' if we're not yet at eof
       const rewind = if eof then 1 else 2;
 
+      writeln("Processing ", data[seqOffset..nextDescOffset-rewind]);
       // fire off a task to process the data for this sequence
       begin process(data[seqOffset..nextDescOffset-rewind]);
     } while !eof;

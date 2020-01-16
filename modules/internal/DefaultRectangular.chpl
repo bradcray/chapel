@@ -2121,8 +2121,14 @@ module DefaultRectangular {
     // Take first pass, computing per-task partial scans, stored in 'state'
     var (numTasks, rngs, state, _) = this.chpl__preScan(op, res, dom);
 
-    // Take second pass updating result based on the scanned 'state'
-    this.chpl__postScan(op, res, numTasks, rngs, state);
+    // Take second pass updating result based on the scanned 'state'.
+    // If there's just one task, this is effectively a no-op.
+    if numTasks != 1 {
+      this.chpl__postScan(op, res, numTasks, rngs, state);
+    } else {
+      if debugDRScan then
+        writeln("Optimized scan for the single-task case");
+    }
 
     // Clean up and return
     delete op;

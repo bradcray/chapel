@@ -219,7 +219,7 @@ def compute_internal_values():
 
     ENV_VALS['  CHPL_QTHREAD_UNIQ_CFG_PATH'] = chpl_3p_qthreads_configs.get_uniq_cfg_path()
     if chpl_tasks.get() == 'qthreads':
-        link_args_3p.extend(["-lqthreads"])
+        link_args_3p.extend(["-lqthread"])
         link_args_3p.extend(chpl_3p_qthreads_configs.get_link_args())
 
     ENV_VALS['  CHPL_RE2_UNIQ_CFG_PATH'] = chpl_3p_re2_configs.get_uniq_cfg_path()

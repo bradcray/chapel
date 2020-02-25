@@ -763,10 +763,10 @@ module ChapelBase {
 
   inline proc _cond_test(x: borrowed object?) return x != nil;
   inline proc _cond_test(x: bool) return x;
-  inline proc _cond_test(x: integral) return x != 0:x.type;
+  //  inline proc _cond_test(x: integral) return x != 0:x.type;
 
   inline proc _cond_test(param x: bool) param return x;
-  inline proc _cond_test(param x: integral) param return x != 0:x.type;
+  //  inline proc _cond_test(param x: integral) param return x != 0:x.type;
 
   inline proc _cond_test(x) {
     compilerError("type '", x.type:string, "' used in if or while condition");
@@ -778,7 +778,7 @@ module ChapelBase {
 
   proc _cond_invalid(x: borrowed object) param return false;
   proc _cond_invalid(x: bool) param return false;
-  proc _cond_invalid(x: integral) param return false;
+  //  proc _cond_invalid(x: integral) param return false;
   proc _cond_invalid(x) param return true;
 
   //
@@ -1081,7 +1081,7 @@ module ChapelBase {
   }
 
 
-  inline proc _cond_test(x: _ddata) return x != nil;
+  //  inline proc _cond_test(x: _ddata) return x != nil;
 
 
   //

@@ -403,7 +403,7 @@ module ChapelDistribution {
     inline proc _grow(size: int, factor=arrayAsVecGrowthFactor) {
       const oldNNZDomSize = nnzDom.size;
       if (size > oldNNZDomSize) {
-        const _newNNZDomSize = if (oldNNZDomSize) then ceil(factor*oldNNZDomSize):int else 1;
+        const _newNNZDomSize = if (oldNNZDomSize != 0) then ceil(factor*oldNNZDomSize):int else 1;
         nnzDom = {1..#_newNNZDomSize};
       }
     }

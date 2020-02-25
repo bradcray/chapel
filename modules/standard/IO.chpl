@@ -1515,7 +1515,7 @@ proc file.close() throws {
   on this.home {
     err = qio_file_close(_file_internal);
   }
-  if err then try ioerror(err, "in file.close", this.tryGetPath());
+  if err != 0 then try ioerror(err, "in file.close", this.tryGetPath());
 }
 
 /*
@@ -1536,7 +1536,7 @@ proc file.fsync() throws {
     try this.checkAssumingLocal();
     err = qio_file_sync(_file_internal);
   }
-  if err then try ioerror(err, "in file.fsync", this.tryGetPath());
+  if err != 0 then try ioerror(err, "in file.fsync", this.tryGetPath());
 }
 
 
@@ -1569,7 +1569,7 @@ proc file.path : string throws {
                                       errors=decodePolicy.escape);
     }
   }
-  if err then try ioerror(err, "in file.path");
+  if err != 0 then try ioerror(err, "in file.path");
   return ret;
 }
 
@@ -1602,7 +1602,7 @@ proc file.length():int(64) throws {
   on this.home {
     err = qio_file_length(this._file_internal, len);
   }
-  if err then try ioerror(err, "in file.length()");
+  if err != 0 then try ioerror(err, "in file.length()");
   return len;
 }
 
@@ -1864,7 +1864,7 @@ proc opentmp(hints:iohints=IOHINT_NONE, style:iostyle = defaultIOStyle()):file t
 
   // On return ret._file_internal.ref_cnt == 1.
   var err = qio_file_open_tmp(ret._file_internal, hints, local_style);
-  if err then try ioerror(err, "in opentmp");
+  if err != 0 then try ioerror(err, "in opentmp");
   return ret;
 }
 
@@ -1892,7 +1892,7 @@ proc openmem(style:iostyle = defaultIOStyle()):file throws {
 
   // On return ret._file_internal.ref_cnt == 1.
   var err = qio_file_open_mem(ret._file_internal, QBUFFER_PTR_NULL, local_style);
-  if err then try ioerror(err, "in openmem");
+  if err != 0 then try ioerror(err, "in openmem");
   return ret;
 }
 
@@ -2201,7 +2201,7 @@ inline proc channel.lock() throws {
       err = qio_channel_lock(_channel_internal);
     }
   }
-  if err then try this._ch_ioerror(err, "in lock");
+  if err != 0 then try this._ch_ioerror(err, "in lock");
 }
 
 /*
@@ -2258,7 +2258,7 @@ proc channel.advance(amount:int(64)) throws {
     try this.lock(); defer { this.unlock(); }
     err = qio_channel_advance(false, _channel_internal, amount);
   }
-  if err then try this._ch_ioerror(err, "in advance");
+  if err != 0 then try this._ch_ioerror(err, "in advance");
 }
 
 /*
@@ -2274,7 +2274,7 @@ proc channel.advancePastByte(byte:uint(8)) throws {
     try this.lock(); defer { this.unlock(); }
     err = qio_channel_advance_past_byte(false, _channel_internal, byte:c_int);
   }
-  if err then try this._ch_ioerror(err, "in advanceToByte");
+  if err != 0 then try this._ch_ioerror(err, "in advanceToByte");
 }
 
 /*
@@ -2311,7 +2311,7 @@ inline proc channel.mark() throws where this.locking == false {
   const offset = this.offset();
   const err = qio_channel_mark(false, _channel_internal);
 
-  if err then
+  if err != 0 then
     throw SystemError.fromSyserr(err);
 
   return offset;
@@ -2366,7 +2366,7 @@ proc channel.seek(start:int, end:int = max(int)) throws {
 
   const err = qio_channel_seek(_channel_internal, start, end);
 
-  if err then
+  if err != 0 then
     throw SystemError.fromSyserr(err);
 }
 
@@ -2405,7 +2405,7 @@ inline proc channel._mark() throws {
   const offset = this.offset();
   const err = qio_channel_mark(false, _channel_internal);
 
-  if err then
+  if err != 0 then
     throw SystemError.fromSyserr(err);
 
   return offset;
@@ -2636,7 +2636,7 @@ proc file.reader(param kind=iokind.dynamic, param locking=true, start:int(64) = 
     try this.checkAssumingLocal();
     ret = new channel(false, kind, locking, this, err, hints, start, end, style);
   }
-  if err then try ioerror(err, "in file.reader", this.tryGetPath());
+  if err != 0 then try ioerror(err, "in file.reader", this.tryGetPath());
 
   return ret;
 }
@@ -2660,7 +2660,7 @@ proc file.lines(param locking:bool = true, start:int(64) = 0, end:int(64) = max(
     var ch = new channel(false, kind, locking, this, err, hints, start, end, local_style);
     ret = new ItemReader(string, kind, locking, ch);
   }
-  if err then try ioerror(err, "in file.lines", this.tryGetPath());
+  if err != 0 then try ioerror(err, "in file.lines", this.tryGetPath());
 
   return ret;
 }
@@ -2722,7 +2722,7 @@ proc file.writer(param kind=iokind.dynamic, param locking=true, start:int(64) = 
     try this.checkAssumingLocal();
     ret = new channel(true, kind, locking, this, err, hints, start, end, style);
   }
-  if err then try ioerror(err, "in file.writer", this.tryGetPath());
+  if err != 0 then try ioerror(err, "in file.writer", this.tryGetPath());
 
   return ret;
 }
@@ -3072,7 +3072,7 @@ private inline proc _read_one_internal(_channel_internal:qio_channel_ptr_t,
   } else if kind == iokind.dynamic {
     var binary:uint(8) = qio_channel_binary(_channel_internal);
     var byteorder:uint(8) = qio_channel_byteorder(_channel_internal);
-    if binary {
+    if binary != 0 {
       select byteorder:iokind {
         when iokind.big    do e = _read_binary_internal(_channel_internal, iokind.big, x);
         when iokind.little do e = _read_binary_internal(_channel_internal, iokind.little, x);
@@ -3104,7 +3104,7 @@ private inline proc _write_one_internal(_channel_internal:qio_channel_ptr_t,
   } else if kind == iokind.dynamic {
     var binary:uint(8) = qio_channel_binary(_channel_internal);
     var byteorder:uint(8) = qio_channel_byteorder(_channel_internal);
-    if binary {
+    if binary != 0 {
       select byteorder:iokind {
         when iokind.big    do e = try _write_binary_internal(_channel_internal, iokind.big, x);
         when iokind.little do e = try _write_binary_internal(_channel_internal, iokind.little, x);
@@ -3378,7 +3378,7 @@ inline proc channel.readwrite(ref x) throws where !this.writing {
       try this.lock(); defer { this.unlock(); }
       err = qio_channel_write_amt(false, _channel_internal, x, len);
     }
-    if err then try this._ch_ioerror(err, "in channel.writeBytes()");
+    if err != 0 then try this._ch_ioerror(err, "in channel.writeBytes()");
     return true;
   }
 
@@ -3766,7 +3766,7 @@ private proc readBytesOrString(ch: channel, ref out_var: ?t,  len: int(64))
     var binary:uint(8) = qio_channel_binary(ch._channel_internal);
     var byteorder:uint(8) = qio_channel_byteorder(ch._channel_internal);
 
-    if binary {
+    if binary != 0 {
       err = qio_channel_read_string(false, byteorder,
                                     iostringstyle.data_toeof:int(64),
                                     ch._channel_internal, tx,
@@ -4070,7 +4070,7 @@ proc channel.flush() throws {
   on this.home {
     err = qio_channel_flush(locking, _channel_internal);
   }
-  if err then try this._ch_ioerror(err, "in channel.flush");
+  if err != 0 then try this._ch_ioerror(err, "in channel.flush");
 }
 // documented in error= version
 pragma "no doc"
@@ -4125,7 +4125,7 @@ proc channel.close() throws {
   on this.home {
     err = qio_channel_close(locking, _channel_internal);
   }
-  if err then try this._ch_ioerror(err, "in channel.close");
+  if err != 0 then try this._ch_ioerror(err, "in channel.close");
 }
 
 /*
@@ -4148,7 +4148,7 @@ proc channel.readBytes(x, len:ssize_t) throws {
   if here != this.home then
     throw new owned IllegalArgumentError("bad remote channel.readBytes");
   var err = qio_channel_read_amt(false, _channel_internal, x, len);
-  if err then try this._ch_ioerror(err, "in channel.readBytes");
+  if err != 0 then try this._ch_ioerror(err, "in channel.readBytes");
 }
 
 /*
@@ -4289,7 +4289,7 @@ proc read(type t ...?numTypes) throws {
 proc unlink(path:string) throws {
   extern proc sys_unlink(path:c_string):err_t;
   var err = sys_unlink(path.localize().c_str());
-  if err then try ioerror(err:syserr, "in unlink", path);
+  if err != 0 then try ioerror(err:syserr, "in unlink", path);
 }
 
 /*
@@ -4313,7 +4313,7 @@ proc file.fstype():int throws {
   on this.home {
     err = qio_get_fs_type(this._file_internal, t);
   }
-  if err then try ioerror(err, "in file.fstype()");
+  if err != 0 then try ioerror(err, "in file.fstype()");
   return t:int;
 }
 
@@ -4342,7 +4342,7 @@ proc file.getchunk(start:int(64) = 0, end:int(64) = max(int(64))):(int(64),int(6
     var len:int(64);
 
     err = qio_get_chunk(this._file_internal, len);
-    if err then try ioerror(err, "in file.getchunk(start:int(64), end:int(64))");
+    if err != 0 then try ioerror(err, "in file.getchunk(start:int(64), end:int(64))");
 
     if (len != 0 && (real_end > start)) {
       // TAKZ - Note that we are only wanting to return an inclusive range -- i.e., we
@@ -5606,9 +5606,9 @@ class _channel_regexp_info {
     hasRegexp = false;
     matchedRegexp = false;
     releaseRegexp = false;
-    if matches then _ddata_free(matches, ncaptures+1);
+    if matches != nil then _ddata_free(matches, ncaptures+1);
     for i in 0..#ncaptures do capArr[i] = b"";
-    if capArr then _ddata_free(capArr, ncaptures);
+    if capArr != nil then _ddata_free(capArr, ncaptures);
   }
   proc allocate_captures() {
     ncaptures = qio_regexp_get_ncaptures(theRegexp);
@@ -6278,7 +6278,7 @@ proc channel.writef(fmtStr: ?t, const args ...?k): bool throws
     this._set_style(save_style);
   }
 
-  if err then try this._ch_ioerror(err, "in channel.writef(fmt:string)");
+  if err != 0 then try this._ch_ioerror(err, "in channel.writef(fmt:string)");
   return true;
 }
 
@@ -6324,7 +6324,7 @@ proc channel.writef(fmtStr:?t): bool throws
     this._set_style(save_style);
   }
 
-  if err then try this._ch_ioerror(err, "in channel.writef(fmt:string, ...)");
+  if err != 0 then try this._ch_ioerror(err, "in channel.writef(fmt:string, ...)");
   return true;
 }
 
@@ -6713,7 +6713,7 @@ proc channel.skipField() throws {
       err = ENOTSUP;
     }
   }
-  if err then try this._ch_ioerror(err, "in skipField");
+  if err != 0 then try this._ch_ioerror(err, "in skipField");
 }
 
 /*
@@ -7059,7 +7059,7 @@ proc channel.search(re:regexp, ref captures ...?k): reMatch throws
     _ddata_free(matches, nm);
   }
 
-  if err then try this._ch_ioerror(err, "in channel.search");
+  if err != 0 then try this._ch_ioerror(err, "in channel.search");
   return m;
 }
 

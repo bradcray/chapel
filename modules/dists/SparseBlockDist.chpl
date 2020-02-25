@@ -238,7 +238,7 @@ class SparseBlockDom: BaseSparseDomImpl {
       f <~> "{";
       for locdom in locDoms do {
         // on locdom do {
-        if (locdom.dsiNumIndices) {
+        if (locdom.dsiNumIndices != 0) {
             f <~> " ";
             locdom.dsiSerialWrite(f);
           }
@@ -735,7 +735,7 @@ proc SparseBlockArr.dsiSerialWrite(f) {
     f <~> "[";
     for locarr in locArr do {
       // on locdom do {
-      if (locarr.locDom.dsiNumIndices) {
+      if locarr.locDom.dsiNumIndices != 0 {
         f <~> " ";
         locarr.dsiSerialWrite(f);
       }

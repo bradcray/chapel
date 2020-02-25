@@ -609,7 +609,7 @@ module HeapSort {
 
     // Heapify
     var start = if high == low then high
-                else if size % 2 then low + ((size - 1)/2) * stride
+                else if (size % 2) != 0 then low + ((size - 1)/2) * stride
                 else low + (size/2 - 1) * stride;
 
     while (start >= low) {
@@ -821,7 +821,7 @@ module MergeSort {
     if ((size+1) < minlen || (((depth & 1) == 0) && (size+1) < 2 * minlen)) {
       InsertionSort.insertionSort(Data, comparator=comparator, lo, hi);
 
-      if depth & 1 {
+      if (depth & 1) != 0 {
         // At odd depths, we need to return the results in Scratch.
         // But if the test above is correct, we'll never reach this point.
         if Dom.stridable then

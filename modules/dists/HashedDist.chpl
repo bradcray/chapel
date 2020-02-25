@@ -828,7 +828,7 @@ class UserMapAssocArr: AbsBaseArr {
 
     var first = true;
     for locArr in locArrs {
-      if locArr.numElements {
+      if locArr.numElements != 0 {
         if first {
           first = false;
         } else {

@@ -167,7 +167,7 @@ proc binarySearch(Data:[?Dom], val, comparator:?rec=defaultComparator, in lo=Dom
   while (lo <= hi) {
     const size = (hi - lo) / stride,
           mid = if hi == lo then hi
-                else if size % 2 then lo + ((size - 1)/2) * stride
+                else if (size % 2) != 0 then lo + ((size - 1)/2) * stride
                 else lo + (size/2 - 1) * stride;
 
     if chpl_compare(Data[mid], val, comparator=comparator) == 0 then

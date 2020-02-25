@@ -683,7 +683,7 @@ module Spawn {
       var done:c_int = 0;
       var exitcode:c_int = 0;
       err = qio_waitpid(pid, 0, done, exitcode);
-      if done {
+      if done != 0 {
         this.running = false;
         this.exit_status = exitcode;
       }
@@ -769,7 +769,7 @@ module Spawn {
       var done:c_int = 0;
       var exitcode:c_int = 0;
       wait_err = qio_waitpid(pid, 1, done, exitcode);
-      if done {
+      if done != 0 {
         this.running = false;
         this.exit_status = exitcode;
       }
@@ -865,7 +865,7 @@ module Spawn {
     var done:c_int = 0;
     var exitcode:c_int = 0;
     err = qio_waitpid(pid, 1, done, exitcode);
-    if done {
+    if done != 0 {
       this.running = false;
       this.exit_status = exitcode;
     }

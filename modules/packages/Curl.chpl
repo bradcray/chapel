@@ -187,7 +187,7 @@ module Curl {
       }
     }
 
-    if err then try ioerror(err, "in file.setopt(opt:c_int, arg)");
+    if err != 0 then try ioerror(err, "in file.setopt(opt:c_int, arg)");
     return true;
   }
 
@@ -247,7 +247,7 @@ module Curl {
       if this.list == nil then
         err = EINVAL;
     }
-    if err then try ioerror(err, "in slist.append()");
+    if err != 0 then try ioerror(err, "in slist.append()");
   }
 
   /* Free an slist. Chapel programs must call this function after using an slist.
@@ -702,27 +702,27 @@ module Curl {
         //writeln("Setting up upload");
         // Set the function to get the data to send
         err = curl_easy_setopt_long(curl, CURLOPT_UPLOAD, 1);
-        if err then return EINVAL;
+        if err != 0 then return EINVAL;
         err =curl_easy_setopt_ptr(curl, CURLOPT_READFUNCTION, c_ptrTo(curl_read_buffered):c_void_ptr);
-        if err then return EINVAL;
+        if err != 0 then return EINVAL;
         err = curl_easy_setopt_ptr(curl, CURLOPT_READDATA, cc:c_void_ptr);
-        if err then return EINVAL;
+        if err != 0 then return EINVAL;
 
         // TODO -- is this necessary?
         //err = curl_easy_setopt_offset(curl, CURLOPT_INFILESIZE_LARGE, 14);
-        //if err then return EINVAL;
+        //if err != 0 then return EINVAL;
       } else {
         //writeln("Setting up download");
         // Set the function to process the received data
         err = curl_easy_setopt_ptr(curl, CURLOPT_WRITEFUNCTION, c_ptrTo(curl_write_received):c_void_ptr);
-        if err then return EINVAL;
+        if err != 0 then return EINVAL;
         err = curl_easy_setopt_ptr(curl, CURLOPT_WRITEDATA, cc:c_void_ptr);
-        if err then return EINVAL;
+        if err != 0 then return EINVAL;
       }
       // If it's seekable, start at the right offset
       if cc.curlf!.seekable {  // we can request byteranges
         err = curl_easy_setopt_offset(curl, CURLOPT_RESUME_FROM_LARGE, start);
-        if err then return EINVAL;
+        if err != 0 then return EINVAL;
       } else {
         if start != 0 then
           return EINVAL;

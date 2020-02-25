@@ -301,7 +301,7 @@ proc chown(out error: syserr, name: string, uid: int, gid: int) {
 proc copy(src: string, dest: string, metadata: bool = false) throws {
   var destFile = dest;
   try {
-    if (isDir(destFile)) {
+    if isDir(destFile) {
       // destFile = joinPath(destFile, basename(src));
       ioerror(EISDIR:syserr, "in copy(" + src + ", " + dest + ")");
 
@@ -317,7 +317,7 @@ proc copy(src: string, dest: string, metadata: bool = false) throws {
   try copyFile(src, destFile);
   try copyMode(src, destFile);
 
-  if (metadata) {
+  if metadata {
     extern proc chpl_fs_copy_metadata(source: c_string, dest: c_string): syserr;
 
     // Copies the access time, and time of last modification.
@@ -382,7 +382,7 @@ proc copyFile(src: string, dest: string) throws {
       ioerror(EISDIR:syserr, "in copyFile(" + src + ", " + dest + ")");
     }
 
-    if (sameFile(src, dest)) {
+    if sameFile(src, dest) {
       // Check if the files are the same, error if yes
       try ioerror(EINVAL:syserr, "in copyFile(" + src + ", " + dest + ")");
     }
@@ -522,12 +522,12 @@ proc copyMode(out error: syserr, src: string, dest: string) {
 */
 proc copyTree(src: string, dest: string, copySymbolically: bool=false) throws {
   var expectedErrorCases = try exists(dest);
-  if (expectedErrorCases) then
+  if expectedErrorCases then
     // dest exists.  That's not ideal.
     try ioerror(EEXIST:syserr, "in copyTree(" + src + ", " + dest + ")");
 
   expectedErrorCases = !(try isDir(src));
-  if (expectedErrorCases) then
+  if expectedErrorCases then
     try ioerror(ENOTDIR:syserr, "in copyTree(" + src + ", " + dest + ")");
 
   var srcPath = try realPath(src);
@@ -642,7 +642,7 @@ proc locale.cwd(out error: syserr): string {
 proc exists(name: string): bool throws {
   extern proc chpl_fs_exists(ref result:c_int, name: c_string): syserr;
 
-  if (name.isEmpty()) {
+  if name.isEmpty() {
     // chpl_fs_exists uses stat to determine if a file exists, which throws an
     // error when "" is passed to it.  Check it here early and return false
     // like Python does
@@ -690,7 +690,7 @@ proc exists(out error: syserr, name: string): bool {
 
 iter findfiles(startdir: string = ".", recursive: bool = false,
                hidden: bool = false): string {
-  if (recursive) then
+  if recursive then
     for subdir in walkdirs(startdir, hidden=hidden) do
       for file in listdir(subdir, hidden=hidden, dirs=false, files=true, listlinks=true) do
         yield subdir+"/"+file;
@@ -703,7 +703,7 @@ pragma "no doc"
 iter findfiles(startdir: string = ".", recursive: bool = false,
                hidden: bool = false, param tag: iterKind): string
        where tag == iterKind.standalone {
-  if (recursive) then
+  if recursive then
     // Why "with (ref hidden)"?  A: the compiler currently allows only
     // [const] ref intents in forall loops over recursive parallel iterators
     // such as walkdirs().
@@ -972,13 +972,13 @@ iter glob(pattern: string = "*", followThis, param tag: iterKind): string
        where tag == iterKind.follower {
   use GlobWrappers;
   var glb : glob_t;
-  if (followThis.size != 1) then
+  if followThis.size != 1 then
     compilerError("glob() iterator can only be zipped with 1D iterators");
   var r = followThis(1);
 
   glob_w(pattern, glb);
   const num = glob_num_w(glb);
-  if (r.high >= num) then
+  if r.high >= num then
     HaltWrappers.zipLengthHalt("glob() is being zipped with something too big; it only has " + num:string + " matches");
 
   for i in r do
@@ -1082,7 +1082,7 @@ proc isFile(out error:syserr, name:string):bool {
 proc isLink(name: string): bool throws {
   extern proc chpl_fs_is_link(ref result:c_int, name: c_string): syserr;
 
-  if (name.isEmpty()) {
+  if name.isEmpty() {
     // chpl_fs_is_link uses lstat to determine if a path is a link, which throws
     // an error when "" is passed to it.  Check it here early and return false
     // like Python does
@@ -1195,7 +1195,7 @@ iter listdir(path: string = ".", hidden: bool = false, dirs: bool = true,
   var ent: direntptr;
   var err:syserr = ENOERR;
   dir = opendir(unescape(path).c_str());
-  if (!is_c_nil(dir)) {
+  if !is_c_nil(dir) {
     ent = readdir(dir);
     while (!is_c_nil(ent)) {
       var filename: string;
@@ -1310,7 +1310,7 @@ proc mkdir(out error: syserr, name: string, mode: int = 0o777,
 */
 proc moveDir(src: string, dest: string) throws {
   var destExists = try exists(dest);
-  if (destExists) {
+  if destExists {
     // dest already existed
     if (try isFile(dest)) {
       // dest is a file, we can't move src within it!
@@ -1447,7 +1447,7 @@ private proc rmTreeHelper(root: string) throws {
   for dirname in listdir(path=root, dirs=true, files=false, listlinks=true, hidden=true) {
     var fullpath = root + "/" + dirname;
     var dirIsLink = try isLink(fullpath);
-    if (dirIsLink) {
+    if dirIsLink {
       try remove(fullpath);
     } else {
       try rmTreeHelper(fullpath);
@@ -1651,12 +1651,12 @@ iter walkdirs(path: string = ".", topdown: bool = true, depth: int = max(int),
               hidden: bool = false, followlinks: bool = false,
               sort: bool = false): string {
 
-  if (topdown) then
+  if topdown then
     yield path;
 
-  if (depth) {
+  if depth != 0 {
     var subdirs = listdir(path, hidden=hidden, files=false, listlinks=followlinks);
-    if (sort) {
+    if sort {
       use Sort /* only sort */;
       sort(subdirs);
     }
@@ -1669,7 +1669,7 @@ iter walkdirs(path: string = ".", topdown: bool = true, depth: int = max(int),
     }
   }
 
-  if (!topdown) then
+  if !topdown then
     yield path;
 }
 
@@ -1683,13 +1683,13 @@ iter walkdirs(path: string = ".", topdown: bool = true, depth: int =max(int),
               sort: bool = false, param tag: iterKind): string
        where tag == iterKind.standalone {
 
-  if (sort) then
+  if sort then
     warning("sorting has no effect for parallel invocations of walkdirs()");
 
-  if (topdown) then
+  if topdown then
     yield path;
 
-  if (depth) {
+  if depth != 0 {
     var subdirs = listdir(path, hidden=hidden, files=false, listlinks=followlinks);
     forall subdir in subdirs {
       const fullpath = path + "/" + subdir;
@@ -1702,7 +1702,7 @@ iter walkdirs(path: string = ".", topdown: bool = true, depth: int =max(int),
     }
   }
 
-  if (!topdown) then
+  if !topdown then
     yield path;
 }
 

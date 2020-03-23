@@ -818,12 +818,15 @@ Symbol* ResolveScope::getFieldLocally(const char* fieldName) const {
 Symbol* ResolveScope::lookupNameLocally(const char* name, bool isUse) const {
   Bindings::const_iterator it     = mBindings.find(name);
   Symbol*                  retval = NULL;
+  extern bool fPermitDirectSubModuleRefs;
 
   if (it != mBindings.end()) {
     Symbol* sym = it->second;
 
     // don't consider modules to be visible unless this is a use
-    if (toModuleSymbol(sym) == NULL || isUse) {
+    // (exception: permit sub-modules to be referred to if flag is thrown
+    if (toModuleSymbol(sym) == NULL || isUse ||
+        (fPermitDirectSubModuleRefs && this != rootScope)) {
       retval = sym;
     }
   }

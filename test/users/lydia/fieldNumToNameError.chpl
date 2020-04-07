@@ -4,4 +4,4 @@ record R {
   var c: real;
 }
 
-writeln(__primitive("field num to name", R, 4));
+writeln(__primitive("field num to name", R, 3));

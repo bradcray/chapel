@@ -30,13 +30,13 @@ myproc(borrowed C, cls);
 
 proc myproc(type t, ref m) {
   assert(__primitive("num fields", t) == 3);
-  assert(__primitive("field num to name", t, 1) == "x");
-  assert(__primitive("field num to name", t, 2) == "y");
-  assert(__primitive("field num to name", t, 3) == "z");
-  assert(__primitive("field by num", m, 1) == 3);
-  assert(__primitive("field by num", m, 2) == "hi");
-  assert(realEqual(__primitive("field by num", m, 3), 17.23));
-  for param i in 1..(__primitive("num fields", t)) {
+  assert(__primitive("field num to name", t, 0) == "x");
+  assert(__primitive("field num to name", t, 1) == "y");
+  assert(__primitive("field num to name", t, 2) == "z");
+  assert(__primitive("field by num", m, 0) == 3);
+  assert(__primitive("field by num", m, 1) == "hi");
+  assert(realEqual(__primitive("field by num", m, 2), 17.23));
+  for param i in 0..<(__primitive("num fields", t)) {
     writeln(__primitive("field num to name", t, i));
     writeln(__primitive("field by num", m, i));
   }

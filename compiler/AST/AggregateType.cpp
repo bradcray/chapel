@@ -2268,7 +2268,7 @@ void AggregateType::buildDefaultInitializer() {
 
       fn->insertAtTail(new CallExpr(PRIM_SET_UNION_ID,
                                     fn->_this,
-                                    new_IntSymbol(0)));
+                                    new_IntSymbol(-1)));
 
       normalize(fn);
 
@@ -2547,7 +2547,7 @@ void AggregateType::buildCopyInitializer() {
       // call below to set it to the right value (and default init)
       fn->insertAtTail(new CallExpr(PRIM_SET_UNION_ID,
                                     fn->_this,
-                                    new_IntSymbol(0)));
+                                    new_IntSymbol(-1)));
 
       for_fields(fieldDefExpr, this) {
         if (VarSymbol* field = toVarSymbol(fieldDefExpr)) {

@@ -58,7 +58,7 @@ proc numFields(type t) param : int
    :returns: the name of the field, as a param string
  */
 proc getFieldName(type t, param i:int) param : string
-  return __primitive("field num to name", checkQueryT(t), i+1);
+  return __primitive("field num to name", checkQueryT(t), i);
 
 // Note, since this version has a where clause, it is preferred
 // over the const ref one.
@@ -72,9 +72,9 @@ proc getFieldName(type t, param i:int) param : string
 */
 proc getField(const ref x:?t, param i: int) param
   where i >= 0 && i < numFields(t) &&
-        isParam(__primitive("field by num", x, i+1)) {
+        isParam(__primitive("field by num", x, i)) {
 
-  return __primitive("field by num", x, i+1);
+  return __primitive("field by num", x, i);
 }
 
 // Note, since this version has a where clause, it is preferred
@@ -89,9 +89,9 @@ proc getField(const ref x:?t, param i: int) param
 */
 proc getField(const ref x:?t, param i: int) type
   where i >= 0 && i < numFields(t) &&
-        isType(__primitive("field by num", x, i+1)) {
+        isType(__primitive("field by num", x, i)) {
 
-  return __primitive("field by num", x, i+1);
+  return __primitive("field by num", x, i);
 }
 
 /* Get the ith field in a class or record.
@@ -104,7 +104,7 @@ proc getField(const ref x:?t, param i: int) type
 pragma "unsafe"
 inline
 proc getField(const ref x:?t, param i:int) const ref
-  return __primitive("field by num", x, i+1);
+  return __primitive("field by num", x, i);
 
 /* Get a field in a class or record by name. When the named
    field is a `param` this overload will be chosen to return a
@@ -148,7 +148,7 @@ pragma "unsafe"
 inline
 proc getField(const ref x:?t, param s:string) const ref {
   param i = __primitive("field name to num", t, s);
-  if i == 0 then
+  if i == -1 then
     compilerError("field ", s, " not found in ", t:string);
   return __primitive("field by num", x, i);
 }
@@ -202,7 +202,7 @@ proc getImplementationField(const ref x:?t, param i:int) const ref {
 pragma "unsafe"
 inline
 proc getFieldRef(ref x:?t, param i:int) ref
-  return __primitive("field by num", x, i+1);
+  return __primitive("field by num", x, i);
 
 /* Get a mutable ref to a field in a class or record by name.
    Will generate a compilation error if a field with that name
@@ -215,7 +215,7 @@ proc getFieldRef(ref x:?t, param i:int) ref
 pragma "unsafe"
 proc getFieldRef(ref x:?t, param s:string) ref {
   param i = __primitive("field name to num", t, s);
-  if i == 0 then
+  if i == -1 then
     compilerError("field ", s, " not found in ", t:string);
   return __primitive("field by num", x, i);
 }
@@ -228,7 +228,7 @@ proc getFieldRef(ref x:?t, param s:string) ref {
    :returns: an index `i` usable in getField, or -1 if the field was not found.
  */
 proc getFieldIndex(type t, param s:string) param : int
-  return __primitive("field name to num", checkQueryT(t), s)-1;
+  return __primitive("field name to num", checkQueryT(t), s);
 
 /* Returns `true` if a class or record has a field named `s`,
    or `false` otherwise.

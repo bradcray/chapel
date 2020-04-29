@@ -1253,6 +1253,14 @@ BlockStmt* buildParamForLoopStmt(const char* index, Expr* range, BlockStmt* stmt
   return ParamForLoop::buildParamForLoop(indexVar, range, stmts);
 }
 
+BlockStmt* buildTypeForLoopStmt(const char* index, Expr* range, BlockStmt* stmts) {
+  VarSymbol* indexVar = new VarSymbol(index);
+  indexVar->addFlag(FLAG_TYPE_VARIABLE);
+  SymExpr* se = new SymExpr(indexVar);
+
+  return ForLoop::buildForLoop(se, range, stmts, false, false);
+}
+
 BlockStmt*
 buildAssignment(Expr* lhs, Expr* rhs, const char* op) {
   INT_ASSERT(op != NULL);

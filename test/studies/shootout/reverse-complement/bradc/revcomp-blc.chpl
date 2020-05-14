@@ -31,40 +31,36 @@ proc main(args: [] string) {
     }
   } while more;
 
-  for i in buf.indices by -1 {
-    if buf[i] != 0 {
-      end = i;
-      break;
-    }
+  end = stdinBin.offset()-1;
+
+  var to = end;
+
+  while (to >= 0) {
+    var from = to;
+    while buf[from] != '>'.toByte() do
+      from -= 1;
+
+    process(buf, from, to);
+
+    to = from - 1;
   }
 
-  if end {
-    var to = end;
-
-    do {
-      var from = to;
-      while buf[from] != '>'.toByte() do
-        from -= 1;
-
-      process(buf, from, to);
-
-      to = from - 1;
-    } while (to >= 0);
-
-    stdoutBin.write(buf[..end]);
-  }
+  stdoutBin.write(buf[..end]);
 }
 
 proc process(buf, in from, in to) {
+  param cols = 60;
+
   while buf[from] != eol do
     from += 1;
   from += 1;
 
-  const len = to - from,
-        off = 60 - (len % 61);
+  const len = to - from + 1,
+        shift = (len-1)%(cols+1),
+        off = cols - shift;
 
   if off {
-    for m in from+60-off..<to by 61 {
+    for m in from+shift..<to by 61 {
       for i in m..#off by -1 do
         buf[i+1] = buf[i];
       buf[m] = eol;
@@ -72,15 +68,8 @@ proc process(buf, in from, in to) {
   }
 
   to -= 1;
-  do {
-    ref d1 = buf[from],
-        d2 = buf[to];
-
-    (d1, d2) = (table[d2], table[d1]);
-
-    from += 1;
-    to -= 1;
-  } while (from <= to);
+  for (i,j) in zip(from..#(len/2), ..to by -1) do
+    (buf[i], buf[j]) = (table[buf[j]], table[buf[i]]);
 }
 
 

@@ -42,7 +42,7 @@ proc main(args: [] string) {
       lo -= 1;
 
     // process the sequence once we find it
-    process(buf[lo..hi]);
+    process(buf, lo, hi);
 
     hi = lo - 1;
   }
@@ -52,15 +52,14 @@ proc main(args: [] string) {
 }
 
 
-proc process(buf: [?inds]) {
+proc process(buf, in lo, hi) {
   param cols = 61;  // the number of characters per row (including '\n')
-  var lo = inds.low,
-      hi = inds.high;
   
   // skip past header line
-  do {
+  while (buf[lo] != eol) {
     lo += 1;
-  } while buf[lo-1] != eol;
+  }
+  lo += 1;
 
   // shift all of the linefeeds into the right places
   const len = hi - lo + 1,
@@ -76,8 +75,7 @@ proc process(buf: [?inds]) {
   }
 
   // march from both ends of the sequence, complementing and swapping
-  hi -= 1;
-  for (i,j) in zip(lo..#(len/2), ..hi by -1) do
+  for (i,j) in zip(lo..#(len/2), ..<hi by -1) do
     (buf[i], buf[j]) = (table[buf[j]], table[buf[i]]);
 }
 

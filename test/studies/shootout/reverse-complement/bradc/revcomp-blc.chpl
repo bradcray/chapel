@@ -16,6 +16,7 @@ proc main(args: [] string) {
         stdoutBin = openfd(1).writer(iokind.native, locking=false,
                                   hints=QIO_CH_ALWAYS_UNBUFFERED);;
 
+  // read in the data using an incrementally growing buffer
   var bufLen = 8 * 1024,
       bufDom = {0..<bufLen},
       buf: [bufDom] uint(8),
@@ -30,45 +31,53 @@ proc main(args: [] string) {
       bufDom = {0..<bufLen};
     }
   } while more;
-
   end = stdinBin.offset()-1;
 
-  var to = end;
+  // search for the '>' that marks the start of a sequence
+  var hi = end;
 
-  while (to >= 0) {
-    var from = to;
-    while buf[from] != '>'.toByte() do
-      from -= 1;
+  while (hi >= 0) {
+    var lo = hi;
+    while buf[lo] != '>'.toByte() do
+      lo -= 1;
 
-    process(buf, from, to);
+    // process the sequence once we find it
+    process(buf[lo..hi]);
 
-    to = from - 1;
+    hi = lo - 1;
   }
 
+  // write out the transformed buffer
   stdoutBin.write(buf[..end]);
 }
 
-proc process(buf, in from, in to) {
-  param cols = 60;
 
-  while buf[from] != eol do
-    from += 1;
-  from += 1;
+proc process(buf: [?inds]) {
+  param cols = 61;  // the number of characters per row (including '\n')
+  var lo = inds.low,
+      hi = inds.high;
+  
+  // skip past header line
+  do {
+    lo += 1;
+  } while buf[lo-1] != eol;
 
-  const len = to - from + 1,
-        shift = (len-1)%(cols+1),
-        off = cols - shift;
+  // shift all of the linefeeds into the right places
+  const len = hi - lo + 1,
+        off = (len-1)%cols,
+        shift = cols - off - 1;
 
   if off {
-    for m in from+shift..<to by 61 {
-      for i in m..#off by -1 do
+    for m in lo+off..<hi by cols {
+      for i in m..#shift by -1 do
         buf[i+1] = buf[i];
       buf[m] = eol;
     }
   }
 
-  to -= 1;
-  for (i,j) in zip(from..#(len/2), ..to by -1) do
+  // march from both ends of the sequence, complementing and swapping
+  hi -= 1;
+  for (i,j) in zip(lo..#(len/2), ..hi by -1) do
     (buf[i], buf[j]) = (table[buf[j]], table[buf[i]]);
 }
 

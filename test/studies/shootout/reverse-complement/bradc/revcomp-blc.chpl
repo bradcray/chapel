@@ -34,17 +34,19 @@ proc main(args: [] string) {
   end = stdinBin.offset()-1;
 
   // process the buffer a sequence at a time, working from the end
-  var hi = end;
-  while (hi >= 0) {
-    // search for the '>' that marks the start of a sequence
-    var lo = hi;
-    while buf[lo] != '>'.toByte() do
-      lo -= 1;
+  sync {
+    var hi = end;
+    while (hi >= 0) {
+      // search for the '>' that marks the start of a sequence
+      var lo = hi;
+      while buf[lo] != '>'.toByte() do
+        lo -= 1;
 
-    // reverse and complement the sequence once we find it
-    revcomp(buf[lo..hi]);
+      // reverse and complement the sequence once we find it
+      begin revcomp(buf[lo..hi]);
 
-    hi = lo - 1;
+      hi = lo - 1;
+    }
   }
 
   // write out the transformed buffer

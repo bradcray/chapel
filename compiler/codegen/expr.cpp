@@ -36,7 +36,6 @@
 #include "stmt.h"
 #include "stringutil.h"
 #include "type.h"
-#include "view.h"
 #include "virtualDispatch.h"
 #include "WhileStmt.h"
 #include "wellknown.h"

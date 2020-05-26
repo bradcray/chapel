@@ -200,8 +200,10 @@ passByRef(Symbol* sym) {
   // Coforall vars are constant, but are not marked so.
   // todo - mark them with FLAG_CONST and remove this assert,
   //        as well as the special case for FLAG_COFORALL_INDEX_VAR.
+  /*
   INT_ASSERT(!sym->hasFlag(FLAG_COFORALL_INDEX_VAR) ||
              !sym->hasFlag(FLAG_CONST));
+  */
 
   if (sym->hasFlag(FLAG_CONST) ||
       sym->hasFlag(FLAG_COFORALL_INDEX_VAR)) {  // These are constant, too.

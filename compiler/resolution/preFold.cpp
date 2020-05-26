@@ -1869,10 +1869,12 @@ static Expr* unrollHetTupleLoop(CallExpr* call, Expr* tupExpr, Type* iterType) {
     // 
     VarSymbol* field = new_CStringSymbol(tupType->getField(i)->name);
     noop->insertBefore(new DefExpr(tmp));
+    Expr* tupExprCopy = tupExpr->copy();
+    PrimitiveTag op = (tupExprCopy->isRefOrWideRef() ?
+                       PRIM_GET_MEMBER :
+                       PRIM_GET_MEMBER_VALUE);
     noop->insertBefore(new CallExpr(PRIM_MOVE, tmp,
-                                    new CallExpr(PRIM_GET_MEMBER,
-                                                 tupExpr->copy(),
-                                                 field)));
+                                    new CallExpr(op, tupExprCopy, field)));
 
     // clone the body; subtract 2 from i to number unrollings from 0
     //

@@ -1725,9 +1725,14 @@ static void destroyFormalInTaskFn(ArgSymbol* formal, FnSymbol* taskFn) {
   CallExpr* downEndCount = findDownEndCount(taskFn);
   INT_ASSERT(downEndCount);
   FnSymbol* autoDestroyFn = autoDestroyMap.get(formal->type);
-  INT_ASSERT(autoDestroyFn);
-  CallExpr* autoDestroyCall = new CallExpr(autoDestroyFn, formal);
-  downEndCount->insertBefore(autoDestroyCall);
+  if (formal->isRef()) {
+    // we don't expect to autodestroy refs
+    INT_ASSERT(autoDestroyFn==NULL);
+  } else {
+    INT_ASSERT(autoDestroyFn);
+    CallExpr* autoDestroyCall = new CallExpr(autoDestroyFn, formal);
+    downEndCount->insertBefore(autoDestroyCall);
+  }
 }
 
 /************************************* | **************************************

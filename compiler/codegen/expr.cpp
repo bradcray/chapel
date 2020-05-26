@@ -36,6 +36,7 @@
 #include "stmt.h"
 #include "stringutil.h"
 #include "type.h"
+#include "view.h"
 #include "virtualDispatch.h"
 #include "WhileStmt.h"
 #include "wellknown.h"
@@ -5625,7 +5626,7 @@ static bool codegenIsSpecialPrimitive(BaseAST* target, Expr* e, GenRet& ret) {
       SymExpr* se = toSymExpr(call->get(2));
 
       // Invalid AST to use PRIM_GET_MEMBER with a ref field
-      //      INT_ASSERT(!call->get(2)->isRefOrWideRef());
+      INT_ASSERT(!call->get(2)->isRefOrWideRef());
 
       if (call->get(1)->typeInfo()->symbol->hasFlag(FLAG_WIDE_CLASS) ||
           call->get(1)->isWideRef()   ||

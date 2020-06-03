@@ -1834,7 +1834,7 @@ static Expr* unrollHetTupleLoop(CallExpr* call, Expr* tupExpr, Type* iterType) {
     if (DefExpr* defexp = toDefExpr(firstStmt)) {
       if (VarSymbol* loopVar = toVarSymbol(defexp->sym)) {
         wellformed = true;
-        loopVar->addFlag(FLAG_REF_VAR);
+        //        loopVar->addFlag(FLAG_REF_VAR);
         loopVar->addFlag(FLAG_CONST);
       }
     }
@@ -1863,16 +1863,21 @@ static Expr* unrollHetTupleLoop(CallExpr* call, Expr* tupExpr, Type* iterType) {
     // create a temp to refer to the tuple field
     //
     VarSymbol* tmp = newTemp(astr("tupleTemp"));
-    tmp->addFlag(FLAG_REF_VAR);
 
     // create the AST for 'tupleTemp = tuple.field'
     // 
     VarSymbol* field = new_CStringSymbol(tupType->getField(i)->name);
     noop->insertBefore(new DefExpr(tmp));
     Expr* tupExprCopy = tupExpr->copy();
-    PrimitiveTag op = (tupExprCopy->isRefOrWideRef() ?
-                       PRIM_GET_MEMBER :
-                       PRIM_GET_MEMBER_VALUE);
+    PrimitiveTag op;
+    /*
+    if (tupExprCopy->isRefOrWideRef()) {
+      op = PRIM_GET_MEMBER;
+      tmp->addFlag(FLAG_REF_VAR);
+    } else {
+    */
+      op = PRIM_GET_MEMBER_VALUE;
+      //    }
     noop->insertBefore(new CallExpr(PRIM_MOVE, tmp,
                                     new CallExpr(op, tupExprCopy, field)));
 

@@ -153,7 +153,8 @@
  */
 module ChapelRange {
 
-  private use ChapelBase, SysBasic, HaltWrappers;
+  private use ChapelBase, SysBasic, HaltWrappers, ChapelLocale,
+              DefaultRectangular;
 
   use Math;
 

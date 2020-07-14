@@ -24,7 +24,7 @@
 // arrays obtained from external code to Chapel (and thus that we do not own).
 //
 module ExternalArray {
-  private use ChapelStandard;
+  private use ChapelStandard, CPtr;
 
   extern record chpl_opaque_array {
     var _pid: int;

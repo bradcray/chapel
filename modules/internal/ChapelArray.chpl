@@ -170,6 +170,13 @@ module ChapelArray {
   import Reflection;
   private use ChapelDebugPrint;
   private use SysCTypes;
+  use ChapelError;
+  use LocaleTree;
+  public use ChapelDistribution;
+  public use DefaultRectangular;
+  use ChapelRange;
+  use ChapelReduce;
+  use ChapelSyncvar;
 
   // Explicitly use a processor atomic, as most calls to this function are
   // likely be on locale 0

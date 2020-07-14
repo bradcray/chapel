@@ -28,10 +28,10 @@
 //
 module LocaleModel {
 
-  use LocaleModelHelpAPU;
-  use LocaleModelHelpMem;
+  public use LocaleModelHelpAPU;
+  public use LocaleModelHelpMem;
 
-  private use IO;
+  private use ChapelBase, IO, ChapelLocale, DefaultRectangular;
 
   //
   // The task layer calls these to convert between full sublocales and

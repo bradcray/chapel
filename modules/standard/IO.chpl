@@ -432,7 +432,8 @@ module IO {
 */
 
 private use SysBasic, SysCTypes;
-use SysError;
+public use SysError;
+use CPtr;
 
 /*
 
@@ -5228,6 +5229,7 @@ FormattedIO Functions and Types
 module FormattedIO {
   use IO;
   use SysCTypes;
+  use SysBasic;
 //use SysError;
 //use IO;
 

@@ -25,6 +25,7 @@ module LocaleModelHelpFlat {
   use LocaleModelHelpSetup;
   use LocaleModelHelpRuntime;
   private use SysCTypes;
+  use ChapelLocale;
 
   //////////////////////////////////////////
   //

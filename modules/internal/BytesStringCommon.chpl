@@ -23,6 +23,7 @@ module BytesStringCommon {
   private use SysCTypes;
   private use ByteBufferHelpers;
   private use String.NVStringFactory;
+  private use SysBasic;
 
   /*
      ``decodePolicy`` specifies what happens when there is malformed characters

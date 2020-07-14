@@ -22,7 +22,7 @@
 //
 module ChapelTaskDataHelp {
 
-  private use ChapelStandard;
+  private use ChapelStandard, LocaleModelHelpRuntime;
 
   extern type chpl_task_infoChapel_t;
   pragma "fn synchronization free"

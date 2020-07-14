@@ -202,6 +202,10 @@ module ChapelIO {
   use ChapelLocale;
   use SysBasic;
   use SysError;
+  use ChapelTuple;
+  use ChapelRange;
+  use ChapelLocale;
+  use ChapelError;
 
   // TODO -- this should probably be private
   pragma "no doc"

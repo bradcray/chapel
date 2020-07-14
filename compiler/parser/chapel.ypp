@@ -716,9 +716,9 @@ except_ls:
 ;
 
 use_access_control:
-           { $$ = (currentModuleType != MOD_INTERNAL ? true : false); } // private | public
+           { $$ = true; }  // private by default
 | TPUBLIC  { $$ = false; } // public
-| TPRIVATE { $$ = true; } // private
+| TPRIVATE { $$ = true; }  // private
 ;
 
 use_stmt:

@@ -71,6 +71,7 @@ module ChapelLocale {
   public use LocaleModel;
   import HaltWrappers;
   use SysCTypes;
+  use CPtr;
 
   //
   // Node and sublocale types and special sublocale values.

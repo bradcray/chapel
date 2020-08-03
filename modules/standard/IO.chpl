@@ -434,6 +434,7 @@ module IO {
 public use SysBasic;
 use SysCTypes;
 public use SysError;
+use CPtr;
 
 /*
 

@@ -35,7 +35,8 @@
 module SysError {
 
 use SysBasic;
-private use SysCTypes;
+use SysCTypes;
+use CPtr;
 
 /*
 

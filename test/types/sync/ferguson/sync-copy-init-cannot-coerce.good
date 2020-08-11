@@ -1,1 +1,1 @@
-sync-copy-init-cannot-coerce.chpl:3: error: cannot initialize 'sync string' from 'sync int(64)' because 'int(64)' is not coercible to 'string'
+sync-copy-init-cannot-coerce.chpl:3: error: Cannot initialize one sync var directly from another; try applying a method like .readFE(), .readFF(), etc. to the pre-existing variable

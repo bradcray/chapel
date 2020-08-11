@@ -143,7 +143,16 @@ module ChapelSyncvar {
       this.isOwned = false;
     }
 
+    proc init=(const other: _syncvar(?)) {
+      compilerError("Cannot initialize one sync var directly from another; try applying a method like .readFE(), .readFF(), etc. to the pre-existing variable");
+      // seems like these shouldn't be necessary, but see issue #16225
+      this.valType = other.valType;
+      this.wrapped = other.wrapped;
+    }
+
+/*
     proc init=(const other : _syncvar) {
+      compilerError("initialization from unmethoded sync var not permitted");
       // Allow initialization from compatible sync variables, e.g.:
       //   var x : sync int = 5;
       //   var y : sync real = x;
@@ -155,6 +164,7 @@ module ChapelSyncvar {
       this.init(this.type.valType);
       this.writeEF(other.readFE());
     }
+    */
 
     pragma "dont disable remote value forwarding"
     proc init=(const other : this.valType) {
@@ -277,7 +287,12 @@ module ChapelSyncvar {
     return wrapped.isFull;
   }
 
-  proc   = (ref lhs : _syncvar(?t), rhs : t) {
+  proc =(ref lhs: _syncvar, rhs) {
+    compilerError("Cannot assign directly to a sync var; apply a method like .writeEF() or .writeFF() to modify it");
+  }
+
+/*
+  proc =(ref lhs : _syncvar(?t), rhs : t) {
     lhs.wrapped.writeEF(rhs);
   }
 
@@ -328,6 +343,27 @@ module ChapelSyncvar {
   pragma "init copy fn"
   proc chpl__initCopy(ref sv : _syncvar(?t)) {
     return sv.readFE();
+  }
+  */
+
+  proc <(lhs: _syncvar(?t), rhs: _syncvar(t)) {
+    compilerError("Cannot directly compare sync vars; apply a .read??() method first");
+    return false;
+  }
+
+  proc >(lhs: _syncvar(?t), rhs: _syncvar(t)) {
+    compilerError("Cannot directly compare sync vars; apply a .read??() method first");
+    return false;
+  }
+
+  proc <(lhs: _singlevar(?t), rhs: _singlevar(t)) {
+    compilerError("Cannot directly compare single vars; apply a .read??() method first");
+    return false;
+  }
+
+  proc >(lhs: _singlevar(?t), rhs: _singlevar(t)) {
+    compilerError("Cannot directly compare single vars; apply a .read??() method first");
+    return false;
   }
 
   pragma "auto copy fn"
@@ -683,6 +719,7 @@ module ChapelSyncvar {
     }
 
     proc init=(const other : _singlevar) {
+      compilerError("single vars no longer initable from single vars");
       // Allow initialization from compatible single variables, e.g.:
       //   var x : single int = 5;
       //   var y : single real = x;

@@ -339,12 +339,12 @@ module ChapelSyncvar {
   proc <<= (ref lhs : _syncvar(?t), rhs : t) {
     lhs.wrapped.writeEF(lhs.wrapped.readFE() << rhs);
   }
+*/
 
   pragma "init copy fn"
   proc chpl__initCopy(ref sv : _syncvar(?t)) {
     return sv.readFE();
   }
-  */
 
   proc <(lhs: _syncvar(?t), rhs: _syncvar(t)) {
     compilerError("Cannot directly compare sync vars; apply a .read??() method first");
@@ -384,6 +384,7 @@ module ChapelSyncvar {
   pragma "no doc"
   proc chpl__readXX(const ref x : _syncvar(?)) return x.readXX();
 
+  /*
   proc <=>(lhs : _syncvar, ref rhs) {
     const tmp = lhs;
 
@@ -397,12 +398,10 @@ module ChapelSyncvar {
     lhs = rhs;
     rhs = tmp;
   }
+  */
 
   proc <=>(lhs : _syncvar, rhs : _syncvar) {
-    const tmp = lhs;
-
-    lhs = rhs;
-    rhs = tmp;
+    compilerError("swapping sync variables is not supported");
   }
 
   /************************************ | *************************************

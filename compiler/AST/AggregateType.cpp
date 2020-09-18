@@ -2278,6 +2278,19 @@ void AggregateType::buildDefaultInitializer() {
 // whether we should use the new-style 'PRIM_INIT_VAR' approach.
 //
 static bool fieldNeedsSimpleInit(VarSymbol* field) {
+  static const char* syncvar = astr("_syncvar");
+  if (DefExpr* defPoint = field->defPoint) {
+    if (CallExpr* ce = toCallExpr(defPoint->exprType)) {
+      if (SymExpr* se = toSymExpr(ce->baseExpr))
+	if (TypeSymbol* ts = toTypeSymbol(se->symbol())) {
+	  if (ts->name == syncvar) {
+	    return false;
+	  }
+	}
+    }
+  }
+  return true;
+
   // type and param fields need the old-style initializer
   if (field->hasFlag(FLAG_TYPE_VARIABLE) ||
       field->hasFlag(FLAG_PARAM)) {
@@ -2404,6 +2417,7 @@ void AggregateType::fieldToArg(FnSymbol*              fn,
         viewFlags(field);
         printf("\n\n");
         */
+	/*
         if (strcmp(name, "AAA") == 0 ||
             strcmp(name, "DDD") == 0 ||
             strcmp(name, "xxx") == 0) {
@@ -2412,6 +2426,7 @@ void AggregateType::fieldToArg(FnSymbol*              fn,
             ce->isUnresolvedDomainExpr();
           }
         }
+	*/
 
         if (fieldNeedsSimpleInit(field)) {
           fn->insertAtTail(new CallExpr("=",

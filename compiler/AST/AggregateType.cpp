@@ -2398,14 +2398,14 @@ void AggregateType::fieldToArg(FnSymbol*              fn,
             fieldToArgType(defPoint, arg);
 
             arg->defaultExpr = new BlockStmt(defPoint->init->copy());
-            arg->typeExpr = new BlockStmt(defPoint->exprType->copy());
+            arg->typeExpr = new BlockStmt(new CallExpr("_desync", defPoint->exprType->copy()));
 
           } else {
             fieldToArgType(defPoint, arg);
 
             arg->defaultExpr = new BlockStmt(defPoint->init->copy());
-            arg->typeExpr = new BlockStmt(defPoint->exprType->copy());
-            //            arg->typeExpr = new BlockStmt(new CallExpr("_desync", defPoint->exprType->copy()));
+	    //            arg->typeExpr = new BlockStmt(defPoint->exprType->copy());
+	    arg->typeExpr = new BlockStmt(new CallExpr("_desync", defPoint->exprType->copy()));
           }
         }
 
@@ -2435,6 +2435,7 @@ void AggregateType::fieldToArg(FnSymbol*              fn,
                                                      new_CStringSymbol(name)),
                                         arg));
         } else {
+	  //	  printf("Using complex init for field %s\n", name);
           if (defPoint->exprType) {
             VarSymbol* call_tmp = newTemp("call_tmp");
             call_tmp->addFlag(FLAG_MAYBE_PARAM);

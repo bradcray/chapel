@@ -1069,6 +1069,21 @@ bool isClass(Type* t) {
   return false;
 }
 
+bool isHeapAllocatedType(Type* t) {
+  if (AggregateType* ct = toAggregateType(t)) {
+    TypeSymbol* ts = ct->symbol;
+    if (ts->hasEitherFlag(FLAG_REF,FLAG_WIDE_REF))
+      return false;
+    if (ts->hasFlag(FLAG_C_ARRAY))
+      return false;
+
+    return (ts->hasFlag(FLAG_DATA_CLASS) ||
+            ts->hasFlag(FLAG_WIDE_CLASS) ||
+            ct->isClass());
+  }
+  return false;
+}
+
 bool isClassOrNil(Type* t) {
   if (t == dtNil) return true;
   return isClass(t);
@@ -1219,6 +1234,24 @@ bool isArrayImplType(Type* type)
 bool isDistImplType(Type* type)
 {
   return isDerivedType(type, FLAG_BASE_DIST);
+}
+
+bool isAliasingArrayImplType(Type* t) {
+  return t->symbol->hasFlag(FLAG_ALIASING_ARRAY);
+}
+
+bool isAliasingArrayType(Type* t) {
+  if (t->symbol->hasFlag(FLAG_ARRAY)) {
+    AggregateType* at = toAggregateType(t);
+    INT_ASSERT(at);
+
+    Symbol* instanceField = at->getField("_instance", false);
+    if (instanceField) {
+      return isAliasingArrayImplType(instanceField->type);
+    }
+  }
+
+  return false;
 }
 
 static bool isDerivedType(Type* type, Flag flag)

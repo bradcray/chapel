@@ -46,6 +46,7 @@
 #include "iterator.h"
 #include "lifetime.h"
 #include "ModuleSymbol.h"
+#include "optimizations.h"
 #include "ParamForLoop.h"
 #include "PartialCopyData.h"
 #include "passes.h"
@@ -111,10 +112,10 @@ SymbolMap                          paramMap;
 Vec<CallExpr*>                     callStack;
 
 std::map<Type*,     FnSymbol*>     autoCopyMap;
+std::map<Type*,     FnSymbol*>     initCopyMap;
 std::map<Type*,     Serializers>   serializeMap;
 
 Map<Type*,          FnSymbol*>     autoDestroyMap;
-Map<Type*,          FnSymbol*>     unaliasMap;
 Map<FnSymbol*,      FnSymbol*>     coerceMoveFromCopyMap;
 Map<Type*,          FnSymbol*>     valueToRuntimeTypeMap;
 Map<FnSymbol*,      FnSymbol*>     iteratorLeaderMap;
@@ -177,11 +178,12 @@ static void resolveMove(CallExpr* call);
 static void resolveNew(CallExpr* call);
 static void resolveCoerce(CallExpr* call);
 static void resolveAutoCopyEtc(AggregateType* at);
+static FnSymbol* autoMemoryFunction(AggregateType* at, const char* fnName);
 
 static Expr* foldTryCond(Expr* expr);
 
 static void unmarkDefaultedGenerics();
-static void resolveUses(ModuleSymbol* mod);
+static void resolveUses(ModuleSymbol* mod, const char* path);
 static void resolveSupportForModuleDeinits();
 static void resolveExports();
 static void resolveEnumTypes();
@@ -391,9 +393,78 @@ FnSymbol* getAutoDestroy(Type* t) {
   return autoDestroyMap.get(t);
 }
 
-FnSymbol* getUnalias(Type* t) {
-  return unaliasMap.get(t);
+Type* getCopyTypeDuringResolution(Type* t) {
+  if (isSyncType(t) || isSingleType(t)) {
+    Type* baseType = t->getField("valType")->type;
+    return baseType;
+  }
+  if (isAliasingArrayType(t) || // avoid inf. loop in resolving array functions
+      t->symbol->hasFlag(FLAG_ITERATOR_RECORD)) {
+    AggregateType* at = toAggregateType(t);
+    INT_ASSERT(at);
+
+    FnSymbol* fn = getInitCopyDuringResolution(at);
+    INT_ASSERT(fn);
+
+    if (fn->retType == t)
+      INT_FATAL("Expected different return type for this initCopy");
+
+    return fn->retType;
+  }
+
+  return t;
 }
+
+static Type* canCoerceToCopyType(Type* actualType, Symbol* actualSym,
+                                 Type* formalType, ArgSymbol* formalSym,
+                                 FnSymbol* fn) {
+
+  Type* copyType = NULL;
+
+  Type* actualValType = actualType->getValType();
+  Type* formalValType = formalType->getValType();
+
+  if (isSyncType(actualValType) || isSingleType(actualValType)) {
+    copyType = getCopyTypeDuringResolution(actualValType);
+  } else if (isAliasingArrayType(actualValType) ||
+             actualValType->symbol->hasFlag(FLAG_ITERATOR_RECORD)) {
+    // The conditions below avoid infinite loops and problems
+    // relating to resolving initCopy for iterators when not needed.
+    if (formalValType == dtAny ||
+        formalValType->symbol->hasFlag(FLAG_ARRAY)) {
+      if (fn == NULL ||
+          !(fn->name == astr_initCopy || fn->name == astr_autoCopy ||
+            fn->name == astr_coerceMove || fn->name == astr_coerceCopy)) {
+
+        if (formalSym == NULL || inOrOutFormalNeedingCopyType(formalSym)) {
+          copyType = getCopyTypeDuringResolution(actualValType);
+        }
+      }
+    }
+  }
+
+  if (copyType == dtUnknown) copyType = NULL;
+  return copyType;
+}
+
+FnSymbol* getInitCopyDuringResolution(Type* type) {
+  std::map<Type*, FnSymbol*>::iterator it = initCopyMap.find(type);
+
+  FnSymbol* fn = NULL;
+  if (it != initCopyMap.end())
+    fn = it->second;  // can also be NULL
+
+  if (fn != NULL)
+    return fn;
+
+  if (AggregateType* at = toAggregateType(type)) {
+    fn = autoMemoryFunction(at, astr_initCopy);
+    initCopyMap[at] = fn;
+  }
+
+  return fn;
+}
+
 
 FnSymbol* getCoerceMoveFromCoerceCopy(FnSymbol* coerceCopyFn) {
   return coerceMoveFromCopyMap.get(coerceCopyFn);
@@ -525,37 +596,6 @@ static bool fits_in_uint(int width, Immediate* imm) {
   return false;
 }
 
-// Since an `inout` copy will be made at the call site, this function
-// looks for the original value before the copy in order to do correct
-// const-ness checking for passing to inout arguments.
-static SymExpr* findSourceOfInCopy(Symbol* sym) {
-  if (startsWith(sym->name, "_formal_tmp_in_")) {
-    for_SymbolSymExprs(se, sym) {
-      CallExpr* call = toCallExpr(se->getStmtExpr());
-      SymExpr* lhsSe = NULL;
-      CallExpr* initOrCtor = NULL;
-      if (isInitOrReturn(call, lhsSe, initOrCtor)) {
-        if (lhsSe->symbol() == sym) {
-          if (initOrCtor == NULL && call->isPrimitive()) {
-            // e.g. PRIM_MOVE lhs rhs
-            SymExpr* rhsSe = toSymExpr(call->get(2));
-            INT_ASSERT(rhsSe);
-            return rhsSe;
-          } else {
-            // assumes that the called function is init/coerce
-            // and the last argument is the source
-            Expr* rhs = initOrCtor->get(initOrCtor->numActuals());
-            SymExpr* rhsSe = toSymExpr(rhs);
-            INT_ASSERT(rhsSe);
-            return rhsSe;
-          }
-        }
-      }
-    }
-  }
-  return NULL;
-}
-
 // Is this a legal actual argument where an l-value is required?
 // I.e. for an out/inout/ref formal.
 //
@@ -605,15 +645,6 @@ isLegalLvalueActualArg(ArgSymbol* formal, Expr* actual,
       if (! (formal && formal->hasFlag(FLAG_ARG_THIS) &&
              calledFn && calledFn->hasFlag(FLAG_REF_TO_CONST_WHEN_CONST_THIS)))
       {
-
-        if (formal->intent == INTENT_INOUT) {
-          // check for a formal temp to handle the `in` part; if we have
-          // it, look at the source of it.
-          if (SymExpr* sourceSe = findSourceOfInCopy(sym)) {
-            return isLegalLvalueActualArg(formal, sourceSe,
-                                          constnessErrorOut, exprTmpErrorOut);
-          }
-        }
         constnessErrorOut = constnessError;
         exprTmpErrorOut = exprTmpError;
         return false;
@@ -1493,6 +1524,11 @@ bool canCoerce(Type*     actualType,
                bool*     paramNarrows) {
   bool tmpPromotes = false;
   bool tmpParamNarrows = false;
+
+  // MPF TODO: use the intent instead of whether or not `formalType`
+  // has a `ref` type in order to rule out coercions that would not
+  // be allowed (e.g. passing an `int(8)` argument to a `ref x: int(64)`).
+
   if (canParamCoerce(actualType, actualSym, formalType, &tmpParamNarrows)) {
     if (paramNarrows) *paramNarrows = tmpParamNarrows;
     return true;
@@ -1506,16 +1542,6 @@ bool canCoerce(Type*     actualType,
     if (paramNarrows) *paramNarrows = tmpParamNarrows;
     return true;
   }
-
-  /*
-  if (isSyncType(actualType) || isSingleType(actualType)) {
-    Type* baseType = actualType->getField("valType")->type;
-
-    // sync can't store an array or a param, so no need to
-    // propagate promotes / paramNarrows
-    return canDispatch(baseType, NULL, formalType, formalSym, fn);
-  }
-  */
 
   if (canCoerceTuples(actualType, actualSym, formalType, formalSym, fn)) {
     return true;
@@ -1562,6 +1588,14 @@ bool canCoerce(Type*     actualType,
           break;
         actualParent = actualParent->dispatchParents.only();
       }
+    }
+  }
+
+  if (Type* copyType = canCoerceToCopyType(actualType, actualSym,
+                                           formalType, formalSym, fn)) {
+    if (copyType != actualType) {
+      return canDispatch(copyType, actualSym, formalType, formalSym, fn,
+                         promotes, paramNarrows);
     }
   }
 
@@ -3032,6 +3066,7 @@ static FnSymbol* resolveNormalCall(CallExpr* call, check_state_t checkState);
 
 static void      findVisibleFunctionsAndCandidates(
                                      CallInfo&                  info,
+                                     VisibilityInfo&            visInfo,
                                      Vec<FnSymbol*>&            visibleFns,
                                      Vec<ResolutionCandidate*>& candidates);
 
@@ -3385,18 +3420,19 @@ static FnSymbol* resolveNormalCall(CallInfo& info, check_state_t checkState) {
   ResolutionCandidate*      bestCref   = NULL;
   ResolutionCandidate*      bestVal    = NULL;
 
+  VisibilityInfo            visInfo(info.call);
   int                       numMatches = 0;
 
   FnSymbol*                 retval     = NULL;
 
-  findVisibleFunctionsAndCandidates(info, mostApplicable, candidates);
+  findVisibleFunctionsAndCandidates(info, visInfo, mostApplicable, candidates);
 
-  numMatches = disambiguateByMatch(info,
-                                   candidates,
+  numMatches = disambiguateByMatch(info, candidates,
+                                   bestRef, bestCref, bestVal);
 
-                                   bestRef,
-                                   bestCref,
-                                   bestVal);
+  if (checkState == CHECK_NORMAL_CALL && visInfo.inPOI())
+    updateCacheInfosForACall(visInfo,
+                             bestRef, bestCref, bestVal);
 
   // If no candidates were found and it's a method, try forwarding
   if (candidates.n                  == 0 &&
@@ -3883,7 +3919,6 @@ void resolveNormalCallCompilerWarningStuff(CallExpr* call,
       if (inFn != NULL) {
         inCopyIsh = inFn->hasFlag(FLAG_INIT_COPY_FN) ||
                     inFn->hasFlag(FLAG_AUTO_COPY_FN) ||
-                    inFn->hasFlag(FLAG_UNALIAS_FN) ||
                     inFn->name == astrInitEquals;
       }
       if (inCopyIsh) {
@@ -4051,8 +4086,8 @@ struct ExampleCandidateComparator {
     ResolutionCandidate* a = new ResolutionCandidate(aFn);
     ResolutionCandidate* b = new ResolutionCandidate(bFn);
 
-    a->isApplicable(info);
-    b->isApplicable(info);
+    a->isApplicable(info, NULL);
+    b->isApplicable(info, NULL);
 
     if (failedCandidateIsBetterMatch(a, b))
       ret = true;
@@ -4300,11 +4335,15 @@ static void generateUnresolvedMsg(CallInfo& info, Vec<FnSymbol*>& visibleFns) {
 //
 typedef std::vector<FnSymbol*> LastResortCandidates;
 
-// add a null separator if needed
+// add a null separator
 static void markEndOfPOI(LastResortCandidates& lrc) {
-  if (int sz = (int) lrc.size())
-    if (lrc[sz-1] != NULL)
-      lrc.push_back(NULL);
+  lrc.push_back(NULL);
+}
+
+// do we have any LRCs to look at?
+static bool haveAnyLRCs(LastResortCandidates& lrc, int poiDepth) {
+  // discount (visInfo.poiDepth+1) nulls that are separators
+  return (int)lrc.size() > (poiDepth + 1);
 }
 
 // do we have more LRCs to look at?
@@ -4313,20 +4352,24 @@ static bool haveMoreLRCs(LastResortCandidates& lrc, int numVisited) {
 }
 
 static void filterCandidate (CallInfo&                  info,
+                             VisibilityInfo&            visInfo,
                              FnSymbol*                  fn,
                              Vec<ResolutionCandidate*>& candidates);
 
 static void gatherCandidates(CallInfo&                  info,
+                             VisibilityInfo&            visInfo,
                              FnSymbol*                  fn,
                              Vec<ResolutionCandidate*>& candidates);
 
-static void gatherCandidatesAndLastResort(CallInfo& info,
+static void gatherCandidatesAndLastResort(CallInfo&     info,
+                             VisibilityInfo&            visInfo,
                              Vec<FnSymbol*>&            visibleFns,
                              int&                       numVisited,
                              LastResortCandidates&      lrc,
                              Vec<ResolutionCandidate*>& candidates);
 
 static void gatherLastResortCandidates(CallInfo&                  info,
+                                       VisibilityInfo&            visInfo,
                                        LastResortCandidates&      lrc,
                                        int&                       numVisited,
                                        Vec<ResolutionCandidate*>& candidates);
@@ -4414,8 +4457,18 @@ void trimVisibleCandidates(CallInfo&       info,
   trimVisibleCandidates(info, mostApplicable, numVisitedVis, visibleFns);
 }
 
+void advanceCurrStart(VisibilityInfo& visInfo) {
+  INT_ASSERT((int)visInfo.instnPoints.size() == visInfo.poiDepth);
+  if (visInfo.nextPOI != NULL)
+    visInfo.instnPoints.push_back(visInfo.nextPOI);
+
+  visInfo.currStart = visInfo.nextPOI;
+  visInfo.nextPOI = NULL;
+}
+
 static void findVisibleFunctionsAndCandidates(
                                 CallInfo&                  info,
+                                VisibilityInfo&            visInfo,
                                 Vec<FnSymbol*>&            mostApplicable,
                                 Vec<ResolutionCandidate*>& candidates) {
   CallExpr* call = info.call;
@@ -4429,7 +4482,7 @@ static void findVisibleFunctionsAndCandidates(
     handleTaskIntentArgs(info, fn);
 
     // no need for trimVisibleCandidates() and findVisibleCandidates()
-    gatherCandidates(info, fn, candidates);
+    gatherCandidates(info, visInfo, fn, candidates);
 
     explainGatherCandidate(info, candidates);
 
@@ -4443,29 +4496,37 @@ static void findVisibleFunctionsAndCandidates(
   int numVisitedVis = 0, numVisitedMA = 0;
   LastResortCandidates lrc;
   std::set<BlockStmt*> visited;
-  std::vector<BlockStmt*> currentScopes, nextScopes;
-  currentScopes.push_back(getVisibilityScope(call));
+  visInfo.currStart = getVisibilityScope(call);
+  INT_ASSERT(visInfo.poiDepth == -1); // we have not used it
 
   do {
-    findVisibleFunctions(info, &visited, &currentScopes, &nextScopes,
+    visInfo.poiDepth++;
+
+    findVisibleFunctions(info, &visInfo, &visited,
                          &numVisitedVis, visibleFns);
 
     trimVisibleCandidates(info, mostApplicable,
                           numVisitedVis, visibleFns);
 
-    gatherCandidatesAndLastResort(info, mostApplicable, numVisitedMA,
+    gatherCandidatesAndLastResort(info, visInfo, mostApplicable, numVisitedMA,
                                   lrc, candidates);
 
-    currentScopes.clear();
-    std::swap(currentScopes, nextScopes);
+    advanceCurrStart(visInfo);
   }
   while
-    (candidates.n == 0 && ! currentScopes.empty());
+    (candidates.n == 0 && visInfo.currStart != NULL);
 
-  // If needed, look at "last resort" candidates.
-  int numVisitedLRC = 0;
-  while (candidates.n == 0 && haveMoreLRCs(lrc, numVisitedLRC)) {
-    gatherLastResortCandidates(info, lrc, numVisitedLRC, candidates);
+  // If we have not found any candidates after traversing all POIs,
+  // look at "last resort" candidates, if any.
+  if (candidates.n == 0 && haveAnyLRCs(lrc, visInfo.poiDepth)) {
+    visInfo.poiDepth = -1;
+    int numVisitedLRC = 0;
+    do {
+      visInfo.poiDepth++;
+      gatherLastResortCandidates(info, visInfo, lrc, numVisitedLRC, candidates);
+    }
+    while
+      (candidates.n == 0 && haveMoreLRCs(lrc, numVisitedLRC));
   }
 
   explainGatherCandidate(info, candidates);
@@ -4473,6 +4534,7 @@ static void findVisibleFunctionsAndCandidates(
 
 // run filterCandidate() on 'fn' if appropriate
 static void gatherCandidates(CallInfo&                  info,
+                             VisibilityInfo&            visInfo,
                              FnSymbol*                  fn,
                              Vec<ResolutionCandidate*>& candidates) {
       // Consider
@@ -4502,18 +4564,19 @@ static void gatherCandidates(CallInfo&                  info,
       //
 
       if (info.call->methodTag == false) {
-        filterCandidate(info, fn, candidates);
+        filterCandidate(info, visInfo, fn, candidates);
 
       } else {
         if (fn->hasFlag(FLAG_NO_PARENS) == true) {
-          filterCandidate(info, fn, candidates);
+          filterCandidate(info, visInfo, fn, candidates);
         }
       }
 }
 
 // filter non-last-resort fns into 'candidates',
 // store last-resort fns into 'lrc'
-static void gatherCandidatesAndLastResort(CallInfo& info,
+static void gatherCandidatesAndLastResort(CallInfo&     info,
+                             VisibilityInfo&            visInfo,
                              Vec<FnSymbol*>&            visibleFns,
                              int&                       numVisited,
                              LastResortCandidates&      lrc,
@@ -4523,7 +4586,7 @@ static void gatherCandidatesAndLastResort(CallInfo& info,
     if (fn->hasFlag(FLAG_LAST_RESORT))
       lrc.push_back(fn);
     else
-      gatherCandidates(info, fn, candidates);
+      gatherCandidates(info, visInfo, fn, candidates);
   }
   markEndOfPOI(lrc);
   numVisited = visibleFns.n;
@@ -4531,19 +4594,21 @@ static void gatherCandidatesAndLastResort(CallInfo& info,
 
 // run filterCandidate() on the next batch of last resort fns
 static void gatherLastResortCandidates(CallInfo&                  info,
+                                       VisibilityInfo&            visInfo,
                                        LastResortCandidates&      lrc,
                                        int&                       numVisited,
                                        Vec<ResolutionCandidate*>& candidates) {
   int idx = numVisited;
 
   for (FnSymbol* fn = lrc[idx]; fn != NULL; fn = lrc[++idx]) {
-    gatherCandidates(info, fn, candidates);
+    gatherCandidates(info, visInfo, fn, candidates);
   }
 
   numVisited = ++idx;
 }
     
 static void filterCandidate(CallInfo&                  info,
+                            VisibilityInfo&            visInfo,
                             FnSymbol*                  fn,
                             Vec<ResolutionCandidate*>& candidates) {
   ResolutionCandidate* candidate = new ResolutionCandidate(fn);
@@ -4558,7 +4623,7 @@ static void filterCandidate(CallInfo&                  info,
     }
   }
 
-  if (candidate->isApplicable(info) == true) {
+  if (candidate->isApplicable(info, &visInfo)) {
     candidates.add(candidate);
   } else {
     delete candidate;
@@ -5734,10 +5799,11 @@ static void captureTaskIntentValues(int        argNum,
       if (hasAutoCopyForType(formal->type) == true) {
         FnSymbol* autoCopy = getAutoCopy(formal->type);
 
-        marker->insertBefore("'move'(%S,%S(%S))",
+        marker->insertBefore("'move'(%S,%S(%S, %S))",
                              capTemp,
                              autoCopy,
-                             varActual);
+                             varActual,
+                             gFalse); // can we do something better here?
 
       } else if (isReferenceType(varActual->type) ==  true &&
                  isReferenceType(capTemp->type)   == false) {
@@ -5820,20 +5886,24 @@ static CallExpr* findOutIntentCallFromAssign(CallExpr* call,
                                              Expr** outActual,
                                              ArgSymbol** outFormal) {
   // Call is an assign from a temp
-  // Find an out argument call setting the temp
+  // Find an out/inout argument call setting the temp
   if (call->isNamed("=")) {
     if (SymExpr* lhs = toSymExpr(call->get(1))) {
       if (SymExpr* rhs = toSymExpr(call->get(2))) {
-        if (SymExpr* defSe = rhs->symbol()->getSingleDef()) {
-          CallExpr* parentCall = toCallExpr(defSe->parentExpr);
-          if (parentCall->resolvedFunction() != NULL) {
-            for_formals_actuals(formal, actual, parentCall) {
-              if (actual == defSe) {
-                if (formal->intent == INTENT_OUT ||
-                    formal->originalIntent == INTENT_OUT) {
-                  *outActual = lhs;
-                  *outFormal = formal;
-                  return parentCall;
+        if (rhs->symbol()->hasFlag(FLAG_TEMP)) {
+          for_SymbolDefs(defSe, rhs->symbol()) {
+            CallExpr* parentCall = toCallExpr(defSe->parentExpr);
+            if (parentCall->resolvedFunction() != NULL) {
+              for_formals_actuals(formal, actual, parentCall) {
+                if (actual == defSe) {
+                  if (formal->intent == INTENT_OUT ||
+                      formal->originalIntent == INTENT_OUT ||
+                      formal->intent == INTENT_INOUT ||
+                      formal->originalIntent == INTENT_INOUT) {
+                    *outActual = lhs;
+                    *outFormal = formal;
+                    return parentCall;
+                  }
                 }
               }
             }
@@ -5902,11 +5972,6 @@ static void lvalueCheckActual(CallExpr* call, Expr* actual, IntentTag intent, Ar
     nonTaskFnParent->addFlag(FLAG_MODIFIES_CONST_FIELDS);
   }
 
-  // A constness error for an inout argument need only be
-  // reported for the first of the 2 formals.
-  if (errorMsg && formal->hasFlag(FLAG_HIDDEN_FORMAL_INOUT))
-    errorMsg = false;
-
   if (errorMsg == true) {
     if (nonTaskFnParent &&
         nonTaskFnParent->hasFlag(FLAG_SUPPRESS_LVALUE_ERRORS)) {
@@ -5950,7 +6015,13 @@ static void lvalueCheckActual(CallExpr* call, Expr* actual, IntentTag intent, Ar
           findOutIntentCallFromAssign(call, &outActual, &outFormal);
 
         if (outCall != NULL) {
-          lvalueCheckActual(outCall, outActual, INTENT_OUT, outFormal);
+
+          IntentTag intent = INTENT_OUT;
+          if (outFormal->intent == INTENT_INOUT ||
+              outFormal->originalIntent == INTENT_INOUT)
+            intent = INTENT_INOUT;
+
+          lvalueCheckActual(outCall, outActual, intent, outFormal);
           return;
         }
       }
@@ -6392,6 +6463,8 @@ static void resolveInitField(CallExpr* call) {
 
   call->primitive = primitives[PRIM_SET_MEMBER];
 
+  setDefinedConstForPrimSetMemberIfApplicable(call);
+
   resolveSetMember(call); // Can we remove some of the above with this?
 }
 
@@ -6571,7 +6644,10 @@ void resolveInitVar(CallExpr* call) {
     // If the target type is generic, compute the appropriate instantiation
     // type.
     if (genericTgt) {
-      Type* inst = getInstantiationType(srcType, NULL, targetType, NULL, call);
+      Type* inst = getInstantiationType(srcType, NULL, targetType, NULL, call,
+                                        /* allowCoercion */ true,
+                                        /* implicitBang */ false,
+                                        /* inOrOtherValue */ true);
 
       // Does not allow initializations of the form:
       //   var x : MyGenericType = <expr>;
@@ -6599,6 +6675,13 @@ void resolveInitVar(CallExpr* call) {
       VarSymbol* tmp = newTemp(astr_init_coerce_tmp, targetType);
       if (dst->hasFlag(FLAG_PARAM))
         tmp->addFlag(FLAG_PARAM);
+
+      // this protects against issues with coercing from sync int to int
+      if ((targetType->symbol->hasFlag(FLAG_HAS_RUNTIME_TYPE) && !genericTgt)) {
+        if (dst->hasFlag(FLAG_CONST)) {
+          tmp->addFlag(FLAG_CONST);
+        }
+      }
 
       CallExpr* coerce = new CallExpr(PRIM_COERCE,
                                       srcExpr->copy(),
@@ -6659,9 +6742,20 @@ void resolveInitVar(CallExpr* call) {
     // For example, even though domains can leverage 'init=' for basic
     // copy-initialization, the compiler only currently knows about calls to
     // 'chpl__initCopy' and how to turn them into something else when necessary
-    // (e.g. chpl__unalias).
 
-    CallExpr* initCopy = new CallExpr(astr_initCopy, srcExpr->remove());
+    // Normally e.g. var y = foo() - where foo returns by value - will not add a
+    // copy and so the result of foo() need not be auto-destroyed.  However, if
+    // foo() is returning an array slice, then it is copied from and the source
+    // of the copy does need to be destroyed.
+    if (SymExpr* rhsSe = toSymExpr(srcExpr))
+      if (VarSymbol* rhsVar = toVarSymbol(rhsSe->symbol()))
+        if (isAliasingArrayType(rhsVar->getValType()))
+          if (rhsVar->hasFlag(FLAG_NO_AUTO_DESTROY) == false)
+            rhsVar->addFlag(FLAG_INSERT_AUTO_DESTROY);
+
+    Symbol *definedConst = dst->hasFlag(FLAG_CONST)? gTrue : gFalse;
+    CallExpr* initCopy = new CallExpr(astr_initCopy, srcExpr->remove(),
+                                                     definedConst);
     call->insertAtTail(initCopy);
     call->primitive = primitives[PRIM_MOVE];
 
@@ -6682,6 +6776,11 @@ void resolveInitVar(CallExpr* call) {
       resolveExpr(initCopy);
       resolveMove(call);
     }
+
+    if (isAliasingArrayType(srcExpr->getValType()) || initCopyIter)
+      if (FnSymbol* initCopyFn = initCopy->resolvedFunction())
+        if (initCopyFn->retType == srcExpr->getValType())
+          INT_FATAL("Expected different return type for this initCopy");
 
   } else if (isRecord(targetType->getValType())) {
     AggregateType* at = toAggregateType(targetType->getValType());
@@ -6777,7 +6876,9 @@ FnSymbol* findCopyInitFn(AggregateType* at, const char*& err) {
   CallExpr* call = NULL;
 
   if (at->symbol->hasFlag(FLAG_TUPLE)) {
-    call = new CallExpr(astr_initCopy, tmpAt);
+    call = new CallExpr(astr_initCopy, tmpAt,
+                        /* definedConst = */gFalse);
+                       
   } else {
     call = new CallExpr(astrInitEquals, gMethodToken, tmpAt, tmpAt);
   }
@@ -6873,7 +6974,28 @@ static FnSymbol* fixInstantiationPointAndTryResolveBody(AggregateType* at,
                                                         CallExpr* call) {
 
   if (FnSymbol* fn = call->resolvedFunction()) {
-    fn->setInstantiationPoint(at->symbol->instantiationPoint);
+    if (fn->instantiatedFrom != NULL) {
+      // it is a generic function, so make sure to set instantiationPoint
+      BlockStmt* point = NULL;
+      if (at->symbol->instantiationPoint == NULL) {
+        // If the type doesn't have an instantiation point, use its defPoint
+        point = getInstantiationPoint(at->symbol->defPoint);
+        // Unless it is an iterator record - in that case use the
+        // instantiation point for the iterator if there is one.
+        if (at->symbol->hasFlag(FLAG_ITERATOR_RECORD)) {
+          IteratorInfo* ii = at->iteratorInfo;
+          if (ii != NULL && ii->iterator != NULL) {
+            BlockStmt* iterPt = ii->iterator->instantiationPoint();
+            if (iterPt != NULL)
+              point = iterPt;
+          }
+        }
+      } else {
+        point = at->symbol->instantiationPoint;
+      }
+      INT_ASSERT(point != NULL);
+      fn->setInstantiationPoint(point);
+    }
 
     inTryResolve++;
     tryResolveStates.push_back(CHECK_BODY_RESOLVES);
@@ -7636,6 +7758,8 @@ static void resolveNewSetupManaged(CallExpr* newExpr, Type*& manager) {
         } else if (DecoratedClassType* dt = toDecoratedClassType(type)) {
           if (dt->isUnmanaged()) {
             manager = dtUnmanaged;
+          } else if (dt->isBorrowed()) {
+            manager = dtBorrowed;
           } else {
             manager = dtOwned;
           }
@@ -8196,7 +8320,9 @@ Expr* resolveExpr(Expr* expr) {
     }
 
   } else if (CallExpr* call = toCallExpr(expr)) {
+    // Most calls to resolveCall() are from here.
     retval = resolveExprPhase2(expr, fn, preFold(call));
+
   } else if (CondStmt* stmt = toCondStmt(expr)) {
     BlockStmt* then = stmt->thenStmt;
     // TODO: Should we just store a boolean field in CondStmt instead?
@@ -8626,7 +8752,6 @@ static void resolveExprMaybeIssueError(CallExpr* call) {
           FnSymbol*     fn     = frame->getFunction();
           bool inCopyIsh = fn->hasFlag(FLAG_INIT_COPY_FN) ||
                            fn->hasFlag(FLAG_AUTO_COPY_FN) ||
-                           fn->hasFlag(FLAG_UNALIAS_FN) ||
                            fn->hasFlag(FLAG_COERCE_FN) ||
                            fn->name == astrInitEquals;
           if (inCopyIsh) {
@@ -8791,10 +8916,10 @@ void resolve() {
 
   resolveObviousGlobals();
 
-  resolveUses(ModuleSymbol::mainModule());
+  resolveUses(ModuleSymbol::mainModule(), "");
 
   if (printModuleInitModule)
-    resolveUses(printModuleInitModule);
+    resolveUses(printModuleInitModule, "");
 
   if (chpl_gen_main)
     resolveFunction(chpl_gen_main);
@@ -8915,30 +9040,32 @@ static void unmarkDefaultedGenerics() {
 *                                                                             *
 ************************************** | *************************************/
 
-static void resolveUses(ModuleSymbol* mod) {
-  static Vec<ModuleSymbol*> initMods;
-  static int                moduleResolutionDepth = 0;
+static std::set<ModuleSymbol*> moduleInitResolved;
 
-  if (initMods.set_in(mod) == NULL) {
-    initMods.set_add(mod);
+static void resolveUses(ModuleSymbol* mod, const char* path) {
+  if (moduleInitResolved.count(mod) == 0) {
+    moduleInitResolved.insert(mod);
 
-    ++moduleResolutionDepth;
+    if (fPrintModuleResolution == true) {
+      // update path variable
+      if (path == NULL || path[0] == '\0')
+        path = mod->name;
+      else
+        path = astr(path, ".", mod->name);
+    }
 
     if (ModuleSymbol* parent = mod->defPoint->getModule()) {
       if (parent != theProgram && parent != rootModule) {
-        resolveUses(parent);
+        resolveUses(parent, path);
       }
     }
 
     for_vector(ModuleSymbol, usedMod, mod->modUseList) {
-      resolveUses(usedMod);
+      resolveUses(usedMod, path);
     }
 
     if (fPrintModuleResolution == true) {
-      fprintf(stderr,
-              "%2d Resolving module %30s ...",
-              moduleResolutionDepth,
-              mod->name);
+      fprintf(stderr, "%s\n  from %s\n", mod->name, path);
     }
 
     resolveSignatureAndFunction(mod->initFn);
@@ -8952,10 +9079,9 @@ static void resolveUses(ModuleSymbol* mod) {
 
       mod->accept(&visitor);
 
-      fprintf(stderr, " %6d asts\n", visitor.total());
+      if (developer)
+        fprintf(stderr, "%s contains %6d asts\n", mod->name, visitor.total());
     }
-
-    --moduleResolutionDepth;
   }
 }
 
@@ -9234,7 +9360,6 @@ static void resolveDestructors() {
 ************************************** | *************************************/
 
 static const char* autoCopyFnForType(AggregateType* at);
-static FnSymbol*   autoMemoryFunction(AggregateType* at, const char* fnName);
 
 static void resolveAutoCopies() {
   for_alive_in_Vec(TypeSymbol, ts, gTypeSymbols) {
@@ -9300,16 +9425,6 @@ static void resolveAutoCopyEtc(AggregateType* at) {
 
     autoDestroyMap.put(at, fn);
   }
-
-  // resolve unalias
-  // We make the 'unalias' hook available to all user records,
-  // but for now it only applies to array/domain/distribution
-  // in order to minimize the changes.
-  if (unaliasMap.get(at) == NULL && isRecordWrappedType(at) == true) {
-    FnSymbol* fn = autoMemoryFunction(at, "chpl__unalias");
-
-    unaliasMap.put(at, fn);
-  }
 }
 
 // Just use 'chpl__initCopy' instead of 'chpl__autoCopy'
@@ -9336,7 +9451,17 @@ static const char* autoCopyFnForType(AggregateType* at) {
 
 static FnSymbol* autoMemoryFunction(AggregateType* at, const char* fnName) {
   VarSymbol* tmp    = newTemp(at);
-  CallExpr*  call   = new CallExpr(fnName, tmp);
+  CallExpr*  call   = NULL;
+
+  if (fnName == astr_initCopy || fnName == astr_autoCopy) {
+    call = new CallExpr(fnName, tmp, new SymExpr(gFalse));
+  }
+  else {
+    call = new CallExpr(fnName, tmp);
+  }
+
+
+
 
   chpl_gen_main->insertAtHead(new DefExpr(tmp));
 
@@ -9351,8 +9476,7 @@ static FnSymbol* autoMemoryFunction(AggregateType* at, const char* fnName) {
     if (FnSymbol* fn = call->resolvedFunction()) {
       // if it's an initCopy e.g. we should have already marked it as erroneous
       if (fn->hasFlag(FLAG_INIT_COPY_FN) ||
-          fn->hasFlag(FLAG_AUTO_COPY_FN) ||
-          fn->hasFlag(FLAG_UNALIAS_FN))
+          fn->hasFlag(FLAG_AUTO_COPY_FN))
         INT_ASSERT(fn->hasFlag(FLAG_ERRONEOUS_COPY));
 
       // Return the resolved function, for storing in the map
@@ -10137,10 +10261,14 @@ static void lowerRuntimeTypeInit(CallExpr* call,
       runtimeTypeToValueCall->insertAtTail(sub);
     }
   }
-
+ 
   // Add the argument indicating if this is a noinit
   Symbol* isNoInit = noinit ? gTrue : gFalse;
   runtimeTypeToValueCall->insertAtTail(isNoInit);
+
+  // Add the argument indicating if this is defined as const
+  Symbol* definedConst = var->hasFlag(FLAG_CONST) ? gTrue : gFalse;
+  runtimeTypeToValueCall->insertAtTail(definedConst);
 
   call->replace(new CallExpr(PRIM_MOVE, var, runtimeTypeToValueCall));
 

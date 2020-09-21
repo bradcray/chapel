@@ -516,123 +516,161 @@ module BytesStringCommon {
     return result;
   }
 
+  proc doSplitHelp(const ref localx: ?t, const ref localSep: t,
+                   const maxsplit: int = -1, const ignoreEmpty: bool = false,
+                   ref start: getIndexType(t), const splitCount: int): t {
+
+    type _idxt = getIndexType(t);
+
+    // really should be <, but we need to avoid returns and extra yields so
+    // the iterator gets inlined
+    var splitAll: bool = maxsplit <= 0;
+
+    var chunk: t;
+    var end: _idxt = -1;
+    var done = false;
+
+    if (maxsplit == 0) {
+      chunk = localx;
+      done = true;
+    } else {
+      if (splitAll || splitCount < maxsplit) then
+        end = localx.find(localSep, start..);
+
+      if(end == -1) {
+        // Separator not found
+        chunk = localx[start..];
+        done = true;
+      } else {
+        chunk = localx[start..end-1];
+      }
+    }
+
+    if done {
+      start = localx.numBytes+1;
+    }
+    else {
+      start = end+localSep.numBytes;
+    }
+    return chunk;
+  }
+
+  pragma "not order independent yielding loops"
   iter doSplit(const ref x: ?t, sep: t, maxsplit: int = -1,
-                ignoreEmpty: bool = false): t {
+               ignoreEmpty: bool = false): t {
     assertArgType(t, "doSplit");
 
     type _idxt = getIndexType(t);
 
     if !(maxsplit == 0 && ignoreEmpty && x.isEmpty()) {
-      const localThis: t = x.localize();
+      const localx: t = x.localize();
       const localSep: t = sep.localize();
 
-      // really should be <, but we need to avoid returns and extra yields so
-      // the iterator gets inlined
-      var splitAll: bool = maxsplit <= 0;
       var splitCount: int = 0;
 
+      // this is passed as a ref to the helper
       var start: _idxt = 0;
-      var done: bool = false;
-      while !done  {
-        var chunk: t;
-        var end: _idxt = -1;
 
-        if (maxsplit == 0) {
-          chunk = localThis;
-          done = true;
-        } else {
-          if (splitAll || splitCount < maxsplit) then
-            end = localThis.find(localSep, start..);
-
-          if(end == -1) {
-            // Separator not found
-            chunk = localThis[start..];
-            done = true;
-          } else {
-            chunk = localThis[start..end-1];
-          }
-        }
-
+      while start <= localx.numBytes  {
+        const chunk = doSplitHelp(localx, localSep, maxsplit, ignoreEmpty, start, splitCount);
         if !(ignoreEmpty && chunk.isEmpty()) {
-          // Putting the yield inside the if prevents us from being inlined
-          // in the zippered case, but I don't think there is any way to avoid
-          // that easily
           yield chunk;
           splitCount += 1;
         }
-        start = end+localSep.numBytes;
       }
     }
   }
 
+  proc doSplitWSNoEncHelp(const ref localx: ?t, maxsplit: int = -1,
+                          ref i: int, const splitCount: int,
+                          const noSplits: bool, const limitSplits: bool,
+                          const iEnd: byteIndex): t {
+    var done : bool = false;
+    var yieldChunk : bool = false;
+    var chunk : t;
+
+    var inChunk : bool = false;
+    var chunkStart : idxType;
+
+    // emit whole string, unless all whitespace
+    // TODO Engin: Why is noSplit check inside the loop?
+    while i < localx.size {
+      var c = localx.byte(i);
+      if noSplits {
+        done = true;
+        if !localx.isSpace() then {
+          chunk = localx;
+          yieldChunk = true;
+        }
+      } else {
+        var cSpace = byte_isWhitespace(c);
+        // first char of a chunk
+        if !(inChunk || cSpace) {
+          chunkStart = i;
+          inChunk = true;
+          if i > iEnd {
+            chunk = localx[chunkStart..];
+            yieldChunk = true;
+            done = true;
+          }
+        } else if inChunk {
+          // first char out of a chunk
+          if cSpace {
+            // last split under limit
+            if limitSplits && splitCount >= maxsplit {
+              chunk = localx[chunkStart..];
+              yieldChunk = true;
+              done = true;
+            // no limit
+            } else {
+              chunk = localx[chunkStart..i-1];
+              yieldChunk = true;
+              inChunk = false;
+            }
+          // out of chars
+          } else if i > iEnd {
+            chunk = localx[chunkStart..];
+            yieldChunk = true;
+            done = true;
+          }
+        }
+      }
+
+      if done {
+        i = localx.size;
+      }
+      if yieldChunk {
+        return chunk;
+      }
+      else {
+        i += 1;
+      }
+    }
+
+    return "";
+  }
+
   // split iterator over whitespace
+  pragma "not order independent yielding loops"
   iter doSplitWSNoEnc(const ref x: ?t, maxsplit: int = -1): t {
     assertArgType(t, "doSplitWSNoEnc");
 
     if !x.isEmpty() {
       const localx: t = x.localize();
-      var done : bool = false;
-      var yieldChunk : bool = false;
-      var chunk : t;
-
-      const noSplits : bool = maxsplit == 0;
-      const limitSplits : bool = maxsplit > 0;
       var splitCount: int = 0;
-      const iEnd: idxType = localx.buffLen - 2;
 
-      var inChunk : bool = false;
-      var chunkStart : idxType;
+      // this is passed to the helper as a ref
+      var i = 0;
 
-      for (i,c) in zip(x.indices, localx.bytes()) {
-        // emit whole string, unless all whitespace
-        // TODO Engin: Why is x inside the loop?
-        if noSplits {
-          done = true;
-          if !localx.isSpace() then {
-            chunk = localx;
-            yieldChunk = true;
-          }
-        } else {
-          var cSpace = byte_isWhitespace(c);
-          // first char of a chunk
-          if !(inChunk || cSpace) {
-            chunkStart = i;
-            inChunk = true;
-            if i > iEnd {
-              chunk = localx[chunkStart..];
-              yieldChunk = true;
-              done = true;
-            }
-          } else if inChunk {
-            // first char out of a chunk
-            if cSpace {
-              splitCount += 1;
-              // last split under limit
-              if limitSplits && splitCount > maxsplit {
-                chunk = localx[chunkStart..];
-                yieldChunk = true;
-                done = true;
-              // no limit
-              } else {
-                chunk = localx[chunkStart..i-1];
-                yieldChunk = true;
-                inChunk = false;
-              }
-            // out of chars
-            } else if i > iEnd {
-              chunk = localx[chunkStart..];
-              yieldChunk = true;
-              done = true;
-            }
-          }
-        }
-
-        if yieldChunk {
+      while i < localx.numBytes {
+        const chunk = doSplitWSNoEncHelp(localx, maxsplit, i, splitCount,
+                                         noSplits=(maxsplit==0),
+                                         limitSplits=(maxsplit>0),
+                                         iEnd=(localx.buffLen-2):byteIndex);
+        if !chunk.isEmpty() {
           yield chunk;
-          yieldChunk = false;
+          splitCount += 1;
         }
-        if done then
-          break;
       }
     }
   }
@@ -842,6 +880,109 @@ module BytesStringCommon {
       return (x, "":t, "":t);
     }
   }
+
+  proc doDedent(const ref x: ?t, columns=0, ignoreFirst=true): t {
+      const low = if ignoreFirst then 1 else 0;
+      const newline = '\n':t;
+      var lines = x.split(newline);
+      var ret = '': t;
+
+      if columns <= 0 {
+        // Find common leading whitespace across all non-empty lines
+        const margin = computeMargin(lines[low..]);
+
+        // Remove margins from all lines if it's not empty
+        if margin.size > 0 {
+          for line in lines[low..] {
+            // Compute offset
+            var offset = 0;
+            if !isDedentWhitespaceOnly(line) {
+              offset = margin.size;
+            } else {
+              // Remove margin as long as it matches for empty lines
+              for i in 0..<min(margin.size, line.size) {
+                if line[i] != margin[i] then break;
+                offset += 1;
+              }
+            }
+            // Remove margin from line
+            line = line[offset..];
+          }
+        }
+      } else {
+        // Remove up to `columns` number of spaces from each line
+        for line in lines[low..] {
+          // Note: We only consider spaces (not tabs) for columns > 0
+          const indent = line.size - line.strip(' ':t, trailing=false).size;
+          const offset = min(indent, columns);
+          line = line[offset..];
+        }
+      }
+
+      ret = ('\n':t).join(lines);
+      return ret;
+    }
+
+    /* Compute margin of common leading white space across lines in a string.
+       Spaces and tabs are respected.
+     */
+    private proc computeMargin(lines: [] ?t): t{
+      var margin = '': t;
+
+      for line in lines {
+
+        // Skip empty lines
+        if isDedentWhitespaceOnly(line) {
+          continue;
+        }
+
+        // Determine leading whitespace (spaces and tabs) in line
+        var curMargin = '':t;
+        const space = ' ':t;
+        const tab = '\t':t;
+        for char in line.items() {
+          if char != space && char != tab then break;
+          else curMargin += char:t;
+        }
+
+        if curMargin == '':t {
+          // An unindented non-empty line means no margin exists, return early
+          margin = '';
+          break;
+        } else if margin == '':t {
+          // Initialize margin
+          margin = curMargin;
+        } else if curMargin.startsWith(margin) {
+          // Current indent is deeper than margin, continue
+          continue;
+        } else if margin.startsWith(curMargin) {
+          // Current indent is shallower than margin, update margin
+          margin = curMargin;
+        } else {
+          // Find largest common whitespace between current and previous margin
+          for i in margin.indices {
+            if margin[i] != curMargin[i] {
+              margin = margin[..<i];
+              break;
+            }
+          }
+        }
+      }
+      return margin;
+    }
+
+    /* Return true if string only contains spaces and tabs */
+    private proc isDedentWhitespaceOnly(s: ?t): bool {
+      const space = ' ':t;
+      const tab = '\t':t;
+      for char in s.items() {
+        if char != space && char != tab then
+          return false;
+      }
+      return true;
+    }
+
+
 
   proc doAppend(ref lhs: ?t, const ref rhs: t) {
     assertArgType(t, "doAppend");
@@ -1188,6 +1329,20 @@ module BytesStringCommon {
   pragma "no doc"
   inline proc isInitialByte(b: uint(8)) : bool {
     return (b & 0xc0) != 0x80;
+  }
+
+  /* 
+   Returns the byte index of the beginning of the first codepoint starting from
+   (and including) i
+   */
+  proc _findStartOfNextCodepointFromByte(x: string, i: byteIndex) {
+    var ret = i:int;
+    if ret > 0 {
+      while ret < x.buffLen && !isInitialByte(x.buff[ret]) {
+        ret += 1;
+      }
+    }
+    return ret;
   }
 
   // character-wise operation helpers

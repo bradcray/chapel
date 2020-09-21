@@ -32,7 +32,9 @@
 #include "ForallStmt.h"
 #include "ForLoop.h"
 #include "ImportStmt.h"
+#include "IfExpr.h"
 #include "LoopExpr.h"
+#include "optimizations.h"
 #include "ParamForLoop.h"
 #include "parser.h"
 #include "stringutil.h"
@@ -165,6 +167,8 @@ BlockStmt* buildPragmaStmt(Vec<const char*>* pragmas,
     if (DefExpr* def = toDefExpr(expr)) {
       addPragmaFlags(def->sym, pragmas);
     } else if (isEndOfStatementMarker(expr)) {
+      // ignore it
+    } else if (isForwardingStmt(expr)) {
       // ignore it
     } else {
       error = true;
@@ -792,7 +796,7 @@ buildExternBlockStmt(const char* c_code) {
 #ifdef HAVE_LLVM
     // Chapel was built with LLVM
     // Just bring up an error if extern blocks are disabled
-    if (externC == false)
+    if (fAllowExternC == false)
       USR_FATAL(ret, "extern block syntax is turned off. Use "
                      "--extern-c flag to turn on.");
 #else
@@ -1380,9 +1384,9 @@ buildReduceScanPreface1(FnSymbol* fn, Symbol* data, Symbol* eltType,
   fn->insertAtTail(new DefExpr(eltType));
 
   if( !zippered ) {
-    fn->insertAtTail("{TYPE 'move'(%S, 'typeof'(chpl__initCopy(iteratorIndex(_getIterator(%S)))))}", eltType, data);
+    fn->insertAtTail("{TYPE 'move'(%S, 'typeof'(chpl__initCopy(iteratorIndex(_getIterator(%S)), %S)))}", eltType, data, gFalse);
   } else {
-    fn->insertAtTail("{TYPE 'move'(%S, 'typeof'(chpl__initCopy(iteratorIndex(_getIteratorZip(%S)))))}", eltType, data);
+    fn->insertAtTail("{TYPE 'move'(%S, 'typeof'(chpl__initCopy(iteratorIndex(_getIteratorZip(%S)), %S)))}", eltType, data, gFalse);
   }
 }
 
@@ -1589,6 +1593,8 @@ BlockStmt* buildVarDecls(BlockStmt* stmts, const char* docs,
 
           if (cnameExpr != NULL && !firstvar)
             USR_FATAL_CONT(var, "external symbol renaming can only be applied to one symbol at a time");
+
+          setDefinedConstForDefExprIfApplicable(defExpr, flags);
 
           for (std::set<Flag>::iterator it = flags->begin(); it != flags->end(); ++it) {
             var->addFlag(*it);

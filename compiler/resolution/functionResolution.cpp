@@ -394,10 +394,6 @@ FnSymbol* getAutoDestroy(Type* t) {
 }
 
 Type* getCopyTypeDuringResolution(Type* t) {
-  if (isSyncType(t) || isSingleType(t)) {
-    Type* baseType = t->getField("valType")->type;
-    return baseType;
-  }
   if (isAliasingArrayType(t) || // avoid inf. loop in resolving array functions
       t->symbol->hasFlag(FLAG_ITERATOR_RECORD)) {
     AggregateType* at = toAggregateType(t);
@@ -424,9 +420,7 @@ static Type* canCoerceToCopyType(Type* actualType, Symbol* actualSym,
   Type* actualValType = actualType->getValType();
   Type* formalValType = formalType->getValType();
 
-  if (isSyncType(actualValType) || isSingleType(actualValType)) {
-    copyType = getCopyTypeDuringResolution(actualValType);
-  } else if (isAliasingArrayType(actualValType) ||
+  if (isAliasingArrayType(actualValType) ||
              actualValType->symbol->hasFlag(FLAG_ITERATOR_RECORD)) {
     // The conditions below avoid infinite loops and problems
     // relating to resolving initCopy for iterators when not needed.

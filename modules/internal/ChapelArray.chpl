@@ -3922,6 +3922,7 @@ module ChapelArray {
         // move it into the array
         __primitive("=", aa, copy);
       }
+      /*
     } else if isSyncType(a.eltType) {
       forall aa in a {
         pragma "no auto destroy"
@@ -3936,6 +3937,7 @@ module ChapelArray {
         // move it into the array
         __primitive("=", aa, copy);
       }
+*/
     } else {
       forall aa in a {
         pragma "no auto destroy"
@@ -4112,7 +4114,7 @@ module ChapelArray {
 
   pragma "find user line"
   pragma "ignore transfer errors"
-  proc chpl__transferArray(ref a: [], const ref b,
+  inline proc chpl__transferArray(ref a: [], const ref b,
                            param kind=_tElt.assign) lifetime a <= b {
     if (a.eltType == b.type ||
         _isPrimitiveType(a.eltType) && _isPrimitiveType(b.type)) {
@@ -4213,22 +4215,26 @@ module ChapelArray {
             // move it into the array
             __primitive("=", aa, copy);
           }
-
-        } else if isSyncType(a.eltType) {
-          [ (aa,bb) in zip(a,b) ] {
-            pragma "no auto destroy"
-            var copy: a.eltType = bb.readFE(); // init copy
-            // move it into the array
-            __primitive("=", aa, copy);
-          }
-        } else if isSingleType(a.eltType) {
-          [ (aa,bb) in zip(a,b) ] {
-            pragma "no auto destroy"
-            var copy: a.eltType = bb.readFF(); // init copy
-            // move it into the array
-            __primitive("=", aa, copy);
-          }
+          /*
+       } else if isSyncType(a.eltType) {
+         [ (aa,bb) in zip(a,b) ] {
+           pragma "no auto destroy"
+           var copy: a.eltType = bb.readFE(); // init copy
+           // move it into the array
+           __primitive("=", aa, copy);
+         }
+       } else if isSingleType(a.eltType) {
+         [ (aa,bb) in zip(a,b) ] {
+           pragma "no auto destroy"
+           var copy: a.eltType = bb.readFF(); // init copy
+           // move it into the array
+           __primitive("=", aa, copy);
+         }
+*/
         } else {
+          if (isSyncType(a.eltType) || isSingleType(a.eltType)) {
+            compilerWarning("Direct assignment to arrays of 'sync'/'single' type is deprecated; apply '.read??'/'.write??' methods instead");
+          }
           [ (aa,bb) in zip(a,b) ] {
             pragma "no auto destroy"
             var copy: a.eltType = bb; // init copy
@@ -4246,7 +4252,7 @@ module ChapelArray {
 
   // assigning from a param
   pragma "find user line"
-  proc chpl__transferArray(ref a: [], param b,
+  inline proc chpl__transferArray(ref a: [], param b,
                                   param kind=_tElt.assign) {
     forall aa in a do
       aa = b;
@@ -4337,9 +4343,27 @@ module ChapelArray {
     return x.valType;
   }
 
+  proc _desync_warn(type t:_syncvar) type {
+    if chpl_warnUnstable then
+      compilerWarning("In an upcoming release, compiler-generated default initializers for objects containing 'sync' fields will change from taking a formal of type 'sync t' to simply 't'.  You can stabilize your code from such changes by adding an explicit default initializer now.");
+    return t;
+  }
+
+  proc _desync_warn(type t:_singlevar) type {
+    if chpl_warnUnstable then
+      compilerWarning("In an upcoming release, compiler-generated default initializers for objects containing 'single' fields will change from taking a formal of type 'single t' to simply 't'.  You can stabilize your code from such changes by adding an explicit default initializer now.");
+    return t;
+  }
+
   proc _desync(type t) type where isAtomicType(t) {
     var x: t;
     return x.read().type;
+  }
+
+  proc _desync_warn(type t) type where isAtomicType(t) {
+    if chpl_warnUnstable then
+      compilerWarning("In an upcoming release, compiler-generated default initializers for objects containing 'atomic' fields will change from taking a formal of type 'atomic t' to simply 't'.  You can stabilize your code from such changes by adding an explicit default initializer now.");
+    return t;
   }
 
   /* Or, we could explicitly overload for each atomic type since there
@@ -4356,6 +4380,10 @@ module ChapelArray {
   }
 
   proc _desync(type t) type {
+    return t;
+  }
+
+  proc _desync_warn(type t) type {
     return t;
   }
 

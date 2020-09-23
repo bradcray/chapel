@@ -144,7 +144,8 @@ module ChapelSyncvar {
     }
 
     proc init=(const ref other : _syncvar) {
-      compilerWarning("Initializing a type-inferred variable from a 'sync' is deprecated; apply a 'read??()' method to the right-hand side");
+      // TODO: How to enable without breaking arrays of syncs?
+      //      compilerWarning("Initializing a type-inferred variable from a 'sync' is deprecated; apply a 'read??()' method to the right-hand side");
       // Allow initialization from compatible sync variables, e.g.:
       //   var x : sync int = 5;
       //   var y : sync real = x;

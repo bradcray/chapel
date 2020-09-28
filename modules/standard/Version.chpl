@@ -241,4 +241,67 @@ module Version {
       compilerError("can't compare versions that only differ by commit IDs");
     return retval >= 0 && retval != 2;
   }
+
+  // Convert a `real` value to a major.minor version
+  private proc realToVersion(param v: real) {
+    if (v < 0.0) then
+      compilerError("Can only compare versions to positive floating point values");
+    param major = v:int;
+    param diff = v-major;
+    param diffstrsize = (diff:string).size;
+    param minor = diff * 10**(diffstrsize-2);
+    if (minor != minor:int:real) {
+      compilerWarning(major:string + " " + diff:string + " " + diffstrsize: string + " " + minor:string);
+      compilerError("Can only compare versions to floating point values with a fractional value of .00-.99");
+    }
+    return new sourceVersion(major, minor:int, 0, "");
+  }
+  
+  proc ==(v1: sourceVersion(?), param v2: real) param : bool {
+    return v1 == realToVersion(v2);
+  }
+
+  proc !=(v1: sourceVersion(?), param v2: real) param : bool {
+    return v1 != realToVersion(v2);
+  }
+
+  proc <(v1: sourceVersion(?), param v2: real) param : bool {
+    return v1 < realToVersion(v2);
+  }
+
+  proc <=(v1: sourceVersion(?), param v2: real) param : bool {
+    return v1 <= realToVersion(v2);
+  }
+
+  proc >(v1: sourceVersion(?), param v2: real) param : bool {
+    return v1 > realToVersion(v2);
+  }
+
+  proc >=(v1: sourceVersion(?), param v2: real) param : bool {
+    return v1 >= realToVersion(v2);
+  }
+
+  proc ==(param v1: real, v2: sourceVersion(?)) param : bool {
+    return realToVersion(v1) == v2;
+  }
+
+  proc !=(param v1: real, v2: sourceVersion(?)) param : bool {
+    return realToVersion(v1) != v2;
+  }
+
+  proc <(param v1: real, v2: sourceVersion(?)) param : bool {
+    return realToVersion(v1) < v2;
+  }
+
+  proc <=(param v1: real, v2: sourceVersion(?)) param : bool {
+    return realToVersion(v1) <= v2;
+  }
+
+  proc >(param v1: real, v2: sourceVersion(?)) param : bool {
+    return realToVersion(v1) > v2;
+  }
+
+  proc >=(param v1: real, v2: sourceVersion(?)) param : bool {
+    return realToVersion(v1) >= v2;
+  }
 }

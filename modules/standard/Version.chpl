@@ -139,12 +139,13 @@ module Version {
 
   // cast from sourceVersion to string
   pragma "no doc"
-  proc _cast(type t: string, x: sourceVersion(?)) {
-    var str = "version " + x.major:string + "." + x.minor:string + "." +
-        x.update:string;
-    if (x.commit != "") then
-      str += " (" + x.commit + ")";
-    return str;
+  proc _cast(type t: string, x: sourceVersion(?)) param {
+    if (x.commit == "") then
+      return ("version " + x.major:string + "." + x.minor:string + "." +
+              x.update:string);
+    else
+      return ("version " + x.major:string + "." + x.minor:string + "." +
+              x.update:string + " (" + x.commit + ")");
   }
 
 
@@ -246,14 +247,16 @@ module Version {
   private proc realToVersion(param v: real) {
     if (v < 0.0) then
       compilerError("Can only compare versions to positive floating point values");
+    param version = v: bytes;
+    for param i in 0..version.numBytes() {
     param major = v:int;
     param diff = v-major;
+    compilerWarning("diff is: " + diff:string);
     param diffstrsize = (diff:string).size;
-    param minor = diff * 10**(diffstrsize-2);
-    if (minor != minor:int:real) {
-      compilerWarning(major:string + " " + diff:string + " " + diffstrsize: string + " " + minor:string);
-      compilerError("Can only compare versions to floating point values with a fractional value of .00-.99");
-    }
+    compilerWarning("diffstrsize is: " + diffstrsize:string);
+    param minor = diff * (10**(diffstrsize-2)):real;
+    compilerWarning("minor is: " + minor:int:string);
+    compilerWarning("Converted " + v:string + " to ", major:string + "." + minor:int:string + "(" + new sourceVersion(major, minor:int, 0, ""):string);
     return new sourceVersion(major, minor:int, 0, "");
   }
   

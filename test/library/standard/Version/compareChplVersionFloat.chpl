@@ -14,8 +14,8 @@ const v2_2_1_p = version(2,2,1,"ddd");
 const v3_1_0_p = version(3,1,0,"eee");
 const v3_1_1_p = version(3,1,1,"fff");
 
-compareLTVersions(v2_1_0, v2_1_0_p);
-compareGTVersions(v2_1_0_p, v2_1_0);
+compareBothVersions(v2_1_0, v2_1_0_p);
+//compareGTVersions(v2_1_0_p, v2_1_0);
 
 compareBothVersions(v2_1_0, v2_1_1);
 compareBothVersions(v2_1_0, v2_2_0);

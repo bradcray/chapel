@@ -28,6 +28,8 @@ module DefaultAssociative {
   use ChapelBase, ChapelLocks, IO;
   use ChapelHashing, ChapelHashtable;
   use SysError;
+  use OwnedObject;
+  use DefaultRectangular;
 
   config param debugDefaultAssoc = false;
   config param debugAssocDataPar = false;

@@ -1131,7 +1131,7 @@ static void processManagedNew(CallExpr* newCall) {
             // A call that is not resolved, as in new (t())(),
             //  would appear as a nested CallExpr.
             USR_FATAL_CONT(newCall,
-                           "Attempt to 'new' a function or undefined symbol");
+                           "Attempt to 'new' a function or undefined symbol: %s", baseSe->unresolved);
           }
         }
       }

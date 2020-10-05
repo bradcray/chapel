@@ -155,7 +155,8 @@ module ChapelRange {
 
   use ChapelBase, SysBasic, HaltWrappers;
 
-  use Math, DSIUtil;
+  use Math, DSIUtil, ChapelLocale, Types, ChapelTuple, Builtins;
+  use ChapelIteratorSupport;
 
   // Turns on range iterator debugging.
   pragma "no doc"

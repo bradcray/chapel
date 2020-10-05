@@ -24,6 +24,7 @@
 module ChapelHashing {
 
   use ChapelBase;
+  use ChapelRange;
 
   proc chpl__defaultHashWrapper(x): int {
     const hash = chpl__defaultHash(x);

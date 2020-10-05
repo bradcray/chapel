@@ -171,6 +171,13 @@ module ChapelArray {
   use ChapelDebugPrint;
   use SysCTypes;
   use ChapelPrivatization;
+  use OwnedObject;
+  use ChapelDistribution;
+  use ChapelRange;
+  use ChapelReduce;
+  use ChapelSyncvar;
+  use ChapelError;
+  use LocaleTree;
 
   // Explicitly use a processor atomic, as most calls to this function are
   // likely be on locale 0

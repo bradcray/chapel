@@ -22,7 +22,7 @@
 // Used by the compiler to deeply broadcast global consts
 //
 module ChapelSerializedBroadcast {
-  use ChapelLocale;
+  use ChapelLocale, LocalesArray;
   private use CPtr;
 
   config param chpl__enableSerializedGlobals = true;

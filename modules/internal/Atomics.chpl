@@ -85,6 +85,7 @@ module Atomics {
 
   use ChapelBase;             // to get CHPL_CACHE_REMOTE...
   public use MemConsistency;  // OK: to get and propagate memoryOrder
+  use ChapelEnv, Types;
 
   pragma "no doc"
   pragma "local fn" pragma "fast-on safe extern function"

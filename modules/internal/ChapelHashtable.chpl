@@ -32,7 +32,11 @@ module ChapelHashtable {
   use ChapelBase, DSIUtil;
 
   private use CPtr;
+  use DefaultRectangular, ChapelLocale, OwnedObject;
 
+  private config param debugHashTableDataPar = false,
+                       debugHashTable = false;
+  
   // empty needs to be 0 so memset 0 sets it
   enum chpl__hash_status { empty=0, full, deleted };
 
@@ -174,7 +178,7 @@ module ChapelHashtable {
     //  more intelligent (like evenly dividing up the full slots, led
     //  to poor speed ups.
 
-    if debugAssocDataPar {
+    if debugHashTableDataPar {
       writeln("### numTasks = ", numTasks);
       writeln("### ignoreRunning = ", ignoreRunning);
       writeln("### minSizePerTask = ", minSizePerTask);
@@ -184,7 +188,7 @@ module ChapelHashtable {
                                       minSizePerTask,
                                       size);
 
-    if debugAssocDataPar {
+    if debugHashTableDataPar {
       writeln("### numChunks=", numChunks, ", size=", size);
     }
 
@@ -203,7 +207,7 @@ module ChapelHashtable {
   private iter _allSlots(size: int, param tag: iterKind)
     where tag == iterKind.standalone {
 
-    if debugDefaultAssoc {
+    if debugHashTable {
       writeln("*** In associative domain _allSlots standalone iterator");
     }
 
@@ -211,7 +215,7 @@ module ChapelHashtable {
 
     coforall chunk in 0..#numChunks {
       const (lo, hi) = _computeBlock(size, numChunks, chunk, size-1);
-      if debugAssocDataPar then
+      if debugHashTableDataPar then
         writeln("*** chunk: ", chunk, " owns ", lo..hi);
       for slot in lo..hi {
         yield slot;
@@ -222,14 +226,14 @@ module ChapelHashtable {
   private iter _allSlots(size: int, param tag: iterKind)
     where tag == iterKind.leader {
 
-    if debugDefaultAssoc then
+    if debugHashTable then
       writeln("*** In associative domain _allSlots leader iterator:");
 
     const numChunks = _allSlotsNumChunks(size);
 
     coforall chunk in 0..#numChunks {
       const (lo, hi) = _computeBlock(size, numChunks, chunk, size-1);
-      if debugDefaultAssoc then
+      if debugHashTable then
         writeln("*** DI[", chunk, "]: tuple = ", (lo..hi,));
       yield lo..hi;
     }
@@ -241,7 +245,7 @@ module ChapelHashtable {
 
     var (chunk, followThisDom) = followThis;
 
-    if debugDefaultAssoc then
+    if debugHashTable then
       writeln("In associative domain _allSlots follower iterator: ",
               "Following ", chunk);
 

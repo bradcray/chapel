@@ -31,6 +31,7 @@ module LocaleModel {
 
   public use LocaleModelHelpFlat;
   public use LocaleModelHelpMem;
+  import ChapelLocale.AbstractLocaleModel;
 
   use IO;
 

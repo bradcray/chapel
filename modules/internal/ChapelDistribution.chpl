@@ -23,6 +23,7 @@ module ChapelDistribution {
   use ChapelArray, ChapelRange;
   use ChapelLocks;
   use ChapelHashtable;
+  use ChapelLocale;
 
   //
   // Abstract distribution class

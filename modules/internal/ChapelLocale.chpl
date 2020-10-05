@@ -71,6 +71,10 @@ module ChapelLocale {
   public use LocaleModel;
   import HaltWrappers;
   use SysCTypes, CPtr;
+  use MemConsistency;
+//  use LocalesArray;
+//  public use LocaleTree, LocalesArray;
+  use Atomics;
 
   //
   // Node and sublocale types and special sublocale values.
@@ -739,6 +743,7 @@ module ChapelLocale {
   // part of the declaration).
   pragma "no doc"
   proc chpl_rootLocaleInitPrivate(locIdx) {
+    use LocalesArray;
     // Even when not replicating the rootLocale, we must temporarily
     // set the rootLocale to the original version on locale 0, because
     // the initialization below needs to get/set locale ids.

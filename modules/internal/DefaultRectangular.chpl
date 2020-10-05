@@ -35,7 +35,8 @@ module DefaultRectangular {
   use DefaultSparse, DefaultAssociative;
   public use ExternalArray; // OK: currently expected to be available by
                             // default... though... why 'use' it here?
-
+  use ChapelLocale, ChapelTuple, ChapelError;
+  
   config param debugDefaultDist = false;
   config param debugDefaultDistBulkTransfer = false;
   config param debugDataPar = false;

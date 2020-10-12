@@ -4652,6 +4652,9 @@ When ``n/d`` does not produce an integer, this method may produce incorrect resu
     return new range(bigint, _low=lowCopy, _high=highCopy);
   }
 
+  proc type bigint.chpl__rangeStrideType() type
+    return bigint;
+
   proc chpl__rangeStrideType(type idxType: bigint) type {
     return bigint;
   }
@@ -4733,6 +4736,10 @@ When ``n/d`` does not produce an integer, this method may produce incorrect resu
     return bigint;
   }
 
+  proc chpl__unsignedType(type t: bigint) type {
+    return bigint;
+  }
+
   proc chpl__add(a: bigint, b: bigint, type resultType: bigint)
   {
     return (a + b);
@@ -4759,5 +4766,9 @@ When ``n/d`` does not produce an integer, this method may produce incorrect resu
 
   proc chpl__mod(x: bigint, y: bigint) {
     return x % y;
+  }
+
+  proc isIntegralType(type t: bigint) param {
+    return true;
   }
 }

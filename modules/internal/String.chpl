@@ -312,11 +312,11 @@ module String {
     return new range(t, BoundedRangeType.boundedHigh, _high=high);
 
   pragma "no doc"
-  proc chpl__rangeStrideType(type idxType: byteIndex) type
+  proc type byteIndex.chpl__rangeStrideType() type
     return int;
 
   pragma "no doc"
-  proc chpl__rangeStrideType(type idxType: codepointIndex) type
+  proc type codepointIndex.chpl__rangeStrideType() type
     return int;
 
   pragma "no doc"

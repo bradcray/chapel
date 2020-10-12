@@ -211,11 +211,11 @@ module ChapelRange {
 
     var _low       : chpl__idxTypeToIntIdxType(idxType);  // lower bound
     var _high      : chpl__idxTypeToIntIdxType(idxType);  // upper bound
-    var _stride    : if stridable then chpl__rangeStrideType(idxType) else nothing; // signed stride
+    var _stride    : if stridable then idxType.chpl__rangeStrideType() else nothing; // signed stride
     var _alignment : if stridable then chpl__idxTypeToIntIdxType(idxType) else nothing; // alignment
     var _aligned   : if stridable then bool else nothing;
 
-    proc strType type  return chpl__rangeStrideType(idxType);
+    proc strType type  return idxType.chpl__rangeStrideType();
 
     proc chpl__promotionType() type {
       return idxType;
@@ -244,7 +244,7 @@ module ChapelRange {
                   param stridable : bool = false,
                   _low : idxType = chpl__intToIdx(idxType, 1),
                   _high : idxType = chpl__intToIdx(idxType, 0),
-                  _stride =  1: chpl__rangeStrideType(idxType),
+                  _stride =  1: idxType.chpl__rangeStrideType(),
                   _alignment : idxType = chpl__intToIdx(idxType, 0),
                   _aligned : bool = false) {
     this.idxType     = idxType;
@@ -304,7 +304,7 @@ module ChapelRange {
     if !stridable && s then
       compilerError("cannot initialize a non-stridable range from a stridable range");
 
-    const str = if stridable && s then other.stride else 1:chpl__rangeStrideType(idxType);
+    const str = if stridable && s then other.stride else 1:idxType.chpl__rangeStrideType();
 
     this.init(idxType, boundedType, stridable,
               chpl__intToIdx(idxType, other._low), chpl__intToIdx(idxType, other._high),
@@ -538,9 +538,9 @@ module ChapelRange {
            boundedType == BoundedRangeType.boundedHigh;
 
   /* Returns the stride of the range */
-  inline proc range.stride where stridable  return _stride;
-  pragma "no doc"
-  proc range.stride param where !stridable return 1 : strType;
+  inline proc range.stride {
+    return if !stridable then 1: strType else _stride;
+  }
 
   /* Returns the alignment of the range */
   inline proc range.alignment where stridable return chpl_intToIdx(_alignment);
@@ -591,6 +591,7 @@ module ChapelRange {
   /* Return the range's high bound. If the range does not have a high
      bound the behavior is undefined. */
   inline proc range.high {
+    writeln("_high = ", _high);
     return chpl_intToIdx(_high);
   }
 
@@ -1240,7 +1241,7 @@ proc _cast(type t: range(?), r: range(?)) {
   inline proc +(r: range(?e, ?b, ?s), offset: integral)
   {
     const i = offset:r.intIdxType;
-    type strType = chpl__rangeStrideType(e);
+    type strType = e.chpl__rangeStrideType();
 
     return new range(e, b, s,
                      r.chpl_intToIdx(r._low + i),
@@ -1255,7 +1256,7 @@ proc _cast(type t: range(?), r: range(?)) {
 
   inline proc -(r: range(?e,?b,?s), i: integral)
   {
-    type strType = chpl__rangeStrideType(e);
+    type strType = e.chpl__rangeStrideType();
 
     return new range(e, b, s,
                      r.chpl_intToIdx(r._low - i),
@@ -1282,7 +1283,7 @@ proc _cast(type t: range(?), r: range(?)) {
 
   inline proc chpl_range_check_stride(step, type idxType) {
     chpl_check_step_integral(step);
-    type strType = chpl__rangeStrideType(idxType);
+    type strType = idxType.chpl__rangeStrideType();
 
     // At present, step must coerce to range's intIdxType or strType.
     if numBits(step.type) > numBits(strType) then
@@ -1303,7 +1304,7 @@ proc _cast(type t: range(?), r: range(?)) {
 
   inline proc chpl_range_check_stride(param step, type idxType)  {
     chpl_check_step_integral(step);
-    type strType = chpl__rangeStrideType(idxType);
+    type strType = idxType.chpl__rangeStrideType();
 
     if step == 0 then
       compilerError("the step argument of the 'by' operator is zero");
@@ -1622,7 +1623,7 @@ proc _cast(type t: range(?), r: range(?)) {
       boundsCheckHalt("count -- Cannot count off elements from a range which is ambiguously aligned.");
 
     type resultType = r.intIdxType;
-    type strType = chpl__rangeStrideType(resultType);
+    type strType = resultType.chpl__rangeStrideType();
 
     proc absSameType(str) {
       if (r.stride < 0) {
@@ -1710,7 +1711,7 @@ proc _cast(type t: range(?), r: range(?)) {
                      _aligned = if r.stridable then r.aligned else none);
   }
 
-  proc #(r:range(?i), count:chpl__rangeStrideType(i)) {
+  proc #(r:range(?i), count:i.chpl__rangeStrideType()) {
     return chpl_count_help(r, count);
   }
 
@@ -2073,6 +2074,7 @@ proc _cast(type t: range(?), r: range(?)) {
       var i: intIdxType;
       const start = this.firstAsInt;
       const end: intIdxType = if this.low > this.high then start else this.lastAsInt + stride: intIdxType;
+      writeln((start, end, stride));
       while __primitive("C for loop",
                         __primitive( "=", i, start),
                         __primitive("!=", i, end),
@@ -2098,7 +2100,7 @@ proc _cast(type t: range(?), r: range(?)) {
       var i: intIdxType;
       const start = this._low;
       const end = this._high;
-
+      writeln((start, end));
       while __primitive("C for loop",
                         __primitive( "=", i, start),
                         __primitive("<=", i, end),
@@ -2106,6 +2108,7 @@ proc _cast(type t: range(?), r: range(?)) {
         yield chpl_intToIdx(i);
       }
     } else {
+      writeln("in general iterator case");
       for i in this.generalIterator() do yield i;
     }
   }
@@ -2135,7 +2138,10 @@ proc _cast(type t: range(?), r: range(?)) {
     var i: intIdxType;
     const start = this.first;
     const end = if this.low > this.high then start else this.last;
-
+    writeln((start,end));
+    writeln((this.low, this.high));
+    writeln(this.low > this.high);
+    
     // TODO: Elliot and I have wondered whether we should just always
     // use a while loop here... Is the for loop buying anything?  It
     // seems like a confusing-to-humans use of the loop pattern...
@@ -2346,7 +2352,7 @@ proc _cast(type t: range(?), r: range(?)) {
           assert(false, "hasFirst && hasLast do not imply isBoundedRange");
       }
       if this.stridable || myFollowThis.stridable {
-        var r = chpl_intToIdx(1)..chpl_intToIdx(0) by 1:chpl__rangeStrideType(intIdxType);
+        var r = chpl_intToIdx(1)..chpl_intToIdx(0) by 1:intIdxType.chpl__rangeStrideType();
 
         if flwlen != 0 {
           const stride = this.stride * myFollowThis.stride;
@@ -2600,12 +2606,28 @@ proc _cast(type t: range(?), r: range(?)) {
     compilerError("ranges don't support '", idxType:string, "' as their idxType");
   }
 
+  proc type (int(?)).chpl__rangeStrideType() type
+    return this;
+
+  proc type (uint(?)).chpl__rangeStrideType() type
+    return int(numBits(this));
+
+  proc type enum.chpl__rangeStrideType() type
+    return int;
+
+  proc type bool.chpl__rangeStrideType() type
+    return int;
+
+  proc type (bool(?)).chpl__rangeStrideType() type
+    return int;
+  
   private proc chpl__rangeStrideType(type idxType) type {
     if isIntegralType(idxType) {
       return chpl__signedType(idxType);
     } else if isEnumType(idxType) || isBoolType(idxType) {
       return int;
     } else {
+      compilerWarning("Here");
       chpl__rangeIdxTypeError(idxType);
     }
   }
@@ -2616,6 +2638,7 @@ proc _cast(type t: range(?), r: range(?)) {
     } else if isEnumType(idxType) || isBoolType(idxType) {
       return uint;
     } else {
+      compilerWarning("No, here");
       chpl__rangeIdxTypeError(idxType);
     }
   }

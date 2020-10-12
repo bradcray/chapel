@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -61,10 +62,11 @@
 // And redefine it to call our exit routine:
 #define exit(x) clean_exit(x)
 
-static int  processIdentifier(yyscan_t scanner);
+static int  processIdentifier(yyscan_t scanner, bool queried);
 static int  processToken(yyscan_t scanner, int t);
 static int  processStringLiteral(yyscan_t scanner, const char* q, int type);
-static int  processMultilineStringLiteral(yyscan_t scanner, const char* q);
+static int  processMultilineStringLiteral(yyscan_t scanner, const char* q,
+                                          int type);
 
 static int  processExtern(yyscan_t scanner);
 static int  processExternCode(yyscan_t scanner);
@@ -88,6 +90,7 @@ hexDigit         [0-9a-fA-F]
 letter           [_a-zA-Z]
 
 ident            {letter}({letter}|{digit}|"$")*
+queriedIdent     \?{ident}
 
 binaryLiteral    0[bB]{bit}(_|{bit})*
 octalLiteral     0[oO]{octDigit}(_|{octDigit})*
@@ -121,13 +124,16 @@ align            return processToken(yyscanner, TALIGN);
 as               return processToken(yyscanner, TAS);
 atomic           return processToken(yyscanner, TATOMIC);
 begin            return processToken(yyscanner, TBEGIN);
+bool             return processToken(yyscanner, TBOOL);
 borrowed         return processToken(yyscanner, TBORROWED);
 break            return processToken(yyscanner, TBREAK);
 by               return processToken(yyscanner, TBY);
+bytes            return processToken(yyscanner, TBYTES);
 catch            return processToken(yyscanner, TCATCH);
 class            return processToken(yyscanner, TCLASS);
 cobegin          return processToken(yyscanner, TCOBEGIN);
 coforall         return processToken(yyscanner, TCOFORALL);
+complex          return processToken(yyscanner, TCOMPLEX);
 config           return processToken(yyscanner, TCONFIG);
 const            return processToken(yyscanner, TCONST);
 continue         return processToken(yyscanner, TCONTINUE);
@@ -141,23 +147,32 @@ enum             return processToken(yyscanner, TENUM);
 export           return processToken(yyscanner, TEXPORT);
 except           return processToken(yyscanner, TEXCEPT);
 extern           return processExtern(yyscanner);
+false            return processToken(yyscanner, TFALSE);
 for              return processToken(yyscanner, TFOR);
 forall           return processToken(yyscanner, TFORALL);
 forwarding       return processToken(yyscanner, TFORWARDING);
 if               return processToken(yyscanner, TIF);
+imag             return processToken(yyscanner, TIMAG);
+import           return processToken(yyscanner, TIMPORT);
 in               return processToken(yyscanner, TIN);
+include          return processToken(yyscanner, TINCLUDE);
 index            return processToken(yyscanner, TINDEX);
 inline           return processToken(yyscanner, TINLINE);
 inout            return processToken(yyscanner, TINOUT);
+int              return processToken(yyscanner, TINT);
 iter             return processToken(yyscanner, TITER);
 label            return processToken(yyscanner, TLABEL);
 lambda           return processToken(yyscanner, TLAMBDA);
 let              return processToken(yyscanner, TLET);
+lifetime         return processToken(yyscanner, TLIFETIME);
 local            return processToken(yyscanner, TLOCAL);
+locale           return processToken(yyscanner, TLOCALE);
 module           return processToken(yyscanner, TMODULE);
 new              return processToken(yyscanner, TNEW);
 nil              return processToken(yyscanner, TNIL);
 noinit           return processToken(yyscanner, TNOINIT);
+none             return processToken(yyscanner, TNONE);
+nothing          return processToken(yyscanner, TNOTHING);
 on               return processToken(yyscanner, TON);
 only             return processToken(yyscanner, TONLY);
 otherwise        return processToken(yyscanner, TOTHERWISE);
@@ -171,6 +186,7 @@ private          return processToken(yyscanner, TPRIVATE);
 proc             return processToken(yyscanner, TPROC);
 prototype        return processToken(yyscanner, TPROTOTYPE);
 public           return processToken(yyscanner, TPUBLIC);
+real             return processToken(yyscanner, TREAL);
 record           return processToken(yyscanner, TRECORD);
 reduce           return processToken(yyscanner, TREDUCE);
 ref              return processToken(yyscanner, TREF);
@@ -182,18 +198,23 @@ serial           return processToken(yyscanner, TSERIAL);
 shared           return processToken(yyscanner, TSHARED);
 single           return processToken(yyscanner, TSINGLE);
 sparse           return processToken(yyscanner, TSPARSE);
+string           return processToken(yyscanner, TSTRING);
 subdomain        return processToken(yyscanner, TSUBDOMAIN);
 sync             return processToken(yyscanner, TSYNC);
 then             return processToken(yyscanner, TTHEN);
+this             return processToken(yyscanner, TTHIS);
 throw            return processToken(yyscanner, TTHROW);
 throws           return processToken(yyscanner, TTHROWS);
+true             return processToken(yyscanner, TTRUE);
 try              return processToken(yyscanner, TTRY);
 "try!"           return processToken(yyscanner, TTRYBANG);
 type             return processToken(yyscanner, TTYPE);
+uint             return processToken(yyscanner, TUINT);
 union            return processToken(yyscanner, TUNION);
 unmanaged        return processToken(yyscanner, TUNMANAGED);
 use              return processToken(yyscanner, TUSE);
 var              return processToken(yyscanner, TVAR);
+void             return processToken(yyscanner, TVOID);
 when             return processToken(yyscanner, TWHEN);
 where            return processToken(yyscanner, TWHERE);
 while            return processToken(yyscanner, TWHILE);
@@ -219,17 +240,27 @@ zip              return processToken(yyscanner, TZIP);
 ">>="            return processToken(yyscanner, TASSIGNSR);
 "reduce="        return processToken(yyscanner, TASSIGNREDUCE);
 
+"init="          return processToken(yyscanner, TINITEQUALS);
+
 "=>"             return processToken(yyscanner, TALIAS);
 
 "<=>"            return processToken(yyscanner, TSWAP);
 
 "#"              return processToken(yyscanner, THASH);
 ".."             return processToken(yyscanner, TDOTDOT);
+"..<"            return processToken(yyscanner, TDOTDOTOPENHIGH);
+                 /* The following cases would extend the current '..<'
+                    open range interval constructor to also support
+                    '<..' and '<..<'.  This concept didn't win enough
+                    support to merge as present, but are here in case
+                    we change our minds in a future release. */
+                 /* "<.."            return processToken(yyscanner, TDOTDOTOPENLOW); */
+                 /* "<..<"           return processToken(yyscanner, TDOTDOTOPENBOTH); */
 "..."            return processToken(yyscanner, TDOTDOTDOT);
 
 "&&"             return processToken(yyscanner, TAND);
 "||"             return processToken(yyscanner, TOR);
-"!"              return processToken(yyscanner, TNOT);
+"!"              return processToken(yyscanner, TBANG);
 
 "&"              return processToken(yyscanner, TBAND);
 "|"              return processToken(yyscanner, TBOR);
@@ -276,11 +307,17 @@ zip              return processToken(yyscanner, TZIP);
 {intLiteral}i    return processToken(yyscanner, IMAGLITERAL);
 {floatLiteral}i  return processToken(yyscanner, IMAGLITERAL);
 
-{ident}          return processIdentifier(yyscanner);
-"\"\"\""         return processMultilineStringLiteral(yyscanner, "\"");
-"'''"            return processMultilineStringLiteral(yyscanner, "'");
+{ident}          return processIdentifier(yyscanner, false);
+{queriedIdent}   return processIdentifier(yyscanner, true);
+
+"\"\"\""         return processMultilineStringLiteral(yyscanner, "\"", STRINGLITERAL);
+"'''"            return processMultilineStringLiteral(yyscanner, "'", STRINGLITERAL);
+"b\"\"\""        return processMultilineStringLiteral(yyscanner, "\"", BYTESLITERAL);
+"b'''"           return processMultilineStringLiteral(yyscanner, "'", BYTESLITERAL);
 "\""             return processStringLiteral(yyscanner, "\"", STRINGLITERAL);
 "\'"             return processStringLiteral(yyscanner, "\'", STRINGLITERAL);
+"b\""            return processStringLiteral(yyscanner, "\"", BYTESLITERAL);
+"b\'"            return processStringLiteral(yyscanner, "\'", BYTESLITERAL);
 "c\""            return processStringLiteral(yyscanner, "\"", CSTRINGLITERAL);
 "c\'"            return processStringLiteral(yyscanner, "\'", CSTRINGLITERAL);
 "//"             return processSingleLineComment(yyscanner);
@@ -344,9 +381,9 @@ void stringBufferInit() {
   stringBuffer.clear();
 }
 
-static int  processIdentifier(yyscan_t scanner) {
+static int  processIdentifier(yyscan_t scanner, bool queried) {
   YYSTYPE* yyLval = yyget_lval(scanner);
-  int      retval = processToken(scanner, TIDENT);
+  int      retval = processToken(scanner, queried ? TQUERIEDIDENT : TIDENT);
 
   yyLval->pch = astr(yyget_text(scanner));
 
@@ -426,7 +463,8 @@ static int processStringLiteral(yyscan_t scanner, const char* q, int type) {
   return type;
 }
 
-static int processMultilineStringLiteral(yyscan_t scanner, const char* q) {
+static int processMultilineStringLiteral(yyscan_t scanner, const char* q,
+                                         int type) {
   const char* yyText = yyget_text(scanner);
   YYSTYPE* yyLval = yyget_lval(scanner);
   yyLval->pch = eatMultilineStringLiteral(scanner, q);
@@ -438,7 +476,7 @@ static int processMultilineStringLiteral(yyscan_t scanner, const char* q) {
     captureString.append(yyLval->pch);
     captureString.append(yyText);
   }
-  return STRINGLITERAL;
+  return type;
 }
 
 static const char* eatStringLiteral(yyscan_t scanner, const char* startChar) {

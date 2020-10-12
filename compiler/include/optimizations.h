@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -32,15 +33,22 @@
 #include "map.h"
 #include "vec.h"
 
+#include "flags.h"
+
+#include <set>
 #include <map>
 #include <vector>
 
 class BaseAST;
 class BitVec;
 class BlockStmt;
+class CallExpr;
+class DefExpr;
 class FnSymbol;
+class ForallStmt;
 class Symbol;
 class SymExpr;
+class LifetimeInformation;
 
 void removeUnnecessaryGotos(FnSymbol* fn, bool removeEpilogueLabel = false);
 size_t localCopyPropagation(FnSymbol* fn);
@@ -51,6 +59,12 @@ void eliminateSingleAssignmentReference(Map<Symbol*,Vec<SymExpr*>*>& defMap,
 size_t singleAssignmentRefPropagation(FnSymbol* fn);
 void deadVariableElimination(FnSymbol* fn);
 void deadExpressionElimination(FnSymbol* fn);
+
+bool outlivesBlock(LifetimeInformation* info, Symbol* sym, BlockStmt* block);
+
+void checkLifetimesForForallUnorderedOps(FnSymbol* fn,
+                                         LifetimeInformation* lifetimeInfo);
+void optimizeForallUnorderedOps();
 
 void liveVariableAnalysis(FnSymbol* fn,
                           Vec<Symbol*>& locals,
@@ -64,5 +78,13 @@ void remoteValueForwarding();
 void inferConstRefs();
 
 void computeNoAliasSets();
+
+void removeInitOrAutoCopyPostResolution(CallExpr *call);
+void setDefinedConstForDomainSymbol(Symbol *domainSym, Expr *nextExpr,
+                                    Symbol *isConst);
+void setDefinedConstForDefExprIfApplicable(DefExpr* defExpr,
+                                           std::set<Flag>* flags);
+void setDefinedConstForPrimSetMemberIfApplicable(CallExpr *call);
+void setDefinedConstForFieldsInInitializer(FnSymbol *fn);
 
 #endif

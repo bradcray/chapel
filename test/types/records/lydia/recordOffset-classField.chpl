@@ -1,7 +1,8 @@
+use CPtr;
 // Tests having a class field
 // Note: c_offsetof is intended for use in C interoperability only.
 record Outer {
-  var x : Inner;
+  var x : borrowed Inner;
   var y : int;
 }
 

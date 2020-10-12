@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
  * The entirety of this work is licensed under the Apache License,
@@ -24,6 +25,7 @@
 
 #include <list>
 #include <map>
+#include <set>
 #include <stack>
 #include <string>
 #include <vector>
@@ -34,6 +36,12 @@
 namespace llvm {
   namespace legacy {
     class FunctionPassManager;
+  }
+}
+
+namespace clang {
+  namespace CodeGen {
+    class CGFunctionInfo;
   }
 }
 
@@ -55,11 +63,11 @@ class LayeredValueTable;
 struct LoopData
 {
 #ifdef HAVE_LLVM
-  LoopData(llvm::MDNode *loopMetadata, bool parallel)
-    : loopMetadata(loopMetadata), parallel(parallel)
+  LoopData(llvm::MDNode *accessGroup, bool markMemoryOps)
+    : accessGroup(accessGroup), markMemoryOps(markMemoryOps)
   { }
-  llvm::MDNode* loopMetadata;
-  bool parallel; /* There is no dependency between loops */
+  llvm::MDNode* accessGroup;
+  bool markMemoryOps; // mark load/store with the access group
 #endif
 };
 
@@ -69,6 +77,8 @@ struct LoopData
  */
 struct GenInfo {
   // If we're generating C, this is the FILE* to print to
+  // TODO: Rename cfile to just 'file' since it's also used when
+  //       generating Fortran and Python interfaces.
   FILE* cfile;
   // When generating C, sometimes the code generator needs
   // to introduce a temporary variable. When it does,
@@ -99,7 +109,9 @@ struct GenInfo {
   llvm::MDBuilder *mdBuilder;
   llvm::TargetMachine* targetMachine;
 
-  std::stack<LoopData> loopStack;
+  std::vector<LoopData> loopStack;
+  std::vector<std::pair<llvm::Value*, llvm::Type*> > currentStackVariables;
+  const clang::CodeGen::CGFunctionInfo* currentFunctionABI;
 
   llvm::LLVMContext llvmContext;
   llvm::MDNode* tbaaRootNode;
@@ -146,11 +158,18 @@ bool isBuiltinExternCFunction(const char* cname);
 std::string numToString(int64_t num);
 std::string int64_to_string(int64_t i);
 std::string uint64_to_string(uint64_t i);
+std::string real_to_string(double num);
 std::string zlineToString(BaseAST* ast);
 void zlineToFileIfNeeded(BaseAST* ast, FILE* outfile);
 const char* idCommentTemp(BaseAST* ast);
 void genComment(const char* comment, bool push=false);
 void flushStatements(void);
+
+GenRet codegenCallExpr(const char* fnName);
+GenRet codegenCallExpr(const char* fnName, GenRet a1);
+GenRet codegenCallExpr(const char* fnName, GenRet a1, GenRet a2);
+Type* getNamedTypeDuringCodegen(const char* name);
+void gatherTypesForCodegen(void);
 
 void registerPrimitiveCodegens();
 

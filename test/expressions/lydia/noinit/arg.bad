@@ -1,3 +1,0 @@
-arg.chpl:3: In function 'foo':
-arg.chpl:7: error: illegal lvalue in assignment
-arg.chpl:3: error: Default expression not convertible to formal type

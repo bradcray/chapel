@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
  * The entirety of this work is licensed under the Apache License,
@@ -20,6 +21,7 @@
 #include "chplrt.h"
 
 #include "chpl-comm.h"
+#include "chpl-comm-internal.h"
 #include "chpl-comm-strd-xfer.h"
 #include "chplexit.h"
 #include "error.h"
@@ -57,8 +59,8 @@ static int mysystem(const char* command, const char* description,
 
 // Chapel interface
 chpl_comm_nb_handle_t chpl_comm_put_nb(void *addr, c_nodeid_t node, void* raddr,
-                                       size_t size, int32_t typeIndex,
-                                       int32_t commID, int ln, int32_t fn)
+                                       size_t size, int32_t commID,
+                                       int ln, int32_t fn)
 {
   assert(node == 0);
   chpl_memmove(raddr, addr, size);
@@ -66,8 +68,8 @@ chpl_comm_nb_handle_t chpl_comm_put_nb(void *addr, c_nodeid_t node, void* raddr,
 }
 
 chpl_comm_nb_handle_t chpl_comm_get_nb(void* addr, c_nodeid_t node, void* raddr,
-                                       size_t size, int32_t typeIndex,
-                                       int32_t commID, int ln, int32_t fn)
+                                       size_t size, int32_t commID,
+                                       int ln, int32_t fn)
 {
   assert(node == 0);
   chpl_memmove(addr, raddr, size);
@@ -126,15 +128,29 @@ int chpl_comm_run_in_gdb(int argc, char* argv[], int gdbArgnum, int* status) {
   return 1;
 }
 
+int chpl_comm_run_in_lldb(int argc, char* argv[], int lldbArgnum, int* status) {
+  int i;
+  char* command = chpl_glom_strings(2, "lldb -o 'b gdbShouldBreakHere' -- ",
+                                    argv[0]);
+  for (i=1; i<argc; i++) {
+    if (i != lldbArgnum) {
+      command = chpl_glom_strings(3, command, " ", argv[i]);
+    }
+  }
+  *status = mysystem(command, "running lldb", 0);
+
+  return 1;
+}
+
 void chpl_comm_post_task_init(void) { }
 
 void chpl_comm_rollcall(void) {
   chpl_msg(2, "executing on a single node\n");
 }
 
-void chpl_comm_broadcast_global_vars(int numGlobals) { }
+wide_ptr_t* chpl_comm_broadcast_global_vars_helper(void) { return NULL; }
 
-void chpl_comm_broadcast_private(int id, size_t size, int32_t tid) { }
+void chpl_comm_broadcast_private(int id, size_t size) { }
 
 void chpl_comm_barrier(const char *msg) { }
 
@@ -143,16 +159,14 @@ void chpl_comm_pre_task_exit(int all) { }
 void chpl_comm_exit(int all, int status) { }
 
 void  chpl_comm_put(void* addr, c_nodeid_t node, void* raddr,
-                    size_t size, int32_t typeIndex,
-                    int32_t commID, int ln, int32_t fn) {
+                    size_t size, int32_t commID, int ln, int32_t fn) {
   assert(node==0);
 
   memmove(raddr, addr, size);
 }
 
 void  chpl_comm_get(void* addr, c_nodeid_t node, void* raddr,
-                    size_t size, int32_t typeIndex,
-                    int32_t commID, int ln, int32_t fn) {
+                    size_t size, int32_t commID, int ln, int32_t fn) {
   assert(node==0);
 
   memmove(addr, raddr, size);
@@ -160,29 +174,55 @@ void  chpl_comm_get(void* addr, c_nodeid_t node, void* raddr,
 
 void  chpl_comm_put_strd(void* dstaddr_arg, size_t* dststrides, c_nodeid_t dstnode,
                          void* srcaddr_arg, size_t* srcstrides, size_t* count,
-                         int32_t stridelevels, size_t elemSize, int32_t typeIndex,
-                         int32_t commID, int ln, int32_t fn)
+                         int32_t stridelevels, size_t elemSize, int32_t commID, 
+                         int ln, int32_t fn)
 {
   assert(dstnode==0);
   put_strd_common(dstaddr_arg, dststrides, dstnode,
                   srcaddr_arg, srcstrides,
                   count, stridelevels, elemSize,
                   1, NULL, // "nb" xfers block, so no need for yield
-                  typeIndex, commID, ln, fn);
+                  commID, ln, fn);
 }
 
 void  chpl_comm_get_strd(void* dstaddr_arg, size_t* dststrides, c_nodeid_t srcnode,
                          void* srcaddr_arg, size_t* srcstrides, size_t* count,
-                         int32_t stridelevels, size_t elemSize, int32_t typeIndex,
-                         int32_t commID, int ln, int32_t fn)
+                         int32_t stridelevels, size_t elemSize, int32_t commID, 
+                         int ln, int32_t fn)
 {
   assert(srcnode==0);
   get_strd_common(dstaddr_arg, dststrides, srcnode,
                   srcaddr_arg, srcstrides,
                   count, stridelevels, elemSize,
                   1, NULL, // "nb" xfers block, so no need for yield
-                  typeIndex, commID, ln, fn);
+                  commID, ln, fn);
 }
+
+void chpl_comm_getput_unordered(c_nodeid_t dstnode, void* dstaddr,
+                                c_nodeid_t srcnode, void* srcaddr,
+                                size_t size, int32_t commID,
+                                int ln, int32_t fn)
+{
+  assert(srcnode==0);
+  assert(dstnode==0);
+  memmove(dstaddr, srcaddr, size);
+}
+
+void chpl_comm_get_unordered(void* addr, c_nodeid_t node, void* raddr,
+                             size_t size, int32_t commID, int ln, int32_t fn)
+{
+  assert(node == 0);
+  memmove(addr, raddr, size);
+}
+
+void chpl_comm_put_unordered(void* addr, c_nodeid_t node, void* raddr,
+                             size_t size, int32_t commID, int ln, int32_t fn)
+{
+  assert(node == 0);
+  memmove(raddr, addr, size);
+}
+
+void chpl_comm_getput_unordered_task_fence(void) { }
 
 typedef struct {
   chpl_fn_int_t fid;
@@ -191,16 +231,18 @@ typedef struct {
 } fork_t;
 
 void chpl_comm_execute_on(c_nodeid_t node, c_sublocid_t subloc,
-                    chpl_fn_int_t fid,
-                    chpl_comm_on_bundle_t *arg, size_t arg_size) {
+                          chpl_fn_int_t fid,
+                          chpl_comm_on_bundle_t *arg, size_t arg_size,
+                          int ln, int32_t fn) {
   assert(node==0);
 
   chpl_ftable_call(fid, arg);
 }
 
 void chpl_comm_execute_on_nb(c_nodeid_t node, c_sublocid_t subloc,
-                       chpl_fn_int_t fid,
-                       chpl_comm_on_bundle_t *arg, size_t arg_size) {
+                             chpl_fn_int_t fid,
+                             chpl_comm_on_bundle_t *arg, size_t arg_size,
+                             int ln, int32_t fn) {
   assert(node==0);
 
   chpl_task_startMovedTask(fid, chpl_ftable[fid],
@@ -210,31 +252,10 @@ void chpl_comm_execute_on_nb(c_nodeid_t node, c_sublocid_t subloc,
 
 // Same as chpl_comm_execute_on()
 void chpl_comm_execute_on_fast(c_nodeid_t node, c_sublocid_t subloc,
-                         chpl_fn_int_t fid,
-                         chpl_comm_on_bundle_t *arg, size_t arg_size) {
+                               chpl_fn_int_t fid,
+                               chpl_comm_on_bundle_t *arg, size_t arg_size,
+                               int ln, int32_t fn) {
   assert(node==0);
 
   chpl_ftable_call(fid, arg);
 }
-
-int chpl_comm_numPollingTasks(void) { return 0; }
-
-void chpl_comm_make_progress(void)
-{
-}
-
-void chpl_startVerboseComm() { }
-void chpl_stopVerboseComm() { }
-void chpl_startVerboseCommHere() { }
-void chpl_stopVerboseCommHere() { }
-
-void chpl_startCommDiagnostics() { }
-void chpl_stopCommDiagnostics() { }
-void chpl_startCommDiagnosticsHere() { }
-void chpl_stopCommDiagnosticsHere() { }
-
-void chpl_resetCommDiagnosticsHere() { }
-void chpl_getCommDiagnosticsHere(chpl_commDiagnostics *cd) {
-  memset(cd, 0, sizeof(chpl_commDiagnostics));
-}
-

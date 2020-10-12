@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -23,11 +24,13 @@
 #include "CatchStmt.h"
 
 BlockStmt* TryStmt::build(bool tryBang, Expr* expr) {
-  BlockStmt* body = new BlockStmt(expr);
-  return buildChplStmt(new TryStmt(tryBang, body, NULL));
-}
-
-BlockStmt* TryStmt::build(bool tryBang, BlockStmt* body) {
+  BlockStmt* body = new BlockStmt();
+  if (BlockStmt* block = toBlockStmt(expr)) {
+    // Flatten any scopeless blocks
+    body->appendChapelStmt(block);
+  } else {
+    body->insertAtTail(expr);
+  }
   return buildChplStmt(new TryStmt(tryBang, body, NULL));
 }
 

@@ -82,7 +82,7 @@ GASNet's UDP conduit can be configured with many other options. Please refer
 to:
 
    * ``$CHPL_HOME/third-party/gasnet/gasnet-src/udp-conduit/README``
-   * http://gasnet.lbl.gov/dist/udp-conduit/README
+   * https://gasnet.lbl.gov/dist/udp-conduit/README
 
 
 .. _using-udp-slurm:
@@ -129,7 +129,7 @@ found the following setting useful to disable such printing:
 I'm seeing warnings from GASNet about using a higher-performance network
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-::
+.. code-block:: text
 
   WARNING: Using GASNet's udp-conduit, which exists for portability convenience.
   WARNING: Support was detected for native GASNet conduits: ibv
@@ -148,16 +148,27 @@ warnings. To turn them off, use:
 I get xSocket errors when using a system with multiple IP addresses
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-::
+.. code-block:: text
 
  *** FATAL ERROR: Got an xSocket while spawning slave process: connect()
  failed while creating a connect socket (111:Connection refused)
 
-You need to set ``GASNET_MASTERIP`` and possibly ``GASNET_WORKERIP``.
-Please refer to:
+ Other error codes can arise, ex. (60:Operation timed out)
 
+You need to set ``CHPL_RT_MASTERIP`` (or ``GASNET_MASTERIP``), and possibly
+``CHPL_RT_WORKERIP`` (or ``GASNET_WORKERIP``).  Please refer to:
+
+  * :ref:`chpl-rt-masterip`
+  * :ref:`chpl-rt-workerip`
   * ``$CHPL_HOME/third-party/gasnet/gasnet-src/udp-conduit/README``
-  * http://gasnet.lbl.gov/dist/udp-conduit/README .
+  * https://gasnet.lbl.gov/dist/udp-conduit/README .
 
+For example, when simulating multiple locales by oversubscribing
+the local machine, use:
+
+.. code-block:: bash
+
+  export CHPL_RT_MASTERIP=127.0.0.1
+  export CHPL_RT_WORKERIP=127.0.0.0  # may be optional
 
 

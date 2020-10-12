@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -22,6 +23,11 @@
 
 module ChapelBase {
 
+  pragma "object class"
+  pragma "global type symbol"
+  pragma "no object"
+  class _object { }
+
   //
   // internal reference type
   //
@@ -31,13 +37,4 @@ module ChapelBase {
   class _ref {
     var _val;
   }
-
-  pragma "compiler generated"
-  pragma "last resort"
-  pragma "unalias fn"
-  inline proc chpl__unalias(x) {
-    pragma "no copy" var ret = x;
-    return x;
-  }
-
 }

@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
  * The entirety of this work is licensed under the Apache License,
@@ -85,10 +86,17 @@ void chpl_comm_ofi_oob_barrier(void) {
 }
 
 
-void chpl_comm_ofi_oob_allgather(void* in, void* out, int len) {
+void chpl_comm_ofi_oob_allgather(const void* in, void* out, size_t len) {
   if (chpl_numNodes == 1) {
     chpl_memcpy(out, in, len);
   } else {
     INTERNAL_ERROR_V("multi-locale allgather not supported");
+  }
+}
+
+
+void chpl_comm_ofi_oob_bcast(void* buf, size_t len) {
+  if (chpl_numNodes != 1) {
+    INTERNAL_ERROR_V("multi-locale bcast not supported");
   }
 }

@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -63,6 +64,7 @@ void localizeGlobals() {
             !inAddrOf &&
             !lhsOfMove &&
             var->hasFlag(FLAG_CONST) &&
+            !var->hasFlag(FLAG_EXTERN) &&
             var->defPoint->parentSymbol != rootModule) {
           VarSymbol* local_global = globals.get(var);
           SET_LINENO(se); // Set the se line number for output
@@ -74,7 +76,7 @@ void localizeGlobals() {
 
             // Copy string immediates to localized strings so that
             // we can show the string value in comments next to uses.
-            if (!llvmCodegen)
+            if (!fLlvmCodegen)
               if (VarSymbol* localVarSym = toVarSymbol(var))
                 if (Immediate* immediate = localVarSym->immediate)
                   if (immediate->const_kind == CONST_KIND_STRING)

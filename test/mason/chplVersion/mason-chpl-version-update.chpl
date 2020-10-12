@@ -1,15 +1,16 @@
 
+private use List;
 use MasonUtils;
 use MasonUpdate;
+use IO;
 
 use FileSystem;
 
 config const toml = "";
 
 proc main() {
-  const args = ["foo", "update", "--no-update"];
 
-  UpdateLock(args, toml);
+  updateLock(true, tf=toml);
 
   if exists("Mason.lock") {
     writeln("----- lock file -----");

@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
  * The entirety of this work is licensed under the Apache License,
@@ -21,6 +22,7 @@
 
 #include "astutil.h"
 #include "baseAST.h"
+#include "build.h"
 #include "stmt.h"
 #include "stringutil.h"
 #include "symbol.h"
@@ -29,7 +31,7 @@
 #include <set>
 
 static bool checkIsArray(ArgSymbol* formal, UnresolvedSymExpr* &eltType);
-
+static bool retExprTypeIsVoid(BlockStmt* retExprType);
 // The goal of this pass is to convert any extern proc declarations that
 // contain an array argument to take a c_ptr instead and provide a wrapping
 // function that can handle being passed a Chapel array.
@@ -59,6 +61,8 @@ static bool checkIsArray(ArgSymbol* formal, UnresolvedSymExpr* &eltType);
 //    }
 
 void expandExternArrayCalls() {
+  std::set<Expr*> cptrScopes;
+
   forv_Vec(FnSymbol, fn, gFnSymbols) {
     if (!fn->hasFlag(FLAG_EXTERN))
       continue;
@@ -96,11 +100,20 @@ void expandExternArrayCalls() {
 
     if (fcopy) {
       SET_LINENO(fn);
+      Expr* parentScope = fn->defPoint->parentExpr;
+      if (cptrScopes.count(parentScope) == 0) {
+        BlockStmt* useBlock = buildChapelStmt(new UseStmt(new UnresolvedSymExpr("CPtr"), "",
+                                                        true));
+        fn->defPoint->insertAfter(useBlock);
+        cptrScopes.insert(parentScope);
+      }
+
       fn->defPoint->insertAfter(new DefExpr(fcopy));
       fn->addFlag(FLAG_EXTERN_FN_WITH_ARRAY_ARG);
+      fn->addFlag(FLAG_VOID_NO_RETURN_VALUE);
       fcopy->removeFlag(FLAG_EXTERN);
+      fcopy->removeFlag(FLAG_NO_FN_BODY);
       fcopy->addFlag(FLAG_INLINE);
-      fcopy->addFlag(FLAG_VOID_NO_RETURN_VALUE);
 
       fcopy->cname = astr("chpl__extern_array_wrapper_", fcopy->cname);
       fn->name = astr("chpl__extern_array_", fn->name);
@@ -113,23 +126,22 @@ void expandExternArrayCalls() {
         if(replaced_args.count(current_formal)) {
           UnresolvedSymExpr* eltType = NULL;
           checkIsArray(formal, eltType);
-          if (eltType) {
-            // typed array, replace with c_ptr(eltType)
-            externCall->argList.insertAtTail(new CallExpr("c_ptrTo", new SymExpr(formal)));
-          } else {
-            // Generic array, replace with (c_ptr(eltType)):c_void_ptr
-            externCall->argList.insertAtTail(
-                createCast(
-                  new CallExpr("c_ptrTo", new SymExpr(formal)),
-                  new UnresolvedSymExpr("c_void_ptr")));
-          }
+          externCall->argList.insertAtTail(new CallExpr("chpl_arrayToPtr",
+                                                        new SymExpr(formal),
+                                                        new SymExpr((eltType ?
+                                                                     gFalse :
+                                                                     gTrue))));
         } else {
           externCall->argList.insertAtTail(new SymExpr(formal));
         }
         current_formal++;
       }
-
-      fcopy->body->replace(new BlockStmt(new CallExpr(PRIM_RETURN, externCall)));
+      bool retIsVoid = retExprTypeIsVoid(fn->retExprType);
+      if (fn->retType == dtVoid || retIsVoid) {
+        fcopy->body->replace(new BlockStmt(externCall));
+      } else {
+        fcopy->body->replace(new BlockStmt(new CallExpr(PRIM_RETURN, externCall)));
+      }
     }
   }
 }
@@ -149,6 +161,17 @@ bool checkIsArray(ArgSymbol* formal, UnresolvedSymExpr* &eltType) {
         if (typeAsCall->numActuals() > 1) {
           eltType = toUnresolvedSymExpr(typeAsCall->get(2));
         }
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool retExprTypeIsVoid(BlockStmt* retExprType) {
+  if (retExprType != NULL && retExprType->body.length == 1) {
+    if (SymExpr* se = toSymExpr(retExprType->body.only())) {
+      if (se->symbol()->type == dtVoid) {
         return true;
       }
     }

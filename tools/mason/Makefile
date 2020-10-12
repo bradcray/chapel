@@ -1,4 +1,5 @@
-# Copyright 2004-2018 Cray Inc.
+# Copyright 2020 Hewlett Packard Enterprise Development LP
+# Copyright 2004-2019 Cray Inc.
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -23,18 +24,21 @@ endif
 
 include $(CHPL_MAKE_HOME)/make/Makefile.base
 
-unexport CHPL_MAKE_SETTINGS_NO_NEWLINES
+unexport CHPL_MAKE_CHPLENV_CACHE
 
 bdir=$(CHPL_BIN_DIR)
 link=../../tools/mason/mason
 linkFile=$(bdir)/mason
 
-MASON_SOURCES=MasonBuild.chpl MasonEnv.chpl MasonHelp.chpl MasonNew.chpl MasonRun.chpl MasonSearch.chpl MasonUpdate.chpl MasonUtils.chpl mason.chpl
+MASON_SOURCES=*.chpl
 
-all: mason
+all: $(bdir)/mason FORCE
 
+mason: $(bdir)/mason FORCE
 
-mason: $(MASON_SOURCES)
+install: $(bdir)/mason FORCE
+
+$(bdir)/mason: $(MASON_SOURCES)
 	@if [ $(shell $(CHPL_MAKE_HOME)/util/chplenv/chpl_regexp.py) != re2 ]; then \
         echo "CHPL_REGEXP=re2 is required to build mason"; \
         exit 1;\
@@ -42,28 +46,10 @@ mason: $(MASON_SOURCES)
 	@echo "Building Mason..."
 	@chplBinDir=$(bdir) ./buildMason
 
-install: mason
-ifneq ($(wildcard $(linkFile)),)
-	@echo "Removing old symbolic link..."
-	rm -f $(linkFile)
-	@echo
-endif
-	@echo "Installing symbolic link..."
-	@mkdir -p $(bdir)
-	cd $(CHPL_BIN_DIR) && ln -s $(link) mason
-
-update:
-	@echo "Re-building Mason..."
-	@chplBinDir=$(bdir) ./buildMason
-
-clean:
+clean: FORCE
 	@echo "Removing Mason..."
-	rm -f $(shell pwd)/mason
-ifneq ($(wildcard $(linkFile)),)
-	@echo "Removing old symbolic link..."
-	@rm -f $(linkFile)
-	@echo
-endif
+	rm -f $(bdir)/mason
 
+clobber: clean FORCE
 
-clobber: clean
+FORCE:

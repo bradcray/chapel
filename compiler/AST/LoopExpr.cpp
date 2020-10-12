@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -28,6 +29,7 @@
 #include "build.h"
 #include "expr.h"
 #include "ForLoop.h"
+#include "IfExpr.h"
 #include "LoopExpr.h"
 #include "passes.h"
 #include "scopeResolve.h"
@@ -50,6 +52,7 @@ static void findLoopExprDefs(LoopExpr* fe, Expr* indices, AList& defIndices) {
     VarSymbol* idx = new VarSymbol(se->unresolved);
     idx->addFlag(FLAG_INDEX_VAR);
     idx->addFlag(FLAG_INSERT_AUTO_DESTROY);
+    idx->addFlag(FLAG_NO_DOC);
     DefExpr* def = new DefExpr(idx);
     defIndices.insertAtTail(def);
   }
@@ -192,9 +195,7 @@ class LowerLoopExprVisitor : public AstVisitorTraverse
 // table.
 //
 bool LowerLoopExprVisitor::enterLoopExpr(LoopExpr* node) {
-  if (! node->inTree()) {
-    // nothing to do
-  } else if (node->getStmtExpr() == NULL) {
+  if (node->getStmtExpr() == NULL) {
     // Don't touch LoopExprs in DefExprs, they should be copied later into
     // BlockStmts.
     INT_ASSERT(isDefExpr(node->parentExpr));
@@ -224,17 +225,14 @@ bool LowerLoopExprVisitor::enterLoopExpr(LoopExpr* node) {
 }
 
 void lowerLoopExprs(BaseAST* ast) {
+  INT_ASSERT(ast->inTree()); // otherwise nothing to do
   LowerLoopExprVisitor vis;
   ast->accept(&vis);
 }
 
 
 static Expr* getShapeForZippered(Expr* tupleRef) {
-  Symbol* tupleSym = toSymExpr(tupleRef)->symbol();
-  SymExpr* tupleDef = tupleSym->getSingleDef();
-  CallExpr* move = toCallExpr(tupleDef->parentExpr);
-  INT_ASSERT(move->isPrimitive(PRIM_MOVE));
-  CallExpr* buildTup = toCallExpr(move->get(2));
+  CallExpr* buildTup = toCallExpr(getDefOfTemp(toSymExpr(tupleRef)));
   INT_ASSERT(buildTup->isNamed("_build_tuple"));
   // The shape comes from the first tuple component.
   return buildTup->get(1);
@@ -298,6 +296,7 @@ handleArrayTypeCase(LoopExpr* loopExpr, FnSymbol* fn, Expr* indices,
   //
   FnSymbol* isArrayTypeFn = new FnSymbol("_isArrayTypeFn");
   isArrayTypeFn->addFlag(FLAG_INLINE);
+  isArrayTypeFn->setGeneric(false);
   fn->insertAtTail(new DefExpr(isArrayTypeFn));
 
   // Result of '_isArrayTypeFn'
@@ -391,10 +390,18 @@ static FnSymbol* buildSerialIteratorFn(const char* iteratorName,
                                        Expr* cond,
                                        Expr* indices,
                                        bool zippered,
+                                       bool forall,
                                        Expr*& stmt)
 {
   FnSymbol* sifn = new FnSymbol(iteratorName);
   sifn->addFlag(FLAG_ITERATOR_FN);
+  if (forall) {
+    sifn->addFlag(FLAG_ORDER_INDEPENDENT_YIELDING_LOOPS);
+    sifn->addFlag(FLAG_NO_REDUNDANT_ORDER_INDEPENDENT_PRAGMA_WARNING);
+  } else {
+    sifn->addFlag(FLAG_NOT_ORDER_INDEPENDENT_YIELDING_LOOPS);
+  }
+  sifn->setGeneric(true);
 
   ArgSymbol* sifnIterator = new ArgSymbol(INTENT_BLANK, "iterator", dtAny);
   sifn->insertFormalAtTail(sifnIterator);
@@ -410,10 +417,19 @@ static FnSymbol* buildSerialIteratorFn(const char* iteratorName,
   sifn->insertAtTail(ForLoop::buildForLoop(indices,
                                            new SymExpr(sifnIterator),
                                            new BlockStmt(stmt),
-                                           false, // is it a coforall?
-                                           zippered));
+                                           zippered,
+                                           /*isForExpr*/ true));
 
   return sifn;
+}
+
+static Expr* buildLeaderIteratorWhereClause(ArgSymbol* lifnTag,
+                                       ArgSymbol* lifnIterator, bool zippered)
+{
+  Symbol* tlsym = new_StringSymbol(zippered ? "_toLeaderZip" : "_toLeader");
+  Expr* checkTag = new CallExpr("==", lifnTag, gLeaderTag);
+  Expr* checkToLeader = new CallExpr(PRIM_CALL_RESOLVES, tlsym, lifnIterator);
+  return new CallExpr("&&", checkTag, checkToLeader);
 }
 
 static FnSymbol* buildLeaderIteratorFn(const char* iteratorName,
@@ -421,6 +437,7 @@ static FnSymbol* buildLeaderIteratorFn(const char* iteratorName,
 {
   FnSymbol* lifn = new FnSymbol(iteratorName);
   lifn->addFlag(FLAG_FN_RETURNS_ITERATOR);
+  lifn->setGeneric(true);
 
   Expr* tag = new SymExpr(gLeaderTag);
   ArgSymbol* lifnTag = new ArgSymbol(INTENT_PARAM, "tag", dtUnknown,
@@ -430,7 +447,8 @@ static FnSymbol* buildLeaderIteratorFn(const char* iteratorName,
   ArgSymbol* lifnIterator = new ArgSymbol(INTENT_BLANK, "iterator", dtAny);
   lifn->insertFormalAtTail(lifnIterator);
 
-  lifn->where = new BlockStmt(new CallExpr("==", lifnTag, tag->copy()));
+  lifn->where = new BlockStmt(buildLeaderIteratorWhereClause(
+                                lifnTag, lifnIterator, zippered));
 
   VarSymbol* leaderIterator = newTempConst("_leaderIterator");
   leaderIterator->addFlag(FLAG_EXPR_TEMP);
@@ -449,10 +467,18 @@ static FnSymbol* buildLeaderIteratorFn(const char* iteratorName,
 
 static FnSymbol* buildFollowerIteratorFn(const char* iteratorName,
                                          bool zippered,
+                                         bool forall,
                                          VarSymbol*& followerIterator)
 {
   FnSymbol* fifn = new FnSymbol(iteratorName);
   fifn->addFlag(FLAG_ITERATOR_FN);
+  if (forall) {
+    fifn->addFlag(FLAG_ORDER_INDEPENDENT_YIELDING_LOOPS);
+    fifn->addFlag(FLAG_NO_REDUNDANT_ORDER_INDEPENDENT_PRAGMA_WARNING);
+  } else {
+    fifn->addFlag(FLAG_NOT_ORDER_INDEPENDENT_YIELDING_LOOPS);
+  }
+  fifn->setGeneric(true);
 
   Expr* tag = new SymExpr(gFollowerTag);
   ArgSymbol* fifnTag = new ArgSymbol(INTENT_PARAM, "tag", dtUnknown,
@@ -486,7 +512,8 @@ static FnSymbol* buildFollowerIteratorFn(const char* iteratorName,
 static bool isGlobalVar(Symbol* sym) {
   Symbol* parent = sym->defPoint->parentSymbol;
 
-  if (sym->hasFlag(FLAG_CHAPEL_STRING_LITERAL)) {
+  if (sym->hasFlag(FLAG_CHAPEL_STRING_LITERAL) ||
+      sym->hasFlag(FLAG_CHAPEL_BYTES_LITERAL)) {
     return true;
   }
 
@@ -541,12 +568,20 @@ static bool isOuterVar(Symbol* sym, Expr* enclosingExpr) {
 }
 
 static bool considerForOuter(Symbol* sym) {
+  if (isTypeSymbol(sym->defPoint->parentSymbol)) {
+    // Fields are considered 'outer'
+    return true;
+  }
+
   if (sym->hasFlag(FLAG_TYPE_VARIABLE) ||
       sym->hasFlag(FLAG_PARAM))
     return false;  // these will be eliminated anyway
 
-  if (isArgSymbol(sym))
-    return true;   // a formal is never a global var
+  // Do not consider type formals (detected above with FLAG_TYPE_VARIABLE)
+  // and param formals (detected below with INTENT_PARAM).
+
+  if (ArgSymbol* arg = toArgSymbol(sym))
+    return !(arg->intent == INTENT_PARAM); // a formal is never a global var
 
   if (isGlobalVar(sym))
     return false;  // we do not need to handle globals
@@ -574,7 +609,18 @@ static ArgSymbol* newOuterVarArg(Symbol* ovar) {
   if (argType == dtUnknown)
     argType = dtAny;
 
-  return new ArgSymbol(INTENT_BLANK, ovar->name, argType);
+  ArgSymbol* ret = new ArgSymbol(INTENT_BLANK, ovar->name, argType);
+
+  // An argument might need to be a type or param if the outer variable is
+  // a type field.
+  if (ovar->hasFlag(FLAG_TYPE_VARIABLE)) {
+    ret->addFlag(FLAG_TYPE_VARIABLE);
+  }
+  if (ArgSymbol* ovarArg = toArgSymbol(ovar))
+    if (ovarArg->intent == INTENT_PARAM)
+      ret->intent = INTENT_PARAM;
+
+  return ret;
 }
 
 //
@@ -667,7 +713,8 @@ static CallExpr* buildLoopExprFunctions(LoopExpr* loopExpr) {
   // loop-expr functions in the ArgSymbol's scope, we will insert the functions
   // at module scope and pass outer variables to a top-level wrapper (the
   // chpl__loopexpr function).
-  bool insideArgSymbol = isArgSymbol(loopExpr->parentSymbol);
+  bool insideArgSymbol = isArgSymbol(loopExpr->parentSymbol) ||
+                         isTypeSymbol(loopExpr->parentSymbol);
 
   std::set<Symbol*> outerVars;
   findOuterVars(loopExpr, outerVars);
@@ -687,12 +734,32 @@ static CallExpr* buildLoopExprFunctions(LoopExpr* loopExpr) {
   fn->addFlag(FLAG_COMPILER_NESTED_FUNCTION);
   fn->addFlag(FLAG_FN_RETURNS_ITERATOR);
   fn->addFlag(FLAG_COMPILER_GENERATED);
+  fn->setGeneric(true);
   if (forall) fn->addFlag(FLAG_MAYBE_ARRAY_TYPE);
 
   if (insideArgSymbol) {
     loopExpr->getModule()->block->insertAtHead(new DefExpr(fn));
   } else {
-    loopExpr->getStmtExpr()->insertBefore(new DefExpr(fn));
+    BlockStmt* block = NULL;
+    CondStmt* ifExprCond = NULL;
+    for (Expr* cur = loopExpr->getStmtExpr();
+         cur != NULL;
+         cur = cur->parentExpr) {
+      if (BlockStmt* b = toBlockStmt(cur)) {
+        block = b;
+        break;
+      }
+    }
+
+    if (block != NULL && isLoweredIfExprBlock(block)) {
+      ifExprCond = toCondStmt(block->parentExpr);
+    }
+
+    if (ifExprCond != NULL)
+      // for if-exprs, insert just before the CondStmt
+      ifExprCond->insertBefore(new DefExpr(fn));
+    else
+      loopExpr->getStmtExpr()->insertBefore(new DefExpr(fn));
   }
 
   SymbolMap outerMap;
@@ -729,14 +796,16 @@ static CallExpr* buildLoopExprFunctions(LoopExpr* loopExpr) {
   FnSymbol* fifn = NULL;
 
   Expr* stmt = NULL; // Initialized by buildSerialIteratorFn.
-  sifn = buildSerialIteratorFn(iteratorName, loopBody, cond, indices, zippered, stmt);
+  sifn = buildSerialIteratorFn(iteratorName, loopBody, cond, indices,
+                               zippered, forall, stmt);
 
   if (forall) {
     lifn = buildLeaderIteratorFn(iteratorName, zippered);
     addOuterVariableFormals(lifn, outerVars);
 
     VarSymbol* followerIterator; // Initialized by buildFollowerIteratorFn.
-    fifn = buildFollowerIteratorFn(iteratorName, zippered, followerIterator);
+    fifn = buildFollowerIteratorFn(iteratorName, zippered, forall,
+                                   followerIterator);
 
     // do we need to use this map since symbols have not been resolved?
     SymbolMap map;
@@ -745,7 +814,11 @@ static CallExpr* buildLoopExprFunctions(LoopExpr* loopExpr) {
       indDefCopies.insertAtTail(defI->copy(&map));
     Expr* indicesCopy = (indices) ? indices->copy(&map) : NULL;
     Expr* bodyCopy = stmt->copy(&map);
-    fifn->insertAtTail(ForLoop::buildLoweredForallLoop(indicesCopy, new SymExpr(followerIterator), new BlockStmt(bodyCopy), false, zippered));
+    fifn->insertAtTail(
+        ForLoop::buildLoweredForallLoop(
+          indicesCopy, new SymExpr(followerIterator), new BlockStmt(bodyCopy),
+          zippered,
+          /* isForExpr */ true));
     addOuterVariableFormals(fifn, outerVars);
     adjustIndexDefPoints(fifn, &indDefCopies);
   }

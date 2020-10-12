@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -28,7 +29,6 @@ class TryStmt : public Stmt
 public:
 
   static BlockStmt*   build(bool tryBang, Expr*      expr);
-  static BlockStmt*   build(bool tryBang, BlockStmt* body);
   static BlockStmt*   build(bool tryBang, BlockStmt* body, BlockStmt* catches,
                             bool isSyncTry = false);
   static BlockStmt*   buildWithCatchall(BlockStmt* body, BlockStmt* onErr);

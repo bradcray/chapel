@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -165,13 +166,6 @@ module Collection {
     /*
       Syntactic sugar for `getSize`.
     */
-    proc length : int {
-      return getSize();
-    }
-
-    /*
-      Syntactic sugar for `getSize`.
-    */
     proc size : int {
       return getSize();
     }
@@ -188,12 +182,13 @@ module Collection {
     */
     iter these() : eltType {
       halt("'iter these() : eltType' is not supported...");
-      yield _defaultOf(eltType);
+      var default: eltType;
+      yield default;
     }
   }
 
   /*
-    Syntactic sugar for :proc:`add`.
+    Syntactic sugar for :proc:`CollectionImpl.add`.
   */
   inline proc +=(ref c : CollectionImpl(?eltType), elt : eltType) {
     c.add(elt);

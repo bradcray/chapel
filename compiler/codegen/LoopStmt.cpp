@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -22,29 +23,33 @@
 #include "codegen.h"
 #include "driver.h"
 
-// If vectorization is enabled and this loop is order independent, codegen
-// CHPL_PRAGMA_IVDEP. This method is a no-op if vectorization is off, or the
-// loop is not order independent.
-void LoopStmt::codegenOrderIndependence()
+void LoopStmt::reportVectorizable()
 {
-  if (fNoVectorize == false && isOrderIndependent())
-  {
-    GenInfo* info = gGenInfo;
+  if (fReportVectorizedLoops) {
+    ModuleSymbol *mod = toModuleSymbol(this->getModule());
+    INT_ASSERT(mod);
 
-    // Note: This *must* match the macro definitions provided in the runtime
-    std:: string ivdepStr = "CHPL_PRAGMA_IVDEP";
-    if (fReportOrderIndependentLoops)
+    if (developer || mod->modTag == MOD_USER)
     {
-      ModuleSymbol *mod = toModuleSymbol(this->getModule());
-      INT_ASSERT(mod);
+      if (this->isVectorizable()) {
+        const char* kind = NULL;
 
-      if (developer || mod->modTag == MOD_USER)
-      {
-        printf("Adding %s to %s for %s:%d\n", ivdepStr.c_str(),
-            this->astTagAsString(), mod->name, this->linenum());
+        // if there is a vectorization hazard, we shouldn't
+        // have considered it vectorizable at all.
+        INT_ASSERT(!this->hasVectorizationHazard());
+
+        if (this->hasParallelAccessVectorizationHazard())
+          kind = "loop vectorization (no parallel access)";
+        else
+          kind = "loop vectorization (with parallel access)";
+
+        if (developer)
+          USR_PRINT(this, "%s hinted for %s [%i]", kind,
+                    this->astTagAsString(), this->id);
+        else
+          USR_PRINT(this, "%s hinted for %s", kind,
+                    this->astTagAsString());
       }
     }
-
-    info->cStatements.push_back(ivdepStr+'\n');
   }
 }

@@ -27,6 +27,10 @@ generateCompopts() {
     printchplenv=$(../../../../util/printchplenv --simple --anonymize --no-tidy)
 
     compopts="--home=${CHPL_HOME}"
+
+    # llvm codegen changes some of the environment variables
+    compopts="$compopts --no-llvm"
+
     for var in ${printchplenv}; do
 
         # Princhplenv format: "env=value"
@@ -44,7 +48,7 @@ generateCompopts() {
             "CHPL_TARGET_COMPILER")
                 compopts="$compopts --$flag=$value"
                 ;;
-            "CHPL_TARGET_ARCH")
+            "CHPL_TARGET_CPU")
                 compopts="$compopts --$flag=$value"
                 ;;
             "CHPL_LOCALE_MODEL")
@@ -84,9 +88,6 @@ generateCompopts() {
                 compopts="$compopts --$flag=$value"
                 ;;
             "CHPL_REGEXP")
-                compopts="$compopts --$flag=$value"
-                ;;
-            "CHPL_WIDE_POINTERS")
                 compopts="$compopts --$flag=$value"
                 ;;
             "CHPL_AUX_FILESYS")

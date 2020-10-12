@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -34,14 +35,15 @@ static void removePODinitDestroy()
   forv_Vec(FnSymbol, fn, gFnSymbols) {
     if (fn->hasFlag(FLAG_INIT_COPY_FN) || fn->hasFlag(FLAG_AUTO_COPY_FN))
     {
-      if (fn->retType == dtVoid)
-        // initCopy(void) and autoCopy(void) will have had their void
+      if (fn->retType == dtNothing)
+        // initCopy(none) and autoCopy(none) will have had their nothing
         // argument removed
         continue;
 
-      // We expect both initCopy and autoCopy functions to have one argument
-      // whose type is the same as the return type.
-      INT_ASSERT(fn->numFormals() >= 1);
+      // We expect both initCopy and autoCopy functions to have two arguments
+      // second argument: whose type is the same as the return type
+      // definedConst: whether the LHS was defined const
+      INT_ASSERT(fn->numFormals() >= 2);
 
       if (fn->getFormal(1)->type != fn->retType)
         // In some cases, the autoCopy function has a different return type than
@@ -84,7 +86,7 @@ static void removePODinitDestroy()
           if (lhsType->getValType() != rhsType->getValType()) {
             INT_FATAL(actual, "Type mismatch in updateAutoCopy");
           } else {
-            call->replace(actual->remove());
+            removeInitOrAutoCopyPostResolution(call);
           }
         }
       }

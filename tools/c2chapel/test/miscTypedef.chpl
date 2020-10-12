@@ -5,6 +5,7 @@ require "miscTypedef.h";
 
 // Note: Generated with fake std headers
 
+use CPtr;
 extern record simpleStruct {
   var a : c_int;
   var b : c_char;
@@ -13,9 +14,11 @@ extern record simpleStruct {
   var e : my_string;
 }
 
-extern proc retStruct(a : my_int, b : my_int, r : renamedStruct) : fancyStruct;
+extern proc retStruct(a : my_int, b : my_int, in r : renamedStruct) : fancyStruct;
 
 extern proc tdPointer(ref a : fancyStruct, ref b : c_ptr(renamedStruct)) : void;
+
+extern proc tdPointer(a : c_ptr(fancyStruct), b : c_ptr(c_ptr(renamedStruct))) : void;
 
 
 

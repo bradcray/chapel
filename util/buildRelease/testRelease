@@ -8,9 +8,9 @@ $chplhomedir = abs_path("$cwd/../..");
 
 
 # Mailing lists.
-$failuremail = "chapel-test-results-regressions\@lists.sourceforge.net chapel_cronmail\@cray.com";
-$allmail = "chapel-test-results-all\@lists.sourceforge.net chapel_cronmail_all\@cray.com";
-$replymail = "chapel-developers\@lists.sourceforge.net";
+$failuremail = "chapel+tests\@discoursemail.com";
+$allmail = "chapel-test-results-all\@lists.sourceforge.net";
+$replymail = "";
 
 $printusage = 1;
 $debug = 1;
@@ -44,11 +44,9 @@ $pid = getpgrp();
 $user = `whoami`;
 chomp($user);
 $debugmail = $ENV{'CHPL_NIGHTLY_DEBUG_EMAIL'};
-if ($debugmail eq "") {
-    $debugmail = "$user\@cray.com";
-    if ($debug == 1) {
-        $replymail = $debugemail;
-    }
+if ($debug == 1 && $debugmail eq "") {
+    print "Set CHPL_NIGHTLY_DEBUG_EMAIL to use debug mode\n";
+    exit 1;
 }
 
 if ($cronrecipient eq "" and exists($ENV{"CHPL_NIGHTLY_CRON_RECIPIENT"})) {
@@ -105,7 +103,12 @@ if ($mailer eq "") {
     $chplsendemail = "$chplhomedir/util/test/send_email.py";
     `$chplsendemail --help >/dev/null 2>&1`;
     if ($? == 0) {
-        $mailer = "$chplsendemail --header=Reply-To=$replymail,Precedence=bulk";
+        $header = "";
+        if ($replymail ne "") {
+          $header = "Reply-To=$replymail,";
+        }
+        $header .= "Precedence=bulk";
+        $mailer = "$chplsendemail --header=$header";
     } else {
         print "[Error: send_email.py failed to run. Defaulting to 'mail'.]\n";
         $mailer = "mail";

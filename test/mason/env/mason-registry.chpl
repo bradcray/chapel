@@ -1,9 +1,12 @@
 
+private use List;
 use MasonEnv;
 use MasonSearch;
+use MasonUtils;
 
 use FileSystem;
 use Spawn;
+use SysCTypes;
 
 proc setEnv(name : string, val : string) {
   extern proc setenv(name : c_string, val : c_string, overwrite : c_int) : c_int;
@@ -66,11 +69,12 @@ proc main() {
   // Clear environment for testing
   unsetEnv("MASON_HOME");
   unsetEnv("MASON_REGISTRY");
+  unsetEnv('MASON_OFFLINE');
 
   const tempHome = here.cwd() + "/tempHome";
   const uncached = "/uncached";
-  const altRegistry = tempHome + uncached + "/myRegistry";
-  const altRegistryName = "myRegistry";
+  const altRegistry = tempHome + uncached + "/mason-registry";
+  const altRegistryName = "mason-registry";
 
   mkdir(tempHome + uncached, parents=true);
 
@@ -81,7 +85,9 @@ proc main() {
 
   masonEnv(["foo", "env"]);
 
-  masonSearch(["foo", "search"]);
+  var args1: list(string);
+  for x in ["foo", "search"] do args1.append(x);
+  masonSearch(args1);
 
   assert(isDir(altRegistry));
   assert(isDir(tempHome));

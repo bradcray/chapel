@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -80,9 +81,6 @@ void WhileStmt::verify()
 
   if (byrefVars                 != 0)
     INT_FATAL(this, "WhileStmt::verify. byrefVars is not NULL");
-
-  if (forallIntents             != 0)
-    INT_FATAL(this, "WhileStmt::verify. forallIntents is not NULL");
 }
 
 bool WhileStmt::isWhileStmt() const
@@ -170,27 +168,16 @@ void WhileStmt::checkConstLoops()
         {
           if (outerCall->isPrimitive(PRIM_MOVE))
           {
-            // Expect the update to be the result of a call to _cond_test.
-            if (CallExpr* innerCall = toCallExpr(outerCall->get(2)))
-            {
-              FnSymbol* fn = innerCall->resolvedFunction();
+            Expr* condSrc = skip_cond_test(outerCall->get(2));
 
-              if (innerCall->numActuals()        == 1 &&
-                  strcmp(fn->name, "_cond_test") == 0)
-              {
-                checkWhileLoopCondition(innerCall->get(1));
-              }
-              else
-              {
-                INT_FATAL(innerCall,
-                          "Expected the update of a loop conditional "
-                          "to be piped through _cond_test().");
-              }
+            // The RHS of the move can be a call.
+            if (CallExpr* condCall = toCallExpr(condSrc)) {
+              checkWhileLoopCondition(condCall);
             }
 
             // The RHS of the move can also be a SymExpr as the result of param
             // folding ...
-            else if (SymExpr* moveSrc = toSymExpr(outerCall->get(2)))
+            else if (SymExpr* moveSrc = toSymExpr(condSrc))
             {
               // ... in which case, the literal should be 'true' or 'false'.
               if (moveSrc->symbol() == gTrue)
@@ -208,9 +195,8 @@ void WhileStmt::checkConstLoops()
 
               else
               {
-                INT_FATAL(moveSrc,
-                          "Expected const loop condition variable to be "
-                          "true or false.");
+                // Check more if the RHS of the move is not a param.
+                checkWhileLoopCondition(moveSrc);
               }
             }
 
@@ -273,12 +259,10 @@ SymExpr* WhileStmt::getWhileCondDef(VarSymbol* condSym)
   std::vector<SymExpr*> symExprs;
   SymExpr*              condDef = NULL;
 
-  collectSymExprs(this, symExprs);
+  collectSymExprsFor(this, condSym, symExprs);
 
   for_vector(SymExpr, se, symExprs)
   {
-    if (se->symbol() == condSym)
-    {
       if (se == mCondExpr)
       {
         // The reference is the condition expression - not interesting.
@@ -298,7 +282,6 @@ SymExpr* WhileStmt::getWhileCondDef(VarSymbol* condSym)
         // This is what we are looking for.
         condDef = se;
       }
-    }
   }
 
   return condDef;

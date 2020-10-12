@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -43,14 +44,18 @@ FnSymbol*                 gGenericTupleDestroy  = NULL;
 std::map<FnSymbol*, int>  ftableMap;
 std::vector<FnSymbol*>    ftableVec;
 
-FnSymbol::FnSymbol(const char* initName) : Symbol(E_FnSymbol, initName) {
+FnSymbol::FnSymbol(const char* initName)
+  : Symbol(E_FnSymbol, initName), userInstantiationPointLoc(0, NULL) {
   retType            = dtUnknown;
   where              = NULL;
+  lifetimeConstraints= NULL;
   retExprType        = NULL;
   body               = new BlockStmt();
   thisTag            = INTENT_BLANK;
   retTag             = RET_VALUE;
   iteratorInfo       = NULL;
+  iteratorGroup      = NULL;
+  cacheInfo          = NULL;
   _this              = NULL;
   instantiatedFrom   = NULL;
   _instantiationPoint = NULL;
@@ -65,6 +70,8 @@ FnSymbol::FnSymbol(const char* initName) : Symbol(E_FnSymbol, initName) {
   llvmDISubprogram   = NULL;
   mIsNormalized      = false;
   _throwsError       = false;
+  mIsGeneric         = false;
+  mIsGenericIsValid  = false;
 
   substitutions.clear();
 
@@ -74,26 +81,11 @@ FnSymbol::FnSymbol(const char* initName) : Symbol(E_FnSymbol, initName) {
 }
 
 FnSymbol::~FnSymbol() {
-  if (iteratorInfo && !hasFlag(FLAG_TASK_FN_FROM_ITERATOR_FN)) {
-    // Also set iterator class and iterator record iteratorInfo = NULL.
-    if (iteratorInfo->iclass) {
-      iteratorInfo->iclass->iteratorInfo = NULL;
-    }
-
-    if (iteratorInfo->irecord) {
-      iteratorInfo->irecord->iteratorInfo = NULL;
-    }
-
-    delete iteratorInfo;
-  }
-
+  cleanupIteratorInfo(this);
+  cleanupIteratorGroup(this);
+  cleanupCacheInfo(this);
   BasicBlock::clear(this);
-
-  delete basicBlocks;
-
-  if (calledBy) {
-    delete calledBy;
-  }
+  delete calledBy;
 }
 
 void FnSymbol::verify() {
@@ -122,6 +114,10 @@ void FnSymbol::verify() {
     INT_FATAL(this, "Bad FnSymbol::where::parentSymbol");
   }
 
+  if (lifetimeConstraints && lifetimeConstraints->parentSymbol != this) {
+    INT_FATAL(this, "Bad FnSymbol::lifetimeConstraints::parentSymbol");
+  }
+
   if (retExprType && retExprType->parentSymbol != this) {
     INT_FATAL(this, "Bad FnSymbol::retExprType::parentSymbol");
   }
@@ -138,6 +134,7 @@ void FnSymbol::verify() {
   }
 
   verifyNotOnList(where);
+  verifyNotOnList(lifetimeConstraints);
   verifyNotOnList(retExprType);
   verifyNotOnList(body);
 
@@ -149,6 +146,8 @@ void FnSymbol::verify() {
   verifyInTree(_backupInstantiationPoint, "FnSymbol::backupInstantiationPoint");
   verifyInTree(valueFunction,      "FnSymbol::valueFunction");
   verifyInTree(retSymbol,          "FnSymbol::retSymbol");
+
+  verifyIteratorGroup(this);
 }
 
 FnSymbol* FnSymbol::copyInner(SymbolMap* map) {
@@ -157,6 +156,7 @@ FnSymbol* FnSymbol::copyInner(SymbolMap* map) {
 
   // Copy members that weren't set by copyInnerCore.
   copy->where       = COPY_INT(this->where);
+  copy->lifetimeConstraints = COPY_INT(this->lifetimeConstraints);
   copy->body        = COPY_INT(this->body);
   copy->retExprType = COPY_INT(this->retExprType);
   copy->_this       = this->_this;
@@ -193,8 +193,10 @@ FnSymbol* FnSymbol::copyInnerCore(SymbolMap* map) {
   newFn->thisTag            = this->thisTag;
   newFn->cname              = this->cname;
   newFn->retTag             = this->retTag;
-  newFn->instantiatedFrom   = this->instantiatedFrom;
-  newFn->_instantiationPoint = this->_instantiationPoint;
+  newFn->mIsGeneric         = this->mIsGeneric;
+  newFn->mIsGenericIsValid  = this->mIsGenericIsValid;
+  newFn->instantiatedFrom          = this->instantiatedFrom;
+  newFn->_instantiationPoint       = this->_instantiationPoint;
   newFn->_backupInstantiationPoint = this->_backupInstantiationPoint;
 
   return newFn;
@@ -252,6 +254,13 @@ FnSymbol* FnSymbol::partialCopy(SymbolMap* map) {
     insert_help(newFn->where, NULL, newFn);
   }
 
+  // Copy and insert the lifetimeConstraints clause if it is present.
+  if (this->lifetimeConstraints != NULL) {
+    newFn->lifetimeConstraints = COPY_INT(this->lifetimeConstraints);
+
+    insert_help(newFn->lifetimeConstraints, NULL, newFn);
+  }
+
   // Copy and insert the retExprType if it is present.
   if (this->retExprType != NULL) {
     newFn->retExprType = COPY_INT(this->retExprType);
@@ -262,7 +271,7 @@ FnSymbol* FnSymbol::partialCopy(SymbolMap* map) {
   /*
    * Because we are not copying the function's body we need to make the return
    * symbol available through other means.  To do this we first have to find
-   * where the symbol is defined.  It may either be void, the _this symbol, a
+   * where the symbol is defined.  It may either be nothing, the _this symbol, a
    * formal symbol, or a symbol defined in the function's body.  In the last
    * case a new symbol and definition point have to be generated; the
    * finalizeCopy method will replace their corresponding nodes from the body
@@ -380,8 +389,8 @@ void FnSymbol::finalizeCopy() {
     }
 
     /*
-     * Cases where the return symbol is gVoid or this->_this don't require any
-     * additional actions.
+     * Cases where the return symbol is gVoid or this->_this don't require
+     * any additional actions.
      */
     if (this->retSymbol != gVoid && this->retSymbol != this->_this) {
       Symbol* replacementRet = map->get(partialCopySource->getReturnSymbol());
@@ -432,6 +441,9 @@ void FnSymbol::replaceChild(BaseAST* oldAst, BaseAST* newAst) {
 
   } else if (oldAst == where) {
     where = toBlockStmt(newAst);
+
+  } else if (oldAst == lifetimeConstraints) {
+    lifetimeConstraints = toBlockStmt(newAst);
 
   } else if (oldAst == retExprType) {
     retExprType = toBlockStmt(newAst);
@@ -493,36 +505,6 @@ Symbol* FnSymbol::getReturnSymbol() {
   return retval;
 }
 
-
-// Replace the return symbol with 'newRetSymbol',
-// return the previous return symbol.
-// If newRetType != NULL, also update fn->retType.
-Symbol* FnSymbol::replaceReturnSymbol(Symbol* newRetSymbol, Type* newRetType) {
-  CallExpr* ret    = toCallExpr(this->body->body.last());
-  Symbol*   retval = NULL;
-
-  if (ret != NULL && ret->isPrimitive(PRIM_RETURN) == true) {
-    if (SymExpr* sym = toSymExpr(ret->get(1))) {
-      Symbol* prevRetSymbol = sym->symbol();
-
-      sym->setSymbol(newRetSymbol);
-
-      this->retSymbol = newRetSymbol;
-
-      if (newRetType != NULL) {
-        this->retType = newRetType;
-      }
-
-      retval = prevRetSymbol;
-    }
-
-  } else {
-    INT_FATAL(this, "function is not normal");
-  }
-
-  return retval;
-}
-
 // Removes all statements from body and adds all statements from block.
 void FnSymbol::replaceBodyStmtsWithStmts(BlockStmt* block) {
   for_alist(stmt, this->body->body) {
@@ -552,6 +534,9 @@ void FnSymbol::setInstantiationPoint(Expr* expr) {
     this->_instantiationPoint = block;
     this->_backupInstantiationPoint = block->getFunction();
   }
+
+  //if (expr != NULL)
+  //  userInstantiationPointLoc = getUserInstantiationPoint(this);
 }
 
 BlockStmt* FnSymbol::instantiationPoint() const {
@@ -709,36 +694,32 @@ CallExpr* FnSymbol::singleInvocation() const {
 
 
 //
-// If the function is not currently marked as generic
-//    then if it is generic
-//      1) Update some flags
-//      2) Return true to indicate the status has been modified
+// Labels this function as generic or non-generic.
+// Returns:
+// * TGR_NEWLY_TAGGED - if this function has not been labeled before,
+// * TGR_ALREADY_TAGGED - otherwise,
+// * TGR_TAGGING_ABORTED - if this invocation is recursive and so is aborted.
 //
-bool FnSymbol::tagIfGeneric() {
-  bool retval = false;
+TagGenericResult FnSymbol::tagIfGeneric(SymbolMap* map, bool abortOK) {
+  if (isGenericIsValid()) {
+    // generic-ness has already been established
+    return TGR_ALREADY_TAGGED;
 
-  if (hasFlag(FLAG_GENERIC) == false) {
-    int result = hasGenericFormals();
-
-    // If this function has at least 1 generic formal
-    if (result > 0) {
-      addFlag(FLAG_GENERIC);
-
-      if (retType != dtUnknown && hasFlag(FLAG_TYPE_CONSTRUCTOR) == true) {
-        if (AggregateType* at = toAggregateType(retType)) {
-          at->markAsGeneric();
-          if (result == 2)
-            at->markAsGenericWithDefaults();
-        }
-
-        retType->symbol->addFlag(FLAG_GENERIC);
-      }
-
-      retval = true;
+  } else {
+    // avoid recursing for the function.
+    static std::set<Symbol*> seen;
+    if (seen.count(this)) {
+      INT_ASSERT(abortOK);
+      return TGR_TAGGING_ABORTED;
     }
-  }
+    seen.insert(this);
 
-  return retval;
+    // compute and set this function's genericity
+    bool generic = hasGenericFormals(map);
+    setGeneric(generic);
+    seen.erase(this);
+    return TGR_NEWLY_TAGGED;
+  }
 }
 
 
@@ -751,62 +732,106 @@ bool FnSymbol::tagIfGeneric() {
 //
 //   0 if there are no generic formals
 //
-int FnSymbol::hasGenericFormals() const {
-  bool hasGenericFormal   = false;
-  bool hasGenericDefaults =  true;
-  int  retval             =     0;
+// 'map' is expected to be non-NULL if this function has been instantiated.
+//
+bool FnSymbol::hasGenericFormals(SymbolMap* map) const {
+  bool anyGeneric = false;
 
+  std::vector<unsigned char> formalIsGeneric;
+
+  int count = 0;
   for_formals(formal, this) {
     bool isGeneric = false;
+
+    if (formal->type == dtUnknown && formal->typeExpr != NULL) {
+
+      // If the type expression does not depend on a previous generic formal,
+      // we can resolve it now, even if there was a previous generic formal.
+
+      bool dependsOnPreviousGeneric = false;
+      int i = 0;
+      if (anyGeneric) {
+        for_formals(prevFormal, this) {
+          if (i >= count)
+            break;
+
+          int cursz = formalIsGeneric.size();
+          if (i < cursz && formalIsGeneric[i] == 1) {
+            // check to see if prevFormal is used in the typeExpr
+            // for the current formal.
+            if (findSymExprFor(formal->typeExpr, prevFormal) != NULL) {
+              dependsOnPreviousGeneric = true;
+              break;
+            }
+          }
+          i++;
+        }
+        if (dependsOnPreviousGeneric) {
+          // Stop resolving formals.
+          INT_ASSERT(anyGeneric == true);
+          break;
+        }
+      }
+
+      resolveBlockStmt(formal->typeExpr);
+      formal->type = formal->typeExpr->body.tail->getValType();
+    }
 
     if (formal->intent == INTENT_PARAM) {
       isGeneric = true;
 
     } else if (formal->type->symbol->hasFlag(FLAG_GENERIC) == true) {
-      bool typeHasGenericDefaults = false;
-      if (AggregateType* at = toAggregateType(formal->type))
-        typeHasGenericDefaults = at->isGenericWithDefaults();
-
-      if (typeHasGenericDefaults               == false ||
-          formal->hasFlag(FLAG_MARKED_GENERIC) == true ||
-          formal                               == _this) {
-        if (!(formal == _this && isInitializer())) {
-          isGeneric = true;
+      bool formalInstantiated = false;
+      if (map != NULL && formal->hasFlag(FLAG_TYPE_VARIABLE)) {
+        form_Map(SymbolMapElem, e, *map) {
+          if (e->key->name == formal->name) {
+            formalInstantiated = true;
+            break;
+          }
         }
       }
+
+      if (!formalInstantiated) {
+        bool typeHasGenericDefaults = false;
+        if (AggregateType* at = toAggregateType(formal->type))
+          typeHasGenericDefaults = at->isGenericWithDefaults();
+
+        if (typeHasGenericDefaults               == false ||
+            formal->hasFlag(FLAG_MARKED_GENERIC) == true ||
+            formal                               == _this) {
+          if (!(formal == _this && (isInitializer() || isCopyInit()))) {
+            isGeneric = true;
+          }
+        }
+      }
+
+    }
+
+    // init= on generic types need to be considered generic so that 'this.type'
+    // stuff will resolve.
+    if (map == NULL && formal == _this && isCopyInit() && _this->type->symbol->hasFlag(FLAG_GENERIC)) {
+      isGeneric = true;
     }
 
     if (isGeneric == true) {
       if (hasFlag(FLAG_EXPORT)) {
-        if (!hasGenericFormal) {
-          USR_FATAL_CONT(this,
+        USR_FATAL_CONT(this,
                          "exported function `%s` can't be generic", name);
-        }
         USR_PRINT(this,
                   "   formal argument '%s' causes it to be", formal->name);
       }
-      hasGenericFormal = true;
-
-      if (formal->defaultExpr == NULL) {
-        hasGenericDefaults = false;
-      }
     }
+    anyGeneric = anyGeneric || isGeneric;
+    if (isGeneric) {
+      while ((int)formalIsGeneric.size() < count) {
+        formalIsGeneric.push_back(0);
+      }
+      formalIsGeneric.push_back(1);
+    }
+    count++;
   }
 
-  if (hasGenericFormal == false) {
-    retval = 0;
-
-  } else if (hasGenericDefaults == false) {
-    retval = 1;
-
-  } else if (hasGenericDefaults ==  true) {
-    retval = 2;
-
-  } else {
-    INT_ASSERT(false);
-  }
-
-  return retval;
+  return anyGeneric;
 }
 
 bool FnSymbol::isNormalized() const {
@@ -834,6 +859,9 @@ void FnSymbol::accept(AstVisitor* visitor) {
     if (where)
       where->accept(visitor);
 
+    if (lifetimeConstraints)
+      lifetimeConstraints->accept(visitor);
+
     if (retExprType) {
       retExprType->accept(visitor);
     }
@@ -842,21 +870,21 @@ void FnSymbol::accept(AstVisitor* visitor) {
   }
 }
 
-AggregateType* FnSymbol::getReceiver() const {
-  AggregateType* retval = NULL;
+AggregateType* FnSymbol::getReceiverType() const {
+  if (isMethod()) {
+    if (isResolved() && _this != NULL) {
+      return toAggregateType(_this->getValType());
+    } else if (numFormals() >= 2) {
+      ArgSymbol* _mt   = getFormal(1);
+      ArgSymbol* _this = getFormal(2);
 
-  if (isMethod() == true && numFormals() >= 2) {
-    ArgSymbol* _mt   = getFormal(1);
-    ArgSymbol* _this = getFormal(2);
-
-    if (AggregateType* at = toAggregateType(_this->type)) {
       if (_mt->type == dtMethodToken) {
-        retval = at;
+        return toAggregateType(_this->getValType());
       }
     }
   }
 
-  return retval;
+  return NULL;
 }
 
 bool FnSymbol::isMethod() const {
@@ -866,7 +894,7 @@ bool FnSymbol::isMethod() const {
 bool FnSymbol::isMethodOnClass() const {
   bool retval = false;
 
-  if (AggregateType* at = getReceiver()) {
+  if (AggregateType* at = getReceiverType()) {
     retval = at->isClass();
   }
 
@@ -876,11 +904,18 @@ bool FnSymbol::isMethodOnClass() const {
 bool FnSymbol::isMethodOnRecord() const {
   bool retval = false;
 
-  if (AggregateType* at = getReceiver()) {
+  if (AggregateType* at = getReceiverType()) {
     retval = at->isRecord();
   }
 
   return retval;
+}
+
+bool FnSymbol::isTypeMethod() const {
+  if (isMethod() && _this != NULL) {
+    return _this->hasFlag(FLAG_TYPE_VARIABLE);
+  }
+  return false;
 }
 
 void FnSymbol::setMethod(bool value) {
@@ -909,17 +944,21 @@ bool FnSymbol::isCompilerGenerated() const {
 }
 
 bool FnSymbol::isInitializer() const {
-  return isMethod() == true && strcmp(name, "init")     == 0;
+  return isMethod() == true && name == astrInit;
 }
 
 bool FnSymbol::isPostInitializer() const {
-  return isMethod() == true && strcmp(name, "postinit") == 0;
+  return isMethod() == true && name == astrPostinit;
 }
 
 bool FnSymbol::isDefaultInit() const {
   return hasFlag(FLAG_COMPILER_GENERATED) &&
-         hasFlag(FLAG_DEFAULT_COPY_INIT) == false &&
+         hasFlag(FLAG_COPY_INIT) == false &&
          isInitializer();
+}
+
+bool FnSymbol::isCopyInit() const {
+  return isMethod() && name == astrInitEquals;
 }
 
 // This function or method is an iterator (as opposed to a procedure).
@@ -1051,6 +1090,24 @@ bool FnSymbol::throwsError() const {
   return _throwsError;
 }
 
+bool FnSymbol::isGeneric() {
+  INT_ASSERT(mIsGenericIsValid);
+  return mIsGeneric;
+}
+
+bool FnSymbol::isGenericIsValid() {
+  return mIsGenericIsValid;
+}
+
+void FnSymbol::setGeneric(bool generic) {
+  mIsGeneric = generic;
+  mIsGenericIsValid = true;
+}
+
+void FnSymbol::clearGeneric() {
+  mIsGeneric = mIsGenericIsValid = false;
+}
+
 bool FnSymbol::retExprDefinesNonVoid() const {
   bool retval = true;
 
@@ -1061,7 +1118,7 @@ bool FnSymbol::retExprDefinesNonVoid() const {
     retval = true;
 
   } else if (SymExpr* expr = toSymExpr(retExprType->body.get(1))) {
-    retval = expr->symbol()->type != dtVoid ? true : false;
+    retval = expr->symbol()->type != dtVoid;
 
   } else {
     retval = true;
@@ -1069,6 +1126,219 @@ bool FnSymbol::retExprDefinesNonVoid() const {
 
   return retval;
 }
+
+// Produces a string representing an arg when describing an instantiation;
+// e.g. param x = 3:int(8)
+// if isThisArg is passed, omit the name, and use parens for params
+// e.g. type int
+// e.g. param 1
+// e.g. param (3:int(8))
+static std::string argToString(FnSymbol* concreteFn,
+                               ArgSymbol* concreteArg,
+                               FnSymbol* genericFn, // might be NULL
+                               ArgSymbol* genericArg, // might be NULL
+                               const char* startGeneric,
+                               const char* endGeneric,
+                               bool& printedGeneric) {
+
+  bool isThisArg = concreteArg->name == astrThis;
+  Symbol* sym = NULL;
+  if (concreteFn != genericFn && genericArg)
+    sym = concreteFn->substitutions.get(genericArg);
+  if (sym == NULL)
+    sym = genericArg;
+  if (sym == NULL)
+    sym = concreteArg;
+
+  Type* t = sym->getValType();
+
+  bool isGeneric = genericArg && sym != genericArg;
+
+  bool isParam = genericArg && (genericArg->intent == INTENT_PARAM ||
+                                genericArg->originalIntent == INTENT_PARAM);
+  bool isType = genericArg && (genericArg->intent == INTENT_TYPE ||
+                               genericArg->originalIntent == INTENT_TYPE ||
+                               genericArg->hasFlag(FLAG_TYPE_VARIABLE));
+
+  std::string ret = "";
+  std::string name = concreteArg->name;
+  if (genericArg && genericArg->hasFlag(FLAG_EXPANDED_VARARGS) &&
+      name[0] == '_' && name[1] == 'e') {
+    // change _e##_name into name(##)
+    std::string num = name;
+    num.erase(0, 2); // remove _e
+    std::string n = num; // ##_name
+    num.resize(num.find('_')); // ##
+    n.erase(0, n.find('_')+1); // name
+    name = n + "(" + num + ")";
+  }
+
+  if (isParam) {
+    ret += "param ";
+    if (!isThisArg)
+      ret += name;
+    Immediate* imm = getSymbolImmediate(sym);
+    EnumSymbol* enumSym = NULL;
+    if (imm == NULL && concreteArg != NULL) {
+      // Also look in the defaultExpr. See e.g. recursive-leader-errr.chpl
+      // and the iterKind enum.
+      // Not sure why this pattern doesn't set the immediate.
+      if (SymExpr* se = toSymExpr(concreteArg->defaultExpr->body.tail)) {
+        Symbol* sym = se->symbol();
+        imm = getSymbolImmediate(sym);
+        if (imm == NULL) {
+          enumSym = toEnumSymbol(sym);
+          if (enumSym != NULL) {
+            ret += " = ";
+            ret += toString(t);
+            ret += ".";
+            ret += sym->name;
+          }
+        }
+      }
+    }
+    if (imm) {
+      const size_t bufSize = 128;
+      char buf[bufSize];
+      snprint_imm(buf, bufSize, *imm);
+      ret += " = ";
+      ret += startGeneric;
+      ret += buf;
+      ret += endGeneric;
+      printedGeneric = true;
+    }
+    if (isNumericParamDefaultType(t) == false &&
+        enumSym == NULL) {
+      ret += ": ";
+      ret += toString(t);
+    }
+
+  } else if (isType) {
+    ret += "type ";
+    if (!isThisArg) {
+      ret += name;
+      ret += " = ";
+    }
+    ret += startGeneric;
+    ret += toString(t);
+    ret += endGeneric;
+    printedGeneric = true;
+  } else {
+    if (isGeneric) {
+      if (!isThisArg) {
+        ret += name;
+        ret += ": ";
+      }
+      ret += startGeneric;
+      ret += toString(t);
+      ret += endGeneric;
+      printedGeneric = true;
+    } else {
+      if (!isThisArg) {
+        ret += name;
+        ret += ": ";
+      }
+      ret += toString(t);
+    }
+  }
+
+  return ret;
+}
+
+std::string FnSymbol::nameAndArgsToString(const char* sep,
+                                          bool forError,
+                                          bool& printedUnderline) const {
+  if (sep == NULL || sep[0] == '\0')
+    sep = ", ";
+
+  // To help with printing out generics substitutions as underlined
+  const char* startGeneric = "";
+  const char* endGeneric = "";
+  if (forError) {
+    startGeneric = underlineErrorFormat();
+    endGeneric = clearErrorFormat();
+  }
+
+  FnSymbol* concreteFn = const_cast<FnSymbol*>(this);
+  FnSymbol* genericFn = this->instantiatedFrom;
+
+  std::string ret = "";
+
+  bool printedGeneric = false;
+
+  if (concreteFn->isMethod()) {
+    // Find the concrete and generic `this` argument
+    ArgSymbol* concreteThisArg = NULL;
+    ArgSymbol* genericThisArg = NULL;
+    for_formals(arg, concreteFn) {
+      if (arg->name == astrThis)
+        concreteThisArg = arg;
+    }
+    if (genericFn != NULL) {
+      for_formals(arg, genericFn) {
+        if (arg->name == astrThis)
+          genericThisArg = arg;
+      }
+    }
+
+    // This shouldn't happen
+    if (concreteThisArg == NULL)
+      return ret;
+
+    // Create a string for the this argument
+    std::string argString = argToString(concreteFn, concreteThisArg,
+                                        genericFn, genericThisArg,
+                                        startGeneric, endGeneric,
+                                        printedGeneric);
+    ret += argString;
+    ret += ".";
+  }
+  ret += this->name;
+  ret += "(";
+
+  bool firstArg = true;
+  for_formals(concreteArg, concreteFn) {
+    ArgSymbol* genericArg = NULL;
+    if (genericFn != NULL) {
+      // Get the generic formal, too
+      for_formals(arg, genericFn) {
+        if (arg->name == concreteArg->name)
+          genericArg = arg;
+      }
+    }
+
+    // Method token and this argument handled above
+    if (concreteArg->type == dtMethodToken)
+      continue;
+    if (concreteArg->name == astrThis)
+      continue;
+
+    // Ignore arguments added by the compiler
+    if (concreteArg->hasFlag(FLAG_RETARG) ||
+        concreteArg->hasFlag(FLAG_TYPE_FORMAL_FOR_OUT))
+      continue;
+
+    std::string argString = argToString(concreteFn, concreteArg,
+                                        genericFn, genericArg,
+                                        startGeneric, endGeneric,
+                                        printedGeneric);
+
+    // add a separator if this isn't the first one
+    if (!firstArg)
+      ret += sep;
+    // add the arg string
+    ret += argString;
+
+    firstArg = false;
+  }
+
+  ret += ")";
+
+  printedUnderline = printedGeneric && (startGeneric[0] != '\0');
+
+  return ret;
+}
+
 
 const char* toString(FnSymbol* fn) {
   const char* retval = NULL;
@@ -1081,7 +1351,6 @@ const char* toString(FnSymbol* fn) {
     }
 
   } else {
-    int  start      =     1;
     bool first      =  true;
     bool skipParens = false;
 
@@ -1094,26 +1363,8 @@ const char* toString(FnSymbol* fn) {
         fn = fn->instantiatedFrom;
       }
 
-      if (fn->hasFlag(FLAG_TYPE_CONSTRUCTOR) == true) {
-        // if not, make sure 'str' is built as desired
-        INT_ASSERT(strncmp("_type_construct_", fn->name, 16) == 0);
-        retval = astr(fn->name + 16);
-
-      } else if (fn->isPrimaryMethod() == true) {
-        Flag flag = FLAG_FIRST_CLASS_FUNCTION_INVOCATION;
-
-        if (fn->name == astrThis) {
-          INT_ASSERT(fn->hasFlag(flag) == true);
-
-          retval = astr(toString(fn->getFormal(2)->type));
-          start  = 2;
-
-        } else {
-          INT_ASSERT(fn->hasFlag(flag) == false);
-
-          retval = astr(toString(fn->getFormal(2)->type), ".", fn->name);
-          start  = 3;
-        }
+      if (fn->isMethod() && fn->_this != NULL) {
+        retval = astr(toString(fn->_this->type, false), ".", fn->name);
 
       } else if (fn->hasFlag(FLAG_MODULE_INIT) == true) {
         INT_ASSERT(strncmp("chpl__init_", fn->name, 11) == 0);
@@ -1128,10 +1379,6 @@ const char* toString(FnSymbol* fn) {
     if        (fn->hasFlag(FLAG_NO_PARENS)        == true) {
       skipParens =  true;
 
-    } else if (fn->hasFlag(FLAG_TYPE_CONSTRUCTOR) == true &&
-               fn->numFormals()                   ==    0) {
-      skipParens =  true;
-
     } else if (fn->hasFlag(FLAG_MODULE_INIT)      == true &&
                developer                          == false) {
       skipParens =  true;
@@ -1141,8 +1388,20 @@ const char* toString(FnSymbol* fn) {
       retval     = astr(retval, "(");
     }
 
-    for (int i = start; i <= fn->numFormals(); i++) {
+    for (int i = 1; i <= fn->numFormals(); i++) {
       ArgSymbol* arg = fn->getFormal(i);
+
+      // skip method token etc
+      if (arg->type == dtMethodToken ||
+          arg->type == dtTypeDefaultToken ||
+          arg->type == dtModuleToken)
+        continue;
+
+      // skip _this formal for methods in non-developer mode
+      // because in non-developer mode it has already been printed
+      // along with the method name (e.g. C.mymethod).
+      if (developer == false && fn->isMethod() && arg == fn->_this)
+        continue;
 
       if (first == true) {
         first = false;
@@ -1166,6 +1425,14 @@ const char* toString(FnSymbol* fn) {
         if (arg->typeExpr != NULL) {
           if (SymExpr* sym = toSymExpr(arg->typeExpr->body.tail)) {
             retval = astr(retval, arg->name, ": ", sym->symbol()->name);
+          } else if (CallExpr* call = toCallExpr(arg->typeExpr->body.tail)) {
+            // TODO: need to preserve the original string for function signatures...
+            if (call->isPrimitive(PRIM_TYPEOF)) {
+              SymExpr* se = toSymExpr(call->get(1));
+              retval = astr(retval, arg->name, ": ", se->symbol()->name, ".type");
+            } else {
+              retval = astr(retval, arg->name);
+            }
 
           } else {
             retval = astr(retval, arg->name);

@@ -6,27 +6,17 @@ CHPL_MAKE_HOST_TARGET = --target
 include $(CHPL_MAKE_HOME)/make/Makefile.base
 
 #
-# Cray X* builds are cross-compilations.
+# Cray builds are cross-compilations.
 #
 ifneq (, $(filter cray-x%,$(CHPL_MAKE_TARGET_PLATFORM)))
-CHPL_JEMALLOC_CFG_OPTIONS += --host=$(shell uname -m)-cle-linux-gnu
-else ifneq ($(CHPL_MAKE_HOST_PLATFORM),$(CHPL_MAKE_TARGET_PLATFORM))
-CHPL_JEMALLOC_CFG_OPTIONS += --host=$(CHPL_MAKE_TARGET_PLATFORM)-unknown-linux-gnu
+CHPL_JEMALLOC_CFG_OPTIONS += --host=$(CHPL_MAKE_TARGET_ARCH)-cle-linux-gnu
+else ifneq (, $(filter cray-cs hpe-cray-ex,$(CHPL_MAKE_TARGET_PLATFORM)))
+CHPL_JEMALLOC_CFG_OPTIONS += --host=$(CHPL_MAKE_TARGET_ARCH)-unknown-linux-gnu
 endif
 
 CHPL_JEMALLOC_CFG_OPTIONS += --prefix=$(JEMALLOC_INSTALL_DIR) \
 			     --with-jemalloc-prefix=$(CHPL_JEMALLOC_PREFIX) \
 			     --with-private-namespace=chpl_
-
-# Can't build under CCE with high levels of interprocedural analysis on. We get
-# runtime errors with -hipa3 (the default) or higher so limit to -hipa2.
-ifeq ($(CHPL_MAKE_TARGET_COMPILER),cray-prgenv-cray)
-ifeq ($(OPTIMIZE), 1)
-CFLAGS += -hipa2
-else
-CFLAGS += -hipa0
-endif
-endif
 
 
 # Unless the user explicitly asks for stats gathering, disable it since

@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
  * The entirety of this work is licensed under the Apache License,
@@ -119,6 +120,10 @@ void* chpl_mem_realloc(void* memAlloc, size_t size,
   return moreMemAlloc;
 }
 
+// assumes that alignment/boundary is:
+//   * a power of 2
+//   * a multiple of sizeof(void*)
+// size is not necessarily a multiple of alignment
 static inline
 void* chpl_mem_memalign(size_t boundary, size_t size,
                         chpl_mem_descInt_t description,
@@ -186,6 +191,9 @@ void chpl_mem_layerFree(void*, int32_t lineno, int32_t filename);
 
 #define chpl_mem_alloc(size, description, lineno, filename)        \
   sys_malloc(size)
+
+#define chpl_mem_realloc(memAlloc, size, description, lineno, filename) \
+  sys_realloc(memAlloc, size)
 
 #define chpl_mem_free(ptr, lineno, filename)        \
   sys_free(ptr)

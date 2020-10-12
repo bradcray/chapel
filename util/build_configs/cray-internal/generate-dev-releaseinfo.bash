@@ -22,25 +22,26 @@ source $cwd/common.bash
 # Generate the file
 
 cat <<EOF
-Now Available: Cray Chapel Compiler $major.$minor
+Now Available: HPE Chapel Compiler $major.$minor
 
 This is a draft/placeholder file for development purposes only.
 
 TODO:   Add "highlights of this release"
 TODO:   Add the official release dates
 
-    Cray Inc. and the Chapel open-source community are pleased to
-    announce the release of version $src_version of the Chapel compiler.
-    Chapel is a parallel programming language designed to improve the
-    productivity of high-end computer users while also serving as a
-    portable parallel programming model for use on multicore laptops,
-    commodity clusters, and the cloud.
+    Hewlett Packard Enterprise (HPE) and the Chapel open-source
+    community are pleased to announce the release of version
+    $src_version of the Chapel compiler.  Chapel is a parallel
+    programming language designed to improve the productivity of
+    high-end computer users while also serving as a portable parallel
+    programming model for use on multicore laptops, commodity
+    clusters, and the cloud.
 
 Chapel $major.$minor
 ===========
 
     Chapel is a productive parallel programming language whose design
-    and development are being led by Cray Inc. in a collaborative
+    and development are being led by HPE in a collaborative
     manner with members of academia, computing labs, and industry.
     Chapel's overall goal is to improve programmer productivity on
     large-scale systems.  Its implementation is being pursued in an
@@ -68,9 +69,9 @@ Chapel $major.$minor
     Interested users are encouraged to ask questions and join
     discussions in a variety of forums (Stack Overflow, Gitter,
     mailing lists, etc.) listed at https://chapel-lang.org/users.html.
-    Questions about Chapel can be directed to the Chapel team at
-    chapel_info@cray.com.  To file bugs or feature requests against
-    Chapel, refer to \$CHPL_HOME/doc/html/usingchapel/bugs.html or
+    Questions about Chapel can be directed to the Chapel team.  To file
+    bugs or feature requests against Chapel, refer to
+    \$CHPL_HOME/doc/html/usingchapel/bugs.html or
     https://chapel-lang.org/bugs.html.
 
 
@@ -88,11 +89,10 @@ Deliverables:
 
     The Chapel release packages contain the compiler executables,
     runtime libraries, example programs, and documentation for use on
-    the Cray XE(TM), Cray XK(TM), and Cray XC(TM) systems.  Chapel can
-    be built from source for the Cray CS(TM) system.  Additional
-    information on Chapel can be found at: https://chapel-lang.org, and
-    the open-source release can be found at:
-    https://github.com/chapel-lang/chapel/releases/tag/$src_version
+    Cray XC(TM) systems.  Chapel can be built from source for the Cray
+    CS(TM) system.  Additional information on Chapel can be found at:
+    https://chapel-lang.org, and the open-source release can be found
+    at: https://github.com/chapel-lang/chapel/releases/tag/$src_version
 
 
 Schedule:
@@ -114,8 +114,8 @@ Dependencies:
 -------------
 
     Chapel $major.$minor is supported on the following Cray systems:
+    * HPE Cray EX systems with COS based on SLES15 or later
     * Cray XC systems with CLE 5.2UP04 or later
-    * Cray XE and XK systems with CLE 5.2UP04 or later
     * Cray CS systems running Red Hat, CentOS, or SuSE Linux
 
     A back-end C compiler is required to generate an executable. Any
@@ -128,17 +128,17 @@ Dependencies:
 Installation instructions:
 --------------------------
 
-    Copy the appropriate Chapel RPM file to the current directory and execute
-    one of the following commands:
+    Copy the Chapel RPM file to the current directory and execute
+    the appropriate one of the following commands:
+
+      #On HPE Cray EX systems (x86_64):
+      rpm -ivh chapel-$pkg_version-$rpm_release.x86_64.rpm
 
       #On Cray XC systems (x86_64):
       rpm -ivh chapel-$pkg_version-crayxc$rc_number.x86_64.rpm
 
       #On Cray XC systems (aarch64):
       rpm -ivh chapel-$pkg_version-crayxc$rc_number.aarch64.rpm
-
-      #On Cray XK and XE systems:
-      rpm -ivh chapel-$pkg_version-crayxe$rc_number.x86_64.rpm
 
       #To make this the default version:
       /opt/cray/admin-pe/set_default_files/set_default_chapel_$pkg_version

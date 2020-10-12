@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -94,7 +95,7 @@
   instance. This means that it is easy to add data in bulk, expecting it to be distributed, when in
   reality it is not; if another node needs data, it will steal work on-demand. This may not always be
   desired, and likely will more memory consumption on a single node. We offer a way for the user to
-  invoke a more static load balancing approach, called :proc:`balance`, which will redistributed work.
+  invoke a more static load balancing approach, called :proc:`DistributedBagImpl.balance`, which will redistributed work.
 
   .. code-block:: chapel
 
@@ -111,7 +112,7 @@
       To make matters worse, the waiting tasks don't even get any elements, nor does the work
       stealing task, which opens up the possibility of live-lock where nodes steal work back
       and forth before either can process it.
-  2.  Static work-stealing (A.K.A :proc:`balance`) requires a rework that performs a more distributed
+  2.  Static work-stealing (A.K.A :proc:`DistributedBagImpl.balance`) requires a rework that performs a more distributed
       and fast way of distributing memory, as currently 'excess' elements are shifted to a single
       node to be redistributed in the next pass. On the note, we need to collapse the pass for moving
       excess elements into a single pass, hopefully with a zero-copy overhead.
@@ -122,8 +123,11 @@
 
 module DistributedBag {
 
-  use Collection;
+  public use Collection;
   use BlockDist;
+  private use SysCTypes;
+  private use CPtr;
+  use IO only channel;
 
   /*
     Below are segment statuses, which is a way to make visible to outsiders the
@@ -179,7 +183,7 @@ module DistributedBag {
     The maximum amount of work to steal from a horizontal node's segment. This
     should be set to a value, in megabytes, that determines the maximum amount of
     data that should be sent in bulk at once. The maximum number of elements is
-    determined by: (:const:`distributedBagWorkStealingMemCap` * 1024 * 1024) / sizeof(:type:`eltType`).
+    determined by: (:const:`distributedBagWorkStealingMemCap` * 1024 * 1024) / sizeof(``eltType``).
     For example, if we are storing 8-byte integers and have a 1MB limit, we would
     have a maximum of 125,000 elements stolen at once.
   */
@@ -219,15 +223,16 @@ module DistributedBag {
     its own work-stealing algorithm, and provides a means to obtain a privatized instance of
     the data structure for maximized performance.
   */
+  pragma "always RVF"
   record DistBag {
     type eltType;
 
+    // This is unused, and merely for documentation purposes. See '_value'.
     /*
       The implementation of the Bag is forwarded. See :class:`DistributedBagImpl` for
       documentation.
     */
-    // This is unused, and merely for documentation purposes. See '_value'.
-    var _impl : DistributedBagImpl(eltType);
+    var _impl : unmanaged DistributedBagImpl(eltType)?;
 
     // Privatized id...
     pragma "no doc"
@@ -249,9 +254,21 @@ module DistributedBag {
       if _pid == -1 {
         halt("DistBag is uninitialized...");
       }
-      return chpl_getPrivatizedCopy(DistributedBagImpl(eltType), _pid);
+      return chpl_getPrivatizedCopy(unmanaged DistributedBagImpl(eltType), _pid);
     }
-
+  
+    pragma "no doc"
+    /* Read/write the contents of DistBag from/to a channel */ 
+    proc readWriteThis(ch: channel) throws {
+      ch <~> "[";
+      var size = this.getSize();
+      for (i,iteration) in zip(this, 0..<size) {
+        ch <~> i;
+        if iteration < size-1 then ch <~> ", ";
+      }
+      ch <~> "]";
+    }
+    
     forwarding _value;
   }
 
@@ -268,7 +285,7 @@ module DistributedBag {
     // Node-local fields below. These fields are specific to the privatized instance.
     // To access them from another node, make sure you use 'getPrivatizedThis'
     pragma "no doc"
-    var bag : unmanaged Bag(eltType);
+    var bag : unmanaged Bag(eltType)?;
 
     proc init(type eltType, targetLocales : [?targetLocDom] locale = Locales) {
       super.init(eltType);
@@ -316,6 +333,7 @@ module DistributedBag {
     }
 
     pragma "no doc"
+    pragma "order independent yielding loops"
     iter targetLocalesNotHere() {
       for loc in targetLocales {
         if loc != here {
@@ -329,7 +347,7 @@ module DistributedBag {
       preserved.
     */
     override proc add(elt : eltType) : bool {
-      return bag.add(elt);
+      return bag!.add(elt);
     }
 
     /*
@@ -338,7 +356,7 @@ module DistributedBag {
       bag is empty, it will attempt to steal elements from bags of other nodes.
     */
     override proc remove() : (bool, eltType) {
-      return bag.remove();
+      return bag!.remove();
     }
 
     /*
@@ -352,7 +370,7 @@ module DistributedBag {
       coforall loc in targetLocales do on loc {
         var instance = getPrivatizedThis;
         forall segmentIdx in 0..#here.maxTaskPar {
-          sz.add(instance.bag.segments[segmentIdx].nElems.read() : int);
+          sz.add(instance.bag!.segments[segmentIdx].nElems.read() : int);
         }
       }
 
@@ -423,7 +441,7 @@ module DistributedBag {
       for loc in localThis.targetLocales do on loc {
         var instance = getPrivatizedThis;
         for segmentIdx in 0 .. #here.maxTaskPar {
-          ref segment = instance.bag.segments[segmentIdx];
+          ref segment = instance.bag!.segments[segmentIdx];
           segment.acquire(STATUS_BALANCE);
         }
       }
@@ -431,10 +449,10 @@ module DistributedBag {
       // Phase 2: Concurrently redistribute elements from segments which contain
       // more than the computed average.
       coforall segmentIdx in 0 .. #here.maxTaskPar {
-        var nSegmentElems : [localThis.targetLocales.size] int;
+        var nSegmentElems : [0..#localThis.targetLocales.size] int;
         var locIdx = 0;
         for loc in localThis.targetLocales do on loc {
-          var nElems = getPrivatizedThis.bag.segments[segmentIdx].nElems.read() : int;
+          var nElems = getPrivatizedThis.bag!.segments[segmentIdx].nElems.read() : int;
           nSegmentElems[locIdx] = nElems;
           locIdx += 1;
         }
@@ -457,7 +475,7 @@ module DistributedBag {
         var bufferOffset = 0;
         for loc in localThis.targetLocales do on loc {
           var average = avg;
-          ref segment = getPrivatizedThis.bag.segments[segmentIdx];
+          ref segment = getPrivatizedThis.bag!.segments[segmentIdx];
           var nElems = segment.nElems.read() : int;
           if nElems > average {
             var nTransfer = nElems - average;
@@ -471,7 +489,7 @@ module DistributedBag {
         bufferOffset = 0;
         for loc in localThis.targetLocales do on loc {
           var average = avg;
-          ref segment = getPrivatizedThis.bag.segments[segmentIdx];
+          ref segment = getPrivatizedThis.bag!.segments[segmentIdx];
           var nElems = segment.nElems.read() : int;
           if average > nElems {
             var give = average - nElems;
@@ -491,7 +509,7 @@ module DistributedBag {
 
         // Lastly, if there are items left over, just add them to our locale's segment.
         if excess > bufferOffset {
-          ref segment = localThis.bag.segments[segmentIdx];
+          ref segment = localThis.bag!.segments[segmentIdx];
           var nLeftOvers = excess - bufferOffset;
           var tmpBuffer = buffer + bufferOffset;
           segment.addElementsPtr(tmpBuffer, nLeftOvers, buffer.locale.id);
@@ -504,7 +522,7 @@ module DistributedBag {
       for loc in localThis.targetLocales do on loc {
         var instance = getPrivatizedThis;
         for segmentIdx in 0 .. #here.maxTaskPar {
-          ref segment = instance.bag.segments[segmentIdx];
+          ref segment = instance.bag!.segments[segmentIdx];
           segment.releaseStatus();
         }
       }
@@ -528,6 +546,7 @@ module DistributedBag {
         parallel iteration, for both performance and memory benefit.
 
     */
+    pragma "order independent yielding loops"
     override iter these() : eltType {
       for loc in targetLocales {
         for segmentIdx in 0..#here.maxTaskPar {
@@ -536,18 +555,18 @@ module DistributedBag {
           var buffer : [dom] eltType;
 
           on loc {
-            ref segment = getPrivatizedThis.bag.segments[segmentIdx];
+            ref segment = getPrivatizedThis.bag!.segments[segmentIdx];
 
             if segment.acquireIfNonEmpty(STATUS_LOOKUP) {
               dom = {0..#segment.nElems.read() : int};
               var block = segment.headBlock;
               var idx = 0;
               while block != nil {
-                for i in 0 .. #block.size {
-                    buffer[idx] = block.elems[i];
+                for i in 0 .. #block!.size {
+                    buffer[idx] = block!.elems[i];
                     idx += 1;
                 }
-                block = block.next;
+                block = block!.next;
               }
               segment.releaseStatus();
             }
@@ -565,7 +584,7 @@ module DistributedBag {
       coforall loc in targetLocales do on loc {
         var instance = getPrivatizedThis;
         coforall segmentIdx in 0 .. #here.maxTaskPar {
-          ref segment = instance.bag.segments[segmentIdx];
+          ref segment = instance.bag!.segments[segmentIdx];
 
           if segment.acquireIfNonEmpty(STATUS_LOOKUP) {
             // Create a snapshot...
@@ -575,12 +594,12 @@ module DistributedBag {
             var bufferOffset = 0;
 
             while block != nil {
-              if bufferOffset + block.size > bufferSz {
-                halt("DistributedBag Internal Error: Snapshot attempt with bufferSz(", bufferSz, ") with offset bufferOffset(", bufferOffset + block.size, ")");
+              if bufferOffset + block!.size > bufferSz {
+                halt("DistributedBag Internal Error: Snapshot attempt with bufferSz(", bufferSz, ") with offset bufferOffset(", bufferOffset + block!.size, ")");
               }
-              __primitive("chpl_comm_array_put", block.elems[0], here.id, buffer[bufferOffset], block.size);
-              bufferOffset += block.size;
-              block = block.next;
+              __primitive("chpl_comm_array_put", block!.elems[0], here.id, buffer[bufferOffset], block!.size);
+              bufferOffset += block!.size;
+              block = block!.next;
             }
 
             // Yield this chunk to be process...
@@ -592,6 +611,7 @@ module DistributedBag {
       }
     }
 
+    pragma "order independent yielding loops"
     iter these(param tag : iterKind, followThis) where tag == iterKind.follower {
       var (bufferSz, buffer) = followThis;
       for i in 0 .. #bufferSz {
@@ -615,7 +635,7 @@ module DistributedBag {
 
     // Contiguous memory containing all elements
     var elems :  c_ptr(eltType);
-    var next : unmanaged BagSegmentBlock(eltType);
+    var next : unmanaged BagSegmentBlock(eltType)?;
 
     // The capacity of this block.
     var cap : int;
@@ -690,8 +710,8 @@ module DistributedBag {
     // Used as a test-and-test-and-set spinlock.
     var status : atomic uint;
 
-    var headBlock : unmanaged BagSegmentBlock(eltType);
-    var tailBlock : unmanaged BagSegmentBlock(eltType);
+    var headBlock : unmanaged BagSegmentBlock(eltType)?;
+    var tailBlock : unmanaged BagSegmentBlock(eltType)?;
 
     var nElems : atomic uint;
 
@@ -700,7 +720,7 @@ module DistributedBag {
     }
 
     inline proc acquireWithStatus(newStatus) {
-      return status.compareExchangeStrong(STATUS_UNLOCKED, newStatus);
+      return status.compareAndSwap(STATUS_UNLOCKED, newStatus);
     }
 
     // Set status with a test-and-test-and-set loop...
@@ -752,26 +772,26 @@ module DistributedBag {
           halt(here, ": DistributedBag Internal Error: Attempted transfer ", n, " elements to ", locId, " but failed... destOffset=", destOffset);
         }
 
-        var len = headBlock.size;
+        var len = headBlock!.size;
         var need = n - destOffset;
         // If the amount in this block is greater than what is left to transfer, we
         // cannot begin transferring at the beginning, so we set our offset from the end.
         if len > need {
           srcOffset = len - need;
-          headBlock.size = srcOffset;
-          __primitive("chpl_comm_array_put", headBlock.elems[srcOffset], locId, destPtr[destOffset], need);
+          headBlock!.size = srcOffset;
+          __primitive("chpl_comm_array_put", headBlock!.elems[srcOffset], locId, destPtr[destOffset], need);
           destOffset = destOffset + need;
         } else {
           srcOffset = 0;
-          headBlock.size = 0;
-          __primitive("chpl_comm_array_put", headBlock.elems[srcOffset], locId, destPtr[destOffset], len);
+          headBlock!.size = 0;
+          __primitive("chpl_comm_array_put", headBlock!.elems[srcOffset], locId, destPtr[destOffset], len);
           destOffset = destOffset + len;
         }
 
         // Fix list if we consumed last one...
-        if headBlock.isEmpty {
+        if headBlock!.isEmpty {
           var tmp = headBlock;
-          headBlock = headBlock.next;
+          headBlock = headBlock!.next;
           delete tmp;
 
           if headBlock == nil then tailBlock = nil;
@@ -793,17 +813,17 @@ module DistributedBag {
         }
 
         // Full? Create a new one double the previous size
-        if block.isFull {
-          block.next = new unmanaged BagSegmentBlock(eltType, min(distributedBagMaxBlockSize, block.cap * 2));
-          tailBlock = block.next;
-          block = block.next;
+        if block!.isFull {
+          block!.next = new unmanaged BagSegmentBlock(eltType, min(distributedBagMaxBlockSize, block!.cap * 2));
+          tailBlock = block!.next;
+          block = block!.next;
         }
 
         var nLeft = n - offset;
-        var nSpace = block.cap - block.size;
+        var nSpace = block!.cap - block!.size;
         var nFill = min(nLeft, nSpace);
-        __primitive("chpl_comm_array_get", block.elems[block.size], locId, ptr[offset], nFill);
-        block.size = block.size + nFill;
+        __primitive("chpl_comm_array_get", block!.elems[block!.size], locId, ptr[offset], nFill);
+        block!.size = block!.size + nFill;
         offset = offset + nFill;
       }
 
@@ -820,7 +840,7 @@ module DistributedBag {
           halt("DistributedBag Internal Error: Attempted to take ", n, " elements when insufficient");
         }
 
-        if headBlock.isEmpty {
+        if headBlock!.isEmpty {
           halt("DistributedBag Internal Error: Iterating over ", n, " elements with headBlock empty but nElems is ", nElems.read());
         }
 
@@ -829,9 +849,9 @@ module DistributedBag {
         nElems.sub(1);
 
         // Fix list if we consumed last one...
-        if headBlock.isEmpty {
+        if headBlock!.isEmpty {
           var tmp = headBlock;
-          headBlock = headBlock.next;
+          headBlock = headBlock!.next;
           delete tmp;
 
           if headBlock == nil then tailBlock = nil;
@@ -843,20 +863,21 @@ module DistributedBag {
 
     inline proc takeElement() {
       if isEmpty {
-        return (false, _defaultOf(eltType));
+        var default: eltType;
+        return (false, default);
       }
 
-      if headBlock.isEmpty {
+      if headBlock!.isEmpty {
         halt("DistributedBag Internal Error: Iterating over 1 element with headBlock empty but nElems is ", nElems.read());
       }
 
-      var elem = headBlock.pop();
+      var elem = headBlock!.pop();
       nElems.sub(1);
 
       // Fix list if we consumed last one...
-      if headBlock.isEmpty {
+      if headBlock!.isEmpty {
         var tmp = headBlock;
-        headBlock = headBlock.next;
+        headBlock = headBlock!.next;
         delete tmp;
 
         if headBlock == nil then tailBlock = nil;
@@ -876,13 +897,13 @@ module DistributedBag {
       }
 
       // Full? Create a new one double the previous size
-      if block.isFull {
-        block.next = new unmanaged BagSegmentBlock(eltType, min(distributedBagMaxBlockSize, block.cap * 2));
-        tailBlock = block.next;
-        block = block.next;
+      if block!.isFull {
+        block!.next = new unmanaged BagSegmentBlock(eltType, min(distributedBagMaxBlockSize, block!.cap * 2));
+        tailBlock = block!.next;
+        block = block!.next;
       }
 
-      block.push(elt);
+      block!.push(elt);
       nElems.add(1);
     }
 
@@ -900,7 +921,7 @@ module DistributedBag {
     type eltType;
 
     // A handle to our parent 'distributed' bag, which is needed for work stealing.
-    var parentHandle : DistributedBagImpl(eltType);
+    var parentHandle : borrowed DistributedBagImpl(eltType);
 
     /*
       Helps evenly distribute and balance placement of elements in a best-effort
@@ -943,7 +964,7 @@ module DistributedBag {
         var block = segment.headBlock;
         while block != nil {
           var tmp = block;
-          block = block.next;
+          block = block!.next;
           delete tmp;
         }
       }
@@ -1103,7 +1124,8 @@ module DistributedBag {
 
                     if parentHandle.targetLocales.size == 1 {
                       segment.releaseStatus();
-                      return (false, _defaultOf(eltType));
+                      var default: eltType;
+                      return (false, default);
                     }
 
                     // Attempt to become the sole work stealer for this node. If we
@@ -1115,7 +1137,8 @@ module DistributedBag {
                       loadBalanceInProgress.waitFor(false);
                       var notEmpty = loadBalanceResult.read();
                       if !notEmpty {
-                        return (false, _defaultOf(eltType));
+                        var default: eltType;
+                        return (false, default);
                       }
 
                       // Reset our phase and scan for more elements...
@@ -1143,8 +1166,8 @@ module DistributedBag {
                           var targetBag = parentHandle.bag;
 
                           // Only proceed if the target is not load balancing themselves...
-                          if !targetBag.loadBalanceInProgress.read() {
-                            ref targetSegment = targetBag.segments[segmentIdx];
+                          if !targetBag!.loadBalanceInProgress.read() {
+                            ref targetSegment = targetBag!.segments[segmentIdx];
 
                             // As we only care that the segment contains data,
                             // we test-and-test-and-set until we gain ownership.
@@ -1164,7 +1187,7 @@ module DistributedBag {
 
                                 // Allocate storage...
                                 on stolenWork do stolenWork[loc.id] = (toSteal, c_malloc(eltType, toSteal));
-                                var destPtr = stolenWork[here.id][2];
+                                var destPtr = stolenWork[here.id][1];
                                 targetSegment.transferElements(destPtr, toSteal, stolenWork.locale.id);
                                 targetSegment.releaseStatus();
 
@@ -1204,7 +1227,8 @@ module DistributedBag {
 
                     // At this point, if no work has been found, we will return empty...
                     if isEmpty.read() {
-                      return (false, _defaultOf(eltType));
+                      var default: eltType;
+                      return (false, default);
                     } else {
                       // Otherwise, we try to get data like everyone else.
                       phase = REMOVE_BEST_CASE;

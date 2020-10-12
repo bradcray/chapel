@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -17,24 +18,26 @@
  * limitations under the License.
  */
 
+private use List;
 use MasonBuild;
 use MasonHelp;
 use MasonUtils;
+use MasonExample;
 use FileSystem;
 use TOML;
 
-proc masonRun(args) throws {
+proc masonRun(args: [] string) throws {
 
   var show = false;
   var example = false;
   var release = false;
   var exec = false;
-  var execopts: [1..0] string;
+  var execopts: list(string);
 
   if args.size > 2 {
     for arg in args[2..] {
       if exec == true {
-        execopts.push_back(arg);
+        execopts.append(arg);
       }
       else if arg == '-h' || arg == '--help' {
         masonRunHelp();
@@ -44,7 +47,7 @@ proc masonRun(args) throws {
         masonBuildRun(args);
         exit(1);
       }
-      else if arg == '--' {        
+      else if arg == '--' {
         exec = true;
       }
       else if arg == '--show' {
@@ -56,7 +59,11 @@ proc masonRun(args) throws {
       else if arg == '--release' {
         release=true;
       }
-      else if arg == '--example' {        
+      else if arg.startsWith('--example=') {
+        masonBuildRun(args);
+        exit(0);
+      }
+      else if arg == '--example' {
         if args.size > 3 {
           masonBuildRun(args);
         }
@@ -65,27 +72,27 @@ proc masonRun(args) throws {
         exit(0);
       }
       else {
-        execopts.push_back(arg);
+        execopts.append(arg);
       }
     }
   }
   runProjectBinary(show, release, execopts);
 }
 
-proc runProjectBinary(show: bool, release: bool, execopts: [?d] string) throws {
+proc runProjectBinary(show: bool, release: bool, execopts: list(string)) throws {
 
   try! {
 
     const cwd = getEnv("PWD");
     const projectHome = getProjectHome(cwd);
     const toParse = open(projectHome + "/Mason.toml", iomode.r);
-    const tomlFile = new owned(parseToml(toParse));
-    const project = tomlFile["brick"]["name"].s;
- 
+    const tomlFile = owned.create(parseToml(toParse));
+    const project = tomlFile["brick"]!["name"]!.s;
+
     // Find the Binary and execute
     if isDir(joinPath(projectHome, 'target')) {
-      var execs = ' '.join(execopts);
-    
+      var execs = ' '.join(execopts.these());
+
       // decide which binary(release or debug) to run
       var command: string;
       if release {
@@ -115,17 +122,17 @@ proc runProjectBinary(show: bool, release: bool, execopts: [?d] string) throws {
       else if isFile(joinPath(projectHome, "Mason.toml")) {
         const msg = "Mason could not find your Mason.lock.\n";
         const help = "To build and run your project use: mason run --build";
-        throw new MasonError(msg + help);
+        throw new owned MasonError(msg + help);
       }
       else {
-        throw new MasonError("Mason could not find your Mason.toml file");
+        throw new owned MasonError("Mason could not find your Mason.toml file");
       }
 
       // Close memory
       toParse.close();
     }
     else {
-      throw new MasonError("Mason could not find the compiled program");
+      throw new owned MasonError("Mason could not find the compiled program");
     }
   }
   catch e: MasonError {
@@ -145,16 +152,21 @@ private proc masonBuildRun(args: [?d] string) {
     var force = false;
     var exec = false;
     var buildExample = false;
-    var updateRegistry = true;
-    var execopts: [1..0] string;  
+    var skipUpdate = MASON_OFFLINE;
+    var execopts: list(string);
+    var exampleProgram='';
     for arg in args[2..] {
       if exec == true {
-        execopts.push_back(arg);
+        execopts.append(arg);
       }
       else if arg == "--" {
         if example then
-          throw new MasonError("Examples do not support `--` syntax");
+          throw new owned MasonError("Examples do not support `--` syntax");
         exec = true;
+      }
+      else if arg.startsWith("--example=") {
+        execopts.append(arg);
+        example = true;
       }
       else if arg == "--example" {
         example = true;
@@ -172,27 +184,34 @@ private proc masonBuildRun(args: [?d] string) {
         release = true;
       }
       else if arg == '--no-update' {
-        updateRegistry = false;
+        skipUpdate = true;
+      }
+      else if arg == '--update' {
+        skipUpdate = false;
       }
       else {
         // could be examples or execopts
-        execopts.push_back(arg);
+        execopts.append(arg);
       }
     }
     if example {
-      if !buildExample then execopts.push_back("--no-build");
-      if release then execopts.push_back("--release");
-      if force then execopts.push_back("--force");
-      if show then execopts.push_back("--show");
-      masonExample(execopts);
+      if !buildExample then execopts.append("--no-build");
+      if release then execopts.append("--release");
+      if force then execopts.append("--force");
+      if show then execopts.append("--show");
+      masonExample(execopts.toArray());
     }
     else {
-      var buildArgs: [0..1] string = ["mason", "build"];
-      if !updateRegistry then buildArgs.push_back("--no-update");
-      if release then buildArgs.push_back("--release");
-      if force then buildArgs.push_back("--force");
-      if show then buildArgs.push_back("--show");
-      masonBuild(buildArgs);
+      var buildArgs: list(string);
+      buildArgs.append("mason");
+      buildArgs.append("build");
+      if skipUpdate then buildArgs.append("--no-update");
+                    else buildArgs.append("--update");
+      if release then buildArgs.append("--release");
+      if force then buildArgs.append("--force");
+      if show then buildArgs.append("--show");
+
+      masonBuild(buildArgs.toArray());
       runProjectBinary(show, release, execopts);
     }
   }

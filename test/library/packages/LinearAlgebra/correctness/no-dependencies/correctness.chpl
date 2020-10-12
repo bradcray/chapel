@@ -1,5 +1,6 @@
 use LinearAlgebra;
 use TestUtils;
+use IO;
 
 /* LinearAlgebra correctness tests that do not depend on BLAS/LAPACK
 
@@ -168,7 +169,7 @@ use TestUtils;
 
   {
     var Identity: [MDom] real;
-    for i in MDom.dim(1) do Identity[i, i] = 1.0;
+    for i in MDom.dim(0) do Identity[i, i] = 1.0;
 
     var I = eye(MDom);
     assertEqual(I, Identity, "eye(D)");
@@ -345,6 +346,17 @@ use TestUtils;
   assertEqual(dot(v13, v31), S, "dot(Matrix(1, 3), Matrix(3, 1))");
 }
 
+/* dot - rank-change slice */
+{
+  var M = Matrix(3, 3);
+  M = 1;
+
+  var slice = M[1..3, 1];
+
+  var result = dot(slice, slice);
+  assertEqual(result, 3, 'dot(M[1..3, 1], M[1..3, 1])');
+}
+
 /* outer */
 {
   var v = Vector(3);
@@ -434,6 +446,16 @@ use TestUtils;
                   [5,6,7,8],
                   [9,0,1,2],
                   eltType=real);
+  var M2 = Matrix([1,2,3,4,5,6],
+                  [1,2,3,4,5,6],
+                  [1,2,3,4,5,6],
+                  eltType=real);
+  var M3 = Matrix([1,2,3],
+                  [4,5,6],
+                  [7,8,9],
+                  [1,2,3],
+                  [4,5,6],
+                  eltType=real);
   var v11 = Vector(1,6,1);
   var v12 = Vector(3,8);
   var v13 = Vector([9]);
@@ -443,6 +465,11 @@ use TestUtils;
   assertEqual(v11,  diag(M1),       "diag(M1)");
   assertEqual(v12,  diag(M1,2),     "diag(M1,2)");
   assertEqual(v13,  diag(M1,-2),    "diag(M1,-2)");
+  assertEqual([1],  diag(M2,-2),    "diag(M2,-2)");
+  assertEqual([4,5,6], diag(M2, 3),  "diag(M2,3)");
+  assertEqual([3],  diag(M3,2),     "diag(M3, 2)");
+  assertEqual([4,8,3], diag(M3,-1), "diag(M3,-1)");
+  assertEqual([1, 5], diag(M3,-3),  "diag(M3,-3)"); 
 
   // Now let's try with offsets
 
@@ -450,6 +477,8 @@ use TestUtils;
   ref rv = v.reindex(1..3);
   ref rvMat = vMat.reindex(1..3, 1..3);
   ref rM1 = M1.reindex(1..3, 1..4);
+  ref rM2 = M2.reindex(1..9 by 4, 1..11 by 2);
+  ref rM3 = M3.reindex(1..21 by 5, 1..9 by 4);
   ref rv11 = v11.reindex(1..3);
   ref rv12 = v12.reindex(1..2);
   ref rv13 = v13.reindex(1..1);
@@ -459,6 +488,12 @@ use TestUtils;
   assertEqual(rv11, diag(rM1),      "diag(M1)");
   assertEqual(rv12, diag(rM1,2),    "diag(M1,2)");
   assertEqual(rv13, diag(rM1,-2),   "diag(M1,-2)");
+  assertEqual([1],  diag(rM2,-2),    "diag(M2,-2)");
+  assertEqual([4,5,6], diag(rM2, 3),  "diag(M2,3)");
+  assertEqual([3],  diag(rM3,2),     "diag(M3, 2)");
+  assertEqual([4,8,3], diag(rM3,-1), "diag(M3,-1)");
+  assertEqual([1, 5], diag(rM3,-3),  "diag(M3,-3)");
+
 }
 
 /* kron */
@@ -845,7 +880,7 @@ use TestUtils;
     var B = transpose(A);
 
     assertEqual(B.domain, tDomT, "transpose(A)");
-    for i in A.domain.dim(1) {
+    for i in A.domain.dim(0) {
       assertEqual(A[i,1], B[1, i], "transpose(A) values");
     }
   }
@@ -856,7 +891,7 @@ use TestUtils;
     var B = A.T;
 
     assertEqual(B.domain, tDomT, "transpose(A)");
-    for i in A.domain.dim(1) {
+    for i in A.domain.dim(0) {
       assertEqual(A[i,1], B[1, i], "transpose(A) values");
     }
   }
@@ -905,4 +940,82 @@ use TestUtils;
                                    "Error in matPow with sparse matrices : non-standard domain");
      */
   }
+
+  // Matrix Properties
+  {
+    // Create dense, COO, and CSR domains
+    var domDense: domain(2) = {1..3, 1..3},
+        domCOO: sparse subdomain(domDense),
+        domCSR: sparse subdomain(domDense) dmapped CS();
+
+    // Create dense, COO, and CSR matrices (arrays)
+    var matDense: [domDense] complex,
+        matCOO: [domCOO] complex,
+        matCSR: [domCSR] complex;
+
+
+    // Make matrices diagonal
+    matDense[2,2] = 1.0;
+
+    domCOO += (2,2);
+    matCOO[2,2] = 1.0;
+
+    domCSR += (2,2);
+    matCSR[2,2] = 1.0;
+
+    // Verify matrices are diagonal
+    assertTrue(isDiag(matDense), 'isDiag(matDense)');
+    assertTrue(isDiag(matCOO), 'isDiag(matCOO)');
+    assertTrue(isDiag(matCSR), 'isDiag(matCSR)');
+
+
+    // Make matrices non-symmetric and non-diagonal
+    matDense[1,2] = 1.0i;
+
+    domCOO += (1,2);
+    matCOO[1,2] = 1.0i;
+
+    domCSR += (1,2);
+    matCSR[1,2] = 1.0i;
+
+    // Verify matrices are not diagonal
+    assertFalse(isDiag(matDense), 'isDiag(matDense)');
+    assertFalse(isDiag(matCOO), 'isDiag(matCOO)');
+    assertFalse(isDiag(matCSR), 'isDiag(matCSR)');
+
+    // Verify matrices are not symmetric
+    assertFalse(isSymmetric(matDense), 'isSymmetric(matDense)');
+    assertFalse(isSymmetric(matCOO), 'isSymmetric(matCOO)');
+    assertFalse(isSymmetric(matCSR), 'isSymmetric(matCSR)');
+
+    // Verify matrices are not Hermitian
+    assertFalse(isHermitian(matDense), 'isHermitian(matDense)');
+    assertFalse(isHermitian(matCOO), 'isHermitian(matCOO)');
+    assertFalse(isHermitian(matCSR), 'isHermitian(matCSR)');
+
+    // Make matrices symmetric
+    matDense[2,1] = 1.0i;
+
+    domCOO += (2,1);
+    matCOO[2,1] = 1.0i;
+
+    domCSR += (2,1);
+    matCSR[2,1] = 1.0i;
+
+    // Verify matrices are symmetric
+    assertTrue(isSymmetric(matDense), 'isSymmetric(matDense)');
+    assertTrue(isSymmetric(matCOO), 'isSymmetric(matCOO)');
+    assertTrue(isSymmetric(matCSR), 'isSymmetric(matCSR)');
+
+    // Make matrices Hermitian
+    matDense[2,1] = -1.0i;
+    matCOO[2,1] = -1.0i;
+    matCSR[2,1] = -1.0i;
+
+    // Verify matrices are Hermitian
+    assertTrue(isHermitian(matDense), 'isHermitian(matDense)');
+    assertTrue(isHermitian(matCOO), 'isHermitian(matCOO)');
+    assertTrue(isHermitian(matCSR), 'isHermitian(matCSR)');
+
+  } // Matrix Properties
 } // LinearAlgebra.Sparse

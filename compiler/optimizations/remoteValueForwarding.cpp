@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -212,10 +213,13 @@ static void insertSerialization(FnSymbol*  fn,
 static bool shouldSerialize(ArgSymbol* arg) {
   bool retval = false;
   bool hasSerializer = serializeMap.find(arg->getValType()) != serializeMap.end();
+  Type* argType = arg->getValType();
 
   if (hasSerializer == false) {
     retval = false;
-  } else if (isRecordWrappedType(arg->getValType())) {
+  } else if (argType->symbol->hasFlag(FLAG_ARRAY)) {
+    retval = hasSerializer;
+  } else if (isRecordWrappedType(argType)) {
     // OK to serialize if the record-wrapped type's underlying class is not
     // modified.
     //
@@ -402,6 +406,7 @@ static void serializeAtCallSites(FnSymbol* fn,  ArgSymbol* arg,
     // in that event.
     if (newStyleInIntent) {
       Expr* initExpr = actual->symbol()->getInitialization();
+      INT_ASSERT(initExpr);
 
       CallExpr* initCall = toCallExpr(initExpr);
       INT_ASSERT(initCall);
@@ -553,7 +558,7 @@ static void destroyArgAndDeserialized(FnSymbol* fn, ArgSymbol* arg,
 static void insertSerialization(FnSymbol*  fn,
                                 ArgSymbol* arg) {
   Type* oldArgType    = arg->type;
-  bool newStyleInIntent = shouldAddFormalTempAtCallSite(arg, fn);
+  bool newStyleInIntent = shouldAddInFormalTempAtCallSite(arg, fn);
 
   Serializers ser = serializeMap[oldArgType->getValType()];
 

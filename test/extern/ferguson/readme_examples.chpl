@@ -1,3 +1,6 @@
+use CPtr;
+use SysCTypes;
+
 var i:c_int;
 var i_ptr = c_ptrTo(i); // now i_ptr has type c_ptr(c_int) == int* in C
 writeln(i_ptr.type:string);

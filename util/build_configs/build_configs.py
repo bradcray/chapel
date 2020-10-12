@@ -20,6 +20,11 @@ import subprocess
 import sys
 import time
 
+try:
+    basestring
+except NameError:
+    basestring = str
+
 class Dimension(object):
     """Encapsulate information about a single dimension."""
 
@@ -79,9 +84,11 @@ how they will show up in the usage and what order is used in interactive mode.
 known_dimensions = [
     ( 'host_platform',      'CHPL_HOST_PLATFORM', ),
     ( 'host_compiler',      'CHPL_HOST_COMPILER', ),
+    ( 'host_machine',       'CHPL_HOST_ARCH', ),
     ( 'target_platform',    'CHPL_TARGET_PLATFORM', ),
     ( 'target_compiler',    'CHPL_TARGET_COMPILER', ),
-    ( 'arch',               'CHPL_TARGET_ARCH', ),
+    ( 'target_machine',     'CHPL_TARGET_ARCH', ),
+    ( 'cpu',                'CHPL_TARGET_CPU', ),
     ( 'locale_model',       'CHPL_LOCALE_MODEL', ),
     ( 'comm',               'CHPL_COMM', ),
     ( 'substrate',          'CHPL_COMM_SUBSTRATE', ),

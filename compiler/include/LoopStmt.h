@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -43,6 +44,18 @@ public:
   bool                   isOrderIndependent()                            const;
   void                   orderIndependentSet(bool b);
 
+  // for RV rv.loop.vectorize.enable
+  bool                   hasVectorizationHazard()                        const;
+  void                   setHasVectorizationHazard(bool v);
+
+  // for llvm.loop.parallel_accesses (and C pragmas)
+  bool                   hasParallelAccessVectorizationHazard()          const;
+  void                   setHasParallelAccessVectorizationHazard(bool v);
+
+  // for RV rv.loop.vectorize.enable
+  bool                   isVectorizable()                               const;
+  // for llvm.loop.parallel_accesses (and C pragmas)
+  bool                   isParallelAccessVectorizable()                 const;
 protected:
                          LoopStmt(BlockStmt* initBody);
   virtual               ~LoopStmt();
@@ -50,7 +63,10 @@ protected:
   LabelSymbol*           mBreakLabel;
   LabelSymbol*           mContinueLabel;
   bool                   mOrderIndependent;
-  void                   codegenOrderIndependence();
+  bool                   mVectorizationHazard;
+  bool                   mParallelAccessVectorizationHazard;
+
+  void                   reportVectorizable();
 
 
 private:

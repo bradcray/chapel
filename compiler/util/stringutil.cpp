@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -49,7 +50,8 @@ canonicalize_string(const char *s) {
 
 const char*
 astr(const char* s1, const char* s2, const char* s3, const char* s4,
-     const char* s5, const char* s6, const char* s7, const char* s8) {
+     const char* s5, const char* s6, const char* s7, const char* s8,
+     const char* s9) {
   int len;
   len = strlen(s1);
   if (s2)
@@ -66,6 +68,8 @@ astr(const char* s1, const char* s2, const char* s3, const char* s4,
     len += strlen(s7);
   if (s8)
     len += strlen(s8);
+  if (s9)
+    len += strlen(s9);
   char* s = (char*)malloc(len+1);
   strcpy(s, s1);
   if (s2)
@@ -82,6 +86,8 @@ astr(const char* s1, const char* s2, const char* s3, const char* s4,
     strcat(s, s7);
   if (s8)
     strcat(s, s8);
+  if (s9)
+    strcat(s, s9);
   const char* t = canonicalize_string(s);
   if (s != t)
     free(s);
@@ -168,9 +174,8 @@ void deleteStrings() {
     }                                                             \
     if (strcmp(str+startPos, checkStr) != 0) {                    \
       if (userSupplied) {                                         \
-        VarSymbol* lineTemp = createASTforLineNumber(filename,    \
-                                                     line);       \
-        USR_FATAL(lineTemp, "Integer literal overflow: %s is too" \
+        astlocT astloc(line, filename);                           \
+        USR_FATAL(astloc, "Integer literal overflow: %s is too"   \
                   " big for type " #type, str);                   \
       } else {                                                    \
         INT_FATAL("Integer literal overflow: %s is too "          \
@@ -207,8 +212,8 @@ uint64_t binStr2uint64(const char* str, bool userSupplied,
   }
   if (strlen(str+startPos) > 64) {
     if (userSupplied) {
-      VarSymbol* lineTemp = createASTforLineNumber(filename, line);
-      USR_FATAL(lineTemp, "Integer literal overflow: '%s' is too big "
+      astlocT astloc(line, filename);
+      USR_FATAL(astloc, "Integer literal overflow: '%s' is too big "
                 "for type uint64", str);
     } else {
       INT_FATAL("Integer literal overflow: '%s' is too big "
@@ -249,8 +254,8 @@ uint64_t octStr2uint64(const char* str, bool userSupplied,
 
   if (len-startPos > 22 || (len-startPos == 22 && str[startPos] != '1')) {
     if (userSupplied) {
-      VarSymbol* lineTemp = createASTforLineNumber(filename, line);
-      USR_FATAL(lineTemp, "Integer literal overflow: '%s' is too big "
+      astlocT astloc(line, filename);
+      USR_FATAL(astloc, "Integer literal overflow: '%s' is too big "
                 "for type uint64", str);
     } else {
       INT_FATAL("Integer literal overflow: '%s' is too big "
@@ -284,8 +289,8 @@ uint64_t hexStr2uint64(const char* str, bool userSupplied,
 
   if (strlen(str+startPos) > 16) {
     if (userSupplied) {
-      VarSymbol* lineTemp = createASTforLineNumber(filename, line);
-      USR_FATAL(lineTemp, "Integer literal overflow: '%s' is too big "
+      astlocT astloc(line, filename);
+      USR_FATAL(astloc, "Integer literal overflow: '%s' is too big "
                 "for type uint64", str);
     } else {
       INT_FATAL("Integer literal overflow: '%s' is too big "
@@ -302,13 +307,24 @@ uint64_t hexStr2uint64(const char* str, bool userSupplied,
 }
 
 
+inline int countLeadingSpaces(const std::string& s) {
+  int leadingSpaces = 0;
+  for (size_t i=0; i < s.length(); i++) {
+    if (std::isspace(s[i]))
+      leadingSpaces++;
+    else
+      break;
+  }
+  return leadingSpaces;
+}
+
 /*
  * Trim spaces from start of string.
  *
  * From: http://stackoverflow.com/a/217605
  */
 inline std::string ltrim(std::string s) {
-  s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+  s.erase(s.begin(), s.begin() + countLeadingSpaces(s));
   return s;
 }
 
@@ -316,8 +332,8 @@ inline std::string ltrim(std::string s) {
 /*
  * Return true if 's' is empty or only has whitespace characters.
  */
-inline bool isEmpty(std::string s) {
-  return s.end() == std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace)));
+inline bool isEmpty(const std::string& s) {
+  return s.end() == s.begin()+countLeadingSpaces(s);
 }
 
 
@@ -359,7 +375,7 @@ std::string erasePrefix(std::string s, int count) {
  * Returns first non empty line of the string after ltrimming it. "Empty lines"
  * are those with no characters or only whitespace characters.
  */
-std::string firstNonEmptyLine(std::string s) {
+std::string firstNonEmptyLine(const std::string& s) {
   std::stringstream sStream(s);
   std::string line;
   std::string result;
@@ -380,12 +396,11 @@ std::string firstNonEmptyLine(std::string s) {
  * FIXME: Find minimum prefix also if every single line begins with
  *        "\s+*\s". (thomasvandoren, 2015-02-04)
  */
-int minimumPrefix(std::string s) {
+int minimumPrefix(const std::string& s) {
   std::stringstream sStream(s);
   std::string line;
   bool first = true;
   int minPrefix = INT_MAX;
-  int currentPrefix;
   while (std::getline(sStream, line)) {
     // Skip the first line. It is a special case that often has been trimmed to
     // some extent.
@@ -401,9 +416,11 @@ int minimumPrefix(std::string s) {
     }
 
     // Find the first non-space character. Record if it is the new minimum.
-    currentPrefix = std::find_if(line.begin(), line.end(), std::not1(std::ptr_fun<int, int>(std::isspace))) - line.begin();
-    if (currentPrefix < minPrefix) {
-      minPrefix = currentPrefix;
+    for (size_t i=0; (int)i < minPrefix && i < line.length(); i++) {
+      if (!std::isspace(line[i])) {
+        minPrefix = i;
+        break;
+      }
     }
   }
   return minPrefix;
@@ -418,15 +435,35 @@ std::string ltrimAllLines(std::string s) {
 }
 
 /*
- * Gather words from the string and store them into the array.
- * These words are arguments to a program.
+ * Split a string separated by the given delimiters into a vector of substrings.
  */
-void readArgsFromString(std::string s, std::vector<std::string>& args) {
-  if (s != "") {
-    //split s by spaces
-    std::stringstream argsStream(s);
-    std::string word;
-    while(argsStream >> word)
-      args.push_back(word);
+void splitString(const std::string& s, std::vector<std::string>& vec, const char* delimiters) {
+  if (!s.empty()) {
+    char* cStr = strdup(s.c_str());
+    char* arg = strtok(cStr, delimiters);
+    while (arg) {
+      if (strlen(arg) > 0) {
+        vec.push_back(std::string(arg));
+      }
+      arg = strtok(NULL, delimiters);
+    }
+    free(cStr);
   }
+}
+
+/*
+ * Split a string by all whitespace characters into a vector of substrings.
+ */
+void splitStringWhitespace(const std::string& s, std::vector<std::string>& vec) {
+  splitString(s, vec, " \t\n\r\f\v");
+}
+
+void removeTrailingNewlines(std::string& str) {
+  while (str.size() > 0 && *str.rbegin() == '\n') {
+    str.erase(str.end() - 1);
+  }
+}
+
+bool startsWith(const char* str, const char* prefix) {
+  return (0 == strncmp(str, prefix, strlen(prefix)));
 }

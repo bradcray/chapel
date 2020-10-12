@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -20,11 +21,16 @@
 #ifndef _SCOPE_RESOLVE_H_
 #define _SCOPE_RESOLVE_H_
 
+class astlocT;
 class BaseAST;
+class CallExpr;
 class DefExpr;
 class FnSymbol;
 class Symbol;
+class VisibilityStmt;
 
+#include <cstddef>
+#include <map>
 #include <vector>
 
 void     addToSymbolTable(FnSymbol* fn);
@@ -35,11 +41,29 @@ Symbol*  lookup(const char*           name,
 
 void     lookup(const char*           name,
                 BaseAST*              context,
-                std::vector<Symbol*>& symbols);
+                std::vector<Symbol*>& symbols,
+                std::map<Symbol*, astlocT*>& renameLocs,
+                std::map<Symbol*, VisibilityStmt*>& reexportPts,
+                bool storeRenames = false);
+
+Symbol*  lookupAndCount(const char*           name,
+                        BaseAST*              context,
+                        int&                  nSymbolsFound,
+                        bool storeRenames = false,
+                        astlocT** renameLoc = NULL,
+                        bool issueErrors = true);
+
+void checkConflictingSymbols(std::vector<Symbol *>& symbols,
+                             const char* name,
+                             BaseAST* context,
+                             bool storeRenames,
+                             std::map<Symbol*, astlocT*>& renameLocs,
+                             std::map<Symbol*, VisibilityStmt*>& reexportPts);
 
 BaseAST* getScope(BaseAST* ast);
 
 void resolveUnresolvedSymExprs(BaseAST* ast);
+void resolveUnmanagedBorrows(CallExpr* call);
 
 void destroyModuleUsesCaches();
 

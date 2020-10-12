@@ -1,2 +1,1 @@
-testOpaqueClass2.chpl:23: In function 'main':
-testOpaqueClass2.chpl:27: error: unresolved call 'unmanaged C.a'
+2

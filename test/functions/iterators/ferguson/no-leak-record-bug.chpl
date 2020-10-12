@@ -1,13 +1,13 @@
 class C { var x : int; }
 
 record R {
-  var c : unmanaged C;
-  proc length return c.x;
+  var c : unmanaged C?;
+  proc length return c!.x;
   proc deinit() { delete c; }
 }
 
 pragma "init copy fn"
-proc chpl__initCopy(other : R) {
+proc chpl__initCopy(other : R, definedConst: bool) {
   pragma "no auto destroy"
   var ret : R;
   ret.c = new unmanaged C(other.length);

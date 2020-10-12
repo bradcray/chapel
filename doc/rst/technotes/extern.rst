@@ -7,8 +7,11 @@ C Interoperability
 ==================
 
 This README describes support in the Chapel compiler for referring to C
-code within Chapel using a keyword named 'extern'. These features are
+code within Chapel using a keyword named `extern`. These features are
 still in the process of being improved.
+
+Note that it is also possible to call Chapel from C using the `export`
+keyword. Please see :ref:`readme-libraries` for details.
 
 External C functions, variables, and types can be referred to within a
 Chapel program. The section `Working with C`_ below describes the
@@ -61,6 +64,8 @@ The next section describes the basic information about how the Chapel
 compiler views common C types.
 
 
+.. _readme-extern-standard-c-types:
+
 Standard C Types
 ================
 
@@ -97,6 +102,7 @@ The Chapel names for C types are:
   size_t
   c_void_ptr
   c_ptr(T)
+  c_array(T,n)
   c_string
 
 For consistency, the following type aliases are also provided even
@@ -108,14 +114,16 @@ Chapel types to always be usable):
   c_float  // (a real(32) in Chapel)
   c_double // (a real(64) in Chapel)
 
-c_void_ptr, c_string, and c_ptr(T) are described in the next section.
+c_void_ptr, c_string, c_ptr(T), and c_array(T,n) are
+described in the next section.
 
 
 Pointer and String Types
 ------------------------
 
 Chapel supports four C pointer types: c_void_ptr, c_ptr(T), c_string, and
-c_fn_ptr.
+c_fn_ptr. In addition, it supports c_array(T,n).
+
 These types are the same as C types:
 
 .. code-block:: text
@@ -124,11 +132,12 @@ These types are the same as C types:
   c_ptr(T) is T*
   c_string is const char*
   c_fn_ptr represents a C function pointer (with unspecified arg and return types)
+  c_array(T,n) is T[n]
 
 Note that in some cases, a ref argument intent may be used in place of
 c_void_ptr or c_ptr(T).
 
-All four of these pointer types may only point to local memory. The intent is
+These pointer types may only point to local memory. The intent is
 that they will be used to interoperate with C libraries that run within a
 single locale. In addition, these pointer types must be treated carefully as it
 is possible to create the same kinds of problems as in C - in particular, it is
@@ -153,7 +162,24 @@ The c_ptr(T) type is a generic type representing a C pointer to an arbitrary
 type T. This pointer should normally only point to local memory - since no
 communication will be generated when it is dereferenced.  Of course, the
 pointed-to type T should be one that is supported in C interoperability if the
-c_ptr(T) is used for C interoperability.
+c_ptr(T) is used for C interoperability. The c_ptr(T) type supports
+indexing to get a reference to the i'th element (starting from 0).
+
+c_array(T,n)
+~~~~~~~~~~~~
+
+The c_array(T,n) type is a generic value type representing a C fixed-size
+array. Here 'n' is the number of elements and must be known at compile-time.
+
+The c_array type is a value type in Chapel code but it can coerce to
+a c_ptr(T) type.
+
+Allocating a variable of c_array type in a function will allocate that
+variable on the stack. Indexing into a c_array works similarly to
+indexing into a c_ptr and starts from 0. c_array supports by-value copy
+initialization and assignment.
+
+.. _readme-extern-standard-c-types-ref-intents:
 
 ref intents
 ~~~~~~~~~~~
@@ -187,6 +213,10 @@ because c_string is a local-only type, the .c_str() method can only be
 called on Chapel strings that are stored on the same locale; calling
 .c_str() on a non-local string will result in a runtime error.
 
+.. note::
+
+  ``c_string`` is expected to be deprecated in a future release in favor
+  of instead using ``c_ptr`` types such as ``c_ptr(int(8))``.
 
 c_fn_ptr
 ~~~~~~~~
@@ -262,7 +292,7 @@ Chapel using:
     extern type foo = int(64);
 
 Static, fixed-size C array types can be described within Chapel using
-its homogeneous tuple type.  For example, the following C typedef:
+c_array. For example, the following C typedef:
 
 .. code-block:: chapel
 
@@ -272,7 +302,7 @@ could be described in Chapel using:
 
 .. code-block:: chapel
 
-    extern type vec = 3*real(64);
+    extern type vec = c_array(real(64),3);
 
 To refer to more complex C types like external structs or pointers to
 structs, see the section on `Declaring External C Structs`_ below.
@@ -318,6 +348,10 @@ nothing, the prototype would appear as follows:
 
        extern proc foo();
 
+Declaring Return Types
+~~~~~~~~~~~~~~~~~~~~~~
+
+
 C functions that return values which you wish to refer to within your
 Chapel program must have those return types declared. Note that the Chapel
 compiler will not infer the return type as it does for Chapel functions.
@@ -326,6 +360,12 @@ To make the function above return a C "double", it would be declared:
 .. code-block:: chapel
 
        extern proc foo(): real;
+
+See the :ref:`readme-extern-declarations-limitations` section for
+limitations on what types can be returned.
+
+Declaring Arguments
+~~~~~~~~~~~~~~~~~~~
 
 Similarly, external functions that expect arguments must declare those
 arguments in Chapel.
@@ -347,6 +387,71 @@ integer values and that it returns a 64-bit real ('double' in C).
 External function declarations with omitted type arguments can be used
 to support calls to external C macros or varargs functions that accept
 multiple argument signatures.
+
+.. _readme-extern-declarations-limitations:
+
+Allowed Intents and Types
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Since C passes and returns by value, a C argument such as ``int arg``
+corresponds to an ``in`` intent argument in a Chapel ``extern proc``.
+An argument such as ``int* ptrArg`` can be represented either with
+``c_ptr(int)`` or with the ``ref`` intent in Chapel (and see
+:ref:`readme-extern-standard-c-types-ref-intents` for a discussion of why
+you would use one or the other).
+
+Note that, for numeric and pointer types, the default intent in Chapel is
+already ``const in`` (see the spec section :ref:`Abstract_Intents`).
+
+As of 1.23, there are several limitations on what types can be passed to
+or returned from ``extern`` or ``export`` functions and what intents can
+be used for the arguments to these functions.
+
+First, here are the allowable argument and return types for ``extern``
+and ``export`` functions:
+
+ * Built-in numeric type and pointer types, including the C types
+   described above
+
+ * ``extern record`` types
+
+ * ``string`` and ``bytes`` are allowed in an ``export proc`` but not in
+   an ``extern proc``
+
+   * see :ref:`readme-libraries`
+
+ * array types are allowed in some cases
+
+   * ``extern proc`` arguments currently allow single-locale rectangular
+     arrays in which case the argument will be a pointer to the first
+     element
+   * ``export proc`` s can support more Chapel array types - see
+     :ref:`readme-libraries`
+
+ * ``unmanaged`` and ``borrowed`` class types are allowed
+
+
+The following types are not allowed as argument or return types for
+``extern`` or ``export`` functions:
+
+  * ``owned`` and ``shared`` classes
+  * any Chapel record type that is not an ``extern record``
+
+Only the following argument intents are allowed in ``extern`` and
+``export`` functions:
+
+  * for built-in numeric and pointer types - default intent and ``const``
+    (these correspond to ``const in`` for those types)
+  * ``in``
+  * ``const in``
+  * ``ref``
+  * ``const ref``
+
+Additionally, ``type`` intent arguments are allowed for ``extern``
+functions (see :ref:`readme-extern-declarations-type-arguments`).
+
+Varargs Functions
+~~~~~~~~~~~~~~~~~
 
 Default arguments can be declared for external function arguments, in
 which case the Chapel compiler will supply the default argument value
@@ -379,6 +484,11 @@ as follows:
 which relies on the callsite to pass in reasonable arguments
 (otherwise, the C compilation step will likely fail).
 
+.. _readme-extern-declarations-type-arguments:
+
+Type Arguments
+~~~~~~~~~~~~~~
+
 External C functions or macros that accept type arguments can also be
 prototyped in Chapel by declaring the argument as a type.  For
 example:
@@ -391,6 +501,9 @@ Calling such a routine with a Chapel type will cause the type
 identifier (e.g., 'int') to be passed to the routine.  In practice,
 this will typically only be useful if the external function is a macro
 or built-in (like sizeof()) that can handle type identifiers.
+
+Array Arguments
+~~~~~~~~~~~~~~~
 
 Extern functions with array arguments are handled as a special case within the
 compiler. As an example:
@@ -414,8 +527,12 @@ The Chapel compiler will then rewrite any calls to `foo` like this:
 Note that this same technique won't work for distributed rectangular arrays,
 nor for associative, sparse, or opaque arrays because their data isn't
 necessarily stored using a representation that translates trivially to a C
-array.
+array.  The compiler will automatically insert ``use CPtr;`` into scopes
+containing an ``extern proc`` declaration with an array argument in order
+to support the pointer types used to pass the array to the external routine.
 
+Renaming Extern Procs
+~~~~~~~~~~~~~~~~~~~~~
 
 It is possible to provide the Chapel compiler with a different
 name for the function than the name available to other Chapel code.
@@ -464,7 +581,7 @@ External C struct types can be referred to within Chapel by prefixing
 a Chapel record definition with the extern keyword.  For example,
 given an external C structure defined in foo.h called fltdbl:
 
-.. code-block:: chapel
+.. code-block:: c
 
     typedef struct _fltdbl {
       float x;
@@ -523,6 +640,27 @@ accessed within the Chapel program:
    extern record fltdbl {
    }
 
+
+Extern records can work with pointers or fixed-sized arrays.
+Suppose we have this C structure:
+
+.. code-block:: c
+
+    typedef struct bufptr {
+      int buf[16];
+      int* ptr;
+    } bufptr;
+
+It can be declared in Chapel as follows:
+
+.. code-block:: chapel
+
+   extern record bufptr {
+     var buf:c_array(c_int, 16);
+     var ptr:c_ptr(c_int);
+   }
+
+
 A C header file containing the struct's definition in C must be
 specified on the chpl compiler command line or in a ``require`` statement
 as described in `Expressing Dependencies`_.
@@ -550,52 +688,6 @@ for the type is ``struct stat``:
   }
 
   writeln(getFileSize("stat-example.chpl"));
-
-Note that external record types only support assignment from records
-of matching type.  In particular, Chapel's normal mechanisms that
-perform record assignment by field name are not used for external
-records.  This restriction could be lifted in the future if considered
-useful to users.
-
-
-Referring to External C Pointer-to-Structs ("extern classes")
--------------------------------------------------------------
-
-You can also refer to an external C pointer-to-struct types by
-considering it to be an 'extern class' in Chapel.  The declaration
-style is similar to that described above, it simply has different
-implications on the underlying C types.
-
-As an example, given the declaration:
-
-.. code-block:: chapel
-
-  extern class D {
-    var x: real;
-  }
-
-The requirements on the corresponding C code are:
-
-1) There must be a struct type that is typedef'd to have the name _D.
-
-2) A pointer-to-_D type must be typedef'd to have the name D.
-
-3) The _D struct type must contain a field named 'x' of type double.
-   Like external records/structs, it may also contain other fields
-   that will simply be ignored by the Chapel compiler.
-
-Thus, the following C typedef would fulfill the external Chapel class
-declaration shown above:
-
-.. code-block:: chapel
-
-   typedef struct __D {
-     double x;
-     int y;
-   } _D, *D;
-
-where the Chapel compiler would not know about the 'y' field and
-therefore could not refer to it or manipulate it.
 
 
 Opaque Types
@@ -654,12 +746,20 @@ code using an ``extern block`` as follows:
     ....
   }
 
-Such 'extern { }' block statements add the top-level C statements to
+Such ``extern { }`` block statements add the top-level C statements to
 the enclosing Chapel module.  This is similar to what one might do
 manually using the extern declarations (as described above), but can
 save a lot of labor for a large API.  Moreover, using an inline extern
 block permits you to write C declarations directly within Chapel
 without having to create distinct C files.
+
+An ``extern { }`` also adds ``private use`` statements for the following
+modules since they will generally be used by the implicitly generated
+``extern proc`` functions:
+
+ * :mod:`CPtr`
+ * :mod:`SysCTypes`
+ * :mod:`SysBasic`
 
 If you don't want to have a lot of C symbols cluttering up a module's
 namespace, it's easy to put the C code into its own Chapel module:
@@ -674,6 +774,10 @@ namespace, it's easy to put the C code into its own Chapel module:
   }
 
   writeln(C.foo(3));
+
+In that event, you might consider adding
+``public use CPtr, SysCTypes, SysBasic;`` to the module so
+that the types and functions generated by the extern block will be usable.
 
 This feature strives to support C global variables, functions, structures,
 typedefs, enums, and some #defines. Structures always generate a Chapel record,
@@ -847,6 +951,10 @@ Chapel variables of extern type are not generally initialized
 automatically. Be sure to manually initialize Chapel variables of extern
 type.
 
+The Chapel compiler assume that extern records can be copied to each
+other without running any copy initializer. Similarly, it does not call
+any deinitializer for extern records.
+
 In the future, we would like to support automatic zero initialization
 of such variables and a way to provide their default initializer.
 
@@ -945,10 +1053,11 @@ two mechanisms.
 
        require "foo.h", "foo.c";
 
-    This has an effect similar to adding foo.h and foo.c to the
-    command line. You might need to specify -I and -L arguments
-    to indicate to the directories storing any headers or library
-    files.
+    This has an effect similar to adding foo.h and foo.c to the Chapel
+    compiler's command line. Filenames are interpreted as expressing a
+    path relative to the directory in which the source file lives.
+    You can also use the compiler's -I and -L flags to indicate search
+    directories for headers or library files.
 
     Similarly, the version below uses the require statement to indicate
     that this module depends on libfoo.a (and has a similar effect as if
@@ -999,6 +1108,8 @@ Future Directions
 =================
 
 We intend to continue improving these capabilities to provide richer
-and richer support for external types and functions over time.  If you
-have specific requests for improvement, please let us know at:
-:disguise:`chapel_info@cray.com`.
+support for external types and functions over time.  If you
+have specific requests for improvement, please let us know on the
+`Chapel GitHub issues page`_ or community forums.
+
+.. _Chapel GitHub issues page: https://github.com/chapel-lang/chapel/issues

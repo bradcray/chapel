@@ -126,7 +126,7 @@ if [ -z "$BUILD_CONFIGS_CALLBACK" ]; then
     ( *runtime* )
         log_info "Building Chapel component: runtime"
 
-        compilers=cray,gnu
+        compilers=gnu,cray
         comms=none,ugni
         launchers=aprun,none,slurm-srun
         substrates=aries,mpi,none
@@ -141,8 +141,10 @@ if [ -z "$BUILD_CONFIGS_CALLBACK" ]; then
             --launcher=$launchers \
             --substrate=$substrates \
             --locale-model=$locale_models \
-            --auxfs=$auxfs
+            --auxfs=$auxfs \
+            -- notcompiler
 
+        # NOTE: don't rebuild compiler above (or else problems with switching GCC versions)
         # NOTE: "--target-compiler" values shown above will be discarded by the setenv callback.
         ;;
     ( * )
@@ -264,8 +266,9 @@ else
         list_loaded_modules
     fi
 
-    gen_version_gcc=7.3.0
-    gen_version_cce=8.7.3
+    gen_version_gcc=9.3.0
+    gen_version_cce=10.0.2
+
     target_cpu_module=craype-arm-thunderx2
 
     function load_prgenv_gnu() {

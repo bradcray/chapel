@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -21,23 +22,42 @@
 
 #include "driver.h"
 #include "expr.h"
+#include "stringutil.h"
 #include "symbol.h"
+#include "typeSpecifier.h"
 
 // The well-known types
 AggregateType* dtArray;
 AggregateType* dtBaseArr;
 AggregateType* dtBaseDom;
+AggregateType* dtCFI_cdesc_t;
 AggregateType* dtDist;
 AggregateType* dtError;
 AggregateType* dtExternalArray;
-AggregateType* dtLocale;
 AggregateType* dtLocaleID;
 AggregateType* dtMainArgument;
 AggregateType* dtOnBundleRecord;
-AggregateType* dtOwned;
+AggregateType* dtOpaqueArray;
 AggregateType* dtTaskBundleRecord;
 AggregateType* dtTuple;
+AggregateType* dtRef;
 
+Type* dt_c_int;
+Type* dt_c_uint;
+Type* dt_c_long;
+Type* dt_c_ulong;
+Type* dt_c_longlong;
+Type* dt_c_ulonglong;
+Type* dt_c_char;
+Type* dt_c_schar;
+Type* dt_c_uchar;
+Type* dt_c_short;
+Type* dt_c_ushort;
+Type* dt_c_intptr;
+Type* dt_c_uintptr;
+Type* dt_c_ptrdiff;
+Type* dt_ssize_t;
+Type* dt_size_t;
 
 // The well-known functions
 FnSymbol *gChplHereAlloc;
@@ -57,6 +77,11 @@ FnSymbol *gChplUncaughtError;
 FnSymbol *gChplPropagateError;
 FnSymbol *gChplSaveTaskError;
 FnSymbol *gChplForallError;
+FnSymbol *gAtomicFenceFn;
+FnSymbol *gChplAfterForallFence;
+FnSymbol *gChplCreateStringWithLiteral;
+FnSymbol *gChplCreateBytesWithLiteral;
+FnSymbol *gChplBuildLocaleId;
 
 /************************************* | **************************************
 *                                                                             *
@@ -90,8 +115,8 @@ void gatherIteratorTags() {
 }
 
 // This structure and the following array provide a list of types that must be
-// defined in module code.  At this point, they are all classes.
-struct WellKnownType
+// defined in module code.
+struct WellKnownAggregateType
 {
   const char*     name;
   AggregateType** type_;
@@ -99,57 +124,150 @@ struct WellKnownType
 };
 
 // These types are a required part of the compiler/module interface.
-static WellKnownType sWellKnownTypes[] = {
+static WellKnownAggregateType sWellKnownAggregateTypes[] = {
   { "_array",                &dtArray,            false },
   { "BaseArr",               &dtBaseArr,          true  },
   { "BaseDom",               &dtBaseDom,          true  },
   { "BaseDist",              &dtDist,             true  },
+  { "CFI_cdesc_t",           &dtCFI_cdesc_t,      false },
   { "chpl_external_array",   &dtExternalArray,    false },
-  { "locale",                &dtLocale,           true  },
   { "chpl_localeID_t",       &dtLocaleID,         false },
   { "chpl_main_argument",    &dtMainArgument,     false },
   { "chpl_comm_on_bundle_t", &dtOnBundleRecord,   false },
-  { "_owned",                &dtOwned,            false },
+  { "chpl_opaque_array",     &dtOpaqueArray,      false },
   { "chpl_task_bundle_t",    &dtTaskBundleRecord, false },
   { "_tuple",                &dtTuple,            false },
-  { "Error",                 &dtError,            true  }
+  { "_ref",                  &dtRef,              true  },
+  { "Error",                 &dtError,            true  },
 };
+
+struct WellKnownType
+{
+  const char*     name;
+  Type**          type_;
+};
+
+
+static WellKnownType sWellKnownTypes[] = {
+  // and types reflecting the C compiler
+  { "c_int",                 &dt_c_int       },
+  { "c_uint",                &dt_c_uint      },
+  { "c_long",                &dt_c_long      },
+  { "c_ulong",               &dt_c_ulong     },
+  { "c_longlong",            &dt_c_longlong  },
+  { "c_ulonglong",           &dt_c_ulonglong },
+  { "c_char",                &dt_c_char      },
+  { "c_schar",               &dt_c_schar     },
+  { "c_uchar",               &dt_c_uchar     },
+  { "c_short",               &dt_c_short     },
+  { "c_ushort",              &dt_c_ushort    },
+  { "c_intptr",              &dt_c_intptr    },
+  { "c_uintptr",             &dt_c_uintptr   },
+  { "c_ptrdiff",             &dt_c_ptrdiff   },
+  { "ssize_t",               &dt_ssize_t     },
+  { "size_t",                &dt_size_t      },
+};
+
+static void removeIfUndefinedGlobalType(AggregateType*& t) {
+  if (t->symbol == NULL || t->symbol->defPoint == NULL) {
+    // This means there was no declaration of this type
+    if (t->symbol)
+      gTypeSymbols.remove(gTypeSymbols.index(t->symbol));
+
+    gAggregateTypes.remove(gAggregateTypes.index(t));
+
+    delete t;
+
+    t = NULL;
+  }
+}
+
+static void multipleDefinedTypeError(Symbol* sym, const char* name) {
+  USR_WARN(sym,
+           "'%s' defined more than once in Chapel internal modules.",
+           name);
+}
+
+static void gatherType(Symbol* sym, Type* t, const char* name) {
+  int nTypes = sizeof(sWellKnownTypes) / sizeof(sWellKnownTypes[0]);
+  int nAggregate = sizeof(sWellKnownAggregateTypes) /
+                   sizeof(sWellKnownAggregateTypes[0]);
+
+  for (int i = 0; i < nTypes; ++i) {
+    WellKnownType& wkt = sWellKnownTypes[i];
+
+    if (name == wkt.name) {
+      if (*wkt.type_ != NULL)
+        multipleDefinedTypeError(sym, name);
+      INT_ASSERT(t != NULL);
+      *wkt.type_ = t;
+    }
+  }
+
+  // is ts->name matching one in sWellKnownAggregateTypes?
+  for (int i = 0; i < nAggregate; ++i) {
+    WellKnownAggregateType& wkt = sWellKnownAggregateTypes[i];
+
+    if (name == wkt.name) {
+      if (*wkt.type_ != NULL)
+        multipleDefinedTypeError(sym, name);
+      INT_ASSERT(t != NULL);
+      if (wkt.isClass == true && isClass(t) == false) {
+        USR_FATAL_CONT(sym,
+                       "The '%s' type must be a class.",
+                       wkt.name);
+      }
+      *wkt.type_ = toAggregateType(t);
+    }
+  }
+}
 
 // Gather well-known types from among types known at this point.
 void gatherWellKnownTypes() {
-  int nEntries = sizeof(sWellKnownTypes) / sizeof(sWellKnownTypes[0]);
+  int nTypes = sizeof(sWellKnownTypes) / sizeof(sWellKnownTypes[0]);
+  int nAggregate = sizeof(sWellKnownAggregateTypes) /
+                   sizeof(sWellKnownAggregateTypes[0]);
 
-  // Harvest well-known types from among the global type definitions.
-  // We check before assigning to the well-known type dt<typename>,
-  // to ensure that it is null.  In that way we can flag duplicate
-  // definitions.
-  forv_Vec(TypeSymbol, ts, gTypeSymbols) {
-    for (int i = 0; i < nEntries; ++i) {
-      WellKnownType& wkt = sWellKnownTypes[i];
+  // First, update the name fields to be astrs
+  for (int i = 0; i < nTypes; i++) {
+    WellKnownType& wkt = sWellKnownTypes[i];
+    wkt.name = astr(wkt.name);
+  }
+  for (int i = 0; i < nAggregate; i++) {
+    WellKnownAggregateType& wkt = sWellKnownAggregateTypes[i];
+    wkt.name = astr(wkt.name);
+  }
 
-      if (strcmp(ts->name, wkt.name) == 0) {
-        if (*wkt.type_ != NULL) {
-          USR_WARN(ts,
-                   "'%s' defined more than once in Chapel internal modules.",
-                   wkt.name);
+  // Check type aliases (for e.g. extern type c_int = int(32) )
+  forv_Vec(VarSymbol, var, gVarSymbols) {
+    if (var->defPoint != NULL &&
+        isModuleSymbol(var->defPoint->parentSymbol) &&
+        var->hasFlag(FLAG_TYPE_VARIABLE)) {
+      Type* t = NULL;
+      if (var->type != dtUnknown) {
+        t = var->type;
+      } else {
+        // handle extern type c_int = int(32)
+        DefExpr* def = var->defPoint;
+        if (CallExpr* call = toCallExpr(def->init)) {
+          t = typeForTypeSpecifier(call, false);
         }
-
-        INT_ASSERT(ts->type);
-
-        if (wkt.isClass == true && isClass(ts->type) == false) {
-          USR_FATAL_CONT(ts->type,
-                         "The '%s' type must be a class.",
-                         wkt.name);
-        }
-
-        *wkt.type_ = toAggregateType(ts->type);
       }
+
+      if (t != NULL && t != dtUnknown)
+        gatherType(var, t, var->name);
     }
+  }
+
+  // check types
+  forv_Vec(TypeSymbol, ts, gTypeSymbols) {
+    // is ts->name matching one in sWellKnownTypes or sWellKnownAggregateTypes?
+    gatherType(ts, ts->type, ts->name);
   }
 
   if (fMinimalModules == false) {
     // Make sure all well-known types are defined.
-    for (int i = 0; i < nEntries; ++i) {
+    for (int i = 0; i < nTypes; ++i) {
       WellKnownType& wkt = sWellKnownTypes[i];
 
       if (*wkt.type_ == NULL) {
@@ -159,18 +277,90 @@ void gatherWellKnownTypes() {
       }
     }
 
+    for (int i = 0; i < nAggregate; ++i) {
+      WellKnownAggregateType& wkt = sWellKnownAggregateTypes[i];
+
+      if (*wkt.type_ == NULL) {
+        if (wkt.type_ == &dtCFI_cdesc_t && !fLibraryFortran) {
+          // This should only be defined when --library-fortran is used
+        } else {
+          USR_FATAL_CONT("Type '%s' must be defined in the "
+                         "Chapel internal modules.",
+                         wkt.name);
+        }
+      }
+    }
+
     USR_STOP();
 
   } else {
-    if (dtString->symbol == NULL) {
-      // This means there was no declaration of the string type.
-      gAggregateTypes.remove(gAggregateTypes.index(dtString));
-
-      delete dtString;
-
-      dtString = NULL;
-    }
+    removeIfUndefinedGlobalType(dtString);
+    removeIfUndefinedGlobalType(dtBytes);
+    removeIfUndefinedGlobalType(dtLocale);
+    removeIfUndefinedGlobalType(dtOwned);
+    removeIfUndefinedGlobalType(dtShared);
   }
+}
+
+std::vector<Type*> getWellKnownTypes()
+{
+  std::vector<Type*> types;
+
+  int nTypes = sizeof(sWellKnownTypes) / sizeof(sWellKnownTypes[0]);
+  int nAggregate = sizeof(sWellKnownAggregateTypes) /
+                   sizeof(sWellKnownAggregateTypes[0]);
+
+  for (int i = 0; i < nTypes; i++) {
+    WellKnownType& wkt = sWellKnownTypes[i];
+    if (*wkt.type_ != NULL)
+      types.push_back(*wkt.type_);
+  }
+  for (int i = 0; i < nAggregate; i++) {
+    WellKnownAggregateType& wkt = sWellKnownAggregateTypes[i];
+    if (*wkt.type_ != NULL)
+      types.push_back(*wkt.type_);
+  }
+
+  return types;
+}
+
+void clearGenericWellKnownTypes()
+{
+  int nTypes = sizeof(sWellKnownTypes) / sizeof(sWellKnownTypes[0]);
+  int nAggregate = sizeof(sWellKnownAggregateTypes) /
+                   sizeof(sWellKnownAggregateTypes[0]);
+
+  for (int i = 0; i < nTypes; i++) {
+    WellKnownType& wkt = sWellKnownTypes[i];
+    Type* t = *wkt.type_;
+    if (t != NULL && t->symbol && t->symbol->hasFlag(FLAG_GENERIC))
+      *wkt.type_ = NULL;
+  }
+  for (int i = 0; i < nAggregate; i++) {
+    WellKnownAggregateType& wkt = sWellKnownAggregateTypes[i];
+    if (*wkt.type_ != NULL && (*wkt.type_)->isGeneric())
+      *wkt.type_ = NULL;
+  }
+}
+
+Type* getWellKnownTypeWithName(const char* name) {
+  int nTypes = sizeof(sWellKnownTypes) / sizeof(sWellKnownTypes[0]);
+  int nAggregate = sizeof(sWellKnownAggregateTypes) /
+                   sizeof(sWellKnownAggregateTypes[0]);
+
+  name = astr(name);
+  for (int i = 0; i < nTypes; i++) {
+    WellKnownType& wkt = sWellKnownTypes[i];
+    if (*wkt.type_ != NULL && wkt.name == name)
+      return *wkt.type_;
+  }
+  for (int i = 0; i < nAggregate; i++) {
+    WellKnownAggregateType& wkt = sWellKnownAggregateTypes[i];
+    if (*wkt.type_ != NULL && wkt.name == name)
+      return *wkt.type_;
+  }
+
+  return NULL;
 }
 
 struct WellKnownFn
@@ -288,10 +478,45 @@ static WellKnownFn sWellKnownFns[] = {
     FLAG_UNKNOWN
   },
 
+  {
+    "atomic_fence",
+    &gAtomicFenceFn,
+    FLAG_UNKNOWN
+  },
+
+  {
+    "chpl_after_forall_fence",
+    &gChplAfterForallFence,
+    FLAG_UNKNOWN
+  },
+
+  {
+    "chpl_createStringWithLiteral",
+    &gChplCreateStringWithLiteral,
+    FLAG_UNKNOWN
+  },
+
+  {
+    "chpl_createBytesWithLiteral",
+    &gChplCreateBytesWithLiteral,
+    FLAG_UNKNOWN
+  },
+
+  {
+    "chpl_buildLocaleID",
+    &gChplBuildLocaleId,
+    FLAG_UNKNOWN
+  },
 };
 
 void gatherWellKnownFns() {
   int nEntries = sizeof(sWellKnownFns) / sizeof(sWellKnownFns[0]);
+
+  // First, update the name fields to be astrs
+  for (int i = 0; i < nEntries; ++i) {
+    WellKnownFn& wkfn = sWellKnownFns[i];
+    wkfn.name = astr(wkfn.name);
+  }
 
   // Harvest well-known functions from among the global fn definitions.
   // We check before assigning to the associated global to ensure that it
@@ -300,7 +525,7 @@ void gatherWellKnownFns() {
     for (int i = 0; i < nEntries; ++i) {
       WellKnownFn& wkfn = sWellKnownFns[i];
 
-      if (strcmp(fn->name, wkfn.name) == 0) {
+      if (fn->name == wkfn.name) {
         wkfn.lastNameMatchedFn = fn;
 
         if (wkfn.flag == FLAG_UNKNOWN || fn->hasFlag(wkfn.flag) == true) {
@@ -359,7 +584,7 @@ void clearGenericWellKnownFunctions()
 
   for (int i = 0; i < nEntries; ++i) {
     WellKnownFn& wkfn = sWellKnownFns[i];
-    if (*wkfn.fn != NULL && (*wkfn.fn)->hasFlag(FLAG_GENERIC))
+    if (*wkfn.fn != NULL && (*wkfn.fn)->isGeneric())
       *wkfn.fn = NULL;
   }
 }

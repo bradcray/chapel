@@ -1,5 +1,6 @@
 /*
- * Copyright 2004-2018 Cray Inc.
+ * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
  * The entirety of this work is licensed under the Apache License,
@@ -36,18 +37,22 @@ static char _nlbuf[16];
 static char** chpl_launch_create_argv(const char *launch_cmd,
                                       int argc, char* argv[],
                                       int32_t numLocales) {
-  const int largc = 7;
-  char *largv[largc];
+  const int maxlargc = 9 + chpl_get_charset_env_nargs();
+  char *largv[maxlargc];
 
   snprintf(_nlbuf, sizeof(_nlbuf), "%d", numLocales);
 
+  int largc = 9;
   largv[0] = (char *) launch_cmd;
   largv[1] = (char *) "-n";
   largv[2] = _nlbuf;
   largv[3] = (char *) "-N";
   largv[4] = _nlbuf;
-  largv[5] = (char*) "-E";
-  largv[6] = chpl_get_enviro_keys(',');
+  largv[5] = (char *) "-c";
+  largv[6] = (char *) "0";
+  largv[7] = (char*) "-E";
+  largv[8] = chpl_get_enviro_keys(',');
+  largc += chpl_get_charset_env_args(&largv[largc]);
 
   return chpl_bundle_exec_args(argc, argv, largc, largv);
 }

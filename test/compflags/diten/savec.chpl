@@ -8,8 +8,9 @@ proc mysystem(cmd: string): int {
   return sub.exit_status;
 }
 
-var ret = mysystem(CHPL_HOME + "/bin/" + CHPL_HOST_PLATFORM + "/" +
-                   "chpl -o a.out --savec " + outdir + " " + filename);
+var binpath = CHPL_HOST_PLATFORM + "-" + CHPL_HOST_ARCH;
+var ret = mysystem(CHPL_HOME + "/bin/" + binpath + "/" +
+                   "chpl -o a.out --no-llvm --savec " + outdir + " " + filename);
 if ret != 0 then
   halt("Error compiling Chapel code");
 

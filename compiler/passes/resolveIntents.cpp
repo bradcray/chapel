@@ -45,7 +45,7 @@ IntentTag constIntentForType(Type* t) {
       t == dtNothing ||
       t == dtVoid ||
       t == dtUninstantiated ||
-      //      t->symbol->hasFlag(FLAG_RANGE) ||
+      t->symbol->hasFlag(FLAG_RANGE) ||
       // MPF: This rule seems odd to me
       (t->symbol->hasFlag(FLAG_EXTERN) && !isRecord(t))) {
     return INTENT_CONST_IN;
@@ -203,9 +203,9 @@ IntentTag concreteIntent(IntentTag existingIntent, Type* t) {
 }
 
 static IntentTag constIntentForThisArg(Type* t) {
-  /*  if (t->symbol->hasFlag(FLAG_RANGE))
+  if (t->symbol->hasFlag(FLAG_RANGE))
     return INTENT_CONST_IN;
-    else */if (isRecord(t) || isUnion(t) || t->symbol->hasFlag(FLAG_REF))
+    else if (isRecord(t) || isUnion(t) || t->symbol->hasFlag(FLAG_REF))
     return INTENT_CONST_REF;
   else
     return INTENT_CONST_IN;
@@ -217,10 +217,10 @@ static IntentTag blankIntentForThisArg(Type* t) {
   Type* valType = t->getValType();
 
   // Range default this intent is const-in
-  /*
+
   if (valType->symbol->hasFlag(FLAG_RANGE))
     return INTENT_CONST_IN;
-  */
+
 
   // For user records or types with FLAG_DEFAULT_INTENT_IS_REF_MAYBE_CONST,
   // the intent for this is INTENT_REF_MAYBE_CONST

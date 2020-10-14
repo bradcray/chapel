@@ -11,6 +11,5 @@ hi += lo;
 const r = lo..hi;
 
 writeln(r);
-writeln("r.high = ", r.high);
 for i in r do
   writeln(i);

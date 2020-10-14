@@ -261,8 +261,6 @@ module ChapelRange {
 
     if !stridable && boundsChecking then
       assert(_stride == 1);
-    extern proc printf(x...);
-    printf("in range.init\n");
   }
 
   private proc _isAnyNothing(args...) param : bool {
@@ -291,13 +289,6 @@ module ChapelRange {
     this.complete();
     if stridable then
       compilerError("non-stridable range initializer called with stridable=true");
-    extern proc printf(x...);
-    printf("in range.init B\n");
-    }
-
-  proc deinit() {
-    extern proc printf(x...);
-    printf("in range.deinit\n");
   }
 
   pragma "no doc"
@@ -600,7 +591,7 @@ module ChapelRange {
   /* Return the range's high bound. If the range does not have a high
      bound the behavior is undefined. */
   inline proc range.high {
-    writeln("_high = ", _high);
+//    writeln("_high = ", _high);
     return chpl_intToIdx(_high);
   }
 
@@ -2083,7 +2074,7 @@ proc _cast(type t: range(?), r: range(?)) {
       var i: intIdxType;
       const start = this.firstAsInt;
       const end: intIdxType = if this.low > this.high then start else this.lastAsInt + stride: intIdxType;
-      writeln((start, end, stride));
+//      writeln((start, end, stride));
       while __primitive("C for loop",
                         __primitive( "=", i, start),
                         __primitive("!=", i, end),
@@ -2109,7 +2100,7 @@ proc _cast(type t: range(?), r: range(?)) {
       var i: intIdxType;
       const start = this._low;
       const end = this._high;
-      writeln((start, end));
+//      writeln((start, end));
       while __primitive("C for loop",
                         __primitive( "=", i, start),
                         __primitive("<=", i, end),
@@ -2117,7 +2108,7 @@ proc _cast(type t: range(?), r: range(?)) {
         yield chpl_intToIdx(i);
       }
     } else {
-      writeln("in general iterator case");
+//      writeln("in general iterator case");
       for i in this.generalIterator() do yield i;
     }
   }
@@ -2147,9 +2138,9 @@ proc _cast(type t: range(?), r: range(?)) {
     var i: intIdxType;
     const start = this.first;
     const end = if this.low > this.high then start else this.last;
-    writeln((start,end));
-    writeln((this.low, this.high));
-    writeln(this.low > this.high);
+//    writeln((start,end));
+//    writeln((this.low, this.high));
+//    writeln(this.low > this.high);
     
     // TODO: Elliot and I have wondered whether we should just always
     // use a while loop here... Is the for loop buying anything?  It
@@ -2163,8 +2154,9 @@ proc _cast(type t: range(?), r: range(?)) {
         if i == end then break;
       }
     } else {
+//      writeln("In general case");
       i = start;
-      while (high >= low) {
+      while (high >= i) {
         yield i;
         i += stride:intIdxType;
       }

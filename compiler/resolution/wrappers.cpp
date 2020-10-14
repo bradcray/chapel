@@ -1509,10 +1509,12 @@ static bool checkAnotherFunctionsFormal(FnSymbol* calleeFn, CallExpr* call,
   bool result = isArgSymbol(actualSym) &&
                 (call->parentSymbol != actualSym->defPoint->parentSymbol);
 
+  /*
   if (result                                   &&
       propagateNotPOD(actualSym->getValType()) &&
       ! isLeaderIterator(calleeFn)             )
     USR_FATAL_CONT(calleeFn, "follower iterators accepting a non-POD argument by in-intent are not implemented");
+  */
 
   return result;
 }

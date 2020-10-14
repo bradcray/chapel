@@ -217,14 +217,6 @@ static void storeDefaultValuesForPython(FnSymbol* fn, ArgSymbol* formal) {
 // Fix up value types that need to be ref types.
 static void updateIfRefFormal(FnSymbol* fn, ArgSymbol* formal) {
   // For begin functions, copy ranges in if passed by blank intent.
-  // TODO: remove this code - it should no longer be necessary
-  if (fn->hasFlag(FLAG_BEGIN)                   == true &&
-      formal->type->symbol->hasFlag(FLAG_RANGE) == true) {
-    if (formal->intent == INTENT_BLANK ||
-        formal->intent == INTENT_IN) {
-      formal->intent = INTENT_CONST_IN;
-    }
-  }
 
   bool needRefIntent = false;
   if (needRefFormal(fn, formal, &needRefIntent) == true) {
@@ -301,8 +293,8 @@ static bool needRefFormal(FnSymbol* fn, ArgSymbol* formal,
   } else if (formal                              == fn->_this &&
              formal->hasFlag(FLAG_TYPE_VARIABLE) == false     &&
              (isUnion(formal->type)  == true ||
-               (isRecord(formal->type) == true &&
-                !formal->type->symbol->hasFlag(FLAG_RANGE)))) {
+               (isRecord(formal->type) == true /*&&
+                                                 !formal->type->symbol->hasFlag(FLAG_RANGE)*/))) {
     retval = true;
 
   } else {

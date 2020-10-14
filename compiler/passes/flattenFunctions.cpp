@@ -150,7 +150,7 @@ passableByVal(Type* type) {
       isClass(type)         ||
       type == dtTaskID      ||
       // For now, allow ranges as a special case, not records in general.
-      type->symbol->hasFlag(FLAG_RANGE) ||
+      //      type->symbol->hasFlag(FLAG_RANGE) ||
       0)
     return true;
 

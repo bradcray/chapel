@@ -201,7 +201,7 @@ module ChapelRange {
   // I think the record itself should not be documented, but the above comment
   // should be moved to the top-level module documentation.
   pragma "no doc"
-  pragma "plain old data"
+//  pragma "plain old data"
   pragma "range"
   record range
   {
@@ -261,6 +261,8 @@ module ChapelRange {
 
     if !stridable && boundsChecking then
       assert(_stride == 1);
+    extern proc printf(x...);
+    printf("in range.init\n");
   }
 
   private proc _isAnyNothing(args...) param : bool {
@@ -289,6 +291,13 @@ module ChapelRange {
     this.complete();
     if stridable then
       compilerError("non-stridable range initializer called with stridable=true");
+    extern proc printf(x...);
+    printf("in range.init B\n");
+    }
+
+  proc deinit() {
+    extern proc printf(x...);
+    printf("in range.deinit\n");
   }
 
   pragma "no doc"
@@ -2425,6 +2434,7 @@ proc _cast(type t: range(?), r: range(?)) {
   proc _cast(type t: string, x: range(?)) {
     var ret: string;
 
+    writeln("In range->string cast");
     if x.hasLowBound() then
       ret += x.low:string;
     ret += "..";

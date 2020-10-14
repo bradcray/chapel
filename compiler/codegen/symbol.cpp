@@ -928,7 +928,7 @@ bool argMustUseCPtr(Type* type) {
     return false;
 
   bool recordNotRangeNotExtern = isRecord(type) &&
-                                 !type->symbol->hasFlag(FLAG_RANGE) &&
+    //                                 !type->symbol->hasFlag(FLAG_RANGE) &&
                                  !type->symbol->hasFlag(FLAG_EXTERN);
 
   return recordNotRangeNotExtern ||

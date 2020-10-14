@@ -201,7 +201,6 @@ module ChapelRange {
   // I think the record itself should not be documented, but the above comment
   // should be moved to the top-level module documentation.
   pragma "no doc"
-  pragma "plain old data"
   pragma "range"
   record range
   {

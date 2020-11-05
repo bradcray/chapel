@@ -100,6 +100,16 @@ module ChapelBase {
   inline proc ==(a: _nilType, b: _nilType) param return true;
   inline proc ==(a: bool, b: bool) return __primitive("==", a, b);
   inline proc ==(a: int(?w), b: int(w)) return __primitive("==", a, b);
+  // Note that the following don't support any new functionality, but
+  // are just used to warn against a == b == c situations
+  inline proc ==(a: int(?w), b: bool) {
+    compilerWarning("Please note that you are comparing ints and bools");
+    return a == b: a.type;
+  }
+  inline proc ==(a: bool, b: int(?w)) {
+    compilerWarning("Please note that you are comparing ints and bools");
+    return a: b.type == b;
+  }
   inline proc ==(a: uint(?w), b: uint(w)) return __primitive("==", a, b);
   inline proc ==(a: real(?w), b: real(w)) return __primitive("==", a, b);
   inline proc ==(a: imag(?w), b: imag(w)) return __primitive("==", a, b);

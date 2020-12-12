@@ -270,6 +270,7 @@ zip              return processToken(yyscanner, TZIP);
 "<<"             return processToken(yyscanner, TSHIFTLEFT);
 ">>"             return processToken(yyscanner, TSHIFTRIGHT);
 
+"==="            return processToken(yyscanner, TTRIPLEEQUAL);
 "=="             return processToken(yyscanner, TEQUAL);
 "!="             return processToken(yyscanner, TNOTEQUAL);
 "<="             return processToken(yyscanner, TLESSEQUAL);

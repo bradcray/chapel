@@ -2350,4 +2350,12 @@ module ChapelBase {
   inline proc _removed_cast(in x) {
     return x;
   }
+
+  proc ===(x: ?t, y: t) {
+    return x == y;
+  }
+
+  proc ===(x, y) {
+    compilerError("'===' is only supported between expressions of identical type");
+  }
 }

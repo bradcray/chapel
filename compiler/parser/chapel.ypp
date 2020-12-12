@@ -343,7 +343,7 @@
 %token TBANG TBAND TBNOT TBOR TBXOR
 %token TCOLON TCOMMA
 %token TDIVIDE TDOT TDOTDOT TDOTDOTDOT
-%token TEQUAL TEXP TGREATER
+%token TTRIPLEEQUAL TEQUAL TEXP TGREATER
 %token TGREATEREQUAL
 %token THASH
 %token TIO
@@ -373,7 +373,7 @@
 %left TALIGN TBY THASH
 %left TOR
 %left TAND
-%left TEQUAL TNOTEQUAL
+%left TTRIPLEEQUAL TEQUAL TNOTEQUAL
 %left TLESSEQUAL TGREATEREQUAL TLESS TGREATER
 %left TDOTDOT TDOTDOTOPENHIGH
 // These are not currently supported, though we've discussed adding them
@@ -1376,6 +1376,7 @@ fn_ident:
 | TBOR           { $$ = "|"; }
 | TBXOR          { $$ = "^"; }
 | TBNOT          { $$ = "~"; }
+| TTRIPLEEQUAL   { $$ = "==="; }
 | TEQUAL         { $$ = "=="; }
 | TNOTEQUAL      { $$ = "!="; }
 | TLESSEQUAL     { $$ = "<="; }
@@ -2226,6 +2227,7 @@ binary_op_expr:
 | expr TSHIFTLEFT expr     { $$ = new CallExpr("<<", $1, $3); }
 | expr TSHIFTRIGHT expr    { $$ = new CallExpr(">>", $1, $3); }
 | expr TMOD expr           { $$ = new CallExpr("%", $1, $3); }
+| expr TTRIPLEEQUAL expr   { $$ = new CallExpr("===", $1, $3); }
 | expr TEQUAL expr         { $$ = new CallExpr("==", $1, $3); }
 | expr TNOTEQUAL expr      { $$ = new CallExpr("!=", $1, $3); }
 | expr TLESSEQUAL expr     { $$ = new CallExpr("<=", $1, $3); }

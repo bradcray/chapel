@@ -415,7 +415,7 @@ class LocStencilArr {
   // guard against dynamic dispatch resolution trying to resolve
   // write()ing out an array of sync vars and hitting the sync var
   // type's compilerError()
-  override proc writeThis(f) throws {
+  proc type writeThis(f, val) throws {
     halt("LocStencilArr.writeThis() is not implemented / should not be needed");
   }
 }
@@ -578,14 +578,14 @@ override proc Stencil.dsiNewRectangularDom(param rank: int, type idxType,
 //
 // output distribution
 //
-proc Stencil.writeThis(x) throws {
+proc type Stencil.writeThis(x, val) throws {
   x <~> "Stencil\n";
   x <~> "-------\n";
-  x <~> "distributes: " <~> boundingBox <~> "\n";
-  x <~> "across locales: " <~> targetLocales <~> "\n";
-  x <~> "indexed via: " <~> targetLocDom <~> "\n";
+  x <~> "distributes: " <~> val.boundingBox <~> "\n";
+  x <~> "across locales: " <~> val.targetLocales <~> "\n";
+  x <~> "indexed via: " <~> val.targetLocDom <~> "\n";
   x <~> "resulting in: " <~> "\n";
-  for locid in targetLocDom do
+  for locid in val.targetLocDom do
     x <~> "  [" <~> locid <~> "] locale " <~> locDist(locid).locale.id <~>
       " owns chunk: " <~> locDist(locid).myChunk <~> "\n";
 }

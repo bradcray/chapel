@@ -29,7 +29,8 @@
 // callee is expected to fill in the body of the function and to
 // normalize the returned function before continuing.
 
-FnSymbol* buildWriteThisFnSymbol(AggregateType* ct, ArgSymbol** filearg);
+FnSymbol* buildWriteThisFnSymbol(AggregateType* ct, ArgSymbol** filearg,
+                                 ArgSymbol** valarg);
 
 #endif
 

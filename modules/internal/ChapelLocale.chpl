@@ -366,8 +366,8 @@ module ChapelLocale {
       return hname;
     }
 
-    override proc writeThis(f) throws {
-      HaltWrappers.pureVirtualMethodHalt();
+    proc type writeThis(f, val) throws {
+      val.writeThis(f);
     }
 
     proc name return chpl_name() : string;

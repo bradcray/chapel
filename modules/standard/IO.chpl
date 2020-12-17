@@ -2064,7 +2064,7 @@ record ioChar {
   /* The codepoint value */
   var ch:int(32);
   pragma "no doc"
-  proc writeThis(f) throws {
+  proc type writeThis(f, val) throws {
     // ioChar.writeThis should not be called;
     // I/O routines should handle ioChar directly
     assert(false);
@@ -2102,7 +2102,7 @@ record ioNewline {
    */
   var skipWhitespaceOnly: bool = false;
   pragma "no doc"
-  proc writeThis(f) throws {
+  proc type writeThis(f, val) throws {
     // Normally this is handled explicitly in read/write.
     f <~> "\n";
   }
@@ -2131,9 +2131,9 @@ record ioLiteral {
      whitespace before the literal?
    */
   var ignoreWhiteSpace: bool = true;
-  proc writeThis(f) throws {
+  proc type writeThis(f, val) throws {
     // Normally this is handled explicitly in read/write.
-    f <~> val;
+    f <~> val.val;
   }
 }
 
@@ -2154,9 +2154,9 @@ record ioBits {
   /* How many of the low-order bits of ``v`` should we read or write? */
   var nbits:int(8);
   pragma "no doc"
-  proc writeThis(f) throws {
+  proc type writeThis(f, val) throws {
     // Normally this is handled explicitly in read/write.
-    f <~> v;
+    f <~> val.v;
   }
 }
 
@@ -3171,7 +3171,7 @@ private inline proc _read_one_internal(_channel_internal:qio_channel_ptr_t,
   // (it shouldn't release anything since it's a local copy).
   defer { reader._channel_internal = QIO_CHANNEL_PTR_NULL; }
 
-  try x.readThis(reader);
+  try (x.type).readThis(reader, x);
 
   return ENOERR;
 }
@@ -3210,13 +3210,13 @@ private inline proc _write_one_internal(_channel_internal:qio_channel_ptr_t,
                                     iolit, loc);
     } else if isClassType(t) {
       var notNilX = x!;
-      try notNilX.writeThis(writer);
+      try (notNilX.type).writeThis(writer, x);
     } else {
       // ddata / cptr
-      try x.writeThis(writer);
+      try (x.type).writeThis(writer, x);
     }
   } else {
-    try x.writeThis(writer);
+    try (x.type).writeThis(writer, x);
   }
 
   return err;
@@ -5548,12 +5548,12 @@ class _channel_regexp_info {
   proc deinit() {
     clear();
   }
-  override proc writeThis(f) throws {
-    f <~> "{hasRegexp = " + hasRegexp: string;
-    f <~> ", matchedRegexp = " + matchedRegexp: string;
-    f <~> ", releaseRegexp = " + releaseRegexp: string;
-    f <~> ", ... capturei = " + capturei: string;
-    f <~> ", ncaptures = " + ncaptures: string + "}";
+  proc type writeThis(f, val) throws {
+    f <~> "{hasRegexp = " + val.hasRegexp: string;
+    f <~> ", matchedRegexp = " + val.matchedRegexp: string;
+    f <~> ", releaseRegexp = " + val.releaseRegexp: string;
+    f <~> ", ... capturei = " + val.capturei: string;
+    f <~> ", ncaptures = " + val.ncaptures: string + "}";
   }
 }
 

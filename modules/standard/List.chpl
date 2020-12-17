@@ -1653,20 +1653,20 @@ module List {
 
       :arg ch: A channel to write to.
     */
-    proc readWriteThis(ch: channel) throws {
-      _enter();
+    proc type readWriteThis(ch: channel, val: list(?)) throws {
+      val._enter();
 
       ch <~> "[";
 
-      for i in 0..(_size - 2) do
-        ch <~> _getRef(i) <~> ", ";
+      for i in 0..(val._size - 2) do
+        ch <~> val._getRef(i) <~> ", ";
 
       if _size > 0 then
-        ch <~> _getRef(_size-1);
+        ch <~> val._getRef(val._size-1);
 
       ch <~> "]";
 
-      _leave();
+      val._leave();
     }
 
     /*

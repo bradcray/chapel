@@ -271,8 +271,8 @@ module String {
     proc init=(other: byteIndex) { _bindex = other._bindex; }
     proc init=(i: int) { _bindex = i; }
 
-    proc writeThis(f) throws {
-      f <~> _bindex;
+    proc type writeThis(f, val) throws {
+      f <~> val._bindex;
     }
   }
 
@@ -290,8 +290,8 @@ module String {
     proc init=(i: int) { _cpindex = i; }
     proc init=(cpi: codepointIndex) { _cpindex = cpi._cpindex; }
 
-    proc writeThis(f) throws {
-      f <~> _cpindex;
+    proc type writeThis(f, val) throws {
+      f <~> val._cpindex;
     }
   }
 
@@ -869,7 +869,7 @@ module String {
     }
 
     // These should never be called (but are default functions for records)
-    proc writeThis(f) throws {
+    proc type writeThis(f, val) throws {
       compilerError("not implemented: writeThis");
     }
 

@@ -399,7 +399,7 @@ module Set {
 
       :arg ch: A channel to write to.
     */
-    proc const writeThis(ch: channel) throws {
+    proc type writeThis(ch: channel) throws {
       on this {
         _enter(); defer _leave();
 

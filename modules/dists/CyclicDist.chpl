@@ -394,10 +394,10 @@ proc _cyclic_matchArgsShape(type rangeType, type scalarType, args) type {
   return helper(0);
 }
 
-proc Cyclic.writeThis(x) throws {
-  x <~> this.type:string <~> "\n";
+proc type Cyclic.writeThis(x, val) throws {
+  x <~> this:string <~> "\n";
   x <~> "------\n";
-  for locid in targetLocDom do
+  for locid in val.targetLocDom do
     x <~> " [" <~> locid <~> "=" <~> targetLocs(locid) <~> "] owns chunk: " <~>
       locDist(locid).myChunk <~> "\n";
 }
@@ -1079,7 +1079,7 @@ class LocCyclicArr {
   // guard against dynamic dispatch resolution trying to resolve
   // write()ing out an array of sync vars and hitting the sync var
   // type's compilerError()
-  override proc writeThis(f) throws {
+  proc type writeThis(f, val) throws {
     halt("LocCyclicArr.writeThis() is not implemented / should not be needed");
   }
 }

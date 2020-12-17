@@ -1139,8 +1139,8 @@ module ChapelArray {
 
     proc idxToLocale(ind) return _value.dsiIndexToLocale(ind);
 
-    proc readWriteThis(f) throws {
-      f <~> _value;
+    proc type readWriteThis(f, val) throws {
+      f <~> val._value;
     }
 
     proc displayRepresentation() { _value.dsiDisplayRepresentation(); }
@@ -2069,13 +2069,13 @@ module ChapelArray {
       return _value.dsiGetIndices();
 
     pragma "no doc"
-    proc writeThis(f) throws {
-      _value.dsiSerialWrite(f);
+    proc type writeThis(f, val) throws {
+      val._value.dsiSerialWrite(f);
     }
 
     pragma "no doc"
-    proc readThis(f) throws {
-      _value.dsiSerialRead(f);
+    proc type readThis(f, val) throws {
+      val._value.dsiSerialRead(f);
     }
 
     pragma "no doc"
@@ -3110,13 +3110,13 @@ module ChapelArray {
     }
 
     pragma "no doc"
-    proc writeThis(f) throws {
-      _value.dsiSerialWrite(f);
+    proc type writeThis(f, val) throws {
+      val._value.dsiSerialWrite(f);
     }
 
     pragma "no doc"
-    proc readThis(f) throws {
-      _value.dsiSerialRead(f);
+    proc type readThis(f, val) throws {
+      val._value.dsiSerialRead(f);
     }
 
     // sparse array interface

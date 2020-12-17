@@ -172,8 +172,8 @@ static void buildFieldAccessorFunctions(AggregateType* at) {
   }
 }
 
-static bool typeMatch(Type* type, Symbol* sym) {
-  if (type == dtAny)
+static bool typeMatch(Type* type, Symbol* sym, bool permitAnyFormal = false) {
+  if (type == dtAny || (permitAnyFormal && sym->type == dtAny))
     return true;
   if (sym->type == type)
     return true;
@@ -189,6 +189,60 @@ typedef enum {
   FIND_NOT_REF
 } functionExistsKind;
 
+
+static FnSymbol* typeIOMethodExists(const char* name,
+                                    Type* baseType) {
+  const char* nameAstr = astr(name);
+  bool debug = false;
+
+  forv_Vec(FnSymbol, fn, gFnSymbols) {
+    if (fn->name != nameAstr)
+      continue;
+
+    // numFormals must match exactly.
+    if (fn->numFormals() != 4)
+      continue;
+
+    if (baseType->symbol->hasFlag(FLAG_TUPLE)) {
+      //      printf("Looking at %s for %s\n", name, baseType->symbol->name);
+      //      debug = true;
+    }
+    
+    if (!typeMatch(dtMethodToken, fn->getFormal(1))) {
+      if (debug)
+        printf("Mismatch mt\n");
+      continue;
+    }
+
+    if (!typeMatch(baseType, fn->getFormal(2)))
+      {
+      if (debug)
+        printf("Mismatch base type\n");
+      continue;
+      }
+
+    if (!typeMatch(dtAny, fn->getFormal(3))) {
+      if (debug)
+      printf("Mismatch channel]\n");
+      continue;
+    }
+
+    if (!typeMatch(baseType, fn->getFormal(4), true)) {
+      if (debug)
+      printf("Mismatch val]\n");
+      continue;
+    }
+
+    if (debug)
+      printf("----\n");
+
+
+    return fn;
+  }
+
+  // No matching function found.
+  return NULL;
+}
 
 // functionExists returns true iff
 //  function's name matches name
@@ -1650,7 +1704,8 @@ static bool inheritsFromError(Type* t) {
 
 
 // common code to create a writeThis() function without filling in the body
-FnSymbol* buildWriteThisFnSymbol(AggregateType* ct, ArgSymbol** filearg) {
+FnSymbol* buildWriteThisFnSymbol(AggregateType* ct, ArgSymbol** filearg,
+                                 ArgSymbol** valarg) {
   FnSymbol* fn = new FnSymbol("writeThis");
 
   fn->addFlag(FLAG_COMPILER_GENERATED);
@@ -1661,19 +1716,24 @@ FnSymbol* buildWriteThisFnSymbol(AggregateType* ct, ArgSymbol** filearg) {
     fn->addFlag(FLAG_INLINE);
 
   fn->cname = astr("_auto_", ct->symbol->name, "_write");
-  fn->_this = new ArgSymbol(INTENT_BLANK, "this", ct);
+  fn->_this = new ArgSymbol(INTENT_TYPE, "this", ct); // maybe should be INTENT_BLANK?
   fn->_this->addFlag(FLAG_ARG_THIS);
+  fn->_this->addFlag(FLAG_TYPE_VARIABLE);
 
   ArgSymbol* fileArg = new ArgSymbol(INTENT_BLANK, "f", dtAny);
   *filearg = fileArg;
 
   fileArg->addFlag(FLAG_MARKED_GENERIC);
 
+  ArgSymbol* valArg = new ArgSymbol(INTENT_REF, "val", ct);
+  *valarg = valArg;
+
   fn->setMethod(true);
 
   fn->insertFormalAtTail(new ArgSymbol(INTENT_BLANK, "_mt", dtMethodToken));
   fn->insertFormalAtTail(fn->_this);
   fn->insertFormalAtTail(fileArg);
+  fn->insertFormalAtTail(valArg);
 
   fn->retType = dtVoid;
 
@@ -1716,15 +1776,15 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
     return;
 
   // If we have a readWriteThis, we'll call it from readThis/writeThis.
-  if (functionExists("readWriteThis", dtMethodToken, ct, dtAny)) {
+  if (typeIOMethodExists("readWriteThis", ct)) {
     hasReadWriteThis = true;
   }
 
-  if (functionExists("writeThis", dtMethodToken, ct, dtAny)) {
+  if (typeIOMethodExists("writeThis", ct)) {
     hasWriteThis = true;
   }
 
-  if (functionExists("readThis", dtMethodToken, ct, dtAny)) {
+  if (typeIOMethodExists("readThis", ct)) {
     hasReadThis = true;
   }
 
@@ -1737,8 +1797,8 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
 
   // Make writeThis when appropriate
   if (makeReadThisAndWriteThis == true && hasWriteThis == false) {
-    ArgSymbol* fileArg = NULL;
-    FnSymbol* fn = buildWriteThisFnSymbol(ct, &fileArg);
+    ArgSymbol* fileArg = NULL, *valArg = NULL;
+    FnSymbol* fn = buildWriteThisFnSymbol(ct, &fileArg, &valArg);
 
     // Compiler generated versions of readThis/writeThis now throw.
     fn->throwsErrorInit();
@@ -1746,12 +1806,12 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
     if (hasReadWriteThis == true) {
       Expr* dotReadWriteThis = buildDotExpr(fn->_this, "readWriteThis");
 
-      fn->insertAtTail(new CallExpr(dotReadWriteThis, fileArg));
+      fn->insertAtTail(new CallExpr(dotReadWriteThis, fileArg, valArg));
 
     } else {
       fn->insertAtTail(new CallExpr("writeThisDefaultImpl",
                                     fileArg,
-                                    fn->_this));
+                                    valArg));
     }
 
     normalize(fn);
@@ -1773,30 +1833,35 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
 
     fn->cname = astr("_auto_", ct->symbol->name, "_read");
 
-    fn->_this = new ArgSymbol(INTENT_BLANK, "this", ct);
+    fn->_this = new ArgSymbol(INTENT_TYPE, "this", ct); // INTENT_BLANK?
     fn->_this->addFlag(FLAG_ARG_THIS);
+    fn->_this->addFlag(FLAG_TYPE_VARIABLE);
 
     ArgSymbol* fileArg = new ArgSymbol(INTENT_BLANK, "f", dtAny);
 
     fileArg->addFlag(FLAG_MARKED_GENERIC);
+
+    ArgSymbol* valArg = new ArgSymbol(INTENT_REF, "val", ct);
+    //    valArg->addFlag(FLAG_MARKED_GENERIC);
 
     fn->setMethod(true);
 
     fn->insertFormalAtTail(new ArgSymbol(INTENT_BLANK, "_mt", dtMethodToken));
     fn->insertFormalAtTail(fn->_this);
     fn->insertFormalAtTail(fileArg);
+    fn->insertFormalAtTail(valArg);
 
     fn->retType = dtVoid;
 
     if (hasReadWriteThis == true) {
       Expr* dotReadWriteThis = buildDotExpr(fn->_this, "readWriteThis");
 
-      fn->insertAtTail(new CallExpr(dotReadWriteThis, fileArg));
+      fn->insertAtTail(new CallExpr(dotReadWriteThis, fileArg, valArg));
 
     } else {
       fn->insertAtTail(new CallExpr("readThisDefaultImpl",
                                     fileArg,
-                                    fn->_this));
+                                    valArg));
     }
 
     DefExpr* def = new DefExpr(fn);

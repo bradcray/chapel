@@ -134,7 +134,7 @@ module Version {
     param commit: string = "";
 
     pragma "no doc"
-    proc writeThis(s) throws {
+    proc type writeThis(s) throws {
       s.write(this:string);
     }
   }

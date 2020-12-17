@@ -90,10 +90,10 @@ var B: [0..#3] MyRecord;
    - the I/O operator <~> is available to read or write (depending
      on which situation we are being called in)
  */
-proc MyRecord.readWriteThis(f) throws {
-  f <~> i;
+proc type MyRecord.readWriteThis(f, ref val) throws {
+  f <~> val.i;
   f <~> new ioLiteral("\t");
-  f <~> r;
+  f <~> val.r;
   f <~> new ioLiteral("\t");
 
   // When doing the string I/O, we need to specify that we'd like
@@ -102,7 +102,7 @@ proc MyRecord.readWriteThis(f) throws {
   // on the caller setting the string formatting with the channel's
   // style.
   // In the future, we hope to allow readf in this situation. 
-  f <~> s;
+  f <~> val.s;
 
   f <~> new ioLiteral("\n");
 }

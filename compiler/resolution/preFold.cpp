@@ -2763,8 +2763,8 @@ static Expr* createFunctionAsValue(CallExpr *call) {
 
   /* make writeThis for FCFs */
   {
-    ArgSymbol* fileArg = NULL;
-    FnSymbol* fn = buildWriteThisFnSymbol(ct, &fileArg);
+    ArgSymbol* fileArg = NULL, * valArg = NULL;
+    FnSymbol* fn = buildWriteThisFnSymbol(ct, &fileArg, &valArg);
 
     // All compiler generated writeThis routines now throw.
     fn->throwsErrorInit();

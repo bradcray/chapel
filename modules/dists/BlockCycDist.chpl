@@ -316,15 +316,15 @@ override proc BlockCyclic.dsiNewRectangularDom(param rank: int, type idxType,
 //
 // output distribution
 //
-proc BlockCyclic.writeThis(x) throws {
+proc type BlockCyclic.writeThis(x, val) throws {
   x <~> "BlockCyclic\n";
   x <~> "-------\n";
-  x <~> "distributes: " <~> lowIdx <~> "..." <~> "\n";
-  x <~> "in chunks of: " <~> blocksize <~> "\n";
-  x <~> "across locales: " <~> targetLocales <~> "\n";
-  x <~> "indexed via: " <~> targetLocDom <~> "\n";
+  x <~> "distributes: " <~> val.lowIdx <~> "..." <~> "\n";
+  x <~> "in chunks of: " <~> val.blocksize <~> "\n";
+  x <~> "across locales: " <~> val.targetLocales <~> "\n";
+  x <~> "indexed via: " <~> val.targetLocDom <~> "\n";
   x <~> "resulting in: " <~> "\n";
-  for locid in targetLocDom do
+  for locid in val.targetLocDom do
     x <~> "  [" <~> locid <~> "] " <~> locDist(locid) <~> "\n";
 }
 
@@ -488,12 +488,12 @@ class LocBlockCyclic {
 }
 
 
-proc LocBlockCyclic.writeThis(x) throws {
+proc type LocBlockCyclic.writeThis(x, val) throws {
   var localeid: int;
   on this {
     localeid = here.id;
   }
-  x <~> "locale " <~> localeid <~> " owns blocks: " <~> myStarts;
+  x <~> "locale " <~> localeid <~> " owns blocks: " <~> val.myStarts;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -786,8 +786,8 @@ proc LocBlockCyclicDom.computeFlatInds() {
 //
 // output local domain piece
 //
-proc LocBlockCyclicDom.writeThis(x) throws {
-  x <~> myStarts;
+proc type LocBlockCyclicDom.writeThis(x, val) throws {
+  x <~> val.myStarts;
 }
 
 proc LocBlockCyclicDom.enumerateBlocks() {
@@ -1204,7 +1204,7 @@ class LocBlockCyclicArr {
   // guard against dynamic dispatch resolution trying to resolve
   // write()ing out an array of sync vars and hitting the sync var
   // type's compilerError()
-  override proc writeThis(f) throws {
+  proc type writeThis(f, val) throws {
     halt("LocBlockCyclicArr.writeThis() is not implemented / should not be needed");
   }
 }
@@ -1287,9 +1287,9 @@ proc LocBlockCyclicArr.this(i) ref {
 //
 // output local array piece
 //
-proc LocBlockCyclicArr.writeThis(x) throws {
+proc type LocBlockCyclicArr.writeThis(x, val) throws {
   // note on this fails; see writeThisUsingOn.chpl
-  x <~> myElems;
+  x <~> val.myElems;
 }
 
 // sungeun: This doesn't appear to be used yet, so I left it, but it

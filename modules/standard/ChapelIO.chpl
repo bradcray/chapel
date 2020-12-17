@@ -697,11 +697,13 @@ module ChapelIO {
     warning(tmpstring);
   }
 
+  /*
   pragma "no doc"
-  proc locale.writeThis(f) throws {
+  proc type locale.writeThis(f, val) throws {
     // FIXME this doesn't resolve without `this`
-    f <~> this._instance;
+    f <~> val._instance;
   }
+*/
 
   pragma "no doc"
   proc _ddata.writeThis(f) throws {
@@ -710,24 +712,24 @@ module ChapelIO {
   }
 
   pragma "no doc"
-  proc chpl_taskID_t.writeThis(f) throws {
-    var tmp : uint(64) = this : uint(64);
+  proc type chpl_taskID_t.writeThis(f, val) throws {
+    var tmp : uint(64) = val : uint(64);
     f <~> (tmp);
   }
 
   pragma "no doc"
-  proc chpl_taskID_t.readThis(f) throws {
+  proc type chpl_taskID_t.readThis(f, val) throws {
     var tmp : uint(64);
     f <~> tmp;
-    this = tmp : chpl_taskID_t;
+    val = tmp : chpl_taskID_t;
   }
 
   pragma "no doc"
-  proc nothing.writeThis(f) {}
+  proc type nothing.writeThis(f, val) {}
 
   // Moved here to avoid circular dependencies in ChapelTuple.
   pragma "no doc"
-  proc _tuple.readWriteThis(f) throws {
+  proc type _tuple.readWriteThis(f, ref val) throws {
     var st = f.styleElement(QIO_STYLE_ELEMENT_TUPLE);
     var start:ioLiteral;
     var comma:ioLiteral;
@@ -752,12 +754,12 @@ module ChapelIO {
       f <~> start;
     }
     if size != 0 {
-      f <~> this(0);
+      f <~> val(0);
       for param i in 1..size-1 {
         if !binary {
           f <~> comma;
         }
-        f <~> this(i);
+        f <~> val(i);
       }
     }
     if !binary {
@@ -768,46 +770,46 @@ module ChapelIO {
   // Moved here to avoid circular dependencies in ChapelRange
   // Write implementation for ranges
   pragma "no doc"
-  proc range.writeThis(f) throws
+  proc type range.writeThis(f, val) throws
   {
     // a range with a more normalized alignment
     // a separate variable so 'this' can be const
-    var alignCheckRange = this;
+    var alignCheckRange = val;
     if f.writing {
       alignCheckRange.normalizeAlignment();
     }
 
-    if hasLowBound() then
-      f <~> low;
+    if val.hasLowBound() then
+      f <~> val.low;
     f <~> new ioLiteral("..");
-    if hasHighBound() then
-      f <~> high;
-    if stride != 1 then
-      f <~> new ioLiteral(" by ") <~> stride;
+    if val.hasHighBound() then
+      f <~> val.high;
+    if val.stride != 1 then
+      f <~> new ioLiteral(" by ") <~> val.stride;
 
     // Write out the alignment only if it differs from natural alignment.
     // We take alignment modulo the stride for consistency.
-    if ! alignCheckRange.isNaturallyAligned() && aligned then
-      f <~> new ioLiteral(" align ") <~> chpl_intToIdx(chpl__mod(chpl__idxToInt(alignment), stride));
+    if ! alignCheckRange.isNaturallyAligned() && val.aligned then
+      f <~> new ioLiteral(" align ") <~> val.chpl_intToIdx(chpl__mod(chpl__idxToInt(val.alignment), val.stride));
   }
 
   pragma "no doc"
-  proc ref range.readThis(f) throws {
-    if hasLowBound() then f <~> _low;
+  proc type range.readThis(f, ref val) throws {
+    if hasLowBound() then f <~> val._low;
 
     f <~> new ioLiteral("..");
 
-    if hasHighBound() then f <~> _high;
+    if hasHighBound() then f <~> val._high;
 
-    if stride != 1 then f <~> new ioLiteral(" by ") <~> stride;
+    if stride != 1 then f <~> new ioLiteral(" by ") <~> val.stride;
 
     try {
       f <~> new ioLiteral(" align ");
 
-      if stridable {
+      if val.stridable {
         var a: intIdxType;
         f <~> a;
-        _alignment = a;
+        val._alignment = a;
       } else {
         throw new owned
           BadFormatError("Range is not stridable, cannot store alignment");
@@ -818,11 +820,11 @@ module ChapelIO {
   }
 
   pragma "no doc"
-  override proc LocaleModel.writeThis(f) throws {
+  proc type LocaleModel.writeThis(f, val) throws {
     // Most classes will define it like this:
     //      f <~> name;
     // but here it is defined thus for backward compatibility.
-    f <~> new ioLiteral("LOCALE") <~> chpl_id();
+    f <~> new ioLiteral("LOCALE") <~> val.chpl_id();
   }
 
   /* Errors can be printed out. In that event, they will
@@ -830,8 +832,8 @@ module ChapelIO {
      of calling :proc:`Error.message`.
   */
   pragma "no doc"
-  override proc Error.writeThis(f) throws {
-    var description = chpl_describe_error(this);
+  proc type Error.writeThis(f, val) throws {
+    var description = chpl_describe_error(val);
     f <~> description;
   }
 

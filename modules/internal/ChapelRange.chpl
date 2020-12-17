@@ -2426,7 +2426,6 @@ proc _cast(type t: range(?), r: range(?)) {
   proc _cast(type t: string, x: range(?)) {
     var ret: string;
 
-    writeln("In range->string cast");
     if x.hasLowBound() then
       ret += x.low:string;
     ret += "..";

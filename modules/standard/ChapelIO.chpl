@@ -583,7 +583,7 @@ module ChapelIO {
     // happens now with buildDefaultWriteFunction
     // since it has the concrete type and then calls this method.
     pragma "no doc"
-    proc readThisDefaultImpl(reader, x:?t) throws where isClassType(t) {
+    proc readThisDefaultImpl(reader, ref x:?t) throws where isClassType(t) {
       const st = reader.styleElement(QIO_STYLE_ELEMENT_AGGREGATE);
 
       if !reader.binary() {
@@ -696,14 +696,6 @@ module ChapelIO {
     var tmpstring = stringify((...args));
     warning(tmpstring);
   }
-
-  /*
-  pragma "no doc"
-  proc type locale.writeThis(f, val) throws {
-    // FIXME this doesn't resolve without `this`
-    f <~> val._instance;
-  }
-*/
 
   pragma "no doc"
   proc _ddata.writeThis(f) throws {
@@ -827,6 +819,11 @@ module ChapelIO {
   proc type Error.writeThis(f, val) throws {
     var description = chpl_describe_error(val);
     f <~> description;
+  }
+
+  proc type _iteratorRecord.writeThis(f, val) throws {
+    var a = val; // turn iterator into an array to preserve shape
+    write(a);
   }
 
   /* Equivalent to ``try! stdout.write``. See :proc:`IO.channel.write` */

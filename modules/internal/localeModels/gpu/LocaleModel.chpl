@@ -73,11 +73,6 @@ module LocaleModel {
       name = "node" + _parent._node_id:string + "-CPU" + sid:string;
     }
 
-    override proc writeThis(f) throws {
-      parent.writeThis(f);
-      f <~> '.'+name;
-    }
-
     override proc getChildCount(): int { return 0; }
     iter getChildIndices() : int {
       halt("No children to iterate over.");
@@ -118,11 +113,6 @@ module LocaleModel {
       super.init(new locale(_parent));
       sid = _sid;
       name = "node"+ _parent._node_id:string + "-GPU" + sid:string;
-    }
-
-    override proc writeThis(f) throws {
-      parent.writeThis(f);
-      f <~> '.'+name;
     }
 
     override proc getChildCount(): int { return 0; }
@@ -285,10 +275,6 @@ module LocaleModel {
     }
     override proc chpl_name() return local_name();
     proc local_name() return "rootLocale";
-
-    override proc writeThis(f) throws {
-      f <~> name;
-    }
 
     override proc getChildCount() return this.myLocaleSpace.size;
 

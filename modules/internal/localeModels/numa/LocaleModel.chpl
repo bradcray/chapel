@@ -79,12 +79,6 @@ module LocaleModel {
       ndName = "ND"+sid:string;
     }
 
-    override proc writeThis(f) throws {
-      if parent._instance then
-        parent.writeThis(f);
-      f <~> '.'+ndName;
-    }
-
     override proc getChildCount(): int { return 0; }
     iter getChildIndices() : int {
       halt("No children to iterate over.");
@@ -273,10 +267,6 @@ module LocaleModel {
     }
     override proc chpl_name() return local_name();
     proc local_name() return "rootLocale";
-
-    override proc writeThis(f) throws {
-      f <~> name;
-    }
 
     override proc getChildCount() return this.myLocaleSpace.size;
 

@@ -3209,8 +3209,9 @@ private proc _write_one_internal(_channel_internal:qio_channel_ptr_t,
       err = try _write_one_internal(_channel_internal, iokind.dynamic,
                                     iolit, loc);
     } else if isClassType(t) {
-      var notNilX = x!;
-      try (notNilX.type).writeThis(writer, x);
+      var notNilX = x.borrow()!;
+      //      var notNilX = x!;
+      try (notNilX.type).writeThis(writer, notNilX);
     } else {
       // ddata / cptr
       try (x.type).writeThis(writer, x);

@@ -1710,9 +1710,7 @@ FnSymbol* buildWriteThisFnSymbol(AggregateType* ct, ArgSymbol** filearg,
 
   fn->addFlag(FLAG_COMPILER_GENERATED);
   fn->addFlag(FLAG_LAST_RESORT);
-  if (ct->isClass() && ct != dtObject)
-    fn->addFlag(FLAG_OVERRIDE);
-  else
+  if (!ct->isClass())
     fn->addFlag(FLAG_INLINE);
 
   fn->cname = astr("_auto_", ct->symbol->name, "_write");
@@ -1826,9 +1824,7 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
 
     fn->addFlag(FLAG_COMPILER_GENERATED);
     fn->addFlag(FLAG_LAST_RESORT);
-    if (ct->isClass() && ct != dtObject)
-      fn->addFlag(FLAG_OVERRIDE);
-    else
+    if (!ct->isClass())
       fn->addFlag(FLAG_INLINE);
 
     fn->cname = astr("_auto_", ct->symbol->name, "_read");

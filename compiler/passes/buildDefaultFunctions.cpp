@@ -1723,7 +1723,7 @@ FnSymbol* buildWriteThisFnSymbol(AggregateType* ct, ArgSymbol** filearg,
 
   fileArg->addFlag(FLAG_MARKED_GENERIC);
 
-  ArgSymbol* valArg = new ArgSymbol(INTENT_REF, "val", ct);
+  ArgSymbol* valArg = new ArgSymbol(ct->isClass() ? INTENT_BLANK : INTENT_REF, "val", ct);
   *valarg = valArg;
 
   fn->setMethod(true);

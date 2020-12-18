@@ -202,6 +202,9 @@ module ChapelLocale {
       return this._value.getChildCount();
     }
 
+    proc type writeThis(f, val) throws {
+      f.write("LOCALE", val.chpl_id());
+    }
   } // end of record _locale
 
 
@@ -366,8 +369,8 @@ module ChapelLocale {
       return hname;
     }
 
-    proc type writeThis(f, val) throws {
-      val.writeThis(f);
+    override proc writeThis(f) throws {
+      HaltWrappers.pureVirtualMethodHalt();
     }
 
     proc name return chpl_name() : string;

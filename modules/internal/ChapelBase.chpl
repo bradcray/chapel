@@ -54,7 +54,12 @@ module ChapelBase {
   pragma "object class"
   pragma "global type symbol"
   pragma "no object"
-  class _object { }
+  class _object {
+    proc writeThis(f) throws {
+      use HaltWrappers;
+      HaltWrappers.pureVirtualMethodHalt();
+    }
+  }
 
 
   enum iterKind {leader, follower, standalone};

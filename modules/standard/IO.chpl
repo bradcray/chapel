@@ -3177,7 +3177,7 @@ private inline proc _read_one_internal(_channel_internal:qio_channel_ptr_t,
 }
 
 pragma "suppress lvalue error"
-private inline proc _write_one_internal(_channel_internal:qio_channel_ptr_t,
+private proc _write_one_internal(_channel_internal:qio_channel_ptr_t,
                                         param kind:iokind,
                                         const x:?t,
                                         loc:locale): syserr throws {

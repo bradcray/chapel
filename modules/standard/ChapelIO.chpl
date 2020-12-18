@@ -819,14 +819,6 @@ module ChapelIO {
     }
   }
 
-  pragma "no doc"
-  proc type LocaleModel.writeThis(f, val) throws {
-    // Most classes will define it like this:
-    //      f <~> name;
-    // but here it is defined thus for backward compatibility.
-    f <~> new ioLiteral("LOCALE") <~> val.chpl_id();
-  }
-
   /* Errors can be printed out. In that event, they will
      show information about the error including the result
      of calling :proc:`Error.message`.

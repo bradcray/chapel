@@ -154,6 +154,10 @@ module LocaleModel {
       helpSetupLocaleFlat(this, local_name);
     }
     //------------------------------------------------------------------------}
+
+    override proc writeThis(f) throws {
+      f <~> local_name;
+    }
   }
 
   //
@@ -196,8 +200,8 @@ module LocaleModel {
     override proc chpl_name() return local_name();
     proc local_name() return "rootLocale";
 
-    proc type writeThis(f, val) throws {
-      f <~> val.name;
+    override proc writeThis(f) throws {
+      f <~> name;
     }
 
     override proc getChildCount() return this.myLocaleSpace.size;

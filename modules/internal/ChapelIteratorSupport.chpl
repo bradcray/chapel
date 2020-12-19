@@ -354,14 +354,8 @@ module ChapelIteratorSupport {
   }
 
   proc _iteratorRecord.writeThis(f) throws {
-    var first: bool = true;
-    for e in this {
-      if !first then
-        f <~> " ";
-      else
-        first = false;
-      f <~> e;
-    }
+    var A = this;
+    writeln(A);
   }
 
   proc =(ref ic: _iteratorRecord, xs) {

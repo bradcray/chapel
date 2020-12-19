@@ -164,11 +164,11 @@ var tree = new Tree( "a",
 // This method uses the postorder iterator to print out each node.
 // It uses the "first" flag to avoid printing a leading space.
 //
-proc Tree.writeThis(x)
+proc type Tree.writeThis(x, val)
 {
   var first = true;
 
-  for node in postorder(this) {
+  for node in postorder(val) {
     if first then
       first = false;
     else

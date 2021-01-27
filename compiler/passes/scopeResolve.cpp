@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -315,6 +315,7 @@ static void scopeResolve(ForallStmt*         forall,
       scopeResolveExpr(sdef->init, stmtScope);
   }
 
+  // same as scopeResolve(loopBody, stmtScope)
   scopeResolve(loopBody->body, bodyScope);
 }
 
@@ -398,6 +399,16 @@ static void scopeResolve(TypeSymbol*         typeSym,
   }
 }
 
+static void scopeResolve(InterfaceSymbol*    isym,
+                         const ResolveScope* parent) {
+  ResolveScope* scope = new ResolveScope(isym, parent);
+
+  for_alist(def, isym->ifcFormals)
+    scope->extend(toDefExpr(def)->sym);
+
+  scopeResolve(isym->ifcBody, scope);
+}
+
 static void scopeResolve(IfExpr* ife, ResolveScope* scope) {
   scopeResolve(ife->getThenStmt(), scope);
   scopeResolve(ife->getElseStmt(), scope);
@@ -468,6 +479,9 @@ static void scopeResolve(const AList& alist, ResolveScope* scope) {
 
         } else if (TypeSymbol* typeSym = toTypeSymbol(sym))   {
           scopeResolve(typeSym, scope);
+
+        } else if (InterfaceSymbol* isym = toInterfaceSymbol(sym)) {
+          scopeResolve(isym, scope);
         }
       }
 
@@ -2427,7 +2441,7 @@ bool Symbol::isVisible(BaseAST* scope) const {
 
 BaseAST* getScope(BaseAST* ast) {
   if (Expr* expr = toExpr(ast)) {
-    Expr*     parent = expr->parentExpr;
+   if (Expr* parent = expr->parentExpr) {
     BlockStmt* block = toBlockStmt(parent);
 
     // SCOPELESS and TYPE blocks do not define scopes
@@ -2452,14 +2466,17 @@ BaseAST* getScope(BaseAST* ast) {
 
     } else if (parent) {
       return getScope(parent);
-
-    } else if (FnSymbol* fn = toFnSymbol(expr->parentSymbol)) {
+    }
+   } else {
+    if (FnSymbol* fn = toFnSymbol(expr->parentSymbol)) {
       return fn;
 
     } else if (TypeSymbol* ts = toTypeSymbol(expr->parentSymbol)) {
       if (isEnumType(ts->type) || isAggregateType(ts->type)) {
         return ts;
       }
+    } else if (InterfaceSymbol* isym = toInterfaceSymbol(expr->parentSymbol)) {
+      return isym;
     }
 
     if (expr->parentSymbol == rootModule)
@@ -2467,6 +2484,7 @@ BaseAST* getScope(BaseAST* ast) {
 
     else
       return getScope(expr->parentSymbol->defPoint);
+   }
 
   } else if (Symbol* sym = toSymbol(ast)) {
     if (sym == rootModule)
@@ -2795,13 +2813,8 @@ static bool readNamedArgument(CallExpr* call, const char* name,
 
 static bool symbolInBuiltinModule(Symbol* sym) {
   ModuleSymbol* mod = sym->getModule();
-  if (mod->modTag == MOD_STANDARD &&
-      (!strcmp(mod->name, "Builtins") ||
-       !strcmp(mod->name, "Types") ||
-       !strcmp(mod->name, "Math"))) {
-    return true;
-  }
-  return false;
+  return (mod->modTag == MOD_STANDARD &&
+          mod->hasFlag(FLAG_MODULE_INCLUDED_BY_DEFAULT));
 }
 
 

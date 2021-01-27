@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -78,10 +78,25 @@ module ChapelIteratorSupport {
    } else if isDomain(x) {
     return if x.rank == 1 then x.idxType else x.rank * x.idxType;
    } else {
-    pragma "no copy" var ic = _getIterator(x);
-    pragma "no copy" var i = iteratorIndex(ic);
-    _freeIterator(ic);
-    return i.type;
+    // An earlier implementation invoked iteratorIndex(_getIterator(x)),
+    // which invokes ic.advance() and ic.getValue().
+    // Alas, 'ic' - the _iteratorClass returned by _getIterator(x) -
+    // contains, in turn, another iterator class.
+    // That latter does not get deallocated and leaks, as was observed in:
+    //   test/reductions/reduceLoopOfPromoted.chpl
+    //
+    // Instead, we iterate over 'x' into its first iteration.
+    // Breaking out of the loop with a 'return' somehow causes proper cleanup
+    // of the iterator classes at hand.
+    //
+    // Placing halt() - which the compiler knows terminates the program -
+    // after the loop allows the compiler to accept the return type
+    // produced by the 'return' within the loop.
+
+    for i in x do
+      return i.type;
+
+    halt("the iterator yields no elements, cannot determine its index type");
    }
   }
 
@@ -105,23 +120,15 @@ module ChapelIteratorSupport {
   }
 
   // A helper to handle #16027 ex. test/reductions/reduceLoopOfPromoted.chpl
+  //
+  // This function IS executed at runtime - and 'x' is advanced once -
+  // because the returned type is an array and so has a runtime component.
   pragma "no doc"
   proc chpl_elemTypeForReducingIterables(x) type {
 
     // Part 1 - get the first element yielded by 'x'
-    //
-    // An earlier attempt followed the lead of iteratorIndexType()
-    // and called iteratorIndex(_getIterator(x)). Alas in this case
-    // the _iteratorClass returned by _getIterator(x) contains, in turn,
-    // another iterator class. That latter does not get deallocated and leaks.
-    //
-    // Whereas iteratorIndex() invokes ic.advance() and ic.getValue(),
-    // here we go ahead an iterate over this iterator into its first
-    // iteration. Breaking out of the loop with a 'return' somehow causes
-    // proper cleanup of the iterator classes at hand
-    //
-    // This function IS executed at runtime because the returned type
-    // is an array and therefore has a runtime component.
+    // The for-loop here is analogous to the one in iteratorIndexType()
+    // for the case of a non-array non-domain argument.
 
     for i in x {
       compilerAssert(i.type <= _iteratorRecord); // prevent unintended use
@@ -130,7 +137,8 @@ module ChapelIteratorSupport {
       // analogously to the two versions of chpl__initCopy(_iteratorRecord)
       // that invoke chpl__initCopy_shapeHelp().
       if !chpl_iteratorHasDomainShape(i) then
-        compilerError("unsupported elements of the expression being reduced -- they are iterable expressions without a domain shape");
+        compilerError("unsupported elements of the expression being reduced ",
+                    "-- they are iterable expressions without a domain shape");
 
       // Part 2 - build the array type -- as in chpl__initCopy(_iteratorRecord)
       var shape = new _domain(i._shape_);
@@ -139,14 +147,16 @@ module ChapelIteratorSupport {
       type arrElt = iteratorIndexType(i);
       if isArray(arrElt) || isDomain(arrElt) then
         // This scenario needs testing esp. memory/leaks before enabling it.
-        compilerError("unsupported elements of the expression being reduced -- they are iterable expressions consisting of arrays or domains");
+        compilerError("unsupported elements of the expression being reduced ",
+           "-- they are iterable expressions consisting of arrays or domains");
 
       return chpl__buildArrayRuntimeType(shape, arrElt);
     }
 
     // We do not know the dimensions of the array in this case.
     // Can we produce an empty array here?
-    halt("the expression being reduced contains no elements, which is currently not supported");
+    halt("the expression being reduced contains no elements,",
+         " which is currently not supported");
   }
 
   //
@@ -782,174 +792,4 @@ module ChapelIteratorSupport {
     return iterables.size == 1 && isRefIter(_getIterator(iterables(0)));
   }
 
-
-  // DEV NOTES:
-  //
-  // 3 versions of the iterators exist for each iterKind: a ref and a val
-  // iterator that take a single iterable and a version that takes a tuple of
-  // iterables. The refness of a tuple of iterables is handled automatically by
-  // tuple semantics, and it's only for the single iterable that we need an
-  // explicit ref and non-ref version. It would be ideal if there was an easier
-  // way to provide a wrapper iterator. Something to keep in mind of L/F 2.0?
-  //
-  // Note that no type checking is done on the argument since if a non-iterable
-  // is called it will result in the same error message to the user anyways
-  // since these are just wrapper iterators.
-  //
-  // Also note that we can currently rely on all parallel iterators having a
-  // serial version as well since we always resolve the serial iterator.
-  //
-  // It would be nice to warn the user that the "zip" keyword isn't needed.
-  // That's easy to do for the parallel case since the leader/follower would do
-  // the warning, but there's no way without compiler involvement to do that
-  // for the serial case that I can think of. Perhaps a new flag on the iter
-  // such as "non-zipperable iterator"?
-
-  //
-  // serial versions.
-  //
-
-  /*
-     Vectorize only "wrapper" iterator:
-
-     This iterator wraps and vectorizes other iterators. It takes one or more
-     iterables (an iterator or class/record with a these() iterator) and yields
-     the same elements as the wrapped iterables.
-
-     This iterator exists to provide a way to vectorize data parallel loops
-     without invoking a parallel iterator with the goal of avoiding task
-     creation for loops with small trip counts or where task creation isn't
-     desirable.
-
-     Data parallel operations in Chapel such as forall loops are
-     order-independent. However, a forall is implemented in terms of either
-     leader/follower or standalone iterators which typically create tasks.
-     This iterator exists to allow vectorization of order-independent loops
-     without requiring task creation. By using this wrapper iterator you are
-     asserting that the loop is order-independent (and thus a candidate for
-     vectorization) just as you are when using a forall loop.
-
-     When invoked from a serial for loop, this iterator will simply mark your
-     iterator(s) as order-independent. When invoked from a parallel forall loop
-     this iterator will implicitly be order-independent because of the
-     semantics of a forall, and additionally it will invoke the serial
-     iterator instead of the parallel iterators. For instance:
-
-     .. code-block:: chapel
-
-         forall i in vectorizeOnly(1..10) do;
-         for    i in vectorizeOnly(1..10) do;
-
-     will both effectively generate:
-
-     .. code-block:: c
-
-         // this loop hinted as order-independent
-         for (i=0; i<=10; i+=1) {}
-
-     The ``vectorizeOnly`` iterator  automatically handles zippering, so the
-     ``zip`` keyword is not needed. For instance, to vectorize:
-
-     .. code-block:: chapel
-
-         for (i, j) in zip(1..10, 1..10) do;
-
-     simply write:
-
-     .. code-block:: chapel
-
-         for (i, j) in vectorizeOnly(1..10, 1..10) do;
-
-     Note that the use of ``zip`` is not explicitly prevented, but all
-     iterators being zipped must be wrapped by a ``vectorizeOnly`` iterator.
-     Future releases may explicitly prevent the use ``zip`` with this iterator.
-  */
-  pragma "vectorize yielding loops"
-  iter vectorizeOnly(iterables...) where singleValIter(iterables) {
-    for i in iterables(0) do yield i;
-  }
-
-  pragma "no doc"
-  pragma "vectorize yielding loops"
-  iter vectorizeOnly(iterables...) ref where singleRefIter(iterables) {
-    for i in iterables(0) do yield i;
-  }
-
-  pragma "no doc"
-  pragma "vectorize yielding loops"
-  iter vectorizeOnly(iterables...?numiterables) where numiterables > 1 {
-    for i in zip((...iterables)) do yield i;
-  }
-
-
-  //
-  // standalone versions
-  //
-  pragma "no doc"
-  pragma "vectorize yielding loops"
-  iter vectorizeOnly(param tag: iterKind, iterables...)
-    where tag == iterKind.standalone && singleValIter(iterables) {
-    for i in iterables(0) do yield i;
-  }
-
-  pragma "no doc"
-  pragma "vectorize yielding loops"
-  iter vectorizeOnly(param tag: iterKind, iterables...) ref
-    where tag == iterKind.standalone && singleRefIter(iterables) {
-    for i in iterables(0) do yield i;
-  }
-
-  pragma "no doc"
-  pragma "vectorize yielding loops"
-  iter vectorizeOnly(param tag: iterKind, iterables...?numiterables)
-    where tag == iterKind.standalone && numiterables > 1  {
-    for i in zip((...iterables)) do yield i;
-  }
-
-
-  //
-  // leader versions
-  //
-  pragma "no doc"
-  iter vectorizeOnly(param tag: iterKind, iterables...)
-    where tag == iterKind.leader && singleValIter(iterables) {
-      yield iterables(0);
-  }
-
-  pragma "no doc"
-  iter vectorizeOnly(param tag: iterKind, iterables...) ref
-    where tag == iterKind.leader && singleRefIter(iterables) {
-      yield iterables(0);
-  }
-
-  pragma "no doc"
-  iter vectorizeOnly(param tag: iterKind, iterables...?numiterables)
-    where tag == iterKind.leader && numiterables > 1  {
-      yield iterables;
-  }
-
-
-  //
-  // follower versions
-  //
-  pragma "no doc"
-  pragma "vectorize yielding loops"
-  iter vectorizeOnly(param tag: iterKind, followThis, iterables...)
-    where tag == iterKind.follower && singleValIter(iterables) {
-      for i in iterables(0) do yield i;
-  }
-
-  pragma "no doc"
-  pragma "vectorize yielding loops"
-  iter vectorizeOnly(param tag: iterKind, followThis, iterables...) ref
-    where tag == iterKind.follower && singleRefIter(iterables) {
-      for i in iterables(0) do yield i;
-  }
-
-  pragma "no doc"
-  pragma "vectorize yielding loops"
-  iter vectorizeOnly(param tag: iterKind, followThis, iterables...?numiterables)
-    where tag == iterKind.follower && numiterables > 1 {
-    for i in zip((...iterables)) do yield i;
-  }
 }

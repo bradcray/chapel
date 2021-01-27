@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -30,7 +30,7 @@
 #include "iterator.h"
 #include "ParamForLoop.h"
 #include "passes.h"
-#include "preNormalizeOptimizations.h"
+#include "forallOptimizations.h"
 #include "resolution.h"
 #include "resolveFunction.h"
 #include "resolveIntents.h"
@@ -574,6 +574,23 @@ static Expr* preFoldPrimOp(CallExpr* call) {
     retval = preFoldMaybeLocalThis(call);
     call->replace(retval);
     break;
+
+  case PRIM_MAYBE_LOCAL_ARR_ELEM:
+    retval = preFoldMaybeLocalArrElem(call);
+    call->replace(retval);
+    break;
+
+  case PRIM_MAYBE_AGGREGATE_ASSIGN: {
+    Expr *aggReplacement = preFoldMaybeAggregateAssign(call);
+    call->insertAfter(aggReplacement);
+    if (isCondStmt(aggReplacement)) {
+      normalize(aggReplacement);
+    }
+
+    retval = new CallExpr(PRIM_NOOP);
+    call->replace(retval);
+    break;
+  }
 
   case PRIM_CALL_RESOLVES:
   case PRIM_CALL_AND_FN_RESOLVES:
@@ -2311,7 +2328,7 @@ static Expr* resolveTupleIndexing(CallExpr* call, Symbol* baseVar) {
 
   Type* indexType = call->get(3)->getValType();
 
-  if (!is_int_type(indexType) && !is_uint_type(indexType))
+  if (!is_int_type(indexType) && !is_uint_type(indexType) && !is_bool_type(indexType))
     USR_FATAL(call, "tuple indexing expression is not of integral type");
 
   AggregateType* baseType = toAggregateType(baseVar->getValType());
@@ -2329,6 +2346,12 @@ static Expr* resolveTupleIndexing(CallExpr* call, Symbol* baseVar) {
       error = true;
     }
   } else if (get_uint(call->get(3), &uindex)) {
+    sprintf(field, "x%" PRIu64, uindex);
+    if (uindex >= (unsigned long)baseType->fields.length-1) {
+      USR_FATAL_CONT(call, "tuple index %" PRIu64 " is out of bounds", uindex);
+      error = true;
+    }
+  } else if (get_bool(call->get(3), &uindex)) {
     sprintf(field, "x%" PRIu64, uindex);
     if (uindex >= (unsigned long)baseType->fields.length-1) {
       USR_FATAL_CONT(call, "tuple index %" PRIu64 " is out of bounds", uindex);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -2128,7 +2128,9 @@ static void addLocalCopiesAndWritebacks(FnSymbol*  fn,
         if (fn->hasFlag(FLAG_NEW_WRAPPER) || fn->isDefaultInit()) {
           tmp->addFlag(FLAG_NO_AUTO_DESTROY);
         } else {
-          tmp->addFlag(FLAG_INSERT_AUTO_DESTROY);
+          if (!tmp->hasFlag(FLAG_NO_AUTO_DESTROY)) {
+            tmp->addFlag(FLAG_INSERT_AUTO_DESTROY);
+          }
         }
       }
       break;

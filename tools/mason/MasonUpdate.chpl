@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -80,15 +80,23 @@ proc masonUpdate(args: [?d] string) {
 proc updateLock(skipUpdate: bool, tf="Mason.toml", lf="Mason.lock") {
 
   try! {
-    const cwd = getEnv("PWD");
+    const cwd = here.cwd();
     const projectHome = getProjectHome(cwd, tf);
     const tomlPath = projectHome + "/" + tf;
     const lockPath = projectHome + "/" + lf;
     const openFile = openreader(tomlPath);
     const TomlFile = parseToml(openFile);
+    var updated = false;
     if isFile(tomlPath) {
-      if TomlFile['dependencies']!.A.size > 0 then updateRegistry(skipUpdate);
-      else writeln("Skipping registry update since no dependency found in manifest file.");
+      if TomlFile.pathExists('dependencies') {
+        if TomlFile['dependencies']!.A.size > 0 {
+          updateRegistry(skipUpdate);
+          updated = true;
+        }
+      }
+      if !updated {
+        writeln("Skipping registry update since no dependency found in manifest file.");
+      }
     }
     if isDir(SPACK_ROOT) && TomlFile.pathExists('external') {
       if getSpackVersion != spackVersion then

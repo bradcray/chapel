@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -491,11 +491,6 @@ class LocReplicatedArr {
     // because the RHS could be an arbitrary forall or for expression.
     this.arrLocalRep = this.myDom.domLocalRep.buildArray(eltType,
                                                          initElts=true);
-
-    if initElts == false && !isPODType(eltType) {
-
-      compilerError("ReplicatedDist array initialization is not currently supported for element type " + eltType:string + " - please default-initialize the array");
-    }
   }
 
   proc deinit() {
@@ -657,13 +652,13 @@ proc ReplicatedArr.dsiReallocate(d: domain): void {
 */
 
 // Note: returns an associative array
-proc Replicated.dsiTargetLocales() {
+proc Replicated.dsiTargetLocales() const ref {
   return targetLocales;
 }
-proc ReplicatedDom.dsiTargetLocales() {
+proc ReplicatedDom.dsiTargetLocales() const ref {
   return dist.targetLocales;
 }
-proc ReplicatedArr.dsiTargetLocales() {
+proc ReplicatedArr.dsiTargetLocales() const ref {
   return dom.dist.targetLocales;
 }
 

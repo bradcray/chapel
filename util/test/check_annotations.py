@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """ Do basic validation and checks on the ANNOTATIONS.yaml file
 
 This is a kinda-ugly script that does basic validation of ANNOTATIONS.yaml
@@ -137,10 +137,10 @@ def check_pr_number_dates(ann_data):
                     pr_num = re.match(r'.*#(\d+)', text).group(1)
                     if pr_num in pr_to_date_dict:
                         pr_date = pr_to_date_dict[pr_num]
-                        if pr_date == date:
+                        if pr_date >= date:
                             warnings.warn('Warning: annotation date for "{0}: '
-                                          '{1}" appears to be the same as the '
-                                          'commit date'.format(graph, text))
+                                          '{1}" is earlier than or the same as '
+                                          'the commit date'.format(graph, text))
 
 
 if __name__ == '__main__':

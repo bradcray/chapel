@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -176,6 +176,7 @@ static void resolveSetMember(CallExpr* call);
 static void resolveInitField(CallExpr* call);
 static void resolveMove(CallExpr* call);
 static void resolveNew(CallExpr* call);
+static void resolveForResolutionPoint(CallExpr* call);
 static void resolveCoerce(CallExpr* call);
 static void resolveAutoCopyEtc(AggregateType* at);
 static FnSymbol* autoMemoryFunction(AggregateType* at, const char* fnName);
@@ -790,6 +791,11 @@ bool canInstantiate(Type* actualType, Type* formalType) {
   }
 
   if (formalType == dtAny) {
+    return true;
+  }
+
+  if (isConstrainedType(formalType)) {
+    INT_ASSERT(formalType->symbol->hasFlag(FLAG_GENERIC)); //CG TODO: remove?
     return true;
   }
 
@@ -2604,6 +2610,10 @@ void resolveCall(CallExpr* call) {
 
     case PRIM_NEW:
       resolveNew(call);
+      break;
+
+    case PRIM_RESOLUTION_POINT:
+      resolveForResolutionPoint(call);
       break;
 
     default:
@@ -4489,6 +4499,8 @@ static void findVisibleFunctionsAndCandidates(
     return;
   }
 
+  // CG TODO: pull all visible interface functions, if within a CG context
+
   // Keep *all* discovered functions in 'visibleFns' and 'mostApplicable'
   // so that we can revisit them for error reporting.
   // Keep track in 'numVisited*' of where we left off with the previous POI
@@ -4500,6 +4512,7 @@ static void findVisibleFunctionsAndCandidates(
   INT_ASSERT(visInfo.poiDepth == -1); // we have not used it
 
   do {
+    // CG TODO: no POI for CG functions
     visInfo.poiDepth++;
 
     findVisibleFunctions(info, &visInfo, &visited,
@@ -6652,7 +6665,8 @@ void resolveInitVar(CallExpr* call) {
   if (srcExpr && srcExpr->symbol() == gNoInit) {
     if (call->numActuals() < 3) {
       // no init needs a type, cannot infer from gNoInit.
-      INT_FATAL(call, "bad no init call");
+      USR_FATAL(call, "cannot use noinit on the variable '%s' "
+                      "declared without a type", dst->name);
     }
 
     SymExpr* targetTypeExpr = toSymExpr(call->get(3)->remove());
@@ -6660,7 +6674,8 @@ void resolveInitVar(CallExpr* call) {
 
     if (targetType->symbol->hasFlag(FLAG_GENERIC)) {
       // no init needs a concrete type, cannot infer from gNoInit.
-      INT_FATAL(call, "bad no init call");
+      USR_FATAL(call, "cannot use noinit on the variable '%s' "
+                      "declared with generic type", dst->name);
     }
 
     // Since we are not initializing, just set the variable's type
@@ -6879,7 +6894,16 @@ void resolveInitVar(CallExpr* call) {
 
       call->setUnresolvedFunction(astrInitEquals);
 
+      // If there is an error in that initCopy call,
+      // just mark it for later (rather than raising the error now)
+      // since the initCopy might be removed later in compilation.
+      inTryResolve++;
+      tryResolveStates.push_back(CHECK_CALLABLE_ONLY);
+
       resolveExpr(call);
+
+      tryResolveStates.pop_back();
+      inTryResolve--;
 
       dst->type = call->resolvedFunction()->_this->getValType();
 
@@ -7977,6 +8001,18 @@ static SymExpr* resolveNewFindTypeExpr(CallExpr* newExpr) {
 *                                                                             *
 ************************************** | *************************************/
 
+static void resolveForResolutionPoint(CallExpr* call) {
+  INT_ASSERT(call->numActuals() == 1);
+  resolveConstrainedGenericSymbol(toSymExpr(call->get(1))->symbol(), true);
+  call->convertToNoop();
+}
+
+/************************************* | **************************************
+*                                                                             *
+*                                                                             *
+*                                                                             *
+************************************** | *************************************/
+
 static void resolveCoerce(CallExpr* call) {
   resolveGenericActuals(call);
 }
@@ -8023,7 +8059,6 @@ static Type* resolveGenericActual(SymExpr* se, bool resolvePartials) {
       //   extern var x: c_ptr(c_int);
       if ((vs->hasFlag(FLAG_EXTERN) == true || isGlobal(vs)) &&
           vs->defPoint             != NULL &&
-          vs->defPoint->init       != NULL &&
           vs->getValType()         == dtUnknown ) {
         vs->type = resolveTypeAlias(se);
       }
@@ -8203,9 +8238,22 @@ Type* resolveTypeAlias(SymExpr* se) {
     } else if (VarSymbol* var = toVarSymbol(se->symbol())) {
       SET_LINENO(var->defPoint);
 
-      DefExpr* def      = var->defPoint;
-      Expr*    typeExpr = resolveTypeOrParamExpr(def->init);
-      SymExpr* tse      = toSymExpr(typeExpr);
+      DefExpr* def = var->defPoint;
+      SymExpr* tse = NULL;
+
+      if (def->init != NULL) {
+        tse = toSymExpr(resolveTypeOrParamExpr(def->init));
+      } else if (SymExpr* singleDef = var->getSingleDef()) {
+        // Figure out the RHS of the singleDef, assuming it is in a PRIM_MOVE.
+        if (CallExpr* call = toCallExpr(singleDef->parentExpr))
+          if (call->isPrimitive(PRIM_MOVE))
+            if (call->get(1) == singleDef)
+              tse = toSymExpr(resolveTypeOrParamExpr(call->get(2)));
+      }
+
+      if (tse == NULL) {
+        INT_FATAL("unsupported case in resolveTypeAlias");
+      }
 
       retval = resolveTypeAlias(tse);
     }
@@ -8330,6 +8378,8 @@ Expr* resolveExpr(Expr* expr) {
     }
 
   } else if (DefExpr* def = toDefExpr(expr)) {
+    resolveConstrainedGenericSymbol(def->sym, false);
+
     retval = foldTryCond(postFold(def));
 
   } else if (SymExpr* se = toSymExpr(expr)) {
@@ -8360,6 +8410,10 @@ Expr* resolveExpr(Expr* expr) {
       }
     }
     retval = foldTryCond(postFold(expr));
+
+  } else if (ImplementsStmt* istm = toImplementsStmt(expr)) {
+    resolveImplementsStmt(istm);
+    retval = istm;
 
   } else {
     retval = foldTryCond(postFold(expr));
@@ -8997,6 +9051,8 @@ void resolve() {
   if (fPrintUnusedFns || fPrintUnusedInternalFns)
     printUnusedFunctions();
 
+  saveGenericSubstitutions();
+
   pruneResolvedTree();
 
   resolveForallStmts2();
@@ -9148,12 +9204,13 @@ static void resolveExports() {
       continue;
     }
 
-    if (fn->hasFlag(FLAG_EXPORT) == true) {
+    if (fn->hasFlag(FLAG_EXPORT) || fn->hasFlag(FLAG_ALWAYS_RESOLVE)) {
       SET_LINENO(fn);
 
       resolveSignatureAndFunction(fn);
 
-      exps.push_back(fn);
+      if (fn->hasFlag(FLAG_EXPORT))
+        exps.push_back(fn);
     }
   }
 
@@ -9955,8 +10012,8 @@ static void printCallGraph(FnSymbol* startPoint, int indent, std::set<FnSymbol*>
           }
 
           FnSymbol* instFn = fn;
-          if (fn->instantiatedFrom) {
-            instFn = fn->instantiatedFrom;
+          if (FnSymbol* gfn = fn->instantiatedFrom) {
+            instFn = gfn;
           }
           if (printLocalMultiples || 0 == alreadySeenLocally.count(instFn)) {
             alreadySeenLocally.insert(instFn);
@@ -10844,9 +10901,6 @@ static void lowerPrimInit(CallExpr* call, Symbol* val, Type* type,
     // initialized. This way avoid emitting confusing errors from within
     // the `_defaultOf` and give other code a chance to emit errors as well.
     //
-    // TODO: Prune/don't generate `_defaultOf` for tuples containing non-
-    // default-initializable elements?
-    //
     if (!hasErrored) {
       CallExpr* defaultCall = new CallExpr("_defaultOf", type->symbol);
       CallExpr* move = new CallExpr(PRIM_MOVE, val, defaultCall);
@@ -10856,6 +10910,13 @@ static void lowerPrimInit(CallExpr* call, Symbol* val, Type* type,
 
       resolveCallAndCallee(defaultCall);
       resolveExpr(move);
+
+    //
+    // Go ahead and convert the call to a NOP to avoid getting errors during
+    // post-resolution checks (these run even if errors have been emitted).
+    //
+    } else {
+      call->convertToNoop();
     }
 
   // other types (sync, single, ...)

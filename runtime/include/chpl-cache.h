@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
@@ -28,6 +28,10 @@
 
 #ifdef HAS_CHPL_CACHE_FNS
 // This is a cache for remote data.
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Is the cache enabled? (set at compile time)
 extern const int CHPL_CACHE_REMOTE;
@@ -93,6 +97,16 @@ void chpl_cache_comm_getput_unordered_task_fence(void);
 // For debugging.
 void chpl_cache_print(void);
 void chpl_cache_assert_released(void);
+void chpl_cache_print_stats(void);
+// just stores 0s in the cache; here to exercise the data structures
+// returns 1 if the data was cached
+int chpl_cache_mock_get(c_nodeid_t node, uint64_t raddr, size_t size);
+void chpl_cache_invalidate(c_nodeid_t node, void* raddr, size_t size,
+                           int ln, int32_t fn);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 // ifdef HAS_CHPL_CACHE_FNS

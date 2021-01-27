@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -186,8 +186,8 @@ byte of the argument:
 
    .. code-block:: chapel
 
-     proc getSecondByte(arg:string) : int {
-       var offsetInBytes = 2:byteIndex;
+     proc getSecondByte(arg:string) {
+       var offsetInBytes = 1:byteIndex;
        return arg[offsetInBytes];
      }
 
@@ -196,9 +196,9 @@ codepoint of the argument:
 
    .. code-block:: chapel
 
-     proc getSecondByte(arg:string) : int {
-       var offsetInBytes = 2:byteIndex;
-       return arg[offsetInBytes];
+     proc getSecondCodepoint(arg:string) {
+       var offsetInCodepoints = 1:codepointIndex;
+       return arg[offsetInCodepoints];
      }
 
 
@@ -703,6 +703,11 @@ module String {
     }
   }
 
+  proc cStrAssignmentDeprWarn() {
+    compilerWarning("Assigning to a string from a c_string is deprecated. ",
+                    "Use createStringWith*Buffer functions instead.");
+  }
+
   //
   // String Implementation
   //
@@ -734,6 +739,10 @@ module String {
 
     proc init=(cs: c_string) {
       this.complete();
+      cStrAssignmentDeprWarn();
+      try! {
+        this.cachedNumCodepoints = validateEncoding(cs:bufferType, cs.size);
+      }
       initWithNewBuffer(this, cs:bufferType, length=cs.size, size=cs.size+1);
     }
 
@@ -2099,6 +2108,7 @@ module String {
      Halts if `lhs` is a remote string.
   */
   proc =(ref lhs: string, rhs_c: c_string) {
+    cStrAssignmentDeprWarn();
     // I want to use try! but got tripped over by #14465
     try {
       lhs = createStringWithNewBuffer(rhs_c);

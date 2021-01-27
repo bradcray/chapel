@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  * 
@@ -1001,6 +1001,10 @@ override proc BlockArr.dsiDisplayRepresentation() {
 
 override proc BlockArr.dsiGetBaseDom() return dom;
 
+override proc BlockArr.dsiIteratorYieldsLocalElements() param {
+  return true;
+}
+
 //
 // NOTE: Each locale's myElems array must be initialized prior to
 // setting up the RAD cache.
@@ -1200,6 +1204,7 @@ iter BlockArr.these(param tag: iterKind, followThis, param fast: bool = false) r
       arrSection = _to_nonnil(myLocArr);
 
     local {
+      use CPtr; // Needed to cast from c_void_ptr in the next line
       const narrowArrSection = __primitive("_wide_get_addr", arrSection):arrSection.type?;
       ref myElems = _to_nonnil(narrowArrSection).myElems;
       for i in myFollowThisDom do yield myElems[i];
@@ -1441,15 +1446,15 @@ proc BlockArr.dsiPrivatize(privatizeData) {
 
 ////// more /////////////////////////////////////////////////////////////////
 
-proc BlockArr.dsiTargetLocales() {
+proc BlockArr.dsiTargetLocales() const ref {
   return dom.dist.targetLocales;
 }
 
-proc BlockDom.dsiTargetLocales() {
+proc BlockDom.dsiTargetLocales() const ref {
   return dist.targetLocales;
 }
 
-proc Block.dsiTargetLocales() {
+proc Block.dsiTargetLocales() const ref {
   return targetLocales;
 }
 
@@ -1538,9 +1543,41 @@ where this.sparseLayoutType == unmanaged DefaultDist &&
   return true;
 }
 
-// Block1 <=> Block2 
-proc BlockArr.doiOptimizedSwap(other) {
-  if(this.dom.dist.dsiEqualDMaps(other.dom.dist)) {
+proc BlockArr.canDoOptimizedSwap(other) {
+  var domsMatch = true;
+
+  if this.dom != other.dom { // no need to check if this is true
+    if domsMatch {
+      for param i in 0..this.dom.rank-1 {
+        if this.dom.whole.dim(i) != other.dom.whole.dim(i) {
+          domsMatch = false;
+        }
+      }
+    }
+  }
+
+  if domsMatch {
+    // distributions must be equal, too
+    return this.dom.dist.dsiEqualDMaps(other.dom.dist);
+  }
+  return false;
+}
+
+// A helper routine that will perform a pointer swap on an array
+// instead of doing a deep copy of that array. Returns true
+// if used the optimized swap, false otherwise
+//
+// TODO: stridability causes issues with RAD swap, and somehow isn't captured by
+// the formal type when we check whether this resolves.
+proc BlockArr.doiOptimizedSwap(other: this.type)  
+  where this.stridable == other.stridable {
+
+  if(canDoOptimizedSwap(other)) {
+    if debugOptimizedSwap {
+      writeln("BlockArr doing optimized swap. Domains: ", 
+              this.dom.whole, " ", other.dom.whole, " Bounding boxes: ",
+              this.dom.dist.boundingBox, " ", other.dom.dist.boundingBox);
+    }
     coforall (locarr1, locarr2) in zip(this.locArr, other.locArr) {
       on locarr1 {
         locarr1.myElems <=> locarr2.myElems;
@@ -1549,8 +1586,24 @@ proc BlockArr.doiOptimizedSwap(other) {
     }
     return true;
   } else {
+    if debugOptimizedSwap {
+      writeln("BlockArr doing unoptimized swap. Domains: ", 
+              this.dom.whole, " ", other.dom.whole, " Bounding boxes: ",
+              this.dom.dist.boundingBox, " ", other.dom.dist.boundingBox);
+    }
     return false;
   }
+}
+
+
+// The purpose of this overload is to provide debugging output in the event that
+// debugOptimizedSwap is on and the main routine doesn't resolve (e.g., due to a
+// type, stridability, or rank mismatch in the other argument). When
+// debugOptimizedSwap is off, this overload will be ignored due to its where
+// clause.
+proc BlockArr.doiOptimizedSwap(other) where debugOptimizedSwap {
+  writeln("BlockArr doing unoptimized swap. Type mismatch");
+  return false;
 }
 
 private proc _doSimpleBlockTransfer(Dest, destDom, Src, srcDom) {
@@ -1675,14 +1728,14 @@ proc BlockArr.doiScan(op, dom) where (rank == 1) &&
 
   // The result of this scan, which will be Block-distributed as well
   type resType = op.generate().type;
-  var res: [dom] resType;
+  var res = dom.buildArray(resType, initElts=!isPOD(resType));
 
   // Store one element per locale in order to track our local total
   // for a cross-locale scan as well as flags to negotiate reading and
   // writing it.  This domain really wants an easier way to express
   // it...
   use ReplicatedDist;
-  ref targetLocs = this.dsiTargetLocales();
+  const ref targetLocs = this.dsiTargetLocales();
   const elemPerLocDom = {1..1} dmapped Replicated(targetLocs);
   var elemPerLoc: [elemPerLocDom] resType;
   var inputReady$: [elemPerLocDom] sync bool;
@@ -1751,6 +1804,7 @@ proc BlockArr.doiScan(op, dom) where (rank == 1) &&
       delete myop;
     }
   }
+  if isPOD(resType) then res.dsiElementInitializationComplete();
 
   delete op;
   return res;

@@ -301,6 +301,11 @@ OPTIONS
     duplication that increases executable size and compilation time. There
     may also be execution time overheads independent of loop domain size.
 
+**--[no-]auto-aggregation**
+
+    Enable [disable] optimization of the last statement in forall statements to
+    use aggregated communication. This optimization is disabled by default.
+
 *Run-time Semantic Check Options* 
 
 **--[no-]checks**
@@ -795,5 +800,5 @@ See $CHPL\_HOME/CONTRIBUTORS.md for a list of contributors to Chapel.
 COPYRIGHT
 ---------
 
-| Copyright 2020 Hewlett Packard Enterprise Development LP
+| Copyright 2020-2021 Hewlett Packard Enterprise Development LP
 | Copyright 2004-2019 Cray Inc.

@@ -452,6 +452,9 @@ all:
   09/29/20:
     - text: Do sequential DR assignment if GETs are to be used (#16488)
       config: 16-node-xc, 16-node-cs
+  11/19/20:
+    - Improve the speed of tracking arrays declared over a domain (#16740)
+# End all
 
 AllCompTime: &timecomp-base
   11/09/14:
@@ -682,6 +685,9 @@ create-views:
     - Put param conditionals before others in domain record initialization (#15591)
   09/17/20:
     - Fix some issues with constant domain optimization (#16397)
+  10/02/20:
+    - Only reference count a distribution's domains (#16528)
+
 
 cs-resize:
   03/05/19:
@@ -692,10 +698,14 @@ dist-performance.cc:
     - Use workaround to enable lifetime checking for lists of borrowed classes (#15575)
   06/27/20:
     - Revert changes to `list._commonInitFromIterable` (#15943)
+  12/16/20:
+    - Distributed sort improvements (#16871)
 
 dist-performance.ml-perf:
   07/01/20:
     - Optimize repeated insertions/deletions from chpl__hashtable (#15982)
+  12/16/20:
+    - Distributed sort improvements (#16871)
 
 distCreate-arrays-deinit.cc-perf: &distCreate-base
   02/12/20:
@@ -780,6 +790,9 @@ ep.ml-time:
 empty-chpl-barrier.ml-time:
   08/02/18:
     - Optimize the atomic barrier implementation for network atomics (#10633)
+  11/03/20:
+    - Do fewer GETs to force PUTs into a visible state, and do them later (#16634)
+
 
 exchange:
   04/18/19:
@@ -1107,7 +1120,7 @@ memleaks:
   08/17/16:
     - Single as record (#4350)
   01/05/17:
-    - Maybe "adding support for params without initializers"(#5075)?
+    - Maybe "adding support for params without initializers"(#5069)?
   01/07/17:
     - new test verifying the user's guide type aliases section (#5075)
   01/17/17:
@@ -1142,6 +1155,7 @@ memleaks:
     - Fix problem with new applied to a borrowed nilable type argument (#16380)
   09/17/20:
     - Fix some issues with constant domain optimization (#16397)
+# End memleaks
 
 memleaksfull:
   07/08/14:
@@ -1341,6 +1355,17 @@ memleaksfull:
     - Close a trivial test leak (#15871)
   07/14/20:
     - Add tests for set, map, list of arrays (#16034)
+  10/23/20:
+    - Close leaks coming from unnamed array types (#16600)
+  11/04/20:
+    - Deallocate the RTT memory returned from empty for expressions (#16628)
+  11/20/20:
+    - Fix memory leak in reduceLoopOfPromoted.chpl (#16691)
+  01/09/21:
+    - Add tests and futures looking at I/O on class hierarchies (#16920)
+  01/15/21:
+    - Fix memory leak for classes/io/classToString (#16949)
+# End memleaksfull
 
 meteor:
   12/18/13:
@@ -1599,6 +1624,14 @@ regexdna-submitted:
 regexdnaredux-submitted:
   <<: *regexdna-base
 
+remote-puts.ml-perf:
+  11/03/20:
+    - Do fewer GETs to force PUTs into a visible state, and do them later (#16634)
+
+remote-fetchAmos.ml-perf:
+  11/03/20:
+    - Do fewer GETs to force PUTs into a visible state, and do them later (#16634)
+
 remote-ons.ml-perf:
   05/17/19:
     - Avoid comm/compute overlap for short-lived tasks (#12964)
@@ -1630,7 +1663,7 @@ revcomp: &revcomp-base
     - various qio changes motivated by cygwin failures (#1943)
   10/29/15:
     - Difficult to consistently replicate
-  08/12/16:
+  08/14/16:
     - text: Discontinued performance testing (data invalid) (#4333)
       config: 1-node-xc
   03/10/17:
@@ -1670,10 +1703,16 @@ sad:
 scanPerf:
   03/05/19:
     - Support optionally parallel 1D scans on default rectangular (#12469)
+  01/14/21:
+    - Optimize scans by using noinit for the result array (#16919)
 
 scanPerf.ml-time:
   03/06/19:
     - First good draft of parallel Block-distributed scan (#12481)
+  01/12/21:
+    - Increase the problem size for the multi-locale scan performance test (#16918)
+  01/14/21:
+    - Optimize scans by using noinit for the result array (#16919)
 
 search:
   04/20/17:
@@ -1962,6 +2001,10 @@ compilerAndTestingStats: &compiler-perf-base
     - Give errors in reexporting ambiguities (#15316)
   04/16/20:
     - Cache whether a ResolveScope or UseStmt can reexport (#15517)
+  04/28/20:
+    - Move compiler performance jobs to chapcs04
+  06/15/20:
+    - machine update (McAfee)
   07/27/20:
     - Replace some where-clauses with formals types (#16130)
     - Handle bool tests in the compiler (#16062)
@@ -1998,6 +2041,25 @@ arkouda: &arkouda-base
   09/23/20:
     - text: Optimize DstAggregator by caching remote allocations (mhmerrill/arkouda#485)
       config: 16-node-cs, 16-node-xc
+  10/02/20:
+    - text: Optimize SrcAggregator by caching remote allocations (mhmerrill/arkouda#503)
+      config: 16-node-cs
+  10/03/20:
+    - text: Enable SrcAggregator under ugni (mhmerrill/arkouda#507)
+      config: 16-node-xc
+    - text: Move XC testing from elogin back to login node
+      config: 16-node-xc
+  10/06/20:
+    - text: Optimize aggregators by yielding more often (mhmerrill/arkouda#509)
+      config: 16-node-cs, 16-node-xc
+  10/21/20:
+    - Upgrade Arkouda release testing from 1.22 to 1.23 (#16599)
+  01/08/21:
+    - Benchmark improvements (mhmerrill/arkouda#616)
+  01/14/21:
+    - Optimize scans by using noinit for the result array (#16919)
+  01/15/21:
+    - Optimize int64 prod reduce (mhmerrill/arkouda#628)
 
 
 arkouda-comp:

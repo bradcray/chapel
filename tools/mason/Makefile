@@ -1,4 +1,4 @@
-# Copyright 2020 Hewlett Packard Enterprise Development LP
+# Copyright 2020-2021 Hewlett Packard Enterprise Development LP
 # Copyright 2004-2019 Cray Inc.
 # Other additional copyright holders may be indicated within.
 #
@@ -39,7 +39,7 @@ mason: $(bdir)/mason FORCE
 install: $(bdir)/mason FORCE
 
 $(bdir)/mason: $(MASON_SOURCES)
-	@if [ $(shell $(CHPL_MAKE_HOME)/util/chplenv/chpl_regexp.py) != re2 ]; then \
+	@if [ $(shell $(CHPL_MAKE_PYTHON) $(CHPL_MAKE_HOME)/util/chplenv/chpl_regexp.py) != re2 ]; then \
         echo "CHPL_REGEXP=re2 is required to build mason"; \
         exit 1;\
 	fi;

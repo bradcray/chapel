@@ -137,6 +137,7 @@ bool ResolutionCandidate::isApplicableGeneric(CallInfo& info,
    * filtering and disambiguation processes.
    */
   fn = instantiateSignature(fn, substitutions, visInfo);
+  adjustForCGinstantiation(fn, substitutions);
 
   if (fn == NULL) {
     reason = RESOLUTION_CANDIDATE_OTHER;
@@ -148,9 +149,6 @@ bool ResolutionCandidate::isApplicableGeneric(CallInfo& info,
   if (fn == oldFn)
     return true;
 
-  if (! witnesses.empty()) // i.e. when CG
-    cleanupInstantiatedCGfun(fn, witnesses);
-
   return isApplicable(info, visInfo);
 }
 
@@ -159,13 +157,18 @@ bool ResolutionCandidate::isApplicableGeneric(CallInfo& info,
 // Should this be entirely in interfaceResolution.cpp ?
 bool ResolutionCandidate::isApplicableCG(CallInfo& info,
                                          VisibilityInfo* visInfo) {
+  int indx = 0;
   for_alist(iconExpr, fn->interfaceInfo->interfaceConstraints) {
     IfcConstraint* icon = toIfcConstraint(iconExpr);
     if (ImplementsStmt* istm =
           constraintIsSatisfiedAtCallSite(info.call, icon, substitutions))
-      witnesses.push_back(istm); // success
-    else
+    {
+      // success
+      witnesses.push_back(istm);
+      copyIfcRepsToSubstitutions(fn, indx++, istm, substitutions);
+    } else {
       return false;
+    }
   }
 
   return true; // all constraints are satisfied
@@ -225,14 +228,51 @@ bool ResolutionCandidate::computeAlignment(CallInfo& info) {
   // Record successful substitutions.
   int        j      = 0;
   ArgSymbol* formal = (fn->numFormals()) ? fn->getFormal(1) : NULL;
+  bool skipNextActual = false;
+  bool skipNextFormal = false;
 
   for (int i = 0; i < info.actuals.n; i++) {
     if (info.actualNames.v[i] == NULL) {
       bool match = false;
+      bool skippedThisActual = false;
 
       while (formal != NULL) {
         if (formal->variableExpr) {
           return fn->isGeneric();
+        }
+
+        if (fn->hasFlag(FLAG_OPERATOR)) {
+          if (formal->typeInfo() == dtMethodToken &&
+              info.actuals.v[i]->typeInfo() != dtMethodToken) {
+            // Formal is a method token and the actual is not (but this was an
+            // operator call so that's okay)
+            formal = next_formal(formal);
+            j++;
+            skipNextFormal = true;
+            continue;
+
+          } else if (skipNextFormal) {
+            INT_ASSERT(formal->hasFlag(FLAG_ARG_THIS));
+            formal = next_formal(formal);
+            j++;
+            skipNextFormal = false; // clear
+            continue;
+
+          } else if (formal->typeInfo() != dtMethodToken &&
+                     info.actuals.v[i]->typeInfo() == dtMethodToken) {
+            // actual is a method token but the formal is not (but this was an
+            // operator call so that's okay)
+            skippedThisActual = true;
+            skipNextActual = true;
+            break;
+          } else if (skipNextActual) {
+            // previous actual was a method token, so this is intended to be for
+            // a "this" argument that doesn't exist (but that's okay because
+            // this is an operator call).
+            skippedThisActual = true;
+            skipNextActual = false;
+            break;
+          }
         }
 
         if (formalIdxToActual[j] == NULL &&
@@ -252,14 +292,19 @@ bool ResolutionCandidate::computeAlignment(CallInfo& info) {
 
       // Fail if there are too many unnamed actuals.
       if (match == false) {
-        if (! fn->isGeneric()) {
-          failingArgument = info.actuals.v[i];
-          reason = RESOLUTION_CANDIDATE_TOO_MANY_ARGUMENTS;
-          return false;
-        } else if (fn->hasFlag(FLAG_INIT_TUPLE) == false) {
-          failingArgument = info.actuals.v[i];
-          reason = RESOLUTION_CANDIDATE_TOO_MANY_ARGUMENTS;
-          return false;
+        // If this isn't an operator call, or it was an operator call but this
+        // actual wasn't intended for a skippable method token or "this"
+        // argument, then we should fail at this actual.
+        if (!fn->hasFlag(FLAG_OPERATOR) || !skippedThisActual) {
+          if (! fn->isGeneric()) {
+            failingArgument = info.actuals.v[i];
+            reason = RESOLUTION_CANDIDATE_TOO_MANY_ARGUMENTS;
+            return false;
+          } else if (fn->hasFlag(FLAG_INIT_TUPLE) == false) {
+            failingArgument = info.actuals.v[i];
+            reason = RESOLUTION_CANDIDATE_TOO_MANY_ARGUMENTS;
+            return false;
+          }
         }
       }
     }
@@ -270,9 +315,15 @@ bool ResolutionCandidate::computeAlignment(CallInfo& info) {
   while (formal) {
     if (formalIdxToActual[j] == NULL && formal->defaultExpr == NULL &&
         !formal->hasFlag(FLAG_TYPE_FORMAL_FOR_OUT)) {
-      failingArgument = formal;
-      reason = RESOLUTION_CANDIDATE_TOO_FEW_ARGUMENTS;
-      return false;
+      if (fn->hasFlag(FLAG_OPERATOR) && (formal->typeInfo() == dtMethodToken ||
+                                         formal->hasFlag(FLAG_ARG_THIS))) {
+      // Operator calls are allowed to skip matching the method token and "this"
+      // arguments
+      } else {
+        failingArgument = formal;
+        reason = RESOLUTION_CANDIDATE_TOO_FEW_ARGUMENTS;
+        return false;
+      }
     }
 
     formal = next_formal(formal);
@@ -298,6 +349,7 @@ bool ResolutionCandidate::computeSubstitutions(Expr* ctx) {
   substitutions.clear();
 
   int nDefault = 0;
+  int nIgnored = 0;
   int i = 1;
   for_formals(formal, fn) {
     if (formal->intent                              == INTENT_PARAM ||
@@ -309,6 +361,10 @@ bool ResolutionCandidate::computeSubstitutions(Expr* ctx) {
       } else if (formal->defaultExpr != NULL) {
         computeSubstitutionForDefaultExpr(formal, ctx);
         nDefault++;
+      } else if (fn->hasFlag(FLAG_OPERATOR) &&
+                 (formal->typeInfo() == dtMethodToken ||
+                  formal->hasFlag(FLAG_ARG_THIS))) {
+        nIgnored++;
       }
 
       if (isConstrainedType(formal->type)) {
@@ -318,7 +374,7 @@ bool ResolutionCandidate::computeSubstitutions(Expr* ctx) {
     i++;
   }
 
-  return substitutions.n + nDefault > 0;
+  return substitutions.n + nDefault + nIgnored > 0;
 }
 
 bool ResolutionCandidate::verifyGenericFormal(ArgSymbol* formal) const {
@@ -908,6 +964,16 @@ bool ResolutionCandidate::checkGenericFormals(Expr* ctx) {
             return false;
           }
 
+        } else if (isConstrainedType(formal->type, CT_CGFUN_ASSOC_TYPE)) {
+          // At this point we have not yet recorded the instantiations for
+          // interface types. So we cannot compute their associated types.
+          // So allow anything to match an associated type for now.
+          // Correctness will be checked later in isApplicableConcrete().
+          //
+          // CG TODO: also enable the case when such an AT is nested.
+          // Ex. actual: [1..3] int, formal: [1..3] AT,
+          // where AT is 'int' for the current call.
+
         } else {
           bool formalIsParam = formal->hasFlag(FLAG_INSTANTIATED_PARAM) ||
                                formal->intent == INTENT_PARAM;
@@ -1081,7 +1147,7 @@ void explainCandidateRejection(CallInfo& info, FnSymbol* fn) {
                     failingActualDesc,
                     toString(failingActual->getValType()));
       USR_PRINT(failingFormal, "is passed to formal '%s'",
-                               toString(failingFormal));
+                               toString(failingFormal, true));
       if (isNilableClassType(failingActual->getValType()) &&
           isNonNilableClassType(failingFormal->getValType()))
         USR_PRINT(call, "try to apply the postfix ! operator to %s",
@@ -1108,13 +1174,13 @@ void explainCandidateRejection(CallInfo& info, FnSymbol* fn) {
     case RESOLUTION_CANDIDATE_NOT_PARAM:
       USR_PRINT(call, "because non-param %s", failingActualDesc);
       USR_PRINT(failingFormal, "is passed to param formal '%s'",
-                               toString(failingFormal));
+                               toString(failingFormal, true));
       break;
     case RESOLUTION_CANDIDATE_NOT_TYPE:
       if (failingFormal->hasFlag(FLAG_TYPE_VARIABLE)) {
         USR_PRINT(call, "because non-type %s", failingActualDesc);
         USR_PRINT(failingFormal, "is passed to formal '%s'",
-                                 toString(failingFormal));
+                                 toString(failingFormal, true));
       } else {
         USR_PRINT(call, "because %s is a type", failingActualDesc);
         if (failingFormal->hasFlag(FLAG_EXPANDED_VARARGS)) {
@@ -1122,20 +1188,20 @@ void explainCandidateRejection(CallInfo& info, FnSymbol* fn) {
                     failingFormal->demungeVarArgName().c_str());
         } else {
           USR_PRINT(fn, "but is passed to non-type formal '%s'",
-                    toString(failingFormal));
+                    toString(failingFormal, true));
         }
       }
       break;
     case RESOLUTION_CANDIDATE_TOO_MANY_ARGUMENTS:
-      USR_PRINT(call, "because call includes %i arguments",
-                      userActualsCount);
-      USR_PRINT(fn, "but function can only accept %i arguments",
-                    userFormalsCount);
+      USR_PRINT(call, "because call includes %i argument%s",
+                userActualsCount, ((userActualsCount == 1) ? "" : "s"));
+      USR_PRINT(fn, "but function can only accept %i argument%s",
+                userFormalsCount, ((userFormalsCount == 1) ? "" : "s"));
       break;
     case RESOLUTION_CANDIDATE_TOO_FEW_ARGUMENTS:
       USR_PRINT(call, "because call does not supply enough arguments");
       USR_PRINT(failingFormal, "it is missing a value for formal '%s'",
-                               toString(failingFormal));
+                               toString(failingFormal, true));
       break;
     case RESOLUTION_CANDIDATE_NO_NAMED_ARGUMENT:
       {

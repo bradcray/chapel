@@ -35,6 +35,8 @@ or
 
 .. data:: var notNilDefault = c!
 
+.. data:: var isNilDefault: nilable C = nil
+
 .. data:: var plusDefault = x+y
 
 .. data:: var minusDefault = x-y
@@ -87,11 +89,13 @@ or
 
 .. data:: var castDefault = x: int(32)
 
+.. data:: var tuple1Default = (x,)
+
 .. data:: var tuple2Default = (x, y)
 
 .. data:: var tuple3Default = (x, y, z)
 
-.. data:: var dotTypeDefault = x.type 
+.. data:: var dotTypeDefault = x.type
 
 .. data:: var dotFieldDefault = c!.aField
 
@@ -123,15 +127,15 @@ or
 
    .. attribute:: param a: int
 
-   .. attribute:: param b: a.type 
+   .. attribute:: param b: a.type
 
 .. record:: R3
 
    .. attribute:: param a: int
 
-   .. attribute:: param b: a.type 
+   .. attribute:: param b: a.type
 
-   .. attribute:: param c: b.type 
+   .. attribute:: param c: b.type
 
 .. data:: var R0TypedArgNoDefault: R0
 

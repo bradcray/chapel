@@ -205,18 +205,18 @@ module OwnedObject {
                     else _to_borrowed(src.type);
 
       if isCoercible(src.chpl_t, this.type.chpl_t) == false then
-        compilerError("cannot coerce '", src.type:string, "' to '", this.type:string, "' in initialization");
+        compilerError("cannot initialize '", this.type:string, "' from a '", src.type:string, "'");
 
       this.chpl_p = src.release();
       this.complete();
 
       if isNonNilableClass(this.type) && isNilableClass(src) then
-        compilerError("cannot create a non-nilable owned variable from a nilable class instance");
+        compilerError("cannot initialize '", this.type:string, "' from a '", src.type:string, "'");
     }
 
     pragma "no doc"
     proc init=(src: shared) {
-      compilerError("cannot create an owned variable from a shared class instance");
+      compilerError("cannot initialize '", this.type:string, "' from a '", src.type:string, "'");
       this.chpl_t = if this.type.chpl_t != ?
                     then this.type.chpl_t
                     else _to_borrowed(src.type);
@@ -224,7 +224,7 @@ module OwnedObject {
 
     pragma "no doc"
     proc init=(src: borrowed) {
-      compilerError("cannot create an owned variable from a borrowed class instance");
+      compilerError("cannot initialize '", this.type:string, "' from a '", src.type:string, "'");
       this.chpl_t = if this.type.chpl_t != ?
                     then this.type.chpl_t
                     else _to_borrowed(src.type);
@@ -232,7 +232,7 @@ module OwnedObject {
 
     pragma "no doc"
     proc init=(src: unmanaged) {
-      compilerError("cannot create an owned variable from an unmanaged class instance");
+      compilerError("cannot initialize '", this.type:string, "' from a '", src.type:string, "'");
       this.chpl_t = if this.type.chpl_t != ?
                     then this.type.chpl_t
                     else _to_borrowed(src.type);
@@ -242,12 +242,12 @@ module OwnedObject {
     pragma "leaves this nil"
     proc init=(src : _nilType) {
       if this.type.chpl_t == ? then
-        compilerError("Cannot establish type of owned when initializing with  nil");
+        compilerError("Cannot establish type of owned when initializing with 'nil'");
 
       this.init(this.type.chpl_t);
 
       if isNonNilableClass(chpl_t) then
-        compilerError("Assigning non-nilable owned to nil");
+        compilerError("cannot initialize '", this.type:string, "' from 'nil'");
     }
 
     // Copy-init implementation to allow for 'new _owned(foo)' in module code
@@ -444,7 +444,18 @@ module OwnedObject {
   // Don't print out 'chpl_p' when printing an _owned, just print class pointer
   pragma "no doc"
   proc _owned.readWriteThis(f) throws {
-    f <~> this.chpl_p;
+    if isNonNilableClass(this.chpl_t) {
+      var tmp = this.chpl_p! : borrowed class;
+      f <~> tmp;
+      if tmp == nil then halt("internal error - read nil");
+      if tmp != this.chpl_p then halt("internal error - read changed ptr");
+    } else {
+      var tmp = this.chpl_p : borrowed class?;
+      f <~> tmp;
+      if tmp != this.chpl_p then halt("internal error - read changed ptr");
+      if tmp == nil then
+        this.clear();
+    }
   }
 
   // cast to owned?, no class downcast

@@ -99,6 +99,7 @@ static bool        isCallToTypeConstructor(CallExpr* call);
 static void        normalizeCallToTypeConstructor(CallExpr* call);
 
 static void        applyGetterTransform(CallExpr* call);
+static void        transformIfVar(CallExpr* call);
 static void        insertCallTemps(CallExpr* call);
 static Symbol*     insertCallTempsWithStmt(CallExpr* call, Expr* stmt);
 
@@ -254,12 +255,6 @@ void normalize() {
         fn->name = astrDeinit;
       }
 
-    // make sure methods don't attempt to overload operators
-    } else if (isalpha(fn->name[0])         == 0   &&
-               fn->name[0]                  != '_' &&
-               fn->formals.length           >  1   &&
-               fn->getFormal(1)->typeInfo() == gMethodToken->typeInfo()) {
-      USR_FATAL(fn, "invalid method name");
     }
   }
 
@@ -649,6 +644,7 @@ static void normalizeBase(BaseAST* base, bool addEndOfStatements) {
   for_vector(CallExpr, call, calls2) {
     applyGetterTransform(call);
     insertCallTemps(call);
+    transformIfVar(call);
   }
 
   insertCallTempsForRiSpecs(base);
@@ -962,13 +958,13 @@ static void normalizeIfExprBranch(VarSymbol* cond, VarSymbol* result, BlockStmt*
 // temporary will take the place of the IfExpr, and the CondStmt will be
 // inserted before the IfExpr's parent statement.
 //
-class LowerIfExprVisitor : public AstVisitorTraverse
+class LowerIfExprVisitor final : public AstVisitorTraverse
 {
   public:
-    LowerIfExprVisitor() { }
-    virtual ~LowerIfExprVisitor() { }
+    LowerIfExprVisitor()          = default;
+   ~LowerIfExprVisitor() override = default;
 
-    virtual void exitIfExpr(IfExpr* node);
+    void exitIfExpr(IfExpr* node) override;
 };
 
 static bool isInsideDefExpr(Expr* expr) {
@@ -1346,13 +1342,13 @@ static CallExpr* destructureErr() {
 
 
 
-class AddEndOfStatementMarkers : public AstVisitorTraverse
+class AddEndOfStatementMarkers final : public AstVisitorTraverse
 {
   public:
-    virtual bool enterCallExpr(CallExpr* node);
-    virtual bool enterDefExpr(DefExpr* node);
-    virtual bool enterIfExpr(IfExpr* node);
-    virtual bool enterLoopExpr(LoopExpr* node);
+    bool enterCallExpr(CallExpr* node) override;
+    bool enterDefExpr(DefExpr* node) override;
+    bool enterIfExpr(IfExpr* node) override;
+    bool enterLoopExpr(LoopExpr* node) override;
 };
 
 // Note, this might be called also during resolution
@@ -2246,6 +2242,48 @@ static void applyGetterTransform(CallExpr* call) {
   }
 }
 
+//
+// Handle Chapel code like this:
+//   if var X = RHS then
+//     ....
+// Represented as:
+//   if PRIM_IF_VAR(def X, RHS) then
+//     ....
+// Transform it to:
+//   def ifvar_borrow
+//   move ifvar_borrow <- chpl_checkBorrowIfVar(RHS)
+//   if ifvar_borrow then
+//     def X
+//     move X <- PRIM_TO_NON_NILABLE_CLASS(ifvar_borrow)
+//     ....
+//
+static void transformIfVar(CallExpr* primIfVar) {
+  if (! primIfVar->isPrimitive(PRIM_IF_VAR)) return;
+  SET_LINENO(primIfVar);
+
+  CondStmt* cond = toCondStmt(primIfVar->parentExpr);
+  if (cond == NULL) {
+    CallExpr* parentCall = toCallExpr(primIfVar->parentExpr);
+    INT_ASSERT(parentCall->isNamed("_cond_test"));
+    cond = toCondStmt(parentCall->parentExpr);
+  }
+
+  DefExpr* varDef = toDefExpr(primIfVar->get(1)->remove());
+  Expr*   rhsExpr = primIfVar->get(1)->remove();
+
+  VarSymbol* borrow = newTemp("ifvar_borrow");
+  cond->insertBefore(new DefExpr(borrow));
+  cond->insertBefore("'move'(%S,chpl_checkBorrowIfVar(%E))", borrow, rhsExpr);
+
+  primIfVar->replace(new SymExpr(borrow));
+
+  INT_ASSERT(! varDef->init && ! varDef->exprType); // already normalized
+  cond->thenStmt->insertAtHead(varDef);
+  varDef->insertAfter("'move'(%S,'to non nilable class'(%S))",
+                      varDef->sym, borrow);
+}
+
+
 /************************************* | **************************************
 *                                                                             *
 *                                                                             *
@@ -2329,6 +2367,7 @@ static bool shouldInsertCallTemps(CallExpr* call) {
       call == stmt                                       ||
       call->partialTag                                   ||
       call->isPrimitive(PRIM_TUPLE_EXPAND)               ||
+      call->isPrimitive(PRIM_IF_VAR)                     ||
       (parentCall && parentCall->isPrimitive(PRIM_MOVE)) ||
       (parentCall && parentCall->isPrimitive(PRIM_NEW)) )
     return false;

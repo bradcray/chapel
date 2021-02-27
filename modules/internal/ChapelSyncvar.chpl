@@ -351,11 +351,13 @@ module ChapelSyncvar {
 
   proc chpl__compilerGeneratedAssignSyncSingle(ref lhs: _syncvar(?),
                                                ref rhs: _syncvar(?)) {
+    compilerWarning("In first call");
     // TODO: Should this clone the value and the full/empty state instead?
     lhs.writeEF(rhs.readFE());
   }
 
   proc chpl__compilerGeneratedCopySyncSingle(ref sv : _syncvar(?)) {
+    compilerWarning("In second call");
     // TODO: this should probably clone the value and full/empty state instead
     var ret: sv.type = sv.readFE();
     return ret;
@@ -833,11 +835,13 @@ module ChapelSyncvar {
 
   proc chpl__compilerGeneratedAssignSyncSingle(ref lhs : _singlevar(?),
                                                ref rhs : _singlevar(?)) {
+    compilerWarning("In third call");
     // TODO: Should this clone the value and the full/empty state instead?
     lhs.writeEF(rhs.readFF());
   }
 
   proc chpl__compilerGeneratedCopySyncSingle(ref sv : _singlevar(?)) {
+    compilerWarning("In fourth call");
     // TODO: this should probably clone the value and full/empty state instead
     var ret: sv.type = sv.readFF();
     return ret;

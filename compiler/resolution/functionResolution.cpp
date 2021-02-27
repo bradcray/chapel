@@ -3214,6 +3214,9 @@ void resolveNormalCallAdjustAssign(CallExpr* call) {
           (isSyncType(srcType) || isSingleType(srcType)) &&
           targetType->getValType() == srcType) {
 
+
+        USR_WARN(inFn, "This is where the compiler-generated assign code is");
+        
         // if we are in a compiler-generated assign, rewrite sync/single
         // assignment to avoid deprecation warnings.
 

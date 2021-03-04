@@ -496,6 +496,10 @@ void FnSymbol::finalizeCopy() {
       substituteVarargTupleRefs(this, pci);
     }
 
+    // For CG fns calling to other CG fns.
+    if (InterfaceInfo* ifcInfo = partialCopySource->interfaceInfo)
+      handleCallsToOtherCGfuns(partialCopySource, ifcInfo, this);
+
     // Clean up book keeping information.
     clearPartialCopyData(this);
   }
@@ -814,13 +818,8 @@ TagGenericResult FnSymbol::tagIfGeneric(SymbolMap* map, bool abortOK) {
 
 
 //
-// Scan the formals and return:
-//   2 is there is at least 1 generic formal and every generic
-//     formal has a default value
-//
-//   1 if there is at least 1 generic formal
-//
-//   0 if there are no generic formals
+// Scan the formals and return true if there are any
+// generic formals.
 //
 // 'map' is expected to be non-NULL if this function has been instantiated.
 //
@@ -867,15 +866,21 @@ bool FnSymbol::hasGenericFormals(SymbolMap* map) const {
       formal->type = formal->typeExpr->body.tail->getValType();
     }
 
-    if (formal->intent == INTENT_PARAM) {
+    if (formal->originalIntent == INTENT_OUT) {
+      // out intent formals never make a function generic
+      // (type is inferred from the function body)
+
+    } else if (formal->intent == INTENT_PARAM) {
       isGeneric = true;
 
-    } else if (toConstrainedType(formal->type)) {
+    } else if (isConstrainedType(formal->type)) {
       // A CG function is known to be generic, so we should not be
-      // querying hasGenericFormals(). The only other functions
-      // with CT formals are those in 'interface' declarations.
+      // querying hasGenericFormals().
       INT_ASSERT(! isConstrainedGeneric());
-      INT_ASSERT(isInterfaceSymbol(defPoint->parentSymbol));
+      // It can be:
+      // - a required fn in an 'interface' declaration
+      // - a generic implementation instantiated with a standin type
+      // - an interim instantiation of a CG function
 
     } else if (formal->type->symbol->hasFlag(FLAG_GENERIC) == true) {
       bool formalInstantiated = false;
@@ -1542,8 +1547,7 @@ std::string FnSymbol::nameAndArgsToString(const char* sep,
     // Skip method token
     // Ignore arguments added by the compiler
     if (formal && (formal->type == dtMethodToken ||
-                   formal->hasFlag(FLAG_RETARG) ||
-                   formal->hasFlag(FLAG_TYPE_FORMAL_FOR_OUT))) {
+                   formal->hasFlag(FLAG_RETARG))) {
       formalNames[i] = NULL;
       formal = NULL;
       substitution = NULL;

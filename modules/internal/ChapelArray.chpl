@@ -992,7 +992,7 @@ module ChapelArray {
   // Helper function used to ensure a returned array matches the declared
   // return type when the declared return type specifies a particular element
   // type but not the domain
-  proc chpl__checkEltTypeMatch(a: [], type b) {
+  proc chpl__checkRetEltTypeMatch(a: [], type b) {
     if (a.eltType != b) {
       compilerError("array element type mismatch in return from ",
                     a.eltType: string,
@@ -1001,13 +1001,33 @@ module ChapelArray {
     }
   }
 
-  proc chpl__checkEltTypeMatch(a: _iteratorRecord, type b) {
+  proc chpl__checkRetEltTypeMatch(a: _iteratorRecord, type b) {
     type eltType = iteratorToArrayElementType(a.type);
     if (eltType != b) {
       compilerError("array element type mismatch in return from ",
                     eltType: string,
                     " to ",
                     b: string);
+    }
+  }
+  proc chpl__checkOutEltTypeMatch(a: [], type b) {
+    if (a.eltType != b) {
+      compilerError("array element type mismatch in initializing out formal ",
+                    "with element type ",
+                    b: string,
+                    " from array with element type ",
+                    a.eltType: string);
+    }
+  }
+
+  proc chpl__checkOutEltTypeMatch(a: _iteratorRecord, type b) {
+    type eltType = iteratorToArrayElementType(a.type);
+    if (eltType != b) {
+      compilerError("array element type mismatch in initializing out formal ",
+                    "with element type ",
+                    b: string,
+                    " from iterator with element type ",
+                    eltType: string);
     }
   }
 
@@ -2287,7 +2307,7 @@ module ChapelArray {
      results in the domain '{1..10}'
    */
   pragma "no doc"
-  proc _cast(type t:_domain, d: _domain) where chpl__isRectangularDomType(t) && isRectangularDom(d) {
+  operator :(d: _domain, type t:_domain) where chpl__isRectangularDomType(t) && isRectangularDom(d) {
     var tmpD: t;
     if tmpD.rank != d.rank then
       compilerError("rank mismatch in cast");
@@ -2311,7 +2331,7 @@ module ChapelArray {
     }
   }
 
-  proc _cast(type t:string, x: _domain) {
+  operator :(x: _domain, type t:string) {
     use IO;
     return stringify(x);
   }
@@ -3456,7 +3476,7 @@ module ChapelArray {
 
   // The same as the built-in _cast, except accepts a param arg.
   pragma "no doc"
-  proc _cast(type t:_array, param arg) {
+  operator :(param arg, type t:_array) {
     var result: t;
     // The would-be param version of proc =, inlined.
     chpl__transferArray(result, arg);
@@ -3465,7 +3485,7 @@ module ChapelArray {
 
   // How to cast arrays to strings
   pragma "no doc"
-  proc _cast(type t:string, x: []) {
+  operator :(x: [], type t:string) {
     use IO;
     return stringify(x);
   }
@@ -3811,12 +3831,21 @@ module ChapelArray {
     return false;
   }
 
+  // these functions avoid spurious warnings related to sync variable
+  // deprecation, so once the deprecation has completed these can be removed.
+  private proc isCopyableOrSyncSingle(type t) param {
+    return isSyncType(t) || isSingleType(t) || isCopyableType(t);
+  }
+  private proc isConstCopyableOrSyncSingle(type t) param {
+    return isSyncType(t) || isSingleType(t) || isConstCopyableType(t);
+  }
+
   // This must be a param function
   proc chpl__compatibleForBulkTransfer(a:[], b:[], param kind:_tElt) param {
     if !useBulkTransfer then return false;
     if a.eltType != b.eltType then return false;
     if kind==_tElt.move then return true;
-    if kind==_tElt.initCopy && isConstCopyableType(a.eltType) then return true;
+    if kind==_tElt.initCopy && isConstCopyableOrSyncSingle(a.eltType) then return true;
     if !chpl__supportedDataTypeForBulkTransfer(a.eltType) then return false;
     return true;
   }
@@ -3845,6 +3874,7 @@ module ChapelArray {
     }
   }
 
+  // TODO: should this be returning true for atomic types?
   proc chpl__supportedDataTypeForBulkTransfer(x: string) param return false;
   proc chpl__supportedDataTypeForBulkTransfer(x: bytes) param return false;
   proc chpl__supportedDataTypeForBulkTransfer(x: sync) param return false;
@@ -3930,6 +3960,20 @@ module ChapelArray {
         ref aa = a[ai];
         pragma "no auto destroy"
         var copy: a.eltType = aa; // run copy initializer
+        // move it into the array
+        __primitive("=", aa, copy);
+      }
+    } else if isSyncType(a.eltType) {
+      forall aa in a {
+        pragma "no auto destroy"
+        var copy: a.eltType = aa.readFE(); // run copy initializer
+        // move it into the array
+        __primitive("=", aa, copy);
+      }
+    } else if isSingleType(a.eltType) {
+      forall aa in a {
+        pragma "no auto destroy"
+        var copy: a.eltType = aa.readFF(); // run copy initializer
         // move it into the array
         __primitive("=", aa, copy);
       }
@@ -4203,13 +4247,24 @@ module ChapelArray {
             // move it into the array
             __primitive("=", aa, copy);
           }
-
         } else {
           [ (aa,bb) in zip(a,b) ] {
-            pragma "no auto destroy"
-            var copy: a.eltType = bb; // init copy
-            // move it into the array
-            __primitive("=", aa, copy);
+            if isSyncType(bb.type) {
+              pragma "no auto destroy"
+              var copy: a.eltType = bb.readFE(); // init copy
+              // move it into the array
+              __primitive("=", aa, copy);
+            } else if isSingleType(bb.type) {
+              pragma "no auto destroy"
+              var copy: a.eltType = bb.readFF(); // init copy
+              // move it into the array
+              __primitive("=", aa, copy);
+            } else {
+              pragma "no auto destroy"
+              var copy: a.eltType = bb; // init copy
+              // move it into the array
+              __primitive("=", aa, copy);
+            }
           }
         }
       } else if kind==_tElt.assign {
@@ -4313,6 +4368,22 @@ module ChapelArray {
     return x.valType;
   }
 
+  proc _desync(type t) type where isAtomicType(t) {
+    var x: t;
+    return x.read().type;
+  }
+
+  /* Or, we could explicitly overload for each atomic type since there
+     are a fixed number
+  proc _desync(type t: atomic int) type {
+    return int;
+  } */
+
+  proc _desync(type t:_array) type {
+    type eltType = chpl__eltTypeFromArrayRuntimeType(t);
+    const ref dom = chpl__domainFromArrayRuntimeType(t);
+    return [dom] _desync(eltType);
+  }
 
   proc _desync(type t) type {
     return t;
@@ -4704,7 +4775,7 @@ module ChapelArray {
 
     if lhs.rank != rhs.rank then
       compilerError("rank mismatch in array assignment");
-    if !isCopyableType(eltType) then
+    if !isCopyableOrSyncSingle(eltType) then
       compilerError("Cannot copy-initialize array because element type '",
                     eltType:string, "' cannot be copy-initialized");
 

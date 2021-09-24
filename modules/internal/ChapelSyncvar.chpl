@@ -137,6 +137,12 @@ module ChapelSyncvar {
       this.wrapped = new (getSyncClassType(valType))();
     }
 
+    proc init(in val: ?valType) {
+      this.valType=valType;
+      this.wrapped = new (getSyncClassType(valType))(val);
+      ensureFEType(valType);
+    }
+
     //
     // This is technically a copy-initializer, but it's only called through
     // chpl__autoCopy.
@@ -170,10 +176,10 @@ module ChapelSyncvar {
     }
 
     pragma "dont disable remote value forwarding"
-    proc init=(const other : this.valType) {
-      this.init(other.type);
-      // TODO: initialize the sync class impl with 'other'
-      this.writeEF(other);
+    proc init=(in other : ?valType) {
+      this.valType = valType;
+      this.wrapped = new (getSyncClassType(valType))(other);
+      ensureFEType(valType);
     }
 
     pragma "dont disable remote value forwarding"
@@ -436,6 +442,24 @@ module ChapelSyncvar {
       this.valType = valType;
       this.complete();
       chpl_sync_initAux(syncAux);
+    }
+
+    proc init(type valType, in value: valType) {
+      this.valType = valType;
+      this.value = value;
+      this.complete();
+      chpl_sync_markAndSignalFull(syncAux);
+      chpl_rmem_consist_acquire();
+
+    }
+
+    proc init(in value: ?valType) {
+      this.valType = valType;
+      this.value = value;
+      this.complete();
+      chpl_sync_markAndSignalFull(syncAux);
+      chpl_rmem_consist_acquire();
+
     }
 
     pragma "dont disable remote value forwarding"

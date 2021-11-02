@@ -11409,6 +11409,7 @@ static CallExpr* createGenericRecordVarDefaultInitCall(Symbol* val,
       appendExpr = new SymExpr(value);
     } else if (field->hasFlag(FLAG_TYPE_VARIABLE)) {
       if (value->getValType()->symbol->hasFlag(FLAG_HAS_RUNTIME_TYPE)) {
+        USR_WARN(val, "Problematic default initialization of runtime type");
         // BHARSH 2018-11-02: This technically generates code that would
         // crash at runtime because aggregate types don't contain the runtime
         // type information for their fields, so this temporary will go

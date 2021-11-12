@@ -861,6 +861,7 @@ static void checkNumArgsErrors(AggregateType* at, CallExpr* call, const char* ca
     USR_PRINT(call, "type was specified with %d arguments", numArgs);
     const char* plural = genericFields.size() > 1 ? "fields" : "field";
     USR_PRINT(at, "but type '%s' only has %zu generic %s", symbol->name, genericFields.size(), plural);
+    USR_PRINT(call, "did you forget the 'new' keyword?");
     USR_STOP();
   }
 }
@@ -952,6 +953,7 @@ AggregateType* AggregateType::generateType(CallExpr* call, const char* callStrin
         USR_FATAL_CONT(call, "invalid type specifier '%s'", callString);
         USR_PRINT(call, "type specifier did not match: %s", typeSignature);
         USR_PRINT(call, "type '%s' does not contain a field named '%s'", symbol->name, ne->name);
+        USR_PRINT(call, "did you forget the 'new' keyword?");
         USR_STOP();
       }
       map.put(field, toSymExpr(ne->actual)->symbol());
@@ -1209,6 +1211,7 @@ static void checkTypesForInstantiation(AggregateType* at, CallExpr* call, const 
       USR_FATAL_CONT(call, "invalid type specifier '%s'", callString);
       USR_PRINT(call, "type specifier did not match: %s", typeSignature);
       USR_PRINT(call, "cannot instantiate param field '%s' with non-param", field->name);
+      USR_PRINT(call, "did you forget the 'new' keyword?");
       USR_STOP();
     }
   } else if (field->hasFlag(FLAG_TYPE_VARIABLE)) {
@@ -1216,12 +1219,14 @@ static void checkTypesForInstantiation(AggregateType* at, CallExpr* call, const 
       USR_FATAL_CONT(call, "invalid type specifier '%s'", callString);
       USR_PRINT(call, "type specifier did not match: %s", typeSignature);
       USR_PRINT(call, "cannot instantiate type field '%s' with non-type", field->name);
+      USR_PRINT(call, "did you forget the 'new' keyword?");
       USR_STOP();
     }
   } else if (val->hasFlag(FLAG_TYPE_VARIABLE) == false) {
     USR_FATAL_CONT(call, "invalid type specifier '%s'", callString);
     USR_PRINT(call, "type specifier did not match: %s", typeSignature);
     USR_PRINT(call, "generic field '%s' must be instantiated with a type-expression", field->name);
+    USR_PRINT(call, "did you forget the 'new' keyword?");
     USR_STOP();
   }
 
@@ -1232,12 +1237,14 @@ static void checkTypesForInstantiation(AggregateType* at, CallExpr* call, const 
         USR_FATAL_CONT(call, "invalid type specifier '%s'", callString);
         USR_PRINT(call, "type specifier did not match: %s", typeSignature);
         USR_PRINT(call, "unable to instantiate field '%s : %s' with type '%s'", field->name, fieldType->symbol->name, val->type->symbol->name);
+        USR_PRINT(call, "did you forget the 'new' keyword?");
         USR_STOP();
       }
     } else if (canDispatch(val->type, val, fieldType, NULL, NULL, NULL, NULL, field->hasFlag(FLAG_PARAM)) == false) {
       USR_FATAL_CONT(call, "invalid type specifier '%s'", callString);
       USR_PRINT(call, "type specifier did not match: %s", typeSignature);
       USR_PRINT(call, "unable to instantiate field '%s : %s' with type '%s'", field->name, fieldType->symbol->name, val->type->symbol->name);
+      USR_PRINT(call, "did you forget the 'new' keyword?");
       USR_STOP();
     }
   }

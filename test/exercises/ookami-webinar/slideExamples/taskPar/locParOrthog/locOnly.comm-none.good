@@ -1,0 +1,5 @@
+locOnly.chpl:2: warning: This program will only work if CHPL_COMM != none
+Hello from locale 0!
+locOnly.chpl:5: warning: This program will only work when run with >= 3 locales
+locOnly.chpl:8: error: halt reached - array index out of bounds
+note: index was 1 but array bounds are 0..0

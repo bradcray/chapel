@@ -1,0 +1,3 @@
+(false, 0, false) live on (LOCALE0, LOCALE0, LOCALE0)
+varsLocalToTask.chpl:8: error: halt reached - array index out of bounds
+note: index was 1 but array bounds are 0..0

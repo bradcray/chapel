@@ -14,20 +14,13 @@ var tCalculating, qCalculating, extractCalculating: atomic bool;
 var k, doubleK, qMultiplicand, digit: int;
 
 proc main() {
-  cobegin {
-    tMultiplier();
-    qMultiplier();
+  cobegin with (ref t, ref doubleK, ref tCalculating,
+                ref q, ref qMultiplicand, ref qCalculating) {
+    multiplier(t, doubleK, tCalculating);
+    multiplier(q, qMultiplicand, qCalculating);
     extractor();
     computePi();
   }
-}
-
-proc tMultiplier() {
-  multiplier(t, doubleK, tCalculating);
-}
-
-proc qMultiplier() {
-  multiplier(q, qMultiplicand, qCalculating);
 }
 
 proc multiplier(ref result, ref multiplicand, waitCond) {

@@ -79,6 +79,13 @@ libchplcomp-chpldoc: FORCE
 run-next-linter: FORCE
 	./compiler/next/util/lint --only-changed --jobs=-1
 
+checkwhitespace:
+	@if [ `./util/devel/lookForTrailingSpaces | wc -l` -gt 0 ]; then \
+		echo "Found lines with trailing spaces :-("; \
+		./util/devel/lookForTrailingSpaces; \
+		exit 1; \
+	fi
+
 SPECTEST_DIR = ./test/release/examples/spec
 spectests: FORCE
 	rm -rf $(SPECTEST_DIR)

@@ -2589,43 +2589,7 @@ module ChapelArray {
     initArrFromTuple(a, b, _tElt.assign);
   }
 
-  proc _desync(type t:_syncvar) type {
-    var x: t;
-    return x.valType;
-  }
-
-  proc _desync(type t:_singlevar) type {
-    var x: t;
-    return x.valType;
-  }
-
-  proc _desync(type t) type where isAtomicType(t) {
-    var x: t;
-    return x.read().type;
-  }
-
-  /* Or, we could explicitly overload for each atomic type since there
-     are a fixed number
-  proc _desync(type t: atomic int) type {
-    return int;
-  } */
-
-  proc _desync(type t:_array) type {
-    type eltType = chpl__eltTypeFromArrayRuntimeType(t);
-    const ref dom = chpl__domainFromArrayRuntimeType(t);
-    return [dom] _desync(eltType);
-  }
-
-  proc _desync(type t) type {
-    return t;
-  }
-
-  private proc desyncEltType(type t:_array) type {
-    type eltType = chpl__eltTypeFromArrayRuntimeType(t);
-    return _desync(eltType);
-  }
-
-  operator =(ref a: [], b: _desync(a.eltType)) {
+  operator =(ref a: [], b: a.eltType) {
     forall e in a do
       e = b;
   }
@@ -2633,57 +2597,57 @@ module ChapelArray {
   //
   // op= overloads for array/scalar pairs
   //
-  operator +=(a: [], b: _desync(a.eltType)) {
+  operator +=(a: [], b: a.eltType) {
     forall e in a do
       e += b;
   }
 
-  operator -=(a: [], b: _desync(a.eltType)) {
+  operator -=(a: [], b: a.eltType) {
     forall e in a do
       e -= b;
   }
 
-  operator *=(a: [], b: _desync(a.eltType)) {
+  operator *=(a: [], b: a.eltType) {
     forall e in a do
       e *= b;
   }
 
-  operator /=(a: [], b: _desync(a.eltType)) {
+  operator /=(a: [], b: a.eltType) {
     forall e in a do
       e /= b;
   }
 
-  operator %=(a: [], b: _desync(a.eltType)) {
+  operator %=(a: [], b: a.eltType) {
     forall e in a do
       e %= b;
   }
 
-  operator **=(a: [], b: _desync(a.eltType)) {
+  operator **=(a: [], b: a.eltType) {
     forall e in a do
       e **= b;
   }
 
-  operator &=(a: [], b: _desync(a.eltType)) {
+  operator &=(a: [], b: a.eltType) {
     forall e in a do
       e &= b;
   }
 
-  operator |=(a: [], b: _desync(a.eltType)) {
+  operator |=(a: [], b: a.eltType) {
     forall e in a do
       e |= b;
   }
 
-  operator ^=(a: [], b: _desync(a.eltType)) {
+  operator ^=(a: [], b: a.eltType) {
     forall e in a do
       e ^= b;
   }
 
-  operator >>=(a: [], b: _desync(a.eltType)) {
+  operator >>=(a: [], b: a.eltType) {
     forall e in a do
       e >>= b;
   }
 
-  operator <<=(a: [], b: _desync(a.eltType)) {
+  operator <<=(a: [], b: a.eltType) {
     forall e in a do
       e <<= b;
   }
@@ -3029,51 +2993,6 @@ module ChapelArray {
       compilerError("Cannot assign from tuple to non-rectangular array");
 
     initArrFromTuple(lhs, rhs, _tElt.move);
-
-    lhs._value.dsiElementInitializationComplete();
-
-    return lhs;
-  }
-
-  pragma "find user line"
-  pragma "coerce fn"
-  proc chpl__coerceCopy(type dstType:_array, rhs:desyncEltType(dstType),
-                        definedConst: bool) {
-    type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
-    const ref dom = chpl__domainFromArrayRuntimeType(dstType);
-
-    pragma "no copy" // avoid error about recursion for initCopy
-    pragma "unsafe" // when eltType is non-nilable
-    var lhs = dom.buildArray(eltType, initElts=false);
-
-    forall e in lhs with (in rhs) {
-      pragma "no auto destroy"
-      var copy: lhs.eltType = rhs; // make a copy for this iteration
-      // move it into the array
-      __primitive("=", e, copy);
-    }
-
-    lhs._value.dsiElementInitializationComplete();
-
-    return lhs;
-  }
-  pragma "find user line"
-  pragma "coerce fn"
-  proc chpl__coerceMove(type dstType:_array, in rhs:desyncEltType(dstType), definedConst: bool) {
-    type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
-    const ref dom = chpl__domainFromArrayRuntimeType(dstType);
-
-    pragma "no copy" // avoid error about recursion for initCopy
-    pragma "unsafe" // when eltType is non-nilable
-    var lhs = dom.buildArray(eltType, initElts=false);
-
-    // always copies because there is 1 rhs but many array elts (generally)
-    forall e in lhs with (in rhs) {
-      pragma "no auto destroy"
-      var copy: eltType = rhs; // make a copy for this iteration
-      // move it into the array
-      __primitive("=", e, copy);
-    }
 
     lhs._value.dsiElementInitializationComplete();
 

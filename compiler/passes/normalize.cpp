@@ -45,6 +45,7 @@
 #include "wellknown.h"
 
 #include "global-ast-vecs.h"
+#include "view.h"
 
 #include <cctype>
 #include <set>
@@ -262,6 +263,24 @@ void normalize() {
   }
 
   find_printModuleInit_stuff();
+
+  if (!fNoBoundsChecks) {
+    std::vector<ForallStmt*> forallStmts;
+
+    collectForallStmts(theProgram, forallStmts);
+
+    for_vector(ForallStmt, fs, forallStmts) {
+      //      list_view(fs);
+      if (fs->zippered()) {
+	CallExpr* call = new CallExpr("chpl_checkSizes", buildStringLiteral(fs->astloc.filename()), new_IntSymbol(fs->astloc.lineno()));
+	for_alist(iterand, fs->iteratedExpressions()) {
+	  call->insertAtTail(iterand->copy());
+	}
+	//	list_view(call);
+	fs->insertBefore(call);
+      }
+    }
+  }
 }
 
 /************************************* | **************************************

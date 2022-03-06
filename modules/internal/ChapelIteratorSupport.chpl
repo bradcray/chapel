@@ -704,4 +704,15 @@ module ChapelIteratorSupport {
     return iterables.size == 1 && isRefIter(_getIterator(iterables(0)));
   }
 
+
+  pragma "no doc"
+  inline proc chpl_checkSizes(fn, ln, I...) {
+    const S0 = I(0).shape;
+    for param i in 1..I.size {
+      const S = I(1).shape;
+      if S0 != S then
+        writeln(fn, ":", ln, ": error: Shape mismatch in zippered iteration: ", S0, " vs. ", S);
+	exit(1);
+    }
+  }
 }

@@ -706,13 +706,19 @@ module ChapelIteratorSupport {
 
 
   pragma "no doc"
-  inline proc chpl_checkSizes(fn, ln, I...) {
+  inline proc chpl_checkSizes(fn, ln, const I...) {
+    use Reflection;
+    if !canResolveMethod(I(0), "shape") {
+      return;
+    }
     const S0 = I(0).shape;
-    for param i in 1..I.size {
-      const S = I(1).shape;
-      if S0 != S then
-        writeln(fn, ":", ln, ": error: Shape mismatch in zippered iteration: ", S0, " vs. ", S);
-	exit(1);
+    for param i in 1..<I.size {
+      if canResolveMethod(I(i), "shape") {
+        const S = I(i).shape;
+        if S0 != S then
+          writeln(fn, ":", ln, ": error: Shape mismatch in zippered iteration: ", S0, " vs. ", S);
+	      exit(1);
+      }
     }
   }
 }

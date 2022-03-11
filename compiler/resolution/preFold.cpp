@@ -1132,12 +1132,12 @@ static Expr* preFoldPrimOp(CallExpr* call) {
     break;
   }
 
-  case PRIM_ENUM_TO_INT: {
+  case PRIM_ENUM_TO_ORDER: {
     SymExpr* se = toSymExpr(call->get(1));
     EnumSymbol* es = toEnumSymbol(se->symbol());
     EnumType* et = toEnumType(se->typeInfo());
     if (es == nullptr || et == nullptr)
-      INT_FATAL(call, "'enum to int' not passed an enum");
+      INT_FATAL(call, "'enum to order' not passed an enum");
 
     // TODO: Could replace this (short) search with storing the
     // ordinal value of an enum into its EnumSymbol?
@@ -1151,7 +1151,31 @@ static Expr* preFoldPrimOp(CallExpr* call) {
       count++;
     }
     if (retval == nullptr) {
-      INT_FATAL(call, "'enum to int' couldn't find symbol %s", es->name);
+      INT_FATAL(call, "'enum to order' couldn't find symbol %s", es->name);
+    }
+
+    break;
+  }
+
+  case PRIM_ORDER_TO_ENUM: {
+    EnumType* et = toEnumType(call->get(1));
+    VarSymbol* var = toVarSymbol(toSymExpr(call->get(2))->symbol());
+    if (et == nullptr || var == nullptr) {
+      INT_FATAL("Bad arguments to 'order to enum'");
+    }
+    int order = var->immediate->int_value();
+
+    int count = 0;
+    for_enums(constant, et) {
+      if (count == order) {
+        retval = new SymExpr(constant->sym);
+        call->replace(retval);
+        break;
+      }
+      count++;
+    }
+    if (retval == nullptr) {
+      INT_FATAL(call, "'order to enum' couldn't find item #%d", order);
     }
 
     break;

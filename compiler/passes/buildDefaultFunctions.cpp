@@ -1427,6 +1427,7 @@ static void buildEnumToOrderFunction(EnumType* et, bool paramVersion) {
 //   'proc chpl_enumToOrder(i: integral, type et: et): et'
 //
 static void buildOrderToEnumFunction(EnumType* et, bool paramVersion) {
+  return;
   FnSymbol* fn = new FnSymbol(astr("chpl__orderToEnum"));
   fn->addFlag(FLAG_COMPILER_GENERATED);
   fn->addFlag(FLAG_LAST_RESORT);

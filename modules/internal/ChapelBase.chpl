@@ -2489,7 +2489,7 @@ module ChapelBase {
     compilerError("Can't call a C function pointer within Chapel");
   }
 
-  proc chpl__enumToOrder(e: enum): int {
+  inline proc chpl__enumToOrder(e: enum): int {
 //    extern proc printf(x...);
 //    printf("In my enumToOrder\n");
     return __primitive("cast", int, e);
@@ -2500,7 +2500,15 @@ module ChapelBase {
     */
   }
   // TODO: enable this:
-  proc chpl__enumToOrder(param e: enum) param : int {
-    return __primitive("enum to int", e);
+  inline proc chpl__enumToOrder(param e: enum) param : int {
+    return __primitive("enum to order", e);
+  }
+
+  inline proc chpl__orderToEnum(i: int, type t: enum): t {
+    return __primitive("cast", t, i);
+  }
+
+  inline proc chpl__orderToEnum(param i: int, type t: enum) param : t {
+    return __primitive("order to enum", t, i);
   }
 }

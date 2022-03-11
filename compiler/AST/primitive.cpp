@@ -1102,6 +1102,7 @@ initPrimitive() {
   prim_def(PRIM_IS_REF_ITER_TYPE, "is ref iter type", returnInfoBool);
   prim_def(PRIM_IS_EXTERN_TYPE, "is extern type", returnInfoBool);
   prim_def(PRIM_IS_ABS_ENUM_TYPE, "is abstract enum type", returnInfoBool);
+  prim_def(PRIM_ENUM_TO_INT, "enum to int", returnInfoInt64);
 
   prim_def(PRIM_IS_POD, "is pod type", returnInfoBool);
   prim_def(PRIM_IS_COPYABLE, "is copyable type", returnInfoBool);

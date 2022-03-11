@@ -1132,6 +1132,31 @@ static Expr* preFoldPrimOp(CallExpr* call) {
     break;
   }
 
+  case PRIM_ENUM_TO_INT: {
+    SymExpr* se = toSymExpr(call->get(1));
+    EnumSymbol* es = toEnumSymbol(se->symbol());
+    EnumType* et = toEnumType(se->typeInfo());
+    if (es == nullptr || et == nullptr)
+      INT_FATAL(call, "'enum to int' not passed an enum");
+
+    // TODO: Could replace this (short) search with storing the
+    // ordinal value of an enum into its EnumSymbol?
+    int count = 0;
+    for_enums(constant, et) {
+      if (constant->sym == es) {
+        retval = new SymExpr(new_IntSymbol(count));
+        call->replace(retval);
+        break;
+      }
+      count++;
+    }
+    if (retval == nullptr) {
+      INT_FATAL(call, "'enum to int' couldn't find symbol %s", es->name);
+    }
+
+    break;
+  }
+
   case PRIM_IS_GENERIC_TYPE: {
     Type* t = call->get(1)->typeInfo();
 

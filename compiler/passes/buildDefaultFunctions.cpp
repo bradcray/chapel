@@ -1384,7 +1384,7 @@ static void buildEnumIntegerCastFunctions(EnumType* et) {
 //   'proc chpl_enumToOrder([param] e: enum) [param] : int'
 //
 static void buildEnumToOrderFunction(EnumType* et, bool paramVersion) {
-  //  return;
+  return;
   FnSymbol* fn = new FnSymbol(astr("chpl__enumToOrder"));
   fn->addFlag(FLAG_COMPILER_GENERATED);
   fn->addFlag(FLAG_LAST_RESORT);
@@ -1473,7 +1473,7 @@ static void buildEnumOrderFunctions(EnumType* et) {
   // TODO: optimize case when enums are adjacent by using math rather
   // than select statements
   //
-  buildEnumToOrderFunction(et, true);
+  //  buildEnumToOrderFunction(et, true);
   buildEnumToOrderFunction(et, false);
   buildOrderToEnumFunction(et, true);
   buildOrderToEnumFunction(et, false);

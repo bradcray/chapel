@@ -39,6 +39,7 @@
 #include "parser.h"
 #include "stringutil.h"
 #include "TryStmt.h"
+#include "view.h"
 #include "wellknown.h"
 
 #include "global-ast-vecs.h"
@@ -145,17 +146,24 @@ DefExpr* buildPragmaDefExpr(Vec<const char*>* pragmas, DefExpr* def) {
 
 BlockStmt* buildPragmaStmt(Vec<const char*>* pragmas,
                            BlockStmt* stmt) {
+  //  list_view(stmt);
   bool error = false;
   for_alist(expr, stmt->body) {
     if (DefExpr* def = toDefExpr(expr)) {
       addPragmaFlags(def->sym, pragmas);
+      // If this block is defining an enum type, it's OK that it has
+      // other stuff in it
+      if (isEnumType(def->sym->type)) {
+        printf("*** Found an enum type!\n");
+        //        list_view(stmt);
+        error = false;
+      }
     } else if (isEndOfStatementMarker(expr)) {
       // ignore it
     } else if (isForwardingStmt(expr)) {
       // ignore it
     } else {
       error = true;
-      break;
     }
   }
   if (error && pragmas->n > 0) {
@@ -2785,4 +2793,48 @@ void updateOpThisTagOrErr(FnSymbol* fn) {
 BlockStmt* foreachNotImplementedError() {
   USR_FATAL_CONT(buildErrorStandin(), "foreach is not yet implemented");
   return new BlockStmt();
+}
+
+
+BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
+  TypeSymbol* pst = new TypeSymbol(name, pdt);
+  pdt->symbol = pst;
+  DefExpr* enumDef = new DefExpr(pst);
+  BlockStmt* stmt = buildChapelStmt(enumDef);
+  //  BlockStmt* enumDeclBundle = new BlockStmt(stmt, BLOCK_SCOPELESS);
+  if (currentModuleType == MOD_USER) {
+    printf("Handling %s\n", currentModuleName);
+    CallExpr* arrOfNames = NULL;
+    for_enums(de, pdt) {
+      Expr* symAsString = buildStringLiteral(de->sym->name);
+      if (arrOfNames == NULL) {
+        arrOfNames = new CallExpr(PRIM_ACTUALS_LIST, symAsString);
+      } else {
+        arrOfNames->insertAtTail(symAsString);
+      }
+      //    printf("Got enum: %s\n", de->sym->name);
+    }
+    arrOfNames = new CallExpr("chpl__buildArrayExpr", arrOfNames);
+    const char* strArrName = astr("chpl_enum_str_arr", name);
+    DefExpr* arrDeclStmt = new DefExpr(new VarSymbol(strArrName), arrOfNames);
+    enumDef->insertBefore(arrDeclStmt);
+    CallExpr* debugPrint = new CallExpr("writeln", new UnresolvedSymExpr(strArrName));
+    enumDef->insertBefore(debugPrint);
+
+    FnSymbol* fn = new FnSymbol(astrScolon);
+    fn->addFlag(FLAG_OPERATOR);
+    fn->addFlag(FLAG_COMPILER_GENERATED);
+    fn->addFlag(FLAG_LAST_RESORT);
+    ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, "from", pdt);
+    fn->insertFormalAtTail(arg);
+    ArgSymbol* t = new ArgSymbol(INTENT_BLANK, "t", dtString);
+    t->addFlag(FLAG_TYPE_VARIABLE);
+    fn->insertFormalAtTail(t);
+    fn->insertAtTail(new CallExpr(PRIM_RETURN,
+                                  new CallExpr(new UnresolvedSymExpr(strArrName),
+                                               new CallExpr("chpl__enumToOrder", arg))));
+    DefExpr* defFn = new DefExpr(fn);
+    enumDef->insertBefore(defFn);
+  }
+  return stmt;
 }

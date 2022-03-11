@@ -228,4 +228,6 @@ void updateOpThisTagOrErr(FnSymbol* fn);
 
 BlockStmt* foreachNotImplementedError();
 
+BlockStmt* buildEnumType(const char* name, EnumType* pst);
+
 #endif

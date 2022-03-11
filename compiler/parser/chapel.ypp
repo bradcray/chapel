@@ -1396,9 +1396,7 @@ enum_decl_stmt:
       }
       delete $4;
       pdt->doc = @1.comment;
-      TypeSymbol* pst = new TypeSymbol($2, pdt);
-      $1->symbol = pst;
-      $$ = buildChapelStmt(new DefExpr(pst));
+      $$ = buildEnumType($2, pdt);
     }
 | enum_header ident_def TLCBR error TRCBR
     {

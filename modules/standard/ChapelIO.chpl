@@ -818,7 +818,7 @@ module ChapelIO {
   // (primitive types should support :string directly)
   pragma "no doc"
   pragma "last resort"
-  operator :(x, type t:string) where !isPrimitiveType(x.type) {
+  operator :(x, type t:string) where !isPrimitiveType(x.type) && !isEnumType(x.type) {
     return stringify(x);
   }
 }

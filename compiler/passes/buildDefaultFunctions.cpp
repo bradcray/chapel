@@ -1382,6 +1382,7 @@ static void buildEnumIntegerCastFunctions(EnumType* et) {
 //   'proc chpl_enumToOrder([param] e: enum) [param] : int'
 //
 static void buildEnumToOrderFunction(EnumType* et, bool paramVersion) {
+  //  return;
   FnSymbol* fn = new FnSymbol(astr("chpl__enumToOrder"));
   fn->addFlag(FLAG_COMPILER_GENERATED);
   fn->addFlag(FLAG_LAST_RESORT);
@@ -1925,6 +1926,7 @@ static void buildDefaultReadWriteFunctions(AggregateType* ct) {
 
 static void buildEnumStringOrBytesCastFunctions(EnumType* et,
                                                 AggregateType *otherType) {
+  return;
   if (otherType != dtString && otherType != dtBytes) {
     INT_FATAL("wrong type was passed to buildEnumStringOrBytesCastFunctions");
   }

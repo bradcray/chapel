@@ -2802,22 +2802,43 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
   DefExpr* enumDef = new DefExpr(pst);
   BlockStmt* stmt = buildChapelStmt(enumDef);
   //  BlockStmt* enumDeclBundle = new BlockStmt(stmt, BLOCK_SCOPELESS);
+
+  // Generate arrays of strings and integer values
   if (currentModuleType == MOD_USER) {
     printf("Handling %s\n", currentModuleName);
-    CallExpr* arrOfNames = NULL;
+    CallExpr* arrOfNames = nullptr;
+    CallExpr* arrOfVals = nullptr;
     for_enums(de, pdt) {
       Expr* symAsString = buildStringLiteral(de->sym->name);
-      if (arrOfNames == NULL) {
+      if (arrOfNames == nullptr) {
         arrOfNames = new CallExpr(PRIM_ACTUALS_LIST, symAsString);
       } else {
         arrOfNames->insertAtTail(symAsString);
       }
+
+      if (!pdt->isAbstract()) {
+        Expr* init = de->init;
+        if (init == nullptr) {
+          if (arrOfVals == nullptr) {
+            init = buildIntLiteral("0");
+          } else {
+            USR_WARN("Can't handle inferred enum values yet");
+            init = buildIntLiteral("0");
+          }
+        }
+        if (arrOfVals == nullptr) {
+          arrOfVals = new CallExpr(PRIM_ACTUALS_LIST, init);
+        } else {
+          arrOfVals->insertAtTail(init);
+        }
+      }
       //    printf("Got enum: %s\n", de->sym->name);
     }
     arrOfNames = new CallExpr("chpl__buildArrayExpr", arrOfNames);
-    const char* strArrName = astr("chpl_enum_str_arr", name);
+    const char* strArrName = astr("chpl_enum_str_arr_", name);
     DefExpr* arrDeclStmt = new DefExpr(new VarSymbol(strArrName), arrOfNames);
     enumDef->insertBefore(arrDeclStmt);
+
     CallExpr* debugPrint = new CallExpr("writeln", new UnresolvedSymExpr(strArrName));
     enumDef->insertBefore(debugPrint);
 
@@ -2835,6 +2856,32 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
                                                new CallExpr("chpl__enumToOrder", arg))));
     DefExpr* defFn = new DefExpr(fn);
     enumDef->insertBefore(defFn);
+      
+    if (arrOfVals != nullptr) {
+      arrOfVals = new CallExpr("chpl__buildArrayExpr", arrOfVals);
+      const char* intArrName = astr("chpl_enum_int_arr_", name);
+      DefExpr* arrDeclStmt = new DefExpr(new VarSymbol(intArrName), arrOfVals);
+      enumDef->insertBefore(arrDeclStmt);
+
+      CallExpr* debugPrint = new CallExpr("writeln", new UnresolvedSymExpr(intArrName));
+      enumDef->insertBefore(debugPrint);
+
+      FnSymbol* fn = new FnSymbol(astrScolon);
+      fn->addFlag(FLAG_OPERATOR);
+      fn->addFlag(FLAG_COMPILER_GENERATED);
+      fn->addFlag(FLAG_LAST_RESORT);
+      ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, "from", pdt);
+      fn->insertFormalAtTail(arg);
+      ArgSymbol* t = new ArgSymbol(INTENT_BLANK, "t", dtIntegral);
+      t->addFlag(FLAG_TYPE_VARIABLE);
+      fn->insertFormalAtTail(t);
+      fn->insertAtTail(new CallExpr(PRIM_RETURN,
+                                    new CallExpr(new UnresolvedSymExpr(intArrName),
+                                                 new CallExpr("chpl__enumToOrder", arg))));
+      DefExpr* defFn = new DefExpr(fn);
+      enumDef->insertBefore(defFn);
+    }
+    
   }
   return stmt;
 }

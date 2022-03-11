@@ -1282,6 +1282,8 @@ static void buildEnumIntegerCastFunctions(EnumType* et) {
     normalize(fn);
     fn->tagIfGeneric();
 
+    return;
+    
     // build the enumerated to integer cast
     fn = new FnSymbol(astrScolon);
     fn->addFlag(FLAG_OPERATOR);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -977,20 +977,6 @@ module ChapelRange {
 
   operator !=(r1: range(?), r2: range(?))  return !(r1 == r2);
 
-  /* 
-    .. warning::
-      This procedure is deprecated - please let us know if you were
-      relying on it.
-
-    Returns true if the two ranges are the same in every respect: i.e. the
-     two ranges have the same ``idxType``, ``boundedType``, ``stridable``,
-     ``low``, ``high``, ``stride`` and ``alignment`` values.
-   */
-  deprecated "ident() on ranges is deprecated; please let us know if this is problematic for you"
-  proc ident(r1: range(?), r2: r1.type) {
-    return chpl_ident(r1, r2);
-  }
-  
   proc chpl_ident(r1: range(?), r2: range(?))
     where r1.idxType == r2.idxType &&
     r1.boundedType == r2.boundedType &&
@@ -1037,7 +1023,7 @@ proc range.safeCast(type t: range(?)) {
   }
 
   if tmp.stridable {
-    tmp._stride = this.stride;
+    tmp._stride = this.stride.safeCast(tmp.strType);
     tmp._alignment = chpl__idxToInt(this.alignment).safeCast(tmp.intIdxType);
     tmp._aligned = this.aligned;
   } else if this.stride != 1 {
@@ -1507,28 +1493,13 @@ operator :(r: range(?), type t: range(?)) {
     return new range(i, b, true,  lw, hh, st, alt, ald);
   }
 
-  /*
-   * The following procedure is effectively equivalent to:
-   *
-  inline proc chpl_by(r, step) { ... }
-   *
-   * because the parser renames the routine since 'by' is a keyword.
-   */
+  // This is the definition of the 'by' operator for ranges.
   pragma "no doc"
-  inline operator by(r, step) {
-    if !isRange(r) then
-      compilerError("the first argument of the 'by' operator is not a range");
+  inline operator by(r : range(?), step) {
     chpl_range_check_stride(step, r.idxType);
     return chpl_by_help(r, step);
   }
 
-  /*
-   * The following procedure is effectively equivalent to:
-   *
-  inline proc chpl_by(r: range(?), param step) { ... }
-   *
-   * because the parser renames the routine since 'by' is a keyword.
-   */
   // We want to warn the user at compiler time if they had an invalid param
   // stride rather than waiting until runtime.
   pragma "no doc"
@@ -1537,14 +1508,11 @@ operator :(r: range(?), type t: range(?)) {
     return chpl_by_help(r, step:r.strType);
   }
 
+  pragma "last resort"
+  inline operator by(r, step) {
+    compilerError("cannot apply 'by' to '", r.type:string, "'");
+  }
 
-  /*
-   * The following procedure is effectively equivalent to:
-   *
-  inline proc chpl_align(r: range(?i, ?b, ?s), algn: i) { ... }
-   *
-   * because the parser renames the routine since 'align' is a keyword.
-   */
   // This is the definition of the 'align' operator for ranges.
   // It produces a new range with the specified alignment.
   // By definition, alignment is relative to the low bound of the range.
@@ -1557,19 +1525,15 @@ operator :(r: range(?), type t: range(?)) {
                      r._low, r._high, r.stride, chpl__idxToInt(algn), true);
   }
 
-
-  /*
-   * The following procedure is effectively equivalent to:
-   *
-  inline proc chpl_align(r: range(?i, ?b, ?s), algn) { ... }
-   *
-   * because the parser renames the routine since 'align' is a keyword.
-   */
-  pragma "no doc"
+  pragma "no doc" pragma "last resort"
   inline operator align(r : range(?i, ?b, ?s), algn) {
     compilerError("can't align a range with idxType ", i:string,
                   " using a value of type ", algn.type:string);
-    return r;
+  }
+
+  pragma "last resort"
+  inline operator align(r, algn) {
+    compilerError("cannot apply 'align' to '", r.type:string, "'");
   }
 
   /* Returns a range whose alignment is this range's first index plus ``offset``.
@@ -1897,11 +1861,16 @@ operator :(r: range(?), type t: range(?)) {
     return chpl_count_help(r, count);
   }
 
+  pragma "last resort"
   operator #(r: range(?i), count) {
     compilerError("can't apply '#' to a range with idxType ",
                   i:string, " using a count of type ",
                   count.type:string);
-    return r;
+  }
+
+  pragma "last resort"
+  operator #(r, count) {
+    compilerError("cannot apply '#' to '", r.type:string, "'");
   }
 
   // This function checks if a bounded iterator will overflow. This is basic
@@ -2329,7 +2298,7 @@ operator :(r: range(?), type t: range(?)) {
 
   pragma "no doc"
   iter range.these(param tag: iterKind) where tag == iterKind.standalone &&
-                                              !localeModelHasSublocales
+    !localeModelPartitionsIterationOnSublocales
   {
     if ! isBoundedRange(this) {
       compilerError("parallel iteration is not supported over unbounded ranges");
@@ -2384,7 +2353,7 @@ operator :(r: range(?), type t: range(?)) {
       chpl_debug_writeln("*** In range leader:"); // ", this);
     const numSublocs = here.getChildCount();
 
-    if localeModelHasSublocales && numSublocs != 0 {
+    if localeModelPartitionsIterationOnSublocales && numSublocs != 0 {
       const len = this.sizeAs(intIdxType);
       const tasksPerLocale = dataParTasksPerLocale;
       const ignoreRunning = dataParIgnoreRunningTasks;

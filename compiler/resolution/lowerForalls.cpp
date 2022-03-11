@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -29,6 +29,8 @@
 #include "resolution.h"
 #include "stringutil.h"
 #include "wellknown.h"
+
+#include "global-ast-vecs.h"
 
 #include <map>
 #include <set>
@@ -1530,7 +1532,7 @@ static void removeDeadIters() {
 
 void lowerForallStmtsInline()
 {
-  forv_Vec(ForallStmt, fs, gForallStmts)
+  forv_expanding_Vec(ForallStmt, fs, gForallStmts)
     if (fs->inTree())
       lowerOneForallStmt(fs);
 

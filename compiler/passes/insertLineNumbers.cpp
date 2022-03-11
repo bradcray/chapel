@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -29,6 +29,8 @@
 #include "stringutil.h"
 #include "symbol.h"
 #include "virtualDispatch.h"
+
+#include "global-ast-vecs.h"
 
 #include <algorithm>
 #include <queue>
@@ -262,7 +264,7 @@ static bool isClassMethodCall(CallExpr* call) {
 //      handling a call to a destructor.
 //
 static void insertNilChecks() {
-  forv_Vec(CallExpr, call, gCallExprs) {
+  forv_expanding_Vec(CallExpr, call, gCallExprs) {
     // A member access is one of these primitives or a method call.
     // A method call is expected to access its "this" argument.
     if (call->isPrimitive(PRIM_GET_MEMBER)       ||

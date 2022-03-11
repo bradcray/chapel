@@ -15,7 +15,6 @@ export CHPL_TEST_PERF_CONFIG_NAME='chapcs'
 
 source $CWD/common-perf.bash
 source $CWD/common-llvm.bash
-export CHPL_LLVM=bundled
 
 # common-llvm restricts to just extern/ferguson. Enable all perf tests
 unset CHPL_NIGHTLY_TEST_DIRS
@@ -30,11 +29,11 @@ export CHPL_NIGHTLY_TEST_CONFIG_NAME="perf.chapcs.playground"
 # 4) Update START_DATE to be today, using the format mm/dd/yy
 #
 
-# Test performance of llvm-12
+# Test performance of llvm-13 for version upgrade
 GITHUB_USER=daviditen
-GITHUB_BRANCH=upgrade-llvm-12
-SHORT_NAME=llvm12
-START_DATE=10/25/21
+GITHUB_BRANCH=llvm-13-upgrade
+SHORT_NAME=llvm13
+START_DATE=02/07/22
 
 git branch -D $GITHUB_USER-$GITHUB_BRANCH
 git checkout -b $GITHUB_USER-$GITHUB_BRANCH

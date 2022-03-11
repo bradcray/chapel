@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -27,6 +27,8 @@
 #include "stmt.h"
 #include "stlUtil.h"
 #include "wellknown.h"
+
+#include "global-ast-vecs.h"
 
 // 'markPruned' replaced deletion from SymbolMap, which does not work well.
 Symbol*           markPruned      = NULL;
@@ -728,7 +730,7 @@ void createTaskFunctions(void) {
   }
 
   // Process task-creating constructs. We include 'on' blocks, too.
-  forv_Vec(BlockStmt, block, gBlockStmts) {
+  forv_expanding_Vec(BlockStmt, block, gBlockStmts) {
     if (block->isLoopStmt() == true) {
       // Loops are not a parallel block construct, so do nothing.
       // The isLoopStmt() test guards the call blockInfoGet() below

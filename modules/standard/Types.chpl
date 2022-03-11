@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -225,13 +225,13 @@ proc isComplexValue(e)   param  return isComplexType(e.type);
 proc isStringValue(e)    param  return isStringType(e.type);
 /* Returns `true` if the argument is a `bytes` value. */
 proc isBytesValue(e)     param  return isBytesType(e.type);
-/* Returns `true` if the argument is a value of one the following types: 
+/* Returns `true` if the argument is a value of one the following types:
 `int`, `uint`. */
 proc isIntegralValue(e)  param  return isIntegralType(e.type);
-/* Returns `true` if the argument is a value of one the following types: 
+/* Returns `true` if the argument is a value of one the following types:
 `real`, `imag`. */
 proc isFloatValue(e)     param  return isFloatType(e.type);
-/* Returns `true` if the argument is a value of one the following types: 
+/* Returns `true` if the argument is a value of one the following types:
 `int`, `uint`, `real`, `imag`, `complex`. */
 proc isNumericValue(e)   param  return isNumericType(e.type);
 /* Returns `true` if the argument is a value of primitive type. */
@@ -722,6 +722,11 @@ proc min(type t) where isComplexType(t) {
   return (min(real(floatwidth)), min(real(floatwidth))): t;
 }
 
+pragma "last resort" pragma "no doc"
+proc min(type t) {
+  compilerError("'min(type t)' is not defined for t=", t:string);
+}
+
 // joint documentation, for user convenience
 /*
 Returns the maximum value the type `t` can store.
@@ -760,16 +765,15 @@ proc max(type t) where isComplexType(t) {
   return (max(real(floatwidth)), max(real(floatwidth))): t;
 }
 
-pragma "no doc"
-iter chpl_enumerate(type t: enum) {
-  const enumTuple = chpl_enum_enumerate(t);
-  foreach i in 0..enumTuple.size-1 do
-    yield enumTuple(i);
+pragma "last resort" pragma "no doc"
+proc max(type t) {
+  compilerError("'max(type t)' is not defined for t=", t:string);
 }
+
 pragma "no doc"
 iter type enum.these(){
-  for i in chpl_enumerate(this) do
-    yield i;
+  foreach i in 0..<this.size do
+    yield chpl__orderToEnum(i, this);
 }
 
 pragma "no doc"

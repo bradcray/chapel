@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -47,7 +47,7 @@ module ChapelAutoAggregation {
   pragma "aggregator generator"
   proc chpl_dstAggregatorFor(dom) where isDomain(dom) {
     // this is only called if the user has:
-    // 
+    //
     // forall i in myDomain { i = foo(); }
     //
     // We want that code to fail with proper error message, so we have this
@@ -83,11 +83,11 @@ module ChapelAutoAggregation {
   }
 
   module CopyAggregation {
-    use SysCTypes;
-    use CPtr;
+    use ChplConfig;
+    use CTypes;
     use super.AggregationPrimitives;
 
-    param defaultBuffSize = if CHPL_COMM == "ugni" then 4096 else 8096;
+    param defaultBuffSize = if CHPL_COMM == "ugni" then 4096 else 8192;
     private const yieldFrequency = getEnvInt("CHPL_AGGREGATION_YIELD_FREQUENCY", 1024);
     private const dstBuffSize = getEnvInt("CHPL_AGGREGATION_DST_BUFF_SIZE", defaultBuffSize);
     private const srcBuffSize = getEnvInt("CHPL_AGGREGATION_SRC_BUFF_SIZE", defaultBuffSize);
@@ -101,7 +101,7 @@ module ChapelAutoAggregation {
       type elemType;
       type aggType = (c_ptr(elemType), elemType);
       const bufferSize = dstBuffSize;
-      const myLocaleSpace = LocaleSpace;
+      const myLocaleSpace = 0..<numLocales;
       var opsUntilYield = yieldFrequency;
       var lBuffers: c_ptr(c_ptr(aggType));
       var rBuffers: [myLocaleSpace] remoteBuffer(aggType);
@@ -198,7 +198,7 @@ module ChapelAutoAggregation {
       type elemType;
       type aggType = c_ptr(elemType);
       const bufferSize = srcBuffSize;
-      const myLocaleSpace = LocaleSpace;
+      const myLocaleSpace = 0..<numLocales;
       var opsUntilYield = yieldFrequency;
       var dstAddrs: c_ptr(c_ptr(aggType));
       var lSrcAddrs: c_ptr(c_ptr(aggType));
@@ -312,8 +312,7 @@ module ChapelAutoAggregation {
   }
 
   module AggregationPrimitives {
-    use CPtr;
-    use SysCTypes;
+    use CTypes;
 
     inline proc getAddr(const ref p): c_ptr(p.type) {
       // TODO can this use c_ptrTo?
@@ -404,7 +403,7 @@ module ChapelAutoAggregation {
           assert(lArr.domain.low == 0);
           assert(lArr.locale.id == here.id);
         }
-        const byte_size = size:size_t * c_sizeof(elemType);
+        const byte_size = size:c_size_t * c_sizeof(elemType);
         AggregationPrimitives.PUT(c_ptrTo(lArr[0]), loc, data, byte_size);
       }
 
@@ -412,7 +411,7 @@ module ChapelAutoAggregation {
         if boundsChecking {
           assert(size <= this.size);
         }
-        const byte_size = size:size_t * c_sizeof(elemType);
+        const byte_size = size:c_size_t * c_sizeof(elemType);
         AggregationPrimitives.PUT(lArr, loc, data, byte_size);
       }
 
@@ -423,7 +422,7 @@ module ChapelAutoAggregation {
           assert(lArr.domain.low == 0);
           assert(lArr.locale.id == here.id);
         }
-        const byte_size = size:size_t * c_sizeof(elemType);
+        const byte_size = size:c_size_t * c_sizeof(elemType);
         AggregationPrimitives.GET(c_ptrTo(lArr[0]), loc, data, byte_size);
       }
 

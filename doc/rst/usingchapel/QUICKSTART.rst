@@ -31,14 +31,14 @@ full-featured version of Chapel, refer to
 
       .. code-block:: bash
 
-         tar xzf chapel-1.25.0.tar.gz
+         tar xzf chapel-1.25.1.tar.gz
 
    b. Make sure that you are in the directory that was created when
       unpacking the source release, for example:
 
       .. code-block:: bash
 
-         cd chapel-1.25.0
+         cd chapel-1.25.1
 
    c. Set up your environment for Chapel's Quickstart mode.
       If you are using a shell other than ``bash`` or ``zsh``,
@@ -95,13 +95,14 @@ rebuild Chapel from source in a different configuration:
   1.25, LLVM is the default back-end, which needs to be available for
   full functionality.  There are a few options for using LLVM:
 
-  - ensure that you have a version of LLVM 11 installed on your system
-    and set ``CHPL_LLVM=system`` (or leave it unset and Chapel should
-    find it if it's in your path)
+  - ensure that you have a compatible version of LLVM installed on
+    your system and set ``CHPL_LLVM=system`` (or leave it unset and
+    Chapel should find it if it's in your path.) Currently compatible
+    versions are LLVM-11 and LLVM-12.
 
   - set ``CHPL_LLVM=bundled`` to have Chapel build and use the bundled
     version of LLVM (note that building the bundled version of LLVM
-    can take a long time)
+    can take a long time and requires CMake version 3.13.4 or higher)
 
   - set ``CHPL_LLVM=none`` to continue using the C back-end rather
     than LLVM

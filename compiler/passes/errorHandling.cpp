@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -33,6 +33,8 @@
 #include "symbol.h"
 #include "TryStmt.h"
 #include "wellknown.h"
+
+#include "global-ast-vecs.h"
 
 #include <stack>
 
@@ -1173,7 +1175,7 @@ static void lowerErrorHandling(FnSymbol* fn)
 
 void lowerCheckErrorPrimitive()
 {
-  forv_Vec(CallExpr, call, gCallExprs) {
+  forv_expanding_Vec(CallExpr, call, gCallExprs) {
     if (call->isPrimitive(PRIM_CHECK_ERROR)) {
       SET_LINENO(call);
 

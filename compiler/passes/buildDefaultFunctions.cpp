@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -35,6 +35,8 @@
 #include "TryStmt.h"
 #include "wellknown.h"
 
+#include "global-ast-vecs.h"
+
 #include <unordered_map>
 #include <array>
 #include <vector>
@@ -51,7 +53,6 @@ static void buildUnionAssignmentFunction(AggregateType* ct);
 
 static void buildEnumIntegerCastFunctions(EnumType* et);
 static void buildEnumFirstFunction(EnumType* et);
-static void buildEnumEnumerateFunction(EnumType* et);
 static void buildEnumSizeFunction(EnumType* et);
 static void buildEnumOrderFunctions(EnumType* et);
 static void buildEnumStringOrBytesCastFunctions(EnumType* type,
@@ -183,6 +184,10 @@ void buildDefaultFunctions() {
       }
 
       if (isRecord(ct)) {
+        // Build hash function first so we don't trip over our own
+        // compiler-generated '==' operator
+        buildRecordHashFunction(ct);
+
         if (!isRecordWrappedType(ct)) {
           buildRecordComparisonFunc(ct, "==");
           buildRecordComparisonFunc(ct, "!=");
@@ -192,7 +197,6 @@ void buildDefaultFunctions() {
           buildRecordComparisonFunc(ct, ">=");
         }
 
-        buildRecordHashFunction(ct);
 
         checkNotPod(ct);
       }
@@ -302,7 +306,7 @@ static FnSymbol* functionExists(const char* name,
                                  Type* formalType1,
                                  functionExistsKind kind=FIND_EITHER)
 {
-  return functionExists<1>(name, {formalType1}, kind);
+  return functionExists<1>(name, {{formalType1}}, kind);
 }
 
 static FnSymbol* functionExists(const char* name,
@@ -310,7 +314,7 @@ static FnSymbol* functionExists(const char* name,
                                  Type* formalType2,
                                  functionExistsKind kind=FIND_EITHER)
 {
-  return functionExists<2>(name, {formalType1, formalType2}, kind);
+  return functionExists<2>(name, {{formalType1, formalType2}}, kind);
 }
 
 static FnSymbol* functionExists(const char* name,
@@ -319,7 +323,7 @@ static FnSymbol* functionExists(const char* name,
                                  Type* formalType3,
                                  functionExistsKind kind=FIND_EITHER)
 {
-  return functionExists<3>(name, {formalType1, formalType2, formalType3}, kind);
+  return functionExists<3>(name, {{formalType1, formalType2, formalType3}}, kind);
 }
 
 static FnSymbol* functionExists(const char* name,
@@ -328,7 +332,21 @@ static FnSymbol* functionExists(const char* name,
                                 Type* formalType3,
                                 Type* formalType4,
                                 functionExistsKind kind=FIND_EITHER) {
-  return functionExists<4>(name, {formalType1, formalType2, formalType3, formalType4}, kind);
+  return functionExists<4>(name, {{formalType1, formalType2, formalType3, formalType4}}, kind);
+}
+
+static FnSymbol* operatorExists(const char* name,
+                                Type* formalType1,
+                                Type* formalType2,
+                                functionExistsKind kind=FIND_EITHER) {
+  FnSymbol* retval = NULL;
+  // check for operator method
+  retval = functionExists(name, dtMethodToken, dtAny, formalType1, formalType2);
+  if (retval == NULL) {
+    // check for standalone operator
+    retval = functionExists(name, formalType1, formalType2);
+  }
+  return retval;
 }
 
 static void fixupAccessor(AggregateType* ct, Symbol *field,
@@ -789,6 +807,14 @@ static void buildChplEntryPoints() {
   // It will initialize all the modules it uses, recursively.
   if (!fMultiLocaleInterop) {
     chpl_gen_main->insertAtTail(new CallExpr(mainModule->initFn));
+    // also init other modules mentioned on command line
+    forv_Vec(ModuleSymbol, mod, gModuleSymbols) {
+      if (mod->hasFlag(FLAG_MODULE_FROM_COMMAND_LINE_FILE) &&
+          mod != mainModule) {
+        chpl_gen_main->insertAtTail(new CallExpr(mod->initFn));
+      }
+    }
+
   } else {
     // Create an extern definition for the multilocale library server's main
     // function.  chpl_gen_main needs to call it in the course of its run, so
@@ -927,9 +953,7 @@ static FnSymbol* buildRecordIsComparableFunc(AggregateType* ct,
 }
 
 static void buildRecordComparisonFunc(AggregateType* ct, const char* op) {
-  if (functionExists(op, ct, ct)) {
-    return;
-  } else if (functionExists(op, dtMethodToken, dtAny, ct, ct)) {
+  if (operatorExists(op, ct, ct)) {
     return;
   }
 
@@ -1112,7 +1136,6 @@ void buildEnumFunctions(EnumType* et) {
   buildEnumStringOrBytesCastFunctions(et, dtString);
 
   buildEnumIntegerCastFunctions(et);
-  buildEnumEnumerateFunction(et);
   buildEnumFirstFunction(et);
   buildEnumSizeFunction(et);
   buildEnumOrderFunctions(et);
@@ -1187,30 +1210,6 @@ static void buildEnumFirstFunction(EnumType* et) {
   // they are automatically inserted
   baseModule->block->insertAtTail(fnDef);
   reset_ast_loc(fnDef, et->symbol);
-
-  normalize(fn);
-  fn->tagIfGeneric();
-}
-
-static void buildEnumEnumerateFunction(EnumType* et) {
-  // Build a function that returns a tuple of the enum's values
-  // Each enum type has its own chpl_enum_enumerate function.
-  FnSymbol* fn = new FnSymbol("chpl_enum_enumerate");
-  fn->addFlag(FLAG_COMPILER_GENERATED);
-  fn->addFlag(FLAG_LAST_RESORT);
-  ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, "t", et);
-  arg->addFlag(FLAG_TYPE_VARIABLE);
-  fn->insertFormalAtTail(arg);
-
-  baseModule->block->insertAtTail(new DefExpr(fn));
-
-  // Generate the tuple of enum values for the given enum type
-  CallExpr* call = new CallExpr("_build_tuple");
-  for_enums(constant, et) {
-    call->insertAtTail(constant->sym);
-  }
-
-  fn->insertAtTail(new CallExpr(PRIM_RETURN, call));
 
   normalize(fn);
   fn->tagIfGeneric();
@@ -1479,9 +1478,7 @@ static void buildEnumOrderFunctions(EnumType* et) {
 
 
 static void buildRecordAssignmentFunction(AggregateType* ct) {
-  if (functionExists("=", ct, ct)) {
-    return;
-  } else if (functionExists("=", dtMethodToken, dtAny, ct, ct)) {
+  if (operatorExists("=", ct, ct)) {
     return;
   }
 
@@ -1542,7 +1539,7 @@ static void buildRecordAssignmentFunction(AggregateType* ct) {
 
 static void buildExternAssignmentFunction(Type* type)
 {
-  if (functionExists("=", type, type))
+  if (operatorExists("=", type, type))
     return;
 
   FnSymbol* fn = new FnSymbol("=");
@@ -1570,7 +1567,7 @@ static void buildExternAssignmentFunction(Type* type)
 
 // TODO: we should know what field is active after assigning unions
 static void buildUnionAssignmentFunction(AggregateType* ct) {
-  if (functionExists("=", ct, ct))
+  if (operatorExists("=", ct, ct))
     return;
 
   FnSymbol* fn = new FnSymbol("=");
@@ -1632,7 +1629,10 @@ static void checkNotPod(AggregateType* at) {
 ************************************** | *************************************/
 
 static void buildRecordHashFunction(AggregateType *ct) {
-  if (functionExists("hash", dtMethodToken, ct))
+  if (functionExists("hash", dtMethodToken, ct) ||
+      (!ct->symbol->hasFlag(FLAG_TUPLE) &&  // tuples already always have ==/!=
+       (operatorExists("==", ct, ct) ||
+        operatorExists("!=", ct, ct))))
     return;
 
   FnSymbol *fn = new FnSymbol("hash");
@@ -1928,7 +1928,7 @@ static void buildEnumStringOrBytesCastFunctions(EnumType* et,
   if (otherType != dtString && otherType != dtBytes) {
     INT_FATAL("wrong type was passed to buildEnumStringOrBytesCastFunctions");
   }
-  if (functionExists(astrScolon, otherType, et))
+  if (operatorExists(astrScolon, otherType, et))
     return;
 
   FnSymbol* fn = new FnSymbol(astrScolon);

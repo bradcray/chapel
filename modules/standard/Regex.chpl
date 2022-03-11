@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -340,7 +340,7 @@ Regular Expression Types and Methods
 
  */
 module Regex {
-  private use SysBasic, SysError, SysCTypes, CPtr;
+  private use SysBasic, SysError, CTypes;
 
 pragma "no doc"
 extern type qio_regex_t;
@@ -371,7 +371,7 @@ extern proc qio_regex_release(ref compiled:qio_regex_t);
 pragma "no doc"
 
 private extern proc qio_regex_get_options(const ref regex:qio_regex_t, ref options: qio_regex_options_t);
-private extern proc qio_regex_get_pattern(const ref regex:qio_regex_t, ref pattern: c_string);
+private extern proc qio_regex_borrow_pattern(const ref regex:qio_regex_t, ref pattern: c_string, ref len_out:int(64));
 pragma "no doc"
 extern proc qio_regex_get_ncaptures(const ref regex:qio_regex_t):int(64);
 pragma "no doc"
@@ -393,7 +393,7 @@ extern record qio_regex_string_piece_t {
 
 private extern proc qio_regex_string_piece_isnull(ref sp:qio_regex_string_piece_t):bool;
 
-private extern proc qio_regex_match(const ref re:qio_regex_t, text:c_string, textlen:int(64), startpos:int(64), endpos:int(64), anchor:c_int, submatch:_ddata(qio_regex_string_piece_t), nsubmatch:int(64)):bool;
+private extern proc qio_regex_match(const ref re:qio_regex_t, text:c_string, textlen:int(64), startpos:int(64), endpos:int(64), anchor:c_int, ref submatch:qio_regex_string_piece_t, nsubmatch:int(64)):bool;
 private extern proc qio_regex_replace(const ref re:qio_regex_t, repl:c_string, repllen:int(64), text:c_string, textlen:int(64), startpos:int(64), endpos:int(64), global:bool, ref replaced:c_string, ref replaced_len:int(64)):int(64);
 
 // These two could be folded together if we had a way
@@ -412,6 +412,7 @@ class BadRegexError : Error {
 }
 
 // Until Issue 17275 is fixed:
+deprecated "Regex: 'BadRegexpError' is deprecated; please use 'BadRegexError' instead"
 type BadRegexpError = owned BadRegexError;
 
 // When Issue 17275 is fixed:
@@ -469,6 +470,7 @@ type BadRegexpError = owned BadRegexError;
 proc compile(pattern: ?t, posix=false, literal=false, noCapture=false,
              /*i*/ ignoreCase=false, /*m*/ multiLine=false, /*s*/ dotAll=false,
              /*U*/ nonGreedy=false): regex(t) throws where t==string || t==bytes {
+  use ChplConfig;
 
   if CHPL_RE2 == "none" {
     compilerError("Cannot use Regex with CHPL_RE2=none");
@@ -527,14 +529,30 @@ proc compile(pattern: ?t, posix=false, literal=false, noCapture=false,
       if m then do_something_if_matched();
       if !m then do_something_if_not_matched();
 
+    .. warning::
+      offset field is deprecated, use byteOffset instead
+    .. warning::
+      size field is deprecated, use numBytes instead
  */
 record regexMatch {
   /* true if the regular expression search matched successfully */
   var matched:bool;
   /* 0-based offset into the string or channel that matched; -1 if matched=false */
-  var offset:byteIndex; // 0-based, -1 if matched==false
+  var byteOffset:byteIndex;
   /* the length of the match. 0 if matched==false */
-  var size:int; // 0 if matched==false
+  var numBytes:int;
+
+  pragma "no doc"
+  deprecated "field offset is deprecated, use byteOffset instead"
+  proc offset:byteIndex {
+    return this.byteOffset;
+  }
+
+  pragma "no doc"
+  deprecated "field size is deprecated, use numBytes instead"
+  proc size:int {
+    return this.numBytes;
+  }
 }
 
 pragma "no doc"
@@ -568,7 +586,7 @@ inline proc regexMatch.chpl_cond_test_method() return this.matched;
     :returns: the portion of ``this`` referred to by the match
  */
 proc string.this(m:regexMatch) {
-  if m.matched then return this[m.offset..#m.size];
+  if m.matched then return this[m.byteOffset..#m.numBytes];
   else return "";
 }
 
@@ -581,15 +599,22 @@ proc string.this(m:regexMatch) {
     :returns: the portion of ``this`` referred to by the match
  */
 proc bytes.this(m:regexMatch) {
-  if m.matched then return this[m.offset:int..#m.size];
+  if m.matched then return this[m.byteOffset:int..#m.numBytes];
   else return b"";
 }
 
+private proc serializedType(type exprType) type {
+  var expr:exprType;
+  return expr.chpl__serialize().type;
+}
 
+/* We hold a copy of pattern string/bytes in its serialized form inside
+ * this record.
+ */
 pragma "no doc"
 record chpl_serializeHelper {
   type exprType;
-  var pattern:exprType;
+  var pattern:serializedType(exprType);
   var options:qio_regex_options_t;
 }
 
@@ -636,20 +661,25 @@ record regex {
 
   pragma "no doc"
   proc _serialize() {
-    var pattern: exprType;
+    var pattern: serializedType(exprType);
     var options: qio_regex_options_t;
-    var _regexCopy = _regex;
+    const _regexCopy = _regex;
 
     on this.home {
       /* NOTE we can't reference `this` inside this on block because
-       * it can cause a recursive chpl__serialize loop */
+       * it can cause a recursive chpl__serialize loop
+       * We also use a borrowed string so that the lifetime of the buffer is as
+       * long as the regex itself (and eg. doesn't get freed at the end of this
+       * function)
+       */
       var patternTemp: c_string;
-      qio_regex_get_pattern(_regexCopy, patternTemp);
+      var len:int;
+      qio_regex_borrow_pattern(_regexCopy, patternTemp, len);
       if exprType == string then {
-        try! pattern = createStringWithOwnedBuffer(patternTemp);
+        try! pattern = createStringWithBorrowedBuffer(patternTemp, len).chpl__serialize();
       }
       else {
-        pattern = createBytesWithOwnedBuffer(patternTemp);
+        pattern = createBytesWithBorrowedBuffer(patternTemp, len).chpl__serialize();
       }
 
       var localOptions: qio_regex_options_t;
@@ -661,8 +691,9 @@ record regex {
 
   pragma "no doc"
   proc _deserialize(data) {
-    qio_regex_create_compile(data.pattern.localize().c_str(),
-                             data.pattern.numBytes,
+    const pattern = exprType.chpl__deserialize(data.pattern);
+    qio_regex_create_compile(pattern.c_str(),
+                             pattern.numBytes,
                              data.options,
                              this._regex);
   }
@@ -704,8 +735,8 @@ record regex {
   }
 
   pragma "no doc"
-  proc _handle_captures(text: exprType, matches:_ddata(qio_regex_string_piece_t),
-                        nmatches:int, ref captures) {
+  proc _handle_captures(text: exprType, matches:c_array(qio_regex_string_piece_t, ?nmatches),
+                        ref captures) {
     assert(nmatches >= captures.size);
     for param i in 0..captures.size-1 {
       var m = _to_regexMatch(matches[i+1]);
@@ -832,27 +863,29 @@ record regex {
   pragma "no doc"
   proc _search_match(text: exprType, anchor: c_int, param has_captures, ref captures):regexMatch
   {
+    /* This pattern is a bit ugly, but we'd like to avoid
+    unnecessarily copying `this` when local. And we need to maintain
+    the lifetime of the copied regex when remote. */
+    var regexCopy:regex(exprType);
+    if home != here then regexCopy = this;
+    const localRegex = if home != here then regexCopy._regex else _regex;
     var ret:regexMatch;
-    on this.home {
-      var pos:byteIndex;
-      var endpos:byteIndex;
+    var pos:byteIndex;
+    var endpos:byteIndex;
 
-      pos = 0;
-      endpos = pos + text.numBytes;
+    pos = 0;
+    endpos = pos + text.numBytes;
 
-      var matches:_ddata(qio_regex_string_piece_t);
-      param nmatches = if has_captures then 1 + captures.size else 1;
-      matches = _ddata_allocate(qio_regex_string_piece_t, nmatches);
-      var got:bool;
-      got = qio_regex_match(_regex, text.localize().c_str(), text.numBytes,
-                             pos:int, endpos:int, anchor,
-                             matches, nmatches);
-      // Now try to coerce the read strings into the captures.
-      if has_captures then _handle_captures(text, matches, nmatches, captures);
-      // Now return where we matched.
-      ret = new regexMatch(got, matches[0].offset:byteIndex, matches[0].len);
-      _ddata_free(matches, nmatches);
-    }
+    param nmatches = if has_captures then 1 + captures.size else 1;
+    var matches: c_array(qio_regex_string_piece_t, nmatches);
+    var got:bool;
+    got = qio_regex_match(localRegex, text.localize().c_str(), text.numBytes,
+                          pos:int, endpos:int, anchor,
+                          matches[0], nmatches);
+    // Now try to coerce the read strings into the captures.
+    if has_captures then _handle_captures(text, matches, captures);
+    // Now return where we matched.
+    ret = new regexMatch(got, matches[0].offset:byteIndex, matches[0].len);
     return ret;
   }
 
@@ -869,19 +902,21 @@ record regex {
    */
   iter split(text: exprType, maxsplit: int = 0)
   {
-    var matches:_ddata(qio_regex_string_piece_t);
-    var ncaptures = qio_regex_get_ncaptures(_regex);
+    var regexCopy:regex(exprType);
+    if home != here then regexCopy = this;
+    const localRegex = if home != here then regexCopy._regex else _regex;
+    var ncaptures = qio_regex_get_ncaptures(localRegex);
     var nmatches = 1 + ncaptures;
     var pos:byteIndex;
     var endpos:byteIndex;
     var last:byteIndex;
+    var localText = text.localize();
 
-    on this.home {
-      matches = _ddata_allocate(qio_regex_string_piece_t, nmatches);
-    }
+    var matches = c_malloc(qio_regex_string_piece_t, nmatches);
+    defer c_free(matches);
 
     pos = 0;
-    endpos = pos + text.numBytes;
+    endpos = pos + localText.numBytes;
     last = 0;
 
     var splits = 0;
@@ -889,10 +924,9 @@ record regex {
     if maxsplit == 0 then maxsplits = max(int);
 
     while splits < maxsplits && pos <= endpos {
-      var got:bool;
-      on this.home {
-        got = qio_regex_match(_regex, text.localize().c_str(), text.numBytes, pos:int, endpos:int, QIO_REGEX_ANCHOR_UNANCHORED, matches, nmatches);
-      }
+      var got = qio_regex_match(localRegex, localText.c_str(), localText.numBytes,
+                                pos:int, endpos:int, QIO_REGEX_ANCHOR_UNANCHORED,
+                                matches[0], nmatches);
 
       if !got then break;
 
@@ -920,9 +954,6 @@ record regex {
         yield text[last..<endpos];
       }
     }
-    on this.home {
-      _ddata_free(matches, nmatches);
-    }
   }
 
   /* Enumerates matches in the text as well as capture groups.
@@ -933,39 +964,45 @@ record regex {
      :yields: tuples of :record:`regexMatch` objects, the 1st is always
               the match for the whole pattern and the rest are the capture groups.
    */
-  iter matches(text: exprType, param captures=0, maxmatches: int = max(int))
+  iter matches(text: exprType, param numCaptures=0, maxMatches: int = max(int))
   {
-    var matches:_ddata(qio_regex_string_piece_t);
-    var nmatches = 1 + captures;
+    var regexCopy:regex(exprType);
+    if home != here then regexCopy = this;
+    const localRegex = if home != here then regexCopy._regex else _regex;
+    param nMatches = 1 + numCaptures;
+    var matches: c_array(qio_regex_string_piece_t, nMatches);
     var pos:byteIndex;
-    var endpos:byteIndex;
+    var endPos:byteIndex;
     var textLength:int;
-    on this.home {
-      matches = _ddata_allocate(qio_regex_string_piece_t, nmatches);
-    }
+    var localText = text.localize();
 
     pos = 0;
-    textLength = text.numBytes;
-    endpos = pos + textLength;
+    textLength = localText.numBytes;
+    endPos = pos + textLength;
 
-    var nfound = 0;
+    var nFound = 0;
     var cur = pos;
-    while nfound < maxmatches && cur <= endpos {
-      var got:bool;
-      on this.home {
-        got = qio_regex_match(_regex, text.localize().c_str(), textLength, cur:int, endpos:int, QIO_REGEX_ANCHOR_UNANCHORED, matches, nmatches);
-      }
+    while nFound < maxMatches && cur <= endPos {
+      var got = qio_regex_match(localRegex, localText.c_str(), textLength,
+                                cur:int, endPos:int, QIO_REGEX_ANCHOR_UNANCHORED,
+                                matches[0], nMatches);
       if !got then break;
-      param nret = captures+1;
-      var ret:nret*regexMatch;
-      for i in 0..captures {
+      var ret:nMatches*regexMatch;
+      for i in 0..numCaptures {
         ret[i] = new regexMatch(got, matches[i].offset:byteIndex, matches[i].len);
       }
       yield ret;
       cur = matches[0].offset + max(1, matches[0].len);
+      nFound += 1;
     }
-    on this.home {
-      _ddata_free(matches, nmatches);
+  }
+
+  pragma "last resort"
+  deprecated "regex.matches arguments 'captures' and 'maxmatches' are deprecated. Use 'numCaptures' and/or 'maxMatches instead."
+  iter matches(text: exprType, param captures=0, maxmatches: int = max(int))
+  {
+    for m in matches(text, numCaptures=captures, maxMatches=maxmatches) {
+      yield m;
     }
   }
 
@@ -980,6 +1017,9 @@ record regex {
    */
   proc subn(repl: exprType, text: exprType, global = true ):(exprType, int)
   {
+    var regexCopy:regex(exprType);
+    if home != here then regexCopy = this;
+    const localRegex = if home != here then regexCopy._regex else _regex;
     // TODO -- move subn after sub for documentation clarity
     var pos:byteIndex;
     var endpos:byteIndex;
@@ -990,21 +1030,19 @@ record regex {
     var ret: exprType;
     var nreplaced:int;
 
-    on this.home {
-      var replaced:c_string;
-      var replaced_len:int(64);
-      nreplaced = qio_regex_replace(_regex, repl.localize().c_str(),
-                                    repl.numBytes, text.localize().c_str(),
-                                    text.numBytes, pos:int, endpos:int, global,
-                                    replaced, replaced_len);
-      if exprType==string {
-        try! {
-          ret = createStringWithOwnedBuffer(replaced, replaced_len);
-        }
+    var replaced:c_string;
+    var replaced_len:int(64);
+    nreplaced = qio_regex_replace(localRegex, repl.localize().c_str(),
+                                  repl.numBytes, text.localize().c_str(),
+                                  text.numBytes, pos:int, endpos:int, global,
+                                  replaced, replaced_len);
+    if exprType==string {
+      try! {
+        ret = createStringWithOwnedBuffer(replaced, replaced_len);
       }
-      else {
-        ret = createBytesWithOwnedBuffer(replaced, replaced_len);
-      }
+    }
+    else {
+      ret = createBytesWithOwnedBuffer(replaced, replaced_len);
     }
 
     return (ret, nreplaced);
@@ -1032,14 +1070,15 @@ record regex {
     var pattern:exprType;
     on this.home {
       var patternTemp:c_string;
-      qio_regex_get_pattern(this._regex, patternTemp);
+      var len:int;
+      qio_regex_borrow_pattern(this._regex, patternTemp, len);
       if exprType == string then {
         try! {
-          pattern = createStringWithOwnedBuffer(patternTemp);
+          pattern = createStringWithNewBuffer(patternTemp, len);
         }
       }
       else {
-        pattern = createBytesWithOwnedBuffer(patternTemp);
+        pattern = createBytesWithNewBuffer(patternTemp, len);
       }
     }
     // Note -- this is wrong because we didn't quote
@@ -1070,13 +1109,6 @@ record regex {
 }
 
 pragma "no doc"
-proc regexp type
-{
-   compilerWarning("Regex: 'regexp' is deprecated; please use 'regex' instead");
-   return regex;
-}
-
-pragma "no doc"
 operator regex.=(ref ret:regex(?t), x:regex(t))
 {
   // retain -- release
@@ -1101,10 +1133,11 @@ inline operator :(x: regex(string), type t: string) {
   var pattern: t;
   on x.home {
     var cs: c_string;
-    qio_regex_get_pattern(x._regex, cs);
+    var len:int;
+    qio_regex_borrow_pattern(x._regex, cs, len);
     if t == string {
       try! {
-        pattern = createStringWithOwnedBuffer(cs);
+        pattern = createStringWithNewBuffer(cs, len);
       }
     }
   }
@@ -1117,8 +1150,9 @@ inline operator :(x: regex(bytes), type t: bytes) {
   var pattern: t;
   on x.home {
     var cs: c_string;
-    qio_regex_get_pattern(x._regex, cs);
-    pattern = createBytesWithOwnedBuffer(cs);
+    var len:int;
+    qio_regex_borrow_pattern(x._regex, cs, len);
+    pattern = createBytesWithNewBuffer(cs, len);
   }
   return pattern;
 }
@@ -1136,64 +1170,58 @@ inline operator :(x: bytes, type t: regex(bytes)) throws {
   return compile(x);
 }
 
-/*
-
-   Compile a regular expression and search the receiving string for matches at
-   any offset using :proc:`regex.search`.
-
-   :arg needle: the regular expression to search for
-   :arg ignorecase: true to ignore case in the regular expression
-   :returns: an :record:`regexMatch` object representing the offset in the
-             receiving string where a match occurred
- */
-proc string.search(needle: string, ignorecase=false):regexMatch
-{
-  // Create a regex matching the literal for needle
-  var re = compile(needle, literal=true, nocapture=true, ignorecase=ignorecase);
-  return re.search(this);
-}
-
-/*
-
-   Compile a regular expression and search the receiving bytes for matches at
-   any offset using :proc:`regex.search`.
-
-   :arg needle: the regular expression to search for
-   :arg ignorecase: true to ignore case in the regular expression
-   :returns: an :record:`regexMatch` object representing the offset in the
-             receiving bytes where a match occurred
- */
-proc bytes.search(needle: bytes, ignorecase=false):regexMatch
-{
-  // Create a regex matching the literal for needle
-  var re = compile(needle, literal=true, nocapture=true, ignorecase=ignorecase);
-  return re.search(this);
-}
-
-// documented in the captures version
 pragma "no doc"
+pragma "last resort"
 proc string.search(needle: regex(string)):regexMatch
 {
   return needle.search(this);
 }
-
 // documented in the captures version
 pragma "no doc"
+proc string.search(pattern: regex(string)):regexMatch
+{
+  return pattern.search(this);
+}
+
+pragma "no doc"
+pragma "last resort"
 proc bytes.search(needle: regex(bytes)):regexMatch
 {
   return needle.search(this);
 }
 
+// documented in the captures version
+pragma "no doc"
+proc bytes.search(pattern: regex(bytes)):regexMatch
+{
+  return pattern.search(this);
+}
+
+
+pragma "last resort"
+deprecated "the 'needle' argument is deprecated, use 'pattern' instead"
+proc string.search(needle: regex(string), ref captures ...?k):regexMatch
+{
+  return needle.search(this, (...captures));
+}
+
 /* Search the receiving string for a regular expression already compiled
    by calling :proc:`regex.search`. Search for matches at any offset.
 
-   :arg needle: the compiled regular expression to search for
+   :arg pattern: the compiled regular expression to search for
    :arg captures: (optional) what to capture from the regular expression. These
                   should be strings or types that strings can cast to.
    :returns: an :record:`regexMatch` object representing the offset in the
              receiving string where a match occurred
  */
-proc string.search(needle: regex(string), ref captures ...?k):regexMatch
+proc string.search(pattern: regex(string), ref captures ...?k):regexMatch
+{
+  return pattern.search(this, (...captures));
+}
+
+pragma "last resort"
+deprecated "the 'needle' argument is deprecated, use 'pattern' instead"
+proc bytes.search(needle: regex(bytes), ref captures ...?k):regexMatch
 {
   return needle.search(this, (...captures));
 }
@@ -1201,15 +1229,15 @@ proc string.search(needle: regex(string), ref captures ...?k):regexMatch
 /* Search the receiving bytes for a regular expression already compiled
    by calling :proc:`regex.search`. Search for matches at any offset.
 
-   :arg needle: the compiled regular expression to search for
+   :arg pattern: the compiled regular expression to search for
    :arg captures: (optional) what to capture from the regular expression. These
                   should be bytes or types that bytes can cast to.
    :returns: an :record:`regexMatch` object representing the offset in the
              receiving bytes where a match occurred
  */
-proc bytes.search(needle: regex(bytes), ref captures ...?k):regexMatch
+proc bytes.search(pattern: regex(bytes), ref captures ...?k):regexMatch
 {
-  return needle.search(this, (...captures));
+  return pattern.search(this, (...captures));
 }
 
 // documented in the captures version

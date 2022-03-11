@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -36,6 +36,8 @@
 #include "resolution.h"
 #include "stringutil.h"
 #include "wellknown.h"
+
+#include "global-ast-vecs.h"
 
 #include <algorithm>
 #include <regex>
@@ -232,53 +234,11 @@ bool Symbol::isRenameable() const {
   return true;
 }
 
-bool Symbol::isRef() {
-  QualifiedType q = qualType();
-  return (type != NULL) && (q.isRef() || type->symbol->hasFlag(FLAG_REF));
-}
-
-bool Symbol::isWideRef() {
-  QualifiedType q = qualType();
-  return (q.isWideRef() || type->symbol->hasFlag(FLAG_WIDE_REF));
-}
-
-bool Symbol::isRefOrWideRef() {
-  return isRef() || isWideRef();
-}
-
-
 // Returns the scope in which the given symbol is declared; NULL otherwise.
 BlockStmt* Symbol::getDeclarationScope() const {
   return (defPoint != NULL) ? defPoint->getScopeBlock() : NULL;
 }
 
-
-bool Symbol::hasFlag(Flag flag) const {
-  CHECK_FLAG(flag);
-  return flags[flag];
-}
-
-
-void Symbol::addFlag(Flag flag) {
-  CHECK_FLAG(flag);
-  flags.set(flag);
-}
-
-
-void Symbol::copyFlags(const Symbol* other) {
-  flags |= other->flags;
-  qual   = other->qual;
-}
-
-
-void Symbol::removeFlag(Flag flag) {
-  CHECK_FLAG(flag);
-  flags.reset(flag);
-}
-
-bool Symbol::hasEitherFlag(Flag aflag, Flag bflag) const {
-  return hasFlag(aflag) || hasFlag(bflag);
-}
 
 bool Symbol::isKnownToBeGeneric() {
   if (FnSymbol* fn = toFnSymbol(this))
@@ -505,7 +465,7 @@ const char* Symbol::getSanitizedDeprecationMsg() const {
   //       show up in sanitized message).
   // TODO: Allow prefixing content with ! (and filtering it out in the sanitized message)
   // TODO: Allow prefixing content with ~ (and having it only display last component of target)
-  static const auto reStr = R"(\B\:(mod|proc|iter|data|const|var|param|type|class|record|attr)\:`([\w\$\.]+)`\B)";
+  static const auto reStr = R"(\B\:(mod|proc|iter|data|const|var|param|type|class|record|attr)\:`([!$\w\$\.]+)`\B)";
   msg = std::regex_replace(msg, std::regex(reStr), "$2");
   return astr(msg.c_str());
 }

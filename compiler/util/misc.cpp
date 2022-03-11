@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -65,11 +65,6 @@ static bool        handle_erroneous_fns = true;
 astlocT            last_error_loc(0, NULL);
 
 static bool forceWidePtrs();
-
-// must be non-static to avoid dead-code elim. when compiling -O3
-void gdbShouldBreakHere() {
-
-}
 
 void setupError(const char* subdir, const char* filename, int lineno, int tag) {
   err_subdir        = subdir;
@@ -663,7 +658,7 @@ static void printErrorFooter(bool guess) {
   if (!developer && !err_user) {
     print_error("\n\n"
       "Internal errors indicate a bug in the Chapel compiler (\"It's us, not you\"),\n"
-      "and we're sorry for the hassle.  We would appreciate your reporting this bug -- \n"
+      "and we're sorry for the hassle.  We would appreciate your reporting this bug --\n"
       "please see %s for instructions.  In the meantime,\n"
       "the filename + line number above may be useful in working around the issue.\n\n",
       help_url);

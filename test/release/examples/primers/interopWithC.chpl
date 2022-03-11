@@ -158,10 +158,15 @@ module interopWithC {
    but can be made simpler through the use of the ``--library-makefile`` flag
    as described in :ref:`readme-libraries-linking`.
    
-   An example of compiling a C program with a generated Chapel library using the
-   generated Makefile can be found in the `Makefile
-   <https://github.com/chapel-lang/chapel/blob/master/test/release/examples/primers/Makefile>`_
-   for the primers directory, to build this source file.
+   An example of compiling a C program with a generated Chapel library using
+  the generated Makefile can be found under the `interopWithC` target in the
+  `Makefile
+  <https://github.com/chapel-lang/chapel/blob/master/test/release/examples/primers/Makefile>`_
+  for the primers directory, to build this source file.  An example of using the
+  generated Makefile can be seen in `Makefile.cClient
+  <https://github.com/chapel-lang/chapel/blob/master/test/release/examples/primers/Makefile.cClient>`_.
+  To build the C client, first run `make interopWithC` then run `make -f
+  Makefile.cClient`.
 */ 
 
 /*
@@ -235,17 +240,17 @@ module interopWithC {
    }
 
 /*
-   Chapel also has a standard module named :mod:`SysCTypes` (located under
-   ``$CHPL_HOME/modules/standard/gen/...``). 
+   Chapel also has a standard module named :mod:`CTypes` (located in
+   ``$CHPL_HOME/modules/standard/``). 
    This module defines a few C types which align with the C compiler 
    specification and do not require the ``extern`` keyword, 
    such as ``c_int`` and ``c_char``. For more information about these types see
    the :ref:`readme-extern` Technical Note.
 */
 
-// You can include SysCTypes using a simple use statement:
+// You can include CTypes using a simple use statement:
 
-   use SysCTypes;
+   use CTypes;
 
 // We must always make sure the types align as the C compiler specification allows for
 // different sizes for the same type depending on the compiler.

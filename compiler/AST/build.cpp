@@ -2835,8 +2835,8 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       }
       //    printf("Got enum: %s\n", de->sym->name);
     }
-    arrOfNames = new CallExpr("chpl__buildArrayExpr", arrOfNames);
-    const char* strArrName = astr("chpl_enum_str_arr_", name);
+    arrOfNames = new CallExpr("_build_tuple", arrOfNames);
+    const char* strArrName = astr("chpl_enum_str_tup_", name);
     DefExpr* arrDeclStmt = new DefExpr(new VarSymbol(strArrName), arrOfNames);
     enumDef->insertBefore(arrDeclStmt);
 
@@ -2859,8 +2859,9 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
     enumDef->insertBefore(defFn);
       
     if (arrOfVals != nullptr) {
-      arrOfVals = new CallExpr("chpl__buildArrayExpr", arrOfVals);
-      const char* intArrName = astr("chpl_enum_int_arr_", name);
+      //      printf("In arrOfVals non-null\n");
+      arrOfVals = new CallExpr("_build_tuple", arrOfVals);
+      const char* intArrName = astr("chpl_enum_int_tup_", name);
       VarSymbol* intArrSym = new VarSymbol(intArrName);
       DefExpr* arrDeclStmt = new DefExpr(intArrSym, arrOfVals);
       enumDef->insertBefore(arrDeclStmt);
@@ -2905,6 +2906,7 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
                                                  new CallExpr("chpl__enumToOrder", arg))));
       DefExpr* defFn = new DefExpr(fn);
       enumDef->insertBefore(defFn);
+      //      list_view(defFn);
     }
     
   }

@@ -2806,41 +2806,60 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
   // Generate arrays of strings and integer values
   if (currentModuleType == MOD_USER) {
     printf("Handling %s\n", currentModuleName);
-    CallExpr* arrOfNames = nullptr;
-    CallExpr* arrOfVals = nullptr;
-    bool fillInIncVals = false;
+    CallExpr* tupOfNames = nullptr;
+    CallExpr* tupOfVals = new CallExpr(PRIM_ACTUALS_LIST);
+    VarSymbol* one = new_IntSymbol(1);
+    VarSymbol* prev = nullptr;
     for_enums(de, pdt) {
       Expr* symAsString = buildStringLiteral(de->sym->name);
-      if (arrOfNames == nullptr) {
-        arrOfNames = new CallExpr(PRIM_ACTUALS_LIST, symAsString);
+      if (tupOfNames == nullptr) {
+        tupOfNames = new CallExpr(PRIM_ACTUALS_LIST, symAsString);
       } else {
-        arrOfNames->insertAtTail(symAsString);
+        tupOfNames->insertAtTail(symAsString);
       }
 
       if (!pdt->isAbstract()) {
         Expr* init = de->init;
         if (init == nullptr) {
-          if (arrOfVals == nullptr) {
+	  if (prev) {
+	    VarSymbol* enumVal = new VarSymbol(astr("chpl_", name, "_",
+						    de->sym->name));
+	    enumVal->addFlag(FLAG_CONST);
+	    DefExpr* de = new DefExpr(enumVal, new CallExpr("+",
+							    new SymExpr(prev),
+							    new SymExpr(one)));
+	    enumDef->insertBefore(de);
+	    tupOfVals->insertAtTail(new SymExpr(enumVal));
+	    prev = enumVal;
+	  } else {
+	    tupOfVals->insertAtTail(new SymExpr(one)); // bogus value
+	  }
+				      
+          if (tupOfVals == nullptr) {
             init = buildIntLiteral("0");
           } else {
             init = buildIntLiteral("0");
-            fillInIncVals = true;
           }
-        }
-        if (arrOfVals == nullptr) {
-          arrOfVals = new CallExpr(PRIM_ACTUALS_LIST, init);
         } else {
-          arrOfVals->insertAtTail(init);
-        }
+	  VarSymbol* enumVal = new VarSymbol(astr("chpl_", name, "_",
+						  de->sym->name));
+	  enumVal->addFlag(FLAG_CONST);
+	  DefExpr* de = new DefExpr(enumVal, init->copy());
+	  enumDef->insertBefore(de);
+	  tupOfVals->insertAtTail(new SymExpr(enumVal));
+	  prev = enumVal;
+	}
       }
       //    printf("Got enum: %s\n", de->sym->name);
     }
-    arrOfNames = new CallExpr("_build_tuple", arrOfNames);
-    const char* strArrName = astr("chpl_enum_str_tup_", name);
-    DefExpr* arrDeclStmt = new DefExpr(new VarSymbol(strArrName), arrOfNames);
-    enumDef->insertBefore(arrDeclStmt);
+    tupOfNames = new CallExpr("_build_tuple", tupOfNames);
+    const char* strTupName = astr("chpl_enum_str_tup_", name);
+    VarSymbol* strTupSym = new VarSymbol(strTupName);
+    strTupSym->addFlag(FLAG_CONST);
+    DefExpr* tupDeclStmt = new DefExpr(strTupSym, tupOfNames);
+    enumDef->insertBefore(tupDeclStmt);
 
-    CallExpr* debugPrint = new CallExpr("writeln", new UnresolvedSymExpr(strArrName));
+    CallExpr* debugPrint = new CallExpr("writeln", new SymExpr(strTupSym));
     enumDef->insertBefore(debugPrint);
 
     FnSymbol* fn = new FnSymbol(astrScolon);
@@ -2853,29 +2872,30 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
     t->addFlag(FLAG_TYPE_VARIABLE);
     fn->insertFormalAtTail(t);
     fn->insertAtTail(new CallExpr(PRIM_RETURN,
-                                  new CallExpr(new UnresolvedSymExpr(strArrName),
+                                  new CallExpr(new SymExpr(strTupSym),
                                                new CallExpr("chpl__enumToOrder", arg))));
     DefExpr* defFn = new DefExpr(fn);
     enumDef->insertBefore(defFn);
       
-    if (arrOfVals != nullptr) {
-      //      printf("In arrOfVals non-null\n");
-      arrOfVals = new CallExpr("_build_tuple", arrOfVals);
-      const char* intArrName = astr("chpl_enum_int_tup_", name);
-      VarSymbol* intArrSym = new VarSymbol(intArrName);
-      DefExpr* arrDeclStmt = new DefExpr(intArrSym, arrOfVals);
-      enumDef->insertBefore(arrDeclStmt);
+    if (tupOfVals != nullptr) {
+      //      printf("In tupOfVals non-null\n");
+      tupOfVals = new CallExpr("_build_tuple", tupOfVals);
+      const char* intTupName = astr("chpl_enum_int_tup_", name);
+      VarSymbol* intTupSym = new VarSymbol(intTupName);
+      intTupSym->addFlag(FLAG_CONST);
+      DefExpr* tupDeclStmt = new DefExpr(intTupSym, tupOfVals);
+      enumDef->insertBefore(tupDeclStmt);
 
+      /*
       if (fillInIncVals) {
         int count = 0;
-        VarSymbol* one = new_IntSymbol(1);
         bool foundInits = false;
         for_enums(de, pdt) {
           if (de->init == nullptr) {
             if (foundInits) {
-              CallExpr* lhs = new CallExpr(new SymExpr(intArrSym),
+              CallExpr* lhs = new CallExpr(new SymExpr(intTupSym),
                                            new SymExpr(new_IntSymbol(count)));
-              CallExpr* rhs = new CallExpr(new SymExpr(intArrSym),
+              CallExpr* rhs = new CallExpr(new SymExpr(intTupSym),
                                            new SymExpr(new_IntSymbol(count-1)));
               CallExpr* rhsPlusOne = new CallExpr("+", rhs, one);
               CallExpr* assign = new CallExpr("=", lhs, rhsPlusOne);
@@ -2888,8 +2908,9 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
           count++;
         }
       }
+      */
 
-      CallExpr* debugPrint = new CallExpr("writeln", new SymExpr(intArrSym));
+      CallExpr* debugPrint = new CallExpr("writeln", new SymExpr(intTupSym));
       enumDef->insertBefore(debugPrint);
 
       FnSymbol* fn = new FnSymbol(astrScolon);
@@ -2902,7 +2923,7 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       t->addFlag(FLAG_TYPE_VARIABLE);
       fn->insertFormalAtTail(t);
       fn->insertAtTail(new CallExpr(PRIM_RETURN,
-                                    new CallExpr(new UnresolvedSymExpr(intArrName),
+                                    new CallExpr(new SymExpr(intTupSym),
                                                  new CallExpr("chpl__enumToOrder", arg))));
       DefExpr* defFn = new DefExpr(fn);
       enumDef->insertBefore(defFn);

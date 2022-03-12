@@ -2852,6 +2852,7 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
     FnSymbol* fn = new FnSymbol(astrScolon);
     fn->addFlag(FLAG_OPERATOR);
     fn->addFlag(FLAG_COMPILER_GENERATED);
+    fn->addFlag(FLAG_INLINE);
     ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, "from", pdt);
     fn->insertFormalAtTail(arg);
     ArgSymbol* t = new ArgSymbol(INTENT_TYPE, "t", dtString, new SymExpr(dtString->symbol));
@@ -2905,9 +2906,10 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       FnSymbol* fn = new FnSymbol(astrScolon);
       fn->addFlag(FLAG_OPERATOR);
       fn->addFlag(FLAG_COMPILER_GENERATED);
+      fn->addFlag(FLAG_INLINE);
       ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, "from", pdt);
       fn->insertFormalAtTail(arg);
-      ArgSymbol* t = new ArgSymbol(INTENT_TYPE, "t", dtIntegral, new SymExpr(dtIntegral->symbol));
+      ArgSymbol* t = new ArgSymbol(INTENT_TYPE, "t", dtInt[INT_SIZE_64], new SymExpr(dtInt[INT_SIZE_64]->symbol));
       t->addFlag(FLAG_TYPE_VARIABLE);
       fn->insertFormalAtTail(t);
       fn->insertAtTail(new CallExpr(PRIM_RETURN,

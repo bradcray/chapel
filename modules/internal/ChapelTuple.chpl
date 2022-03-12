@@ -209,7 +209,7 @@ module ChapelTuple {
   pragma "no doc"
   pragma "reference to const when const this"
   pragma "star tuple accessor"
-  proc _tuple.this(i : integral) ref {
+  inline proc _tuple.this(i : integral) ref {
     if !isHomogeneousTuple(this) then
       compilerError("invalid access of non-homogeneous tuple by runtime value");
     if boundsChecking then
@@ -221,7 +221,7 @@ module ChapelTuple {
   pragma "no doc"
   pragma "reference to const when const this"
   pragma "star tuple accessor"
-  proc _tuple.this(i : bool) ref {
+  inline proc _tuple.this(i : bool) ref {
     if !isHomogeneousTuple(this) then
       compilerError("invalid access of non-homogeneous tuple by runtime value");
     if boundsChecking then

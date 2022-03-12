@@ -146,30 +146,33 @@ DefExpr* buildPragmaDefExpr(Vec<const char*>* pragmas, DefExpr* def) {
 
 BlockStmt* buildPragmaStmt(Vec<const char*>* pragmas,
                            BlockStmt* stmt) {
-  //  list_view(stmt);
-  bool error = false;
-  for_alist(expr, stmt->body) {
-    if (DefExpr* def = toDefExpr(expr)) {
-      addPragmaFlags(def->sym, pragmas);
-      // If this block is defining an enum type, it's OK that it has
-      // other stuff in it
-      if (isEnumType(def->sym->type)) {
-        //        list_view(stmt);
-        error = false;
+  // enums have a whole block of code associated with them, but
+  // only the enum itself deserves the pragma
+  DefExpr* de = toDefExpr(stmt->body.tail);
+  if (de && isEnumType(de->sym->type)) {
+    printf("Attaching pragma to %s\n", de->sym->name);
+    addPragmaFlags(de->sym, pragmas);
+  } else {
+    //  list_view(stmt);
+    bool error = false;
+    for_alist(expr, stmt->body) {
+      if (DefExpr* def = toDefExpr(expr)) {
+        addPragmaFlags(def->sym, pragmas);
+      } else if (isEndOfStatementMarker(expr)) {
+        // ignore it
+      } else if (isForwardingStmt(expr)) {
+        // ignore it
+      } else {
+        error = true;
+        break;
       }
-    } else if (isEndOfStatementMarker(expr)) {
-      // ignore it
-    } else if (isForwardingStmt(expr)) {
-      // ignore it
-    } else {
-      error = true;
     }
-  }
-  if (error && pragmas->n > 0) {
-    USR_FATAL_CONT(stmt, "cannot attach pragmas to this statement");
-    USR_PRINT(stmt, "   %s \"%s\"",
-              pragmas->n == 1 ? "pragma" : "starting with pragma",
-              pragmas->v[0]);
+    if (error && pragmas->n > 0) {
+      USR_FATAL_CONT(stmt, "cannot attach pragmas to this statement");
+      USR_PRINT(stmt, "   %s \"%s\"",
+                pragmas->n == 1 ? "pragma" : "starting with pragma",
+                pragmas->v[0]);
+    }
   }
   delete pragmas;
 

@@ -2512,7 +2512,7 @@ module ChapelBase {
     return __primitive("order to enum", t, i);
   }
 
-  operator :(i: integral, type t: enum) {
+  operator :(i: integral, type t: enum) where !isAbstractEnumType(t) {
     for s in t do
       if s:int == i:int then
         return s;

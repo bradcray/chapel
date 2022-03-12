@@ -2512,11 +2512,13 @@ module ChapelBase {
     return __primitive("order to enum", t, i);
   }
 
-  operator :(i: integral, type t: enum) where !isAbstractEnumType(t) {
+  operator :(i: integral, type t: enum) throws where !isAbstractEnumType(t) {
     for s in t do
       if s:int == i:int then
         return s;
-    halt("int->enum cast has bad value");
+    chpl_enum_cast_error(i, t:string);
+    var e: t;
+    return e;
   }
   
 }

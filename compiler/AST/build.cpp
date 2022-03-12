@@ -154,7 +154,6 @@ BlockStmt* buildPragmaStmt(Vec<const char*>* pragmas,
       // If this block is defining an enum type, it's OK that it has
       // other stuff in it
       if (isEnumType(def->sym->type)) {
-        printf("*** Found an enum type!\n");
         //        list_view(stmt);
         error = false;
       }
@@ -2805,7 +2804,6 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
 
   // Generate arrays of strings and integer values
   if (true || currentModuleType == MOD_USER) {
-    printf("Handling %s\n", currentModuleName);
     CallExpr* tupOfNames = new CallExpr(PRIM_ACTUALS_LIST);
     CallExpr* tupOfVals = (pdt->isAbstract() ?
 			   nullptr :

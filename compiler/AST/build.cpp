@@ -150,7 +150,6 @@ BlockStmt* buildPragmaStmt(Vec<const char*>* pragmas,
   // only the enum itself deserves the pragma
   DefExpr* de = toDefExpr(stmt->body.tail);
   if (de && isEnumType(de->sym->type)) {
-    printf("Attaching pragma to %s\n", de->sym->name);
     addPragmaFlags(de->sym, pragmas);
   } else {
     //  list_view(stmt);
@@ -2813,6 +2812,8 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
 			   new CallExpr(PRIM_ACTUALS_LIST));
     VarSymbol* one = new_IntSymbol(1);
     VarSymbol* prev = nullptr;
+    int firstSymWithInit = -1;
+    int count = 0;
     for_enums(de, pdt) {
       Expr* symAsString = buildStringLiteral(de->sym->name);
       tupOfNames->insertAtTail(symAsString);
@@ -2823,20 +2824,25 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
 	  VarSymbol* enumVal = new VarSymbol(astr("chpl_", name, "_",
 						  de->sym->name));
 	  enumVal->addFlag(FLAG_CONST);
-	  Expr* initExpr = (init ?
-			    init->copy() :
-			    new CallExpr("+",
-					 new SymExpr(prev),
-					 new SymExpr(one)));
-	  DefExpr* de = new DefExpr(enumVal, initExpr);
-	  enumDef->insertBefore(de);
-	  tupOfVals->insertAtTail(new SymExpr(enumVal));
-	  prev = enumVal;
-	} else {
-	  tupOfVals->insertAtTail(new SymExpr(one)); // placeholder value
-	}
+	  Expr* initExpr;
+          if (init) {
+            initExpr = init->copy();
+            if (firstSymWithInit == -1) {
+              firstSymWithInit = count;
+            }
+          } else {
+            initExpr = new CallExpr("+", new SymExpr(prev), new SymExpr(one));
+          }
+          DefExpr* de = new DefExpr(enumVal, initExpr);
+          enumDef->insertBefore(de);
+          tupOfVals->insertAtTail(new SymExpr(enumVal));
+          prev = enumVal;
+        } else {
+          tupOfVals->insertAtTail(new SymExpr(one)); // placeholder value
+        }
       }
       //    printf("Got enum: %s\n", de->sym->name);
+      count += 1;
     }
     tupOfNames = new CallExpr("_build_tuple", tupOfNames);
     const char* strTupName = astr("chpl_enum_str_tup_", name);
@@ -2907,12 +2913,27 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       FnSymbol* fn = new FnSymbol(astrScolon);
       fn->addFlag(FLAG_OPERATOR);
       fn->addFlag(FLAG_COMPILER_GENERATED);
-      fn->addFlag(FLAG_INLINE);
       ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, "from", pdt);
       fn->insertFormalAtTail(arg);
       ArgSymbol* t = new ArgSymbol(INTENT_TYPE, "t", dtInt[INT_SIZE_64], new SymExpr(dtInt[INT_SIZE_64]->symbol));
       t->addFlag(FLAG_TYPE_VARIABLE);
       fn->insertFormalAtTail(t);
+      if (pdt->isConcrete()) {
+        // Inline only if this is a concrete enum (it seems like maybe
+        // we can't inline throwing functions?)
+        fn->addFlag(FLAG_INLINE);
+        INT_ASSERT(firstSymWithInit == 0);
+      } else {
+        fn->throwsErrorInit();
+      }
+
+      if (firstSymWithInit != 0) {
+        CallExpr* ltTest = new CallExpr("<", new CallExpr("chpl__enumToOrder", arg), new SymExpr(new_IntSymbol(firstSymWithInit)));
+        CallExpr* throws = new CallExpr("chpl_enum_cast_error_no_int", buildStringLiteral(name), new CallExpr(":", new SymExpr(arg), new SymExpr(dtString->symbol)));
+        BlockStmt* cond = buildIfStmt(ltTest, throws);
+        fn->insertAtTail(cond);
+      }
+      
       fn->insertAtTail(new CallExpr(PRIM_RETURN,
                                     new CallExpr(new SymExpr(intTupSym),
                                                  new CallExpr("chpl__enumToOrder", arg))));

@@ -2804,22 +2804,20 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
   //  BlockStmt* enumDeclBundle = new BlockStmt(stmt, BLOCK_SCOPELESS);
 
   // Generate arrays of strings and integer values
-  if (currentModuleType == MOD_USER) {
+  if (true || currentModuleType == MOD_USER) {
     printf("Handling %s\n", currentModuleName);
-    CallExpr* tupOfNames = nullptr;
-    CallExpr* tupOfVals = new CallExpr(PRIM_ACTUALS_LIST);
+    CallExpr* tupOfNames = new CallExpr(PRIM_ACTUALS_LIST);
+    CallExpr* tupOfVals = (pdt->isAbstract() ?
+			   nullptr :
+			   new CallExpr(PRIM_ACTUALS_LIST));
     VarSymbol* one = new_IntSymbol(1);
     VarSymbol* prev = nullptr;
     for_enums(de, pdt) {
       Expr* symAsString = buildStringLiteral(de->sym->name);
-      if (tupOfNames == nullptr) {
-        tupOfNames = new CallExpr(PRIM_ACTUALS_LIST, symAsString);
-      } else {
-        tupOfNames->insertAtTail(symAsString);
-      }
+      tupOfNames->insertAtTail(symAsString);
 
       if (!pdt->isAbstract()) {
-        Expr* init = de->init;
+	Expr* init = de->init;
 	if (prev || init != nullptr) {
 	  VarSymbol* enumVal = new VarSymbol(astr("chpl_", name, "_",
 						  de->sym->name));
@@ -2846,16 +2844,18 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
     DefExpr* tupDeclStmt = new DefExpr(strTupSym, tupOfNames);
     enumDef->insertBefore(tupDeclStmt);
 
+    /*
     CallExpr* debugPrint = new CallExpr("writeln", new SymExpr(strTupSym));
     enumDef->insertBefore(debugPrint);
+    */
 
     FnSymbol* fn = new FnSymbol(astrScolon);
     fn->addFlag(FLAG_OPERATOR);
     fn->addFlag(FLAG_COMPILER_GENERATED);
-    fn->addFlag(FLAG_LAST_RESORT);
     ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, "from", pdt);
     fn->insertFormalAtTail(arg);
-    ArgSymbol* t = new ArgSymbol(INTENT_BLANK, "t", dtString);
+    ArgSymbol* t = new ArgSymbol(INTENT_TYPE, "t", dtString, new SymExpr(dtString->symbol));
+    t->type = dtString;
     t->addFlag(FLAG_TYPE_VARIABLE);
     fn->insertFormalAtTail(t);
     fn->insertAtTail(new CallExpr(PRIM_RETURN,
@@ -2897,16 +2897,17 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       }
       */
 
+      /*
       CallExpr* debugPrint = new CallExpr("writeln", new SymExpr(intTupSym));
       enumDef->insertBefore(debugPrint);
+      */
 
       FnSymbol* fn = new FnSymbol(astrScolon);
       fn->addFlag(FLAG_OPERATOR);
       fn->addFlag(FLAG_COMPILER_GENERATED);
-      fn->addFlag(FLAG_LAST_RESORT);
       ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, "from", pdt);
       fn->insertFormalAtTail(arg);
-      ArgSymbol* t = new ArgSymbol(INTENT_BLANK, "t", dtIntegral);
+      ArgSymbol* t = new ArgSymbol(INTENT_TYPE, "t", dtIntegral, new SymExpr(dtIntegral->symbol));
       t->addFlag(FLAG_TYPE_VARIABLE);
       fn->insertFormalAtTail(t);
       fn->insertAtTail(new CallExpr(PRIM_RETURN,
@@ -2914,9 +2915,34 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
                                                  new CallExpr("chpl__enumToOrder", arg))));
       DefExpr* defFn = new DefExpr(fn);
       enumDef->insertBefore(defFn);
-      //      list_view(defFn);
+
+      /*
+      {
+	FnSymbol* fn = new FnSymbol(astrScolon);
+	fn->addFlag(FLAG_OPERATOR);
+	fn->addFlag(FLAG_COMPILER_GENERATED);
+	ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, "from", dtIntegral);
+	fn->insertFormalAtTail(arg);
+	ArgSymbol* t = new ArgSymbol(INTENT_TYPE, "t", pdt, new SymExpr(pst));
+	t->addFlag(FLAG_TYPE_VARIABLE);
+	fn->insertFormalAtTail(t);
+	
+	VarSymbol* idx = new VarSymbol("sym");
+	CallExpr* ret = new CallExpr(PRIM_RETURN, new CallExpr("chpl__orderToEnum", new SymExpr(idx), new SymExpr(pst)));
+	BlockStmt* cond = buildIfStmt(new CallExpr("==", new SymExpr(arg), new CallExpr(intTupSym, new SymExpr(idx))), ret);
+	
+	BlockStmt* loop = ForLoop::buildForLoop(new SymExpr(idx),
+						buildBoundedRange(new SymExpr(new_IntSymbol(0)), new CallExpr(".", new SymExpr(intTupSym), new UnresolvedSymExpr("size")), false, true), cond, false, false);
+	fn->insertAtTail(loop);
+	// TODO: This should be an error
+	fn->insertAtTail(new CallExpr(PRIM_RETURN, new CallExpr("chpl__orderToEnum", new SymExpr(new_IntSymbol(0)), new SymExpr(pst))));
+	
+	DefExpr* defFn = new DefExpr(fn);
+	enumDef->insertBefore(defFn);
+	list_view(defFn);
+      }
+      */
     }
-    
   }
   return stmt;
 }

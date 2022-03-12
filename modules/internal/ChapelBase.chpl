@@ -2511,4 +2511,12 @@ module ChapelBase {
   inline proc chpl__orderToEnum(param i: int, type t: enum) param : t {
     return __primitive("order to enum", t, i);
   }
+
+  operator :(i: integral, type t: enum) {
+    for s in t do
+      if s:int == i:int then
+        return s;
+    halt("int->enum cast has bad value");
+  }
+  
 }

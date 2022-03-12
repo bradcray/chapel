@@ -22,6 +22,9 @@ module MemConsistency {
   pragma "c memory order type"
   extern type memory_order;
 
+  use ChapelBase;
+  use ChapelTuple;
+
   // When I finish removing PRIM_INIT before initialization to a known
   // value, then this method should work.  Until then, my stopgap will be
   // an external function in the runtime.

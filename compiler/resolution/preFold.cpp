@@ -2751,7 +2751,7 @@ static Expr* resolveTupleIndexing(CallExpr* call, Symbol* baseVar) {
   Type* indexType = call->get(3)->getValType();
 
   if (!is_int_type(indexType) && !is_uint_type(indexType) && !is_bool_type(indexType))
-    USR_FATAL(call, "tuple indexing expression is not of integral type");
+    USR_FATAL(call, "tuple indexing expression is not of integral type %d", call->id);
 
   AggregateType* baseType = toAggregateType(baseVar->getValType());
   int64_t index;

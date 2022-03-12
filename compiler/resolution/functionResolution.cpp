@@ -6382,9 +6382,10 @@ static void lvalueCheckActual(CallExpr* call, Expr* actual, IntentTag intent, Ar
                        "'const' field(s)",
                        recordName);
       } else {
-        if (constnessError)
+        if (constnessError) {
           USR_FATAL_CONT(actual, "cannot assign to const variable");
-        else
+	  list_view(call);
+        } else
           USR_FATAL_CONT(actual, "illegal lvalue in assignment");
       }
 

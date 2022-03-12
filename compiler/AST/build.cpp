@@ -2820,34 +2820,21 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
 
       if (!pdt->isAbstract()) {
         Expr* init = de->init;
-        if (init == nullptr) {
-	  if (prev) {
-	    VarSymbol* enumVal = new VarSymbol(astr("chpl_", name, "_",
-						    de->sym->name));
-	    enumVal->addFlag(FLAG_CONST);
-	    DefExpr* de = new DefExpr(enumVal, new CallExpr("+",
-							    new SymExpr(prev),
-							    new SymExpr(one)));
-	    enumDef->insertBefore(de);
-	    tupOfVals->insertAtTail(new SymExpr(enumVal));
-	    prev = enumVal;
-	  } else {
-	    tupOfVals->insertAtTail(new SymExpr(one)); // bogus value
-	  }
-				      
-          if (tupOfVals == nullptr) {
-            init = buildIntLiteral("0");
-          } else {
-            init = buildIntLiteral("0");
-          }
-        } else {
+	if (prev || init != nullptr) {
 	  VarSymbol* enumVal = new VarSymbol(astr("chpl_", name, "_",
 						  de->sym->name));
 	  enumVal->addFlag(FLAG_CONST);
-	  DefExpr* de = new DefExpr(enumVal, init->copy());
+	  Expr* initExpr = (init ?
+			    init->copy() :
+			    new CallExpr("+",
+					 new SymExpr(prev),
+					 new SymExpr(one)));
+	  DefExpr* de = new DefExpr(enumVal, initExpr);
 	  enumDef->insertBefore(de);
 	  tupOfVals->insertAtTail(new SymExpr(enumVal));
 	  prev = enumVal;
+	} else {
+	  tupOfVals->insertAtTail(new SymExpr(one)); // placeholder value
 	}
       }
       //    printf("Got enum: %s\n", de->sym->name);

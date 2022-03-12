@@ -2808,6 +2808,7 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
     printf("Handling %s\n", currentModuleName);
     CallExpr* arrOfNames = nullptr;
     CallExpr* arrOfVals = nullptr;
+    bool fillInIncVals = false;
     for_enums(de, pdt) {
       Expr* symAsString = buildStringLiteral(de->sym->name);
       if (arrOfNames == nullptr) {
@@ -2822,8 +2823,8 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
           if (arrOfVals == nullptr) {
             init = buildIntLiteral("0");
           } else {
-            USR_WARN("Can't handle inferred enum values yet");
             init = buildIntLiteral("0");
+            fillInIncVals = true;
           }
         }
         if (arrOfVals == nullptr) {
@@ -2860,10 +2861,34 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
     if (arrOfVals != nullptr) {
       arrOfVals = new CallExpr("chpl__buildArrayExpr", arrOfVals);
       const char* intArrName = astr("chpl_enum_int_arr_", name);
-      DefExpr* arrDeclStmt = new DefExpr(new VarSymbol(intArrName), arrOfVals);
+      VarSymbol* intArrSym = new VarSymbol(intArrName);
+      DefExpr* arrDeclStmt = new DefExpr(intArrSym, arrOfVals);
       enumDef->insertBefore(arrDeclStmt);
 
-      CallExpr* debugPrint = new CallExpr("writeln", new UnresolvedSymExpr(intArrName));
+      if (fillInIncVals) {
+        int count = 0;
+        VarSymbol* one = new_IntSymbol(1);
+        bool foundInits = false;
+        for_enums(de, pdt) {
+          if (de->init == nullptr) {
+            if (foundInits) {
+              CallExpr* lhs = new CallExpr(new SymExpr(intArrSym),
+                                           new SymExpr(new_IntSymbol(count)));
+              CallExpr* rhs = new CallExpr(new SymExpr(intArrSym),
+                                           new SymExpr(new_IntSymbol(count-1)));
+              CallExpr* rhsPlusOne = new CallExpr("+", rhs, one);
+              CallExpr* assign = new CallExpr("=", lhs, rhsPlusOne);
+
+              enumDef->insertBefore(assign);
+            }
+          } else {
+            foundInits = true;
+          }
+          count++;
+        }
+      }
+
+      CallExpr* debugPrint = new CallExpr("writeln", new SymExpr(intArrSym));
       enumDef->insertBefore(debugPrint);
 
       FnSymbol* fn = new FnSymbol(astrScolon);

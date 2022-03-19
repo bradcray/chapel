@@ -2806,7 +2806,7 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
 
   // Generate arrays of strings and integer values
   if (true || currentModuleType == MOD_USER) {
-    // Given 'enum color {red, green=1, blue=green*2, black}`...
+    // Given 'enum color {red, green=1, blue=green*3, black}`...
 
     // tup of names will end up being `("red", "green", "blue", "black")`
     CallExpr* tupOfNames = new CallExpr(PRIM_ACTUALS_LIST);
@@ -2819,19 +2819,60 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
     //   proc chpl_build_enum_vals_tup_color {
     //     const red = -999;
     //     const green = 1;
-    //     const blue = green*2;
+    //     const blue = green*3;
     //     const black = blue+1;
     //     return (red, green, blue, black);
     //   }
     FnSymbol* tupOfValsFn = nullptr;
+
+    // castParamEnumToIntFn will end up being:
+    //   operator :(param from: color, type t: int) {
+    //     param green = 1;
+    //     param blue = green*3;
+    //     param black = blue + 1;
+    //     select chpl_enumToOrder(from) {
+    //       when 1 do
+    //         return green;
+    //       when 2 do
+    //         return blue;
+    //       when 3 do
+    //         return black;
+    //       otherwise:
+    //         compilerError("Cannot convert enum to int at compile-time");
+    //     }
+    //   }
+    FnSymbol* castParamEnumToIntFn = nullptr;
+    ArgSymbol* fromArg = nullptr;
+    BlockStmt* whenStmts = nullptr;
+    
     if (!pdt->isAbstract()) {
+      // initialize tupOfVals
       tupOfVals = new CallExpr(PRIM_ACTUALS_LIST);
+
+      // initialize tupOfValsFn
       tupOfValsFn = new FnSymbol(astr("chpl_build_enum_vals_tup_", name));
       tupOfValsFn->addFlag(FLAG_COMPILER_GENERATED);
+
+      // initialize castParamEnumToIntFn
+      castParamEnumToIntFn = new FnSymbol(astrScolon);
+      castParamEnumToIntFn->addFlag(FLAG_OPERATOR);
+      castParamEnumToIntFn->addFlag(FLAG_COMPILER_GENERATED);
+      fromArg = new ArgSymbol(INTENT_PARAM, "from", pdt);
+      fromArg->addFlag(FLAG_PARAM);
+      castParamEnumToIntFn->insertFormalAtTail(fromArg);
+      ArgSymbol* t = new ArgSymbol(INTENT_TYPE, "t", dtInt[INT_SIZE_64], new SymExpr(dtInt[INT_SIZE_64]->symbol));
+      t->addFlag(FLAG_TYPE_VARIABLE);
+      castParamEnumToIntFn->insertFormalAtTail(t);
+      castParamEnumToIntFn->retTag = RET_PARAM;
+
+      // initialize whenStmts
+      whenStmts = buildChapelStmt();
     }
+    
     VarSymbol* one = new_IntSymbol(1);
     VarSymbol* sentinel = new_IntSymbol(-999);
     VarSymbol* prev = nullptr;
+    VarSymbol* prevParam = nullptr;
     int firstSymWithInit = -1;
     int count = 0;
     for_enums(de, pdt) {
@@ -2843,26 +2884,44 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       if (!pdt->isAbstract()) {
 	Expr* init = de->init;
 	if (prev || init != nullptr) {
-	  VarSymbol* enumVal = new VarSymbol(de->sym->name);
-	  enumVal->addFlag(FLAG_CONST);
+
 	  Expr* initExpr;
+          Expr* paramInitExpr;
           if (init) {
             initExpr = init->copy();
+            paramInitExpr = init->copy();
             if (firstSymWithInit == -1) {
               firstSymWithInit = count;
             }
           } else {
             initExpr = new CallExpr("+", new SymExpr(prev), new SymExpr(one));
+            paramInitExpr = new CallExpr("+", new SymExpr(prevParam), new SymExpr(one));
           }
 
           // insert `const red = <val>;` into tupOfValsFn
+	  VarSymbol* enumVal = new VarSymbol(de->sym->name);
+	  enumVal->addFlag(FLAG_CONST);
           DefExpr* de = new DefExpr(enumVal, initExpr);
           tupOfValsFn->insertAtTail(de);
 
           // insert `red` into tupOfVals
           tupOfVals->insertAtTail(new SymExpr(enumVal));
           
+          // insert `param red = <val>;` into castParamEnumToIntFn
+          VarSymbol* paramEnumVal = new VarSymbol(de->sym->name);
+          paramEnumVal->addFlag(FLAG_PARAM);
+          DefExpr* pde = new DefExpr(paramEnumVal, paramInitExpr);
+          castParamEnumToIntFn->insertAtTail(pde);
+
+          //
+          SymExpr* test = new SymExpr(new_IntSymbol(count));
+          CallExpr* ret = new CallExpr(PRIM_RETURN, new SymExpr(paramEnumVal));
+          CondStmt* when = new CondStmt(new CallExpr(PRIM_WHEN, test), ret);
+          whenStmts->insertAtTail(when);
+
+          // set up for next iteration
           prev = enumVal;
+          prevParam = paramEnumVal;
         } else {
           tupOfVals->insertAtTail(new SymExpr(sentinel)); // placeholder value
         }
@@ -2870,14 +2929,27 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       //    printf("Got enum: %s\n", de->sym->name);
       count += 1;
     }
+    if (whenStmts != nullptr) {
+      // add otherwise to when statements
+      CondStmt* otherwise = new CondStmt(new CallExpr(PRIM_WHEN), new CallExpr("compilerError", buildStringLiteral("Cannot convert enum to int at compile-time")));
+      whenStmts->insertAtTail(otherwise);
+
+      CallExpr* selectExpr = new CallExpr("chpl__enumToOrder", fromArg);
+      BlockStmt* selectStmt = buildChapelStmt(buildSelectStmt(selectExpr, whenStmts));
+      
+      castParamEnumToIntFn->insertAtTail(selectStmt);
+      enumDef->insertBefore(new DefExpr(castParamEnumToIntFn));
+      //      printf("\n\n\n\n\n***castParamEnumToIntFn\n***-------------\n");
+      //      list_view(castParamEnumToIntFn);
+    }
 
     // add `return (red, green, blue, black);` to tupOfValsFn
     if (tupOfVals) {
       tupOfVals = new CallExpr("_build_tuple", tupOfVals);
       tupOfValsFn->insertAtTail(new CallExpr(PRIM_RETURN, tupOfVals));
       enumDef->insertBefore(new DefExpr(tupOfValsFn));
-      printf("\n\n\n\n\n***TupOfValsFn\n***------------\n");
-      list_view(tupOfValsFn);
+      //      printf("\n\n\n\n\n***TupOfValsFn\n***------------\n");
+      //      list_view(tupOfValsFn);
     }
 
     // add `const chpl_enum_str_tup_color = ("red", "green", "blue");`
@@ -2922,8 +2994,8 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       VarSymbol* intTupSym = new VarSymbol(intTupName);
       intTupSym->addFlag(FLAG_CONST);
       DefExpr* tupDeclStmt = new DefExpr(intTupSym, new CallExpr(tupOfValsFn));
-      printf("\n\n***TupleDeclStmt\n***------------\n");
-      list_view(tupDeclStmt);
+      //      printf("\n\n***TupleDeclStmt\n***------------\n");
+      //      list_view(tupDeclStmt);
       enumDef->insertBefore(tupDeclStmt);
 
       /*

@@ -2806,8 +2806,23 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
 
   // Generate arrays of strings and integer values
   if (true || currentModuleType == MOD_USER) {
+    // Given 'enum color {red, green=1, blue=green*2, black}`...
+
+    // tup of names will end up being `("red", "green", "blue", "black")`
     CallExpr* tupOfNames = new CallExpr(PRIM_ACTUALS_LIST);
+
+    // tupOfVals will end up being a tuple like `(_, 1, 2, 3)` where `_` is
+    // an arbitrary placeholder value that should not be used, currently -999
     CallExpr* tupOfVals = nullptr;
+
+    // tupOfValsFn will end up being
+    //   proc chpl_build_enum_vals_tup_color {
+    //     const red = -999;
+    //     const green = 1;
+    //     const blue = green*2;
+    //     const black = blue+1;
+    //     return (red, green, blue, black);
+    //   }
     FnSymbol* tupOfValsFn = nullptr;
     if (!pdt->isAbstract()) {
       tupOfVals = new CallExpr(PRIM_ACTUALS_LIST);
@@ -2815,13 +2830,16 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       tupOfValsFn->addFlag(FLAG_COMPILER_GENERATED);
     }
     VarSymbol* one = new_IntSymbol(1);
+    VarSymbol* sentinel = new_IntSymbol(-999);
     VarSymbol* prev = nullptr;
     int firstSymWithInit = -1;
     int count = 0;
     for_enums(de, pdt) {
+      // add symbol, like "red" to tupOfNames
       Expr* symAsString = buildStringLiteral(de->sym->name);
       tupOfNames->insertAtTail(symAsString);
 
+      // create `const red = <val>;`
       if (!pdt->isAbstract()) {
 	Expr* init = de->init;
 	if (prev || init != nullptr) {
@@ -2836,17 +2854,24 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
           } else {
             initExpr = new CallExpr("+", new SymExpr(prev), new SymExpr(one));
           }
+
+          // insert `const red = <val>;` into tupOfValsFn
           DefExpr* de = new DefExpr(enumVal, initExpr);
           tupOfValsFn->insertAtTail(de);
+
+          // insert `red` into tupOfVals
           tupOfVals->insertAtTail(new SymExpr(enumVal));
+          
           prev = enumVal;
         } else {
-          tupOfVals->insertAtTail(new SymExpr(one)); // placeholder value
+          tupOfVals->insertAtTail(new SymExpr(sentinel)); // placeholder value
         }
       }
       //    printf("Got enum: %s\n", de->sym->name);
       count += 1;
     }
+
+    // add `return (red, green, blue, black);` to tupOfValsFn
     if (tupOfVals) {
       tupOfVals = new CallExpr("_build_tuple", tupOfVals);
       tupOfValsFn->insertAtTail(new CallExpr(PRIM_RETURN, tupOfVals));
@@ -2854,6 +2879,8 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       printf("\n\n\n\n\n***TupOfValsFn\n***------------\n");
       list_view(tupOfValsFn);
     }
+
+    // add `const chpl_enum_str_tup_color = ("red", "green", "blue");`
     tupOfNames = new CallExpr("_build_tuple", tupOfNames);
     const char* strTupName = astr("chpl_enum_str_tup_", name);
     VarSymbol* strTupSym = new VarSymbol(strTupName);
@@ -2866,6 +2893,10 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
     enumDef->insertBefore(debugPrint);
     */
 
+    // create and insert:
+    //   operator :(from: color, type t: string) {
+    //     return chpl_enum_str_tup_color(chpl__enumToOrder(from));
+    //   }
     FnSymbol* fn = new FnSymbol(astrScolon);
     fn->addFlag(FLAG_OPERATOR);
     fn->addFlag(FLAG_COMPILER_GENERATED);
@@ -2883,6 +2914,9 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
     enumDef->insertBefore(defFn);
       
     if (tupOfVals != nullptr) {
+      // create and insert:
+      //   const chpl_enum_int_tup_color = chpl_build_enum_vals_tup();
+      //
       //      printf("In tupOfVals non-null\n");
       const char* intTupName = astr("chpl_enum_int_tup_", name);
       VarSymbol* intTupSym = new VarSymbol(intTupName);
@@ -2921,6 +2955,13 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       enumDef->insertBefore(debugPrint);
       */
 
+      // Create and insert:
+      //   [inline] operator :(from: color, type t: int) throws {
+      //     if chpl_enumToOrder(from) < 1 then  // if we're < "green"
+      //       chpl_enum_cast_error_no_int();    // throw an error
+      //     return chpl_enum__int_tup_color(chpl_enumToOrder(from));
+      //   }
+      //
       FnSymbol* fn = new FnSymbol(astrScolon);
       fn->addFlag(FLAG_OPERATOR);
       fn->addFlag(FLAG_COMPILER_GENERATED);

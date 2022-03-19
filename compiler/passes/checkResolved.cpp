@@ -106,8 +106,8 @@ checkResolved() {
           SymExpr* sym = toSymExpr(def->init);
           if (!sym || (!sym->symbol()->hasFlag(FLAG_PARAM) &&
                        !toVarSymbol(sym->symbol())->immediate)) {
-            USR_FATAL_CONT(def, "enumerator '%s' is not an integer param value",
-                           def->sym->name);
+            //            USR_FATAL_CONT(def, "enumerator '%s' is not an integer param value",
+            //                           def->sym->name);
           } else if (fWarnUnstable) {
             Immediate* imm = toVarSymbol(sym->symbol())->immediate;
             std::string enumVal = imm->to_string();

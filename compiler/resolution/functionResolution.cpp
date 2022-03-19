@@ -8561,6 +8561,7 @@ bool isInstantiation(Type* sub, Type* super) {
 static Expr* resolveTypeOrParamExpr(Expr* expr);
 
 void ensureEnumTypeResolved(EnumType* etype) {
+  return;
   if (etype->integerType == NULL) {
     // Make sure to resolve all enum types.
 
@@ -8585,11 +8586,13 @@ void ensureEnumTypeResolved(EnumType* etype) {
         if (t == dtUnknown) {
           INT_FATAL(def->init, "Unable to resolve enumerator type expression");
         }
+        /*
         if (!is_int_type(t) && !is_uint_type(t)) {
           USR_FATAL(def,
                     "enumerator '%s' is not an integer param value",
                     def->sym->name);
         }
+        */
 
         // Replace def->init if it's not the same as enumTypeExpr
         if (enumTypeExpr != def->init) {

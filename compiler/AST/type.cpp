@@ -595,8 +595,11 @@ bool EnumType::isConcrete() {
 
 
 PrimitiveType* EnumType::getIntegerType() {
+  /*
   INT_ASSERT(integerType);
   return integerType;
+  */
+  return dtInt[INT_SIZE_64];
 }
 
 

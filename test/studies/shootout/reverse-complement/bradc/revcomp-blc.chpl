@@ -17,47 +17,98 @@ param eol = '\n'.toByte(),  // end-of-line, as an integer
              //    ↑↑↑↑  ↑↑  ↑ ↑↑   ↑↑↑↑↑↑ ↑       ↑↑↑↑  ↑↑  ↑ ↑↑   ↑↑↑↑↑↑ ↑
              //    ABCDEFGHIJKLMNOPQRSTUVWXYZ      abcdefghijklmnopqrstuvwxyz
 
+// TODO: config param?
+config const readSize = 65536,
+             n = 0;
 
-proc main(args: [] string) {
-  var stdinBin  = openfd(0).reader(iokind.native, locking=false,
-                                   hints=QIO_CH_ALWAYS_UNBUFFERED),
-      stdoutBin = openfd(1).writer(iokind.native, locking=false,
-                                   hints=QIO_CH_ALWAYS_UNBUFFERED),
-      bufLen = 8 * 1024,
-      bufDom = {0..<bufLen},
-      buf: [bufDom] uint(8),
-      end = 0;
+var pairCmpl: [0..<65536] uint(16);
 
-  // read in the data using an incrementally growing buffer
-  while stdinBin.read(buf[end..]) {
-    end = bufLen;
-    bufLen += min(1024**2, bufLen);
-    bufDom = {0..<bufLen};
-  }
-  end = stdinBin.offset()-1;
+var stdinBin  = openfd(0).reader(iokind.native, locking=false,
+                                 hints=QIO_CH_ALWAYS_UNBUFFERED),
+    stdoutBin = openfd(1).writer(iokind.native, locking=false,
+                                 hints=QIO_CH_ALWAYS_UNBUFFERED);
 
-  // process the buffer a sequence at a time, working from the end
-  var hi = end;
-  while (hi >= 0) {
-    // search for the '>' that marks the start of a sequence
-    var lo = hi;
-    while buf[lo] != '>'.toByte() do
-      lo -= 1;
+// TODO: Shift by just 7?
+inline proc join(i:uint(16), j) {
+  return i << 8 | j;
+}
 
-    // skip past header line
-    var seqlo = lo;
-    while buf[seqlo] != eol {
-      seqlo += 1;
+proc main() {
+  const offs = eol..<cmpl.size;
+  forall i in offs {
+    forall j in offs {
+      pairCmpl[join(i,j)] = join(cmpl(j), cmpl(i));
     }
-
-    // reverse and complement the sequence
-    revcomp(buf, seqlo+1, hi);
-
-    hi = lo - 1;
   }
 
-  // write out the transformed buffer
-  stdoutBin.write(buf[..end]);
+  var seqCap = readSize,
+      totRead, seqSize = 0,
+      seqDom = {0..<seqCap},
+      seq: [seqDom] uint(8);
+
+  do {
+    const chunkInds = seqSize..#readSize;
+    ref nextChunk = seq[chunkInds];
+    const more = stdinBin.read(nextChunk);
+    var bytesRead = stdinBin.offset()-totRead;
+    totRead += readSize;
+//    writef("read %i bytes\n", bytesRead);
+    do {
+//      writeln("Looking for sep");
+      const seqStart = findSep(seq[seqSize..#bytesRead]);
+      if seqStart != 0 {
+        const prevBytes = seqStart - seqSize;
+        seqSize += prevBytes;
+
+        if seqSize {   // TODO: Is this ever not true?
+          revcomp(seq, seqSize);
+
+//          writeln("Shifting from ", seqStart..#(bytesRead-prevBytes), " to ",
+//                  0..<bytesRead-prevBytes);
+          for j in 0..<bytesRead-prevBytes {
+            seq[j] = seq[j+seqStart];
+          }
+
+          seqSize = 0;
+        }
+
+        seqSize += 1;  // TODO: Necessary?
+        bytesRead -= prevBytes+1;
+      }
+    } while seqStart;
+
+    seqSize += bytesRead;
+
+    if seqSize > seqCap-readSize {
+      seqCap *= 2;
+      seqDom = {0..<seqCap};
+    }
+    } while (more);
+
+  if seqSize {
+    revcomp(seq, seqSize);
+  }
+}
+
+
+proc revcomp(seq, size) {
+  var i = 0;
+  while seq[i] != eol {
+    i += 1;
+  }
+  stdoutBin.write(seq[0..i]);
+  stdoutBin.write(seq[i+1..<size]);
+}
+
+
+proc findSep(chunk: [?inds]) {
+  for i in inds {
+    if chunk[i] == '>'.toByte() && i != inds.low {
+//      writeln("Found sep at ", i);
+      return i;
+    }
+  }
+  return 0;
 }
 
 

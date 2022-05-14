@@ -47,10 +47,8 @@ proc main() {
       seq: [seqDom] uint(8);
 
   do {
-    const chunkInds = seqSize..#readSize;
-    ref nextChunk = seq[chunkInds];
-    const more = stdinBin.read(nextChunk);
-    var bytesRead = stdinBin.offset()-totRead;
+    const more = stdinBin.read(seq[seqSize..#readSize]);
+    var bytesRead = stdinBin.offset() - totRead;
     totRead += readSize;
 //    writef("read %i bytes\n", bytesRead);
     do {

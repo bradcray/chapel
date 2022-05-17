@@ -6,7 +6,7 @@
    C gcc #6 version by Jeremy Zerfas
 */
 
-use IO;
+use CTypes, IO;
 
 param eol = '\n'.toByte(),  // end-of-line, as an integer
       cols = 61,            // # of characters per full row (including '\n')
@@ -19,6 +19,7 @@ param eol = '\n'.toByte(),  // end-of-line, as an integer
 
 // TODO: config param?
 config const readSize = 65536,
+             linesPerChunk = 8192,
              n = 0;
 
 var pairCmpl: [0..<65536] uint(16);
@@ -70,7 +71,7 @@ proc main() {
           seqSize = 0;
         }
 
-        seqSize += 1;  // TODO: Necessary?
+        seqSize += 1;
         bytesRead -= prevBytes+1;
       }
     } while seqStart;
@@ -95,8 +96,76 @@ proc revcomp(seq, size) {
     i += 1;
   }
   stdoutBin.write(seq[0..i]);
-  stdoutBin.write(seq[i+1..<size]);
+  //  stdoutBin.write(seq[i+1..<size]);
+  var locked: sync bool,
+      sharedCharsLeft: atomic int,
+      sharedFront: atomic int;
+  coforall tid in 0..<1 { // TODO: update to here.maxTaskPar {
+    var chunkToWrite: [0..<linesPerChunk*cols] uint(8);
+    do {
+      locked.writeEF(true);
+      const charsLeft = sharedCharsLeft.read(),
+            fullLineFrontSpanLength = (charsLeft-1)%cols,
+            fullLineRearSpanLength = cols-1-fullLineFrontSpanLength,
+            chunkSize = if charsLeft>linesPerChunk*cols // TODO: name this
+                        then linesPerChunk*cols
+                        else charsLeft;
+      sharedCharsLeft.sub(chunkSize);
+      var lastProc = sharedFront.fetchSub(chunkSize),
+          chunkLeft = chunkSize;
+      locked.readFE();
+      if chunkLeft {
+        var chunkPos = 0;
+
+        if (!fullLineRearSpanLength) {
+          revcompHelp(chunkPos, lastProc, chunkLeft, chunkToWrite);
+          chunkLeft = 0;
+        }
+
+        // TODO: Could this be a strided while loop?
+        while (chunkLeft >= cols) {
+          revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength, chunkToWrite);
+          chunkPos += fullLineFrontSpanLength;
+          lastProc -= fullLineFrontSpanLength+1;
+          
+          revcompHelp(chunkPos, lastProc, fullLineRearSpanLength, chunkToWrite);
+          chunkPos += fullLineRearSpanLength;
+          lastProc -= fullLineRearSpanLength;
+          
+          chunkToWrite[chunkPos] = eol;
+          chunkPos += 1;
+          
+          chunkLeft -= cols;
+        }
+        
+        if (chunkLeft) {
+          revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength+1, chunkToWrite);
+        }
+
+        // TODO: Need to coordinate here
+        stdoutBin.write(chunkToWrite, chunkSize);
+      }
+    } while chunkLeft;
+  }
+
 }
+
+  proc revcompHelp(in dstFront, in charAfter, in spanLen, chunkToWrite) {
+    if spanLen%2 {
+      charAfter -= 1;
+      chunkToWrite[dstFront] = cmpl[charAfter];
+      dstFront += 1;
+    }
+
+    while (spanLen >= 2) {
+      charAfter -= 2;
+      const pair = ((c_ptrTo(chunkToWrite[charAfter])):c_ptr(uint(16))).deref();
+      const dest = c_ptrTo(chunkToWrite[dstFront]):c_ptr(uint(16));
+      dest.deref() = pairCmpl[pair];
+      spanLen -= 2;
+      dstFront += 2;
+    }
+  }
 
 
 proc findSep(chunk: [?inds]) {

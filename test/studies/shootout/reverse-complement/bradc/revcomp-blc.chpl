@@ -98,8 +98,8 @@ proc revcomp(seq, size) {
   stdoutBin.write(seq[0..i]);
   //  stdoutBin.write(seq[i+1..<size]);
   var locked: sync bool,
-      sharedCharsLeft: atomic int,
-      sharedFront: atomic int;
+      sharedFront: atomic int = size-1,
+      sharedCharsLeft: atomic int = size-(i+1);
   coforall tid in 0..<1 { // TODO: update to here.maxTaskPar {
     var chunkToWrite: [0..<linesPerChunk*cols] uint(8);
     do {
@@ -113,22 +113,23 @@ proc revcomp(seq, size) {
       sharedCharsLeft.sub(chunkSize);
       var lastProc = sharedFront.fetchSub(chunkSize),
           chunkLeft = chunkSize;
+//      writeln(tid, ": ", (fullLineFrontSpanLength, fullLineRearSpanLength, chunkSize, lastProc));
       locked.readFE();
       if chunkLeft {
         var chunkPos = 0;
 
         if (!fullLineRearSpanLength) {
-          revcompHelp(chunkPos, lastProc, chunkLeft, chunkToWrite);
+          revcompHelp(chunkPos, lastProc, chunkLeft, chunkToWrite, seq);
           chunkLeft = 0;
         }
 
         // TODO: Could this be a strided while loop?
         while (chunkLeft >= cols) {
-          revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength, chunkToWrite);
+          revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength, chunkToWrite, seq);
           chunkPos += fullLineFrontSpanLength;
           lastProc -= fullLineFrontSpanLength+1;
           
-          revcompHelp(chunkPos, lastProc, fullLineRearSpanLength, chunkToWrite);
+          revcompHelp(chunkPos, lastProc, fullLineRearSpanLength, chunkToWrite, seq);
           chunkPos += fullLineRearSpanLength;
           lastProc -= fullLineRearSpanLength;
           
@@ -139,27 +140,27 @@ proc revcomp(seq, size) {
         }
         
         if (chunkLeft) {
-          revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength+1, chunkToWrite);
+          revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength+1, chunkToWrite, seq);
         }
 
         // TODO: Need to coordinate here
-        stdoutBin.write(chunkToWrite, chunkSize);
+        stdoutBin.write(chunkToWrite[0..<chunkSize]);
       }
-    } while chunkLeft;
+    } while chunkSize;
   }
 
 }
 
-  proc revcompHelp(in dstFront, in charAfter, in spanLen, chunkToWrite) {
+  proc revcompHelp(in dstFront, in charAfter, in spanLen, chunkToWrite, seq) {
     if spanLen%2 {
       charAfter -= 1;
-      chunkToWrite[dstFront] = cmpl[charAfter];
+      chunkToWrite[dstFront] = cmpl[seq[charAfter]];
       dstFront += 1;
     }
 
     while (spanLen >= 2) {
       charAfter -= 2;
-      const pair = ((c_ptrTo(chunkToWrite[charAfter])):c_ptr(uint(16))).deref();
+      const pair = ((c_ptrTo(seq[charAfter])):c_ptr(uint(16))).deref();
       const dest = c_ptrTo(chunkToWrite[dstFront]):c_ptr(uint(16));
       dest.deref() = pairCmpl[pair];
       spanLen -= 2;

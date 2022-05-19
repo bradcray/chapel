@@ -102,6 +102,7 @@ proc revcomp(seq, size) {
       sharedFront: atomic int = size-1,
       sharedCharsLeft: atomic int = size-(i+1);
 */
+  var writeTurn: atomic int = size-i;
   const numTasks = 1; // TODO: update to here.maxTaskPar
   coforall tid in 0..<numTasks {
     var chunkToWrite: [0..<linesPerChunk*cols] uint(8);
@@ -141,8 +142,9 @@ proc revcomp(seq, size) {
         revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength+1, chunkToWrite, seq);
       }
 
-      // TODO: Need to coordinate here
+      writeTurn.waitFor(charsLeft);
       stdoutBin.write(chunkToWrite[0..<chunkSize]);
+      writeTurn.sub(linesPerChunk*cols*numTasks);
     }
   }
   return;

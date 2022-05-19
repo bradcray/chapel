@@ -103,12 +103,12 @@ proc revcomp(seq, size) {
       sharedCharsLeft: atomic int = size-(i+1);
 */
   var writeTurn: atomic int = size-i-1;
-  const numTasks = 1; // TODO: update to here.maxTaskPar
+  const numTasks = here.maxTaskPar; // 1; // TODO: update to here.maxTaskPar
   coforall tid in 0..<numTasks {
     var chunkToWrite: [0..<linesPerChunk*cols] uint(8);
     // TODO: Is alignment right for multiple tasks?
     // TODO: Do we really need a zip here?  Are these not just always separated by delta?
-    for charsLeft in 0..<size-i by -linesPerChunk*cols*numTasks /* align size-(i+1) - (linesPerChunk*cols*tid) */ {
+    for charsLeft in 0..<size-i by -linesPerChunk*cols*numTasks align size-(i+1) - (linesPerChunk*cols*tid) {
       /*
                                      i+1..<size by -linesPerChunk*cols*numTasks /* align size - (linesPerChunk*cols)*tid */) {
 */
@@ -144,7 +144,7 @@ proc revcomp(seq, size) {
 
       writeTurn.waitFor(charsLeft);
       stdoutBin.write(chunkToWrite[0..<chunkSize]);
-      writeTurn.sub(linesPerChunk*cols*numTasks);
+      writeTurn.sub(linesPerChunk*cols);
     }
   }
   return;

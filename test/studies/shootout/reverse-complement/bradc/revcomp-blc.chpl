@@ -102,6 +102,7 @@ proc revcomp(seq, size) {
       sharedFront: atomic int = size-1,
       sharedCharsLeft: atomic int = size-(i+1);
 */
+  // TODO: try sync instead of atomic?
   var writeTurn: atomic int = size-i-1;
   const numTasks = here.maxTaskPar; // 1; // TODO: update to here.maxTaskPar
   coforall tid in 0..<numTasks {
@@ -142,8 +143,9 @@ proc revcomp(seq, size) {
         revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength+1, chunkToWrite, seq);
       }
 
+      ref outChunk = chunkToWrite[0..<chunkSize];
       writeTurn.waitFor(charsLeft);
-      stdoutBin.write(chunkToWrite[0..<chunkSize]);
+      stdoutBin.write(outChunk);
       writeTurn.sub(linesPerChunk*cols);
     }
   }

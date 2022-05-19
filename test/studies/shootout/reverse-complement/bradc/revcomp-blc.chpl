@@ -97,10 +97,79 @@ proc revcomp(seq, size) {
   }
   stdoutBin.write(seq[0..i]);
   //  stdoutBin.write(seq[i+1..<size]);
+  /*
   var locked: sync bool,
       sharedFront: atomic int = size-1,
       sharedCharsLeft: atomic int = size-(i+1);
-  coforall tid in 0..<1 { // TODO: update to here.maxTaskPar {
+*/
+  const numTasks = 1; // TODO: update to here.maxTaskPar
+  coforall tid in 0..<numTasks {
+    var chunkToWrite: [0..<linesPerChunk*cols] uint(8);
+    // TODO: Is alignment right for multiple tasks?
+    // TODO: Do we really need a zip here?  Are these not just always separated by delta?
+    for charsLeft in 0..<size-i by -linesPerChunk*cols*numTasks /* align size-(i+1) - (linesPerChunk*cols)*tid */ {
+      /*
+                                     i+1..<size by -linesPerChunk*cols*numTasks /* align size - (linesPerChunk*cols)*tid */) {
+*/
+      const fullLineFrontSpanLength = (charsLeft-1)%cols,
+            fullLineRearSpanLength = cols-1-fullLineFrontSpanLength,
+            chunkSize = if charsLeft>linesPerChunk*cols // TODO: name this
+                        then linesPerChunk*cols
+                        else charsLeft;
+      var lastProc = charsLeft+i,
+          chunkLeft = chunkSize;
+//      writeln(tid, ": ", (fullLineFrontSpanLength, fullLineRearSpanLength, chunkSize, lastProc));
+      var chunkPos = 0;
+
+      // TODO: Could this be a strided while loop?
+      while (chunkLeft >= cols) {
+        revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength, chunkToWrite, seq);
+        chunkPos += fullLineFrontSpanLength;
+        lastProc -= fullLineFrontSpanLength+1;
+          
+        revcompHelp(chunkPos, lastProc, fullLineRearSpanLength, chunkToWrite, seq);
+        chunkPos += fullLineRearSpanLength;
+        lastProc -= fullLineRearSpanLength;
+          
+        chunkToWrite[chunkPos] = eol;
+        chunkPos += 1;
+          
+        chunkLeft -= cols;
+      }
+        
+      if (chunkLeft) {
+        revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength+1, chunkToWrite, seq);
+      }
+
+      // TODO: Need to coordinate here
+      stdoutBin.write(chunkToWrite[0..<chunkSize]);
+    }
+  }
+  return;
+
+/* small:
+
+0: (20, 40, 2034, 2055)
+0: (-1, 61, 0, 21)
+0: (60, 0, 3050, 3074)
+0: (-1, 61, 0, 24)
+0: (20, 40, 5084, 5113)
+0: (-1, 61, 0, 29)
+*/
+  
+    /* 25000:
+0: (20, 40, 499712, 508355)
+0: (20, 40, 8622, 8643)
+0: (-1, 61, 0, 21)
+0: (60, 0, 499712, 762524)
+0: (60, 0, 262788, 262812)
+0: (-1, 61, 0, 24)
+0: (20, 40, 499712, 1270863)
+0: (20, 40, 499712, 771151)
+0: (20, 40, 271410, 271439)
+0: (-1, 61, 0, 29)
+*/
+/*
     var chunkToWrite: [0..<linesPerChunk*cols] uint(8);
     do {
       locked.writeEF(true);
@@ -113,7 +182,6 @@ proc revcomp(seq, size) {
       sharedCharsLeft.sub(chunkSize);
       var lastProc = sharedFront.fetchSub(chunkSize),
           chunkLeft = chunkSize;
-//      writeln(tid, ": ", (fullLineFrontSpanLength, fullLineRearSpanLength, chunkSize, lastProc));
       locked.readFE();
       if chunkLeft {
         var chunkPos = 0;
@@ -123,32 +191,10 @@ proc revcomp(seq, size) {
           chunkLeft = 0;
         }
 
-        // TODO: Could this be a strided while loop?
-        while (chunkLeft >= cols) {
-          revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength, chunkToWrite, seq);
-          chunkPos += fullLineFrontSpanLength;
-          lastProc -= fullLineFrontSpanLength+1;
-          
-          revcompHelp(chunkPos, lastProc, fullLineRearSpanLength, chunkToWrite, seq);
-          chunkPos += fullLineRearSpanLength;
-          lastProc -= fullLineRearSpanLength;
-          
-          chunkToWrite[chunkPos] = eol;
-          chunkPos += 1;
-          
-          chunkLeft -= cols;
-        }
-        
-        if (chunkLeft) {
-          revcompHelp(chunkPos, lastProc, fullLineFrontSpanLength+1, chunkToWrite, seq);
-        }
-
-        // TODO: Need to coordinate here
-        stdoutBin.write(chunkToWrite[0..<chunkSize]);
       }
     } while chunkSize;
   }
-
+*/
 }
 
   proc revcompHelp(in dstFront, in charAfter, in spanLen, chunkToWrite, seq) {

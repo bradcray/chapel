@@ -42,6 +42,7 @@
    will be returned through the final ``ret_out`` argument.
 
  */
+deprecated "What happens if we deprecate the 'Sys' module?"
 module Sys {
   // get basic types from SysBasic
   use SysBasic;

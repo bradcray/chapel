@@ -57,31 +57,6 @@ use CTypes;
     return c_double;
   }
 
-  pragma "no doc"
-  pragma "last resort"
-  proc off_t type {
-    use CTypes, Sys, Reflection;
-    chpl_typeMoveWarning("off_t", getModuleName(), "Sys");
-    return off_t;
-  }
-
-  pragma "no doc"
-  pragma "last resort"
-  proc mode_t type {
-    use CTypes, Sys, Reflection;
-    chpl_typeMoveWarning("mode_t", getModuleName(), "Sys");
-    return mode_t;
-  }
-
-  pragma "no doc"
-  pragma "last resort"
-  proc socklen_t type {
-    use CTypes, Sys, Reflection;
-    chpl_typeMoveWarning("socklen_t", getModuleName(), "Sys");
-    return socklen_t;
-  }
-
-
 /* A type storing an error code or an error message.
    A syserr can be compared using == or != to an qio_err_t (ie integer error code)
    or to another syserr. A syserr can be cast to or from an qio_err_t. It can be

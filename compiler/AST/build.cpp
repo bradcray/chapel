@@ -2909,14 +2909,20 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
           
           // insert `param red = <val>;` into castParamEnumToIntFn
           VarSymbol* paramEnumVal = new VarSymbol(de->sym->name);
-          paramEnumVal->addFlag(FLAG_PARAM);
+          paramEnumVal->addFlag(FLAG_MAYBE_PARAM);
+          paramEnumVal->addFlag(FLAG_EXPR_TEMP);
           DefExpr* pde = new DefExpr(paramEnumVal, paramInitExpr);
           castParamEnumToIntFn->insertAtTail(pde);
 
-          //
+          // This prints an error if a param enum doesn't have a param int
+          // value, but this would also seem to prevent us from converting
+          // a param enum to a non-param int, which seems ... problematic.
           SymExpr* test = new SymExpr(new_IntSymbol(count));
           CallExpr* ret = new CallExpr(PRIM_RETURN, new SymExpr(paramEnumVal));
-          CondStmt* when = new CondStmt(new CallExpr(PRIM_WHEN, test), ret);
+          CallExpr* testParam = new CallExpr("isParam", new SymExpr(paramEnumVal));
+          CallExpr* error = new CallExpr("compilerError", buildStringLiteral(astr("'", de->sym->name, "' does not have a 'param' value")));
+          CondStmt* handleCase = new CondStmt(testParam, ret, error);
+          CondStmt* when = new CondStmt(new CallExpr(PRIM_WHEN, test), handleCase);
           whenStmts->insertAtTail(when);
 
           // set up for next iteration
@@ -3039,7 +3045,7 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
       fn->addFlag(FLAG_COMPILER_GENERATED);
       ArgSymbol* arg = new ArgSymbol(INTENT_BLANK, "from", pdt);
       fn->insertFormalAtTail(arg);
-      ArgSymbol* t = new ArgSymbol(INTENT_TYPE, "t", dtInt[INT_SIZE_64], new SymExpr(dtInt[INT_SIZE_64]->symbol));
+      ArgSymbol* t = new ArgSymbol(INTENT_TYPE, "t", dtIntegral, new SymExpr(dtIntegral->symbol));
       t->addFlag(FLAG_TYPE_VARIABLE);
       fn->insertFormalAtTail(t);
       if (pdt->isConcrete()) {
@@ -3057,13 +3063,18 @@ BlockStmt* buildEnumType(const char* name, EnumType* pdt) {
         BlockStmt* cond = buildIfStmt(ltTest, throws);
         fn->insertAtTail(cond);
       }
-      
+
+      VarSymbol* tmp = new VarSymbol("tmp");
+      fn->insertAtTail(new DefExpr(tmp, new CallExpr(new SymExpr(intTupSym),
+                                                     new CallExpr("chpl__enumToOrder", arg))));
+
       fn->insertAtTail(new CallExpr(PRIM_RETURN,
-                                    new CallExpr(new SymExpr(intTupSym),
-                                                 new CallExpr("chpl__enumToOrder", arg))));
+                                    new CallExpr(PRIM_CAST, new SymExpr(tmp),
+                                                 new SymExpr(t))));
       DefExpr* defFn = new DefExpr(fn);
       enumDef->insertBefore(defFn);
-
+      list_view(defFn);
+      
       /*
       {
 	FnSymbol* fn = new FnSymbol(astrScolon);

@@ -41,21 +41,6 @@ module SysBasic {
 /* BASIC TYPES */
 use CTypes;
 
-  pragma "no doc"
-  pragma "last resort"
-  proc c_float type {
-    use CTypes, Reflection;
-    chpl_typeMoveWarning("c_float", getModuleName());
-    return c_float;
-  }
-
-  pragma "no doc"
-  pragma "last resort"
-  proc c_double type {
-    use CTypes, Reflection;
-    chpl_typeMoveWarning("c_double", getModuleName());
-    return c_double;
-  }
 
 /* A type storing an error code or an error message.
    A syserr can be compared using == or != to an qio_err_t (ie integer error code)

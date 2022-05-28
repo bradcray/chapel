@@ -430,7 +430,9 @@ module IO {
       (ie, they can open up channels that are not shared).
 */
 
-public use SysBasic;
+import SysBasic.{syserr,EFORMAT,fd_t,ENOERR,EEOF,qio_err_t};
+import OS.POSIX.{ENOENT, ENOSYS, EINVAL, EILSEQ, EIO, ERANGE};
+private import OS.POSIX.{EBADF};
 use CTypes;
 public use SysError;
 
@@ -5525,7 +5527,8 @@ FormattedIO Functions and Types
 module FormattedIO {
   use IO;
   use CTypes;
-  use SysBasic;
+  use OS.POSIX;
+  import SysBasic.{ENOERR,syserr};
   use SysError;
 //use IO;
 

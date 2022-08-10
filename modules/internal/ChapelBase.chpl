@@ -101,7 +101,7 @@ module ChapelBase {
   inline operator ==(a: real(?w), b: real(w)) return __primitive("==", a, b);
   inline operator ==(a: imag(?w), b: imag(w)) return __primitive("==", a, b);
   inline operator ==(a: complex(?w), b: complex(w)) return a.re == b.re && a.im == b.im;
-  inline operator ==(a: borrowed object?, b: borrowed object?) return __primitive("ptr_eq", a, b);
+  inline operator ==(a: borrowed Object?, b: borrowed Object?) return __primitive("ptr_eq", a, b);
   inline operator ==(a: enum, b: enum) where (a.type == b.type) {
     return __primitive("==", a, b);
   }
@@ -118,7 +118,7 @@ module ChapelBase {
   inline operator !=(a: real(?w), b: real(w)) return __primitive("!=", a, b);
   inline operator !=(a: imag(?w), b: imag(w)) return __primitive("!=", a, b);
   inline operator !=(a: complex(?w), b: complex(w)) return a.re != b.re || a.im != b.im;
-  inline operator !=(a: borrowed object?, b: borrowed object?) return __primitive("ptr_neq", a, b);
+  inline operator !=(a: borrowed Object?, b: borrowed Object?) return __primitive("ptr_neq", a, b);
   inline operator !=(a: enum, b: enum) where (a.type == b.type) {
     return __primitive("!=", a, b);
   }
@@ -736,7 +736,7 @@ module ChapelBase {
   //   promotion of && and ||
   //
 
-  inline proc _cond_test(x: borrowed object?) return x != nil;
+  inline proc _cond_test(x: borrowed Object?) return x != nil;
   inline proc _cond_test(x: bool) return x;
   inline proc _cond_test(x: int) return x != 0;
   inline proc _cond_test(x: uint) return x != 0;
@@ -762,7 +762,7 @@ module ChapelBase {
     }
   }
 
-  proc _cond_invalid(x: borrowed object?) param return false;
+  proc _cond_invalid(x: borrowed Object?) param return false;
   proc _cond_invalid(x: bool) param return false;
   proc _cond_invalid(x: int) param return false;
   proc _cond_invalid(x: uint) param return false;
@@ -1720,7 +1720,7 @@ module ChapelBase {
   pragma "compiler generated"
   pragma "last resort"
   pragma "auto destroy fn"
-  inline proc chpl__autoDestroy(x: object) { }
+  inline proc chpl__autoDestroy(x: Object) { }
 
   pragma "compiler generated"
   pragma "last resort"
@@ -1764,7 +1764,7 @@ module ChapelBase {
   inline proc chpl__tounmanaged(ref arg:Owned) {
     return arg.release();
   }
-  inline proc chpl__tounmanaged(arg) where arg:object {
+  inline proc chpl__tounmanaged(arg) where arg:Object {
     return arg;
   }*/
 

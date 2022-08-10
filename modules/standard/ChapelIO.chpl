@@ -143,7 +143,7 @@ module ChapelIO {
   // TODO -- this should probably be private
   pragma "no doc"
   proc _isNilObject(val) {
-    proc helper(o: borrowed object) return o == nil;
+    proc helper(o: borrowed Object) return o == nil;
     proc helper(o)                  return false;
     return helper(val);
   }
@@ -195,9 +195,9 @@ module ChapelIO {
       var isBinary = writer.binary();
 
       if (isClassType(t)) {
-        if _to_borrowed(t) != borrowed object {
-          // only write parent fields for subclasses of object
-          // since object has no .super field.
+        if _to_borrowed(t) != borrowed Object {
+          // only write parent fields for subclasses of Object
+          // since Object has no .super field.
           writeThisFieldsDefaultImpl(writer, x.super, first);
         }
       }
@@ -331,10 +331,10 @@ module ChapelIO {
       param numFields = __primitive("num fields", t);
       var isBinary = reader.binary();
 
-      if isClassType(t) && _to_borrowed(t) != borrowed object {
+      if isClassType(t) && _to_borrowed(t) != borrowed Object {
 
         //
-        // Only write parent fields for subclasses of object since object has
+        // Only write parent fields for subclasses of Object since Object has
         // no .super field.
         //
         type superType = x.super.type;

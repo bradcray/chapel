@@ -107,7 +107,7 @@ module ChapelHashing {
   }
 
   // Nilable and non-nilable classes will coerce to this.
-  inline proc (borrowed object?).hash(): uint {
+  inline proc (borrowed Object?).hash(): uint {
     return _gen_key(__primitive( "object2int", this));
   }
 

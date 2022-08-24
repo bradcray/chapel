@@ -1,0 +1,76 @@
+---------------------------------------------------------------------
+Things started well, as I wrote this series of programs that tried to
+just support the simple + expression in the instructions:
+---------------------------------------------------------------------
+
+addtree.chpl: My first attempt at getting the first tree working,
+  which was easier than anticipated relative to the AoC trees,
+  primarily because it doesn't need to store any NULL pointers at the
+  leaves of the tree.
+
+addtree2.chpl: Changed from an explicit print() method to writeThis()
+  to be able to use it with write and writeln.
+
+
+------------------------------------------------------------
+Then, I was happy to find that I could apply a little bit of
+genericity to remove some redundancy:
+------------------------------------------------------------
+
+addtree3.chpl: Merged the IntExp and VarExp cases into a single class
+  using generics and type aliases.
+
+
+-------------------------------------------------------------
+Then I did a simple but lame code clone to get the other ops:
+-------------------------------------------------------------
+
+multioptree.chpl: Lame code clone way of adding the '-' and '*'
+  classes
+
+
+----------------------------------------------------------------------
+Then I tried to refactor the lame code using the same generic approach
+as with int/val, but failed to land it:
+----------------------------------------------------------------------
+
+tree-generic-fail.chpl: Tried to similarly merge AddExp, SubExp,
+  MultExp using a generic class, but got an error that wasn't
+  particularly clear, presumably because the generic class OpExp
+  includes vague fields of type Exp.
+
+tree-generic-fail2.chpl: Tried adding an explicit initializer and got
+  similarly challenging error messages.
+
+tree-generic-fail3.chpl: Tried changing argument intents and got back
+  to the previous error, presumably due to having reproduced the
+  compiler-generated initializer.
+
+
+----------------------------------------------------------------------
+So then I tried using inheritance to factor the commonality instead
+(which I like anyway, as the generic-ness seemed like overkill for
+this case and was really just me being optimistic that it would be as
+simple as the previous refactor:
+----------------------------------------------------------------------
+
+multioptree-inherit-fail.chpl: gives assertion error in compiler
+
+/* At this point, I commented out that assertion error
+
+multioptree-inherit-fail2.chpl: same code, comment indicates error I
+  got.
+
+multioptree-inherit-fail3.chpl: tried changing the intents on my
+  initializers to 'in' leading to a different error about
+  '<temporary>'
+
+multioptree-inherit-fail4.chpl: tried changing the formal types to
+  'owned' leading to a slightly different error about '<temporary>'
+
+multioptree-inherit-owned.chpl: made the fields 'owned' as well, which
+  was my first variant of this to work
+
+multioptree-inherit-shared.chpl: changed 'owned' to 'shared' which
+  works equally well, but requires more typing (and, I'd guess,
+  overhead)

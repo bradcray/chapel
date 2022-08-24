@@ -1,5 +1,21 @@
+Approach
+========
+
+* I made trees using:
+  - owned and shared
+  - non-nilable and nilable (but mostly non- because nil wasn't needed)
+  - specialized/code clone classes vs. generic and/or inherited classes
+
+* I think my favorite ended up being a case that used three classes:
+  - an abstract class
+  - a generic class for the leaf nodes
+  - a generic class for the operator nodes
+  - type aliases with instantiations of the previous for the user
+
+
 Takeaways
 =========
+
 * This exercise ran me into similar errors as I hit with AoC day 18,
   most of which were due to:
 

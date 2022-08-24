@@ -4,7 +4,7 @@ class Exp {
 }
 
 class VarExp: Exp {
-  var ident: string;
+  const ident: string;
 
   override proc print() {
     write(ident);
@@ -12,7 +12,7 @@ class VarExp: Exp {
 }
 
 class IntExp: Exp {
-  var val: int;
+  const val: int;
 
   override proc print() {
     write(val);
@@ -20,9 +20,9 @@ class IntExp: Exp {
 }
 
 class AddExp: Exp {
-  var lhs: Exp;
-  var rhs: Exp;
-  var op: string;
+  const lhs: Exp;
+  const rhs: Exp;
+  const op: string;
 
   override proc print() {
     write("(");

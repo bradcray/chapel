@@ -5,7 +5,7 @@ class Exp {
 
 class LeafExp: Exp {
   type t;
-  var val: t;
+  const val: t;
 
   override proc writeThis(ch) {
     write(val);
@@ -16,9 +16,9 @@ type VarExp = LeafExp(string);
 type IntExp = LeafExp(int);
 
 class OpExp: Exp {
-  var op: string;
-  var lhs: owned Exp;
-  var rhs: owned Exp;
+  const op: string;
+  const lhs: owned Exp;
+  const rhs: owned Exp;
 
   override proc writeThis(ch) {
     ch.write("(");

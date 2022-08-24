@@ -1,3 +1,46 @@
+Takeaways
+=========
+* This exercise ran me into similar errors as I hit with AoC day 18,
+  most of which were due to:
+
+  1) generic class fields leading to inscrutible (to me) error messages
+
+     [arguably I didn't actually want to use a generic field; but,
+     being lazy, I also didn't want to type more than necessary; and I
+     remain a little disappointed that I couldn't ever get the generic
+     field case working, nor better understand the error messages]
+     
+  2) my use of default intents rather than 'in' in initializers
+
+     [this made me wonder whether the default intents in initializers
+     should be different than they are; or whether the default intents
+     for classes arguments to initializers should be different; or
+     maybe we could just customize the error message for cases of
+     owned class arguments being used as field initializers to suggest
+     "probably you want 'in' intent?]
+
+* It was also strictly easier than AoC day 18 because of the lack of
+  need for nilability.  I'd encourage anyone who did this exercise to
+  create the three for AoC day 18 as an exercise of nilability (if
+  they didn't do other exercises that naturally led to it).
+
+* I was pleased by how easy it was to write my first few codes.  I was
+  expecting explosions and flames, yet everything worked the first
+  time to my surprise (to a large part due to the previous bullet I
+  think?]
+
+* Things got harder once I refactored to use generics and inheritance,
+  though addressing the two points in my first bullet made things much
+  better behaved and avoided most subsequent errors.
+
+* The internal error I hit in the compiler was concerning, and given
+  that I generally got better (which is to say, user-facing) errors
+  when removing it, I wonder whether we should simply do that.
+
+
+Play-by-play
+============
+
 ---------------------------------------------------------------------
 Things started well, as I wrote this series of programs that tried to
 just support the simple + expression in the instructions:
@@ -119,3 +162,26 @@ multioptree-generic-eval-owned.chpl: A version of
   inheritance-based approach.
 
 multioptree-generic-eval-shared.chpl: Identical, but using 'shared'
+
+
+-------------------------------------------------------------------
+So then I tried adding nilability, not because this pattern really
+wants it or needs it, but just to get some experience with it which
+led to...
+-------------------------------------------------------------------
+
+multioptree-generic-eval-owned-nilable-fail.chpl: I didn't actually
+  expect this to work but was curious how readable the error message
+  would be.  I'd say "not as good as it could be..." — specifically,
+  it seems as though a method call can never be defined on a nilable
+  type, so we could specialize the message really early saying
+  something like "can't call method on nilable type" rather than using
+  what seems to be a more generic unresolved error message (that
+  eventually mentions '!' but after the point that my eyes glazed
+  over.
+
+multioptree-generic-eval-owned-nilable.chpl: This happily worked as
+  expected
+
+
+

@@ -47,16 +47,20 @@ tree-generic-fail3.chpl: Tried changing argument intents and got back
   compiler-generated initializer.
 
 
-----------------------------------------------------------------------
+---------------------------------------------------------------------
+At this point, I thought that maybe generics were overkill for the
+operator anyway, given the current code, so switched from generics to
+inheritance.  That said, once I added the eval() capability below, it
+felt like it could be nice to eliminate the execution-time
+conditional, which suggests that maybe I should return to this...
+
+
 So then I tried using inheritance to factor the commonality instead
-(which I like anyway, as the generic-ness seemed like overkill for
-this case and was really just me being optimistic that it would be as
-simple as the previous refactor:
-----------------------------------------------------------------------
+---------------------------------------------------------------------
 
 multioptree-inherit-fail.chpl: gives assertion error in compiler
 
-/* At this point, I commented out that assertion error
+/* At this point, I commented out that assertion error */
 
 multioptree-inherit-fail2.chpl: same code, comment indicates error I
   got.
@@ -93,3 +97,25 @@ multioptree-inherit-owned4.chpl: tried removing the ': Exp' formal types
 
 multioptree-inherit-shared2.chpl: similar to the above, but using 'shared'
   rather than 'owned'
+
+
+-------------------------------------------------------------------
+At this point, I added the environment to one of my implementations
+-------------------------------------------------------------------
+
+multioptree-inherit-eval-owned.chpl: A version of
+  multioptree-inherit-owned2.chpl with an environment and evaluation
+  methods
+
+
+------------------------------------------------------------------
+So then I went back to trying to make it generic rather than using
+inheritance and had better luck
+------------------------------------------------------------------
+
+multioptree-generic-eval-owned.chpl: A version of
+  multioptree-inherit-eval-owned.chpl that switches back to the
+  generic-based approach for representing the op rather than the
+  inheritance-based approach.
+
+multioptree-generic-eval-shared.chpl: Identical, but using 'shared'

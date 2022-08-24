@@ -68,9 +68,28 @@ multioptree-inherit-fail3.chpl: tried changing the intents on my
 multioptree-inherit-fail4.chpl: tried changing the formal types to
   'owned' leading to a slightly different error about '<temporary>'
 
+
+---------------------------------------------------------------------
+At this point I got some traction by moving away from generic fields:
+---------------------------------------------------------------------
+
 multioptree-inherit-owned.chpl: made the fields 'owned' as well, which
   was my first variant of this to work
 
 multioptree-inherit-shared.chpl: changed 'owned' to 'shared' which
   works equally well, but requires more typing (and, I'd guess,
   overhead)
+
+multioptree-inherit-owned2.chpl: found that if I just made the fields
+  'owned', I could remove a bunch of the other 'owned' parts
+
+multioptree-inherit-owned3-fail.chpl: tried to remove the 'in' intents,
+  but that doesn't work
+
+multioptree-inherit-owned4.chpl: tried removing the ': Exp' formal types
+  (arguably a bad idea for an initializer, but I was curious), and that
+  worked.  Not captured here (and not surprising), but removing the 'in's
+  from this version also doesn't work.
+
+multioptree-inherit-shared2.chpl: similar to the above, but using 'shared'
+  rather than 'owned'

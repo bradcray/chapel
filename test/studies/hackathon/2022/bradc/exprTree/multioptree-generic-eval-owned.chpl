@@ -39,7 +39,7 @@ class OpExp: Exp {
     else if op == "*" then
       return lhs.eval(env) * rhs.eval(env);
     else
-      halt("Unknown operator: '", op, "'");
+      compilerError("Unknown operator: '" + op + "'");
   }
 
   override proc writeThis(ch) {

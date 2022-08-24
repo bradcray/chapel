@@ -28,16 +28,16 @@ type IntExp = LeafExp(int);
 
 class OpExp: Exp {
   param op: string;
-  const lhs: shared Exp;
-  const rhs: shared Exp;
+  const lhs: owned Exp?;
+  const rhs: owned Exp?;
 
   override proc eval(env) {
     if op == "+" then
-      return lhs.eval(env) + rhs.eval(env);
+      return lhs!.eval(env) + rhs!.eval(env);
     else if op == "-" then
-      return lhs.eval(env) - rhs.eval(env);
+      return lhs!.eval(env) - rhs!.eval(env);
     else if op == "*" then
-      return lhs.eval(env) * rhs.eval(env);
+      return lhs!.eval(env) * rhs!.eval(env);
     else
       compilerError("Unknown operator: '" + op + "'");
   }
@@ -56,12 +56,11 @@ type SubExp = OpExp("-");
 type MultExp = OpExp("*");
 
 var env = ["x" => 3, "y" => 2, "z" => 45];
-var exp = new shared AddExp(new shared VarExp("x"), new shared IntExp(42));
-var exp2 = new shared AddExp(new shared VarExp("x"),
-                             new shared MultExp(new shared VarExp("y"),
-                                                new shared SubExp(
-                                                  new shared VarExp("z"),
-                                                  new shared IntExp(42))));
+var exp = new AddExp(new VarExp("x"), new IntExp(42));
+var exp2 = new AddExp(new VarExp("x"),
+                      new MultExp(new VarExp("y"), new SubExp(new VarExp("z"),
+                                                              new IntExp(42)))
+                     );
 
 for (i,e) in zip (env.domain, env) do writeln(i, "=>", e);
 writeln(exp, " = ", eval(exp,env));

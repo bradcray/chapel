@@ -16,6 +16,9 @@ Approach
 Takeaways
 =========
 
+* I think doing lots more of this "let's code using our own language"
+  type of activity would be very valuable to our team and users.
+
 * This exercise ran me into similar errors as I hit with AoC day 18,
   most of which were due to:
 
@@ -37,7 +40,7 @@ Takeaways
 
 * It was also strictly easier than AoC day 18 because of the lack of
   need for nilability.  I'd encourage anyone who did this exercise to
-  create the three for AoC day 18 as an exercise of nilability (if
+  create the tree for AoC day 18 as an exercise of nilability (if
   they didn't do other exercises that naturally led to it).
 
 * I was pleased by how easy it was to write my first few codes.  I was

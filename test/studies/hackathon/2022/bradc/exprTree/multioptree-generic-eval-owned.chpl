@@ -1,3 +1,5 @@
+// Abstract Base Class
+
 class Exp {
   proc eval(env) {  // would like to make a pure virtual function...?
     return 0;
@@ -6,6 +8,8 @@ class Exp {
   proc writeThis(ch) {
   }
 }
+
+// Generic Leaf Expression Class w/ two instantations
 
 class LeafExp: Exp {
   type t;
@@ -25,6 +29,9 @@ class LeafExp: Exp {
 
 type VarExp = LeafExp(string);
 type IntExp = LeafExp(int);
+
+
+// Generic Operator Expression Class w/ three instantiations
 
 class OpExp: Exp {
   param op: string;
@@ -54,6 +61,9 @@ class OpExp: Exp {
 type AddExp = OpExp("+");
 type SubExp = OpExp("-");
 type MultExp = OpExp("*");
+
+
+// Uses and evaluation of classes
 
 var env = ["x" => 3, "y" => 2, "z" => 45];
 var exp = new AddExp(new VarExp("x"), new IntExp(42));

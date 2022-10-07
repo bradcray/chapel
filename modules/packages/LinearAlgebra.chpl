@@ -489,7 +489,7 @@ proc Vector(length, type eltType=real) {
 
 
 /* Return a vector (1D array) over domain ``{space}`` */
-proc Vector(space: range, type eltType=real) {
+proc Vector(space: range(?), type eltType=real) {
   return Vector({space}, eltType);
 }
 
@@ -526,10 +526,10 @@ proc Vector(x: ?t, Scalars...?n, type eltType) where isNumericType(t) {
   // First element is x, and remaining elements are Scalars
   var V: [0..n] eltType;
 
-  V[0] = x: eltType;
+  V[0] = x;
 
   forall i in 1..n {
-    V[i] = Scalars[i-1]: eltType;
+    V[i] = Scalars[i-1];
   }
 
   return V;
@@ -551,13 +551,13 @@ proc Matrix(rows, cols, type eltType=real) where isIntegral(rows) && isIntegral(
 
 
 /* Return a square matrix (2D array) over domain ``{space, space}`` */
-proc Matrix(space: range, type eltType=real) {
+proc Matrix(space: range(?), type eltType=real) {
   return Matrix({space, space}, eltType);
 }
 
 
 /* Return a matrix (2D array) over domain ``{rowSpace, colSpace}`` */
-proc Matrix(rowSpace: range, colSpace: range, type eltType=real) {
+proc Matrix(rowSpace: range(?), colSpace: range(?), type eltType=real) {
   return Matrix({rowSpace, colSpace}, eltType);
 }
 
@@ -666,12 +666,12 @@ proc Matrix(const Arrays ...?n, type eltType) {
   if (isHomogeneousTuple(Arrays)) {
     forall i in dim1 do {
       if Arrays(i).size != Arrays(0).size then halt("Matrix() expected arrays of equal length");
-      M[i, ..] = Arrays(i): eltType;
+      M[i, ..] = Arrays(i);
     }
   } else {
     for param i in 0..<n do {
       if Arrays(i).size != Arrays(0).size then halt("Matrix() expected arrays of equal length");
-      M[i, ..] = Arrays(i): eltType;
+      M[i, ..] = Arrays(i);
     }
   }
 
@@ -2692,13 +2692,13 @@ module Sparse {
 
 
   /* Return an empty CSR domain over parent domain: ``{space, space}`` */
-  proc CSRDomain(space: range) {
+  proc CSRDomain(space: range(?)) {
     return CSRDomain({space, space});
   }
 
 
   /* Return an empty CSR domain over parent domain: ``{rowSpace, colSpace}`` */
-  proc CSRDomain(rowSpace: range, colSpace: range) {
+  proc CSRDomain(rowSpace: range(?), colSpace: range(?)) {
     return CSRDomain({rowSpace, colSpace});
   }
 

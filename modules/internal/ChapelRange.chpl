@@ -1406,8 +1406,10 @@ operator :(r: range(?), type t: range(?)) {
         (r1.stride == -1 && r2.stride != -1) ||
         (r1.stride == 1 && r2.stride != 1) ||
         (r1.stride > 1 && r2.stride <= 1)) {
-      writeln("Assigning to range with stride ", r1.stride,
-              " from range with ", r2.stride);
+      if !r1.isEmpty() {
+        writeln("Assigning to range with stride ", r1.stride,
+                " from range with ", r2.stride);
+      }
     }
 
     if r1.boundedType != r2.boundedType then

@@ -76,7 +76,6 @@ module ChapelRange {
   // I think the record itself should not be documented, but the above comment
   // should be moved to the top-level module documentation.
   pragma "no doc"
-  pragma "plain old data"
   pragma "range"
   record range
   {
@@ -1403,6 +1402,14 @@ operator :(r: range(?), type t: range(?)) {
   pragma "no doc"
   inline operator =(ref r1: range(stridable=?s1), r2: range(stridable=?s2))
   {
+    if ((r1.stride < -1 && r2.stride >= -1) ||
+        (r1.stride == -1 && r2.stride != -1) ||
+        (r1.stride == 1 && r2.stride != 1) ||
+        (r1.stride > 1 && r2.stride <= 1)) {
+      writeln("Assigning to range with stride ", r1.stride,
+              " from range with ", r2.stride);
+    }
+
     if r1.boundedType != r2.boundedType then
       compilerError("type mismatch in assignment of ranges with different boundedType parameters");
 

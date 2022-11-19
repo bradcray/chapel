@@ -1402,10 +1402,16 @@ operator :(r: range(?), type t: range(?)) {
   pragma "no doc"
   inline operator =(ref r1: range(stridable=?s1), r2: range(stridable=?s2))
   {
+    /*
     if ((r1.stride < -1 && r2.stride >= -1) ||
         (r1.stride == -1 && r2.stride != -1) ||
         (r1.stride == 1 && r2.stride != 1) ||
         (r1.stride > 1 && r2.stride <= 1)) {
+*/
+    if ((r1.stride < -1 && r2.stride >= 1) ||
+        (r1.stride == -1 && r2.stride != -1) ||
+        (r1.stride == 1 && r2.stride != 1) ||
+        (r1.stride > 1 && r2.stride <= -1)) {
       if !r1.isEmpty() {
         writeln("Assigning to range with stride ", r1.stride,
                 " from range with ", r2.stride);

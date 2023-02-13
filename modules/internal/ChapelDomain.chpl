@@ -180,6 +180,10 @@ module ChapelDomain {
     return true;
   }
 
+  proc chpl__buildDomainExpr(arr: [] ?t, definedConst) {
+    compilerError("Domains can't currently be created from arrays");
+  }
+  
   proc chpl__buildDomainExpr(ranges..., definedConst)
   where chpl__isTupleOfRanges(ranges) {
     param rank = ranges.size;

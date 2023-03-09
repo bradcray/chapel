@@ -104,7 +104,6 @@ known_dimensions = [
     ( 'hwloc',              'CHPL_HWLOC', ),
     ( 're2',                'CHPL_RE2', ),
     ( 'llvm',               'CHPL_LLVM', ),
-    ( 'auxfs',              'CHPL_AUX_FILESYS', ),
     ( 'lib_pic',            'CHPL_LIB_PIC', ),
 ]
 Dimensions = []

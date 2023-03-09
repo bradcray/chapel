@@ -136,7 +136,6 @@ if [ -z "$BUILD_CONFIGS_CALLBACK" ]; then
         launchers=pbs-aprun,aprun,none,slurm-srun
         substrates=aries,none
         locale_models=flat
-        auxfs=none,lustre
         libpics=none,pic
 
         log_info "Start build_configs $dry_run $verbose # no make target"
@@ -147,7 +146,6 @@ if [ -z "$BUILD_CONFIGS_CALLBACK" ]; then
             --launcher=$launchers \
             --substrate=$substrates \
             --locale-model=$locale_models \
-            --auxfs=$auxfs \
             --lib-pic=$libpics \
             -- notcompiler
 

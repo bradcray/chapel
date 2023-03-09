@@ -131,7 +131,6 @@ if [ -z "$BUILD_CONFIGS_CALLBACK" ]; then
         launchers=aprun,none,slurm-srun
         substrates=aries,mpi,none
         locale_models=flat
-        auxfs=none,lustre
 
         log_info "Start build_configs $dry_run $verbose # no make target"
 
@@ -141,7 +140,6 @@ if [ -z "$BUILD_CONFIGS_CALLBACK" ]; then
             --launcher=$launchers \
             --substrate=$substrates \
             --locale-model=$locale_models \
-            --auxfs=$auxfs \
             -- notcompiler
 
         # NOTE: don't rebuild compiler above (or else problems with switching GCC versions)

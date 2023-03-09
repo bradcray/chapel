@@ -650,12 +650,11 @@ def gather_pe_chpl_pkgconfig_libs():
     if chpl_compiler.get_prgenv_compiler() == 'none':
         return ""
 
-    import chpl_comm, chpl_comm_substrate, chpl_aux_filesys, chpl_libfabric
+    import chpl_comm, chpl_comm_substrate, chpl_libfabric
 
     platform = chpl_platform.get('target')
     comm = chpl_comm.get()
     substrate = chpl_comm_substrate.get()
-    auxfs = chpl_aux_filesys.get()
 
     ret = os.environ.get('PE_CHAPEL_PKGCONFIG_LIBS', '')
     if comm != 'none':
@@ -675,14 +674,6 @@ def gather_pe_chpl_pkgconfig_libs():
 
         if comm == 'ofi' and chpl_libfabric.get() == 'system':
             ret = 'libfabric:' + ret
-
-        # on login/compute nodes, lustre requires the devel api to make
-        # lustre/lustreapi.h available (it's implicitly available on esl nodes)
-        if 'lustre' in auxfs:
-            exists, returncode, out, err = try_run_command(
-                ['pkg-config', '--exists', 'cray-lustre-api-devel'])
-            if exists and returncode == 0:
-                ret = 'cray-lustre-api-devel:' + ret
 
     return ret
 

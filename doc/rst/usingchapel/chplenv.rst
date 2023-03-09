@@ -725,22 +725,6 @@ CHPL_RE2
      ``CHPL_RE2`` to ``'none`` while the ``util/setchplenv.*`` versions
      leave it unset, resulting in the behavior described just above.
 
-.. _readme-chplenv.CHPL_AUX_FILESYS:
-
-CHPL_AUX_FILESYS
-~~~~~~~~~~~~~~~~
-   Optionally, the ``CHPL_AUX_FILESYS`` environment variable can be used to
-   request runtime support for certain filesystems.
-
-       ====== ======================================================
-       Value  Description
-       ====== ======================================================
-       none   only support traditional Linux filesystems
-       lustre enable I/O improvements specific to Lustre filesystems
-       ====== ======================================================
-
-   If unset, ``CHPL_AUX_FILESYS`` defaults to ``none``.
-
 .. _readme-chplenv.CHPL_LLVM:
 
 CHPL_LLVM

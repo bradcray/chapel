@@ -50,7 +50,6 @@ prefixes = {
     'atomics':      'CHPL_ATOMICS',
     'gmp':          'CHPL_GMP',
     'llvm':         'CHPL_LLVM',
-    'fs':           'CHPL_AUX_FILESYS',
     'sanitizers':   'CHPL_SANITIZE_EXE', # obsolete
     'san':          'CHPL_SANITIZE_EXE',
     'lib_pic':      'CHPL_LIB_PIC',

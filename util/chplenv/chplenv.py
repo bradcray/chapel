@@ -1,6 +1,5 @@
 import chpl_cpu
 import chpl_atomics
-import chpl_aux_filesys
 import chpl_bin_subdir
 import chpl_make
 import chpl_platform

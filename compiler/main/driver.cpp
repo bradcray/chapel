@@ -96,7 +96,6 @@ const char* CHPL_GMP = NULL;
 const char* CHPL_HWLOC = NULL;
 const char* CHPL_RE2 = NULL;
 const char* CHPL_LLVM = NULL;
-const char* CHPL_AUX_FILESYS = NULL;
 const char* CHPL_UNWIND = NULL;
 const char* CHPL_LIB_PIC = NULL;
 
@@ -1118,7 +1117,6 @@ static ArgumentDescription arg_desc[] = {
  DRIVER_ARG_HOME,
  {"atomics", ' ', "<atomics-impl>", "Specify atomics implementation", "S", NULL, "_CHPL_ATOMICS", setEnv},
  {"network-atomics", ' ', "<network>", "Specify network atomics implementation", "S", NULL, "_CHPL_NETWORK_ATOMICS", setEnv},
- {"aux-filesys", ' ', "<aio-system>", "Specify auxiliary I/O system", "S", NULL, "_CHPL_AUX_FILESYS", setEnv},
  {"comm", ' ', "<comm-impl>", "Specify communication implementation", "S", NULL, "_CHPL_COMM", setEnv},
  {"comm-substrate", ' ', "<conduit>", "Specify communication conduit", "S", NULL, "_CHPL_COMM_SUBSTRATE", setEnv},
  {"gasnet-segment", ' ', "<segment>", "Specify GASNet memory segment", "S", NULL, "_CHPL_GASNET_SEGMENT", setEnv},
@@ -1468,7 +1466,6 @@ static void setChapelEnvs() {
   CHPL_HWLOC           = envMap["CHPL_HWLOC"];
   CHPL_RE2             = envMap["CHPL_RE2"];
   CHPL_LLVM            = envMap["CHPL_LLVM"];
-  CHPL_AUX_FILESYS     = envMap["CHPL_AUX_FILESYS"];
   CHPL_UNWIND          = envMap["CHPL_UNWIND"];
   CHPL_LIB_PIC         = envMap["CHPL_LIB_PIC"];
 

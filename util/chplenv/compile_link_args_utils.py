@@ -174,25 +174,6 @@ def compute_internal_compile_link_args(runtime_subdir):
         extend2(tgt_compile, chpl_re2.get_compile_args())
         extend2(tgt_link, chpl_re2.get_link_args())
 
-    aux_filesys = chpl_aux_filesys.get()
-    if 'lustre' in aux_filesys:
-        tgt_compile[1].append('-DSYS_HAS_LLAPI')
-        tgt_link[1].append('-llustreapi')
-    if 'hdfs' in aux_filesys:
-        java_install = os.environ.get('JAVA_INSTALL', None)
-        hadoop_install = os.environ.get('HADOOP_INSTALL', None)
-        if java_install:
-            java_include = os.path.join(java_install, 'include')
-            tgt_compile[1].append('-I' + java_include)
-            tgt_compile[1].append('-I' + os.path.join(java_include, 'linux'))
-            java_lib = os.path.join(java_install, 'lib', 'amd64', 'server')
-            tgt_link[1].append('-L' + java_lib)
-        if hadoop_install:
-            hadoop_include = os.path.join(hadoop_install, 'include')
-            tgt_compile[1].append('-I' + hadoop_include)
-            hadoop_lib = os.path.join(hadoop_install, 'lib', 'native')
-            tgt_link[1].append('-L' + hadoop_lib)
-
     # add arguments indicated by compiler selection
     # (e.g. we might have a -I above for a particular LLVM version,
     #  so we want that version before /usr/local/include/llvm.)

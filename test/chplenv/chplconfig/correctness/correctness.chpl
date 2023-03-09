@@ -23,4 +23,3 @@ writeln("CHPL_GMP: none +");
 writeln("CHPL_HWLOC: bundled +");
 writeln("CHPL_RE2: bundled +");
 writeln("CHPL_LLVM: none +");
-writeln("CHPL_AUX_FILESYS: none +");

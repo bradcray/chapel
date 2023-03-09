@@ -69,7 +69,6 @@ chplvars = [
              # CHPL_LLVM_VERSION -- doesn't make sense to override it
              'CHPL_LLVM_GCC_PREFIX', # not in printchplenv --all
 
-             'CHPL_AUX_FILESYS',
              'CHPL_LIB_PIC',
              'CHPL_SANITIZE',
              'CHPL_SANITIZE_EXE',

@@ -655,8 +655,7 @@ isLegalLvalueActualArg(ArgSymbol* formal, Expr* actual,
         sym->isParameter())
       actualConst = true;
 
-    bool actualExprTmp = sym->hasFlag(FLAG_EXPR_TEMP) &&
-                         !sym->type->symbol->hasFlag(FLAG_ARRAY);
+    bool actualExprTmp = sym->hasFlag(FLAG_EXPR_TEMP);
     TypeSymbol* formalTS = NULL;
     bool formalCopyMutates = false;
     if (formal) {

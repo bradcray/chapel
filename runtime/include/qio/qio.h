@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -56,6 +56,9 @@ typedef enum {
 } qio_fdflag_t;
 
 typedef uint32_t qio_hint_t;
+
+extern ssize_t qio_write_unbuffered_threshold;
+extern ssize_t qio_read_unbuffered_threshold;
 
 // TODO: make these better values
 #ifndef FTYPE_NONE
@@ -674,7 +677,7 @@ typedef struct qio_channel_s {
    * we allocate bufferspace (appending without updating av_end)
    * and then update av_end to be the end of the buffer.
    *
-   * right_mark_start is mark_space[mark_next-1] or av_start if mark_next==0.
+   * right_mark_start is mark_space[mark_cur] or av_start if mark_cur==0.
    *
    * How does marking interact with cached_cur/start/end?
    *  - mark positions are always offsets from get_offset which includes cached_cur.
@@ -687,7 +690,7 @@ typedef struct qio_channel_s {
    * |             | aka available           | aka allocated          |
    *             mark_stack[0]              av_end
    *             "av_start"
-   *                  mark_stack[mark_next-1]
+   *                  mark_stack[mark_cur-1]
    *                  "right_mark_start"
    * the available section is ready for user read/write.
    * Space to the right of av_end is allocated but not yet read from disk
@@ -966,6 +969,14 @@ void qio_channel_set_style(qio_channel_t* ch, qio_style_t* style)
   ch->style = *style;
 }
 static inline
+int64_t qio_channel_get_size(qio_channel_t* ch) {
+  if (ch->end_pos == INT64_MAX) {
+    return -1;
+  } else {
+    return ch->end_pos - ch->start_pos;
+  }
+}
+static inline
 uint8_t qio_channel_binary(qio_channel_t* ch)
 {
   return ch->style.binary;
@@ -1202,7 +1213,7 @@ qioerr qio_channel_end_peek_cached(const int threadsafe, qio_channel_t* ch, void
   return err;
 }
 
-qioerr qio_channel_advance_past_byte(const int threadsafe, qio_channel_t* ch, int byte);
+qioerr qio_channel_advance_past_byte(const int threadsafe, qio_channel_t* ch, int byte, const int consume_byte);
 
 qioerr qio_channel_begin_peek_buffer(const int threadsafe, qio_channel_t* ch, int64_t require, int writing, qbuffer_t** buf_out, qbuffer_iter_t* start_out, qbuffer_iter_t* end_out);
 

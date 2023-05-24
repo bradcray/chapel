@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -20,32 +20,32 @@
 
 import RangeChunk;
 
-pragma "no doc"
+@chpldoc.nodoc
 /* Debug flag */
 config param debugCS = false;
 
-pragma "no doc"
+@chpldoc.nodoc
 config param csLayoutSupportsAutoLocalAccess = true;
 
 /* Default sparse dimension index sorting mode for LayoutCS.
 Sparse dimension indices will default to sorted order if true, inserted order if false */
 config param LayoutCSDefaultToSorted = true;
 
-pragma "no doc"
+@chpldoc.nodoc
 /* Comparator used for sorting by columns */
 record _ColumnComparator {
   proc key(idx: _tuple) { return (idx(1), idx(0));}
 }
 
-pragma "no doc"
+@chpldoc.nodoc
 const _columnComparator: _ColumnComparator;
 
 
 //
 // Necessary since `t == CS` does not support classes with param fields
 //
-pragma "no doc"
-proc isCSType(type t) param return isSubtype(_to_borrowed(t), CS);
+@chpldoc.nodoc
+proc isCSType(type t) param do return isSubtype(_to_borrowed(t), CS);
 
 /*
 This CS layout provides a Compressed Sparse Row (CSR) and Compressed Sparse
@@ -156,7 +156,7 @@ class CSDom: BaseSparseDomImpl {
   override proc getNNZ(): int {
     return _nnz;
   }
-  override proc dsiMyDist() return dist;
+  override proc dsiMyDist() do return dist;
 
   proc dsiAssignDomain(rhs: domain, lhsPrivate:bool) {
     if _to_borrowed(rhs._instance.type) == this.type &&
@@ -172,7 +172,7 @@ class CSDom: BaseSparseDomImpl {
 
       this.startIdx = rhs.startIdx;
       this.idx = rhs.idx;
-    } else if _to_borrowed(rhs._instance.type) < DefaultSparseDom {
+    } else if isProperSubtype(_to_borrowed(rhs._instance.type), DefaultSparseDom) {
       // Optimized COO -> CSR/CSC
 
       // Note: only COO->CSR can take advantage of COO having sorted indices
@@ -615,14 +615,14 @@ class CSDom: BaseSparseDomImpl {
   }
 
   proc dsiSerialWrite(f) {
-    f <~> "{\n";
+    f.write("{\n");
     if this.compressRows {
       for r in rowRange {
         const lo = startIdx(r),
               hi = stopIdx(r);
         for c in lo..hi {
-          f <~> " (" <~> r <~> ", " <~> idx(c) <~> ")" <~>
-            if (c==hi) then "\n" else "";
+          f.write(" (", r, ", ", idx(c), ")");
+          if c == hi then f.write("\n");
         }
       }
     } else {
@@ -631,12 +631,12 @@ class CSDom: BaseSparseDomImpl {
         const lo = startIdx(c),
               hi = stopIdx(c);
         for r in lo..hi {
-          f <~> " (" <~> idx(r) <~> ", " <~> c <~> ")" <~>
-            if (r==hi) then "\n" else "";
+          f.write(" (", idx(r), ", ", c, ")");
+          if r == hi then f.write("\n");
         }
       }
     }
-    f <~> "}\n";
+    f.write("}\n");
   }
 
   override proc dsiSupportsAutoLocalAccess() param {
@@ -732,7 +732,7 @@ class CSArr: BaseSparseArrImpl {
         const lo = dom.startIdx(r);
         const hi = dom.stopIdx(r);
         for c in lo..hi {
-          f <~> data(c) <~> if (c==hi) then "\n" else " ";
+          f.write(data(c), if (c==hi) then "\n" else " ");
         }
       }
     } else {
@@ -740,7 +740,7 @@ class CSArr: BaseSparseArrImpl {
         const lo = dom.startIdx(c);
         const hi = dom.stopIdx(c);
         for r in lo..hi {
-          f <~> data(r) <~> if (r==hi) then "\n" else " ";
+          f.write(data(r), if (r==hi) then "\n" else " ");
         }
       }
     }

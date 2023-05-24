@@ -1,4 +1,4 @@
-# Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 # Copyright 2004-2019 Cray Inc.
 # Other additional copyright holders may be indicated within.
 #
@@ -114,22 +114,22 @@ endif
 # query gcc version
 #
 ifndef GNU_GCC_MAJOR_VERSION
-export GNU_GCC_MAJOR_VERSION = $(shell $(CC) -dumpversion | awk '{split($$1,a,"."); printf("%s", a[1]);}')
+export GNU_GCC_MAJOR_VERSION := $(shell $(CC) -dumpversion | awk '{split($$1,a,"."); printf("%s", a[1]);}')
 endif
 ifndef GNU_GCC_MINOR_VERSION
-export GNU_GCC_MINOR_VERSION = $(shell $(CC) -dumpversion | awk '{split($$1,a,"."); printf("%s", a[2]);}')
+export GNU_GCC_MINOR_VERSION := $(shell $(CC) -dumpversion | awk '{split($$1,a,"."); printf("%s", a[2]);}')
 endif
 ifndef GNU_GPP_MAJOR_VERSION
-export GNU_GPP_MAJOR_VERSION = $(shell $(CXX) -dumpversion | awk '{split($$1,a,"."); printf("%s", a[1]);}')
+export GNU_GPP_MAJOR_VERSION := $(shell $(CXX) -dumpversion | awk '{split($$1,a,"."); printf("%s", a[1]);}')
 endif
 ifndef GNU_GPP_MINOR_VERSION
-export GNU_GPP_MINOR_VERSION = $(shell $(CXX) -dumpversion | awk '{split($$1,a,"."); printf("%s", a[2]);}')
+export GNU_GPP_MINOR_VERSION := $(shell $(CXX) -dumpversion | awk '{split($$1,a,"."); printf("%s", a[2]);}')
 endif
 ifndef GNU_GPP_SUPPORTS_MISSING_DECLS
-export GNU_GPP_SUPPORTS_MISSING_DECLS = $(shell test $(GNU_GPP_MAJOR_VERSION) -lt 4 || (test $(GNU_GPP_MAJOR_VERSION) -eq 4 && test $(GNU_GPP_MINOR_VERSION) -le 2); echo "$$?")
+export GNU_GPP_SUPPORTS_MISSING_DECLS := $(shell test $(GNU_GPP_MAJOR_VERSION) -lt 4 || (test $(GNU_GPP_MAJOR_VERSION) -eq 4 && test $(GNU_GPP_MINOR_VERSION) -le 2); echo "$$?")
 endif
 ifndef GNU_GCC_SUPPORTS_STRICT_OVERFLOW
-export GNU_GCC_SUPPORTS_STRICT_OVERFLOW = $(shell test $(GNU_GCC_MAJOR_VERSION) -lt 4 || (test $(GNU_GCC_MAJOR_VERSION) -eq 4 && test $(GNU_GCC_MINOR_VERSION) -le 2); echo "$$?")
+export GNU_GCC_SUPPORTS_STRICT_OVERFLOW := $(shell test $(GNU_GCC_MAJOR_VERSION) -lt 4 || (test $(GNU_GCC_MAJOR_VERSION) -eq 4 && test $(GNU_GCC_MINOR_VERSION) -le 2); echo "$$?")
 endif
 
 #
@@ -143,9 +143,9 @@ DEF_CXX_VER := $(shell echo __cplusplus | $(CXX) -E -x c++ - | sed -e '/^\#/d' -
 C_STD := $(shell test $(DEF_C_VER) -lt 199901 && echo -std=gnu99)
 CXX_STD := $(shell test $(DEF_C_VER) -ge 201112 -a $(DEF_CXX_VER) -lt 201103 && echo -std=gnu++11)
 
-# CXX11_STD is the flag to select C++11, or "unknown" for compilers
-# we don't know how to do that with yet.
-# If a compiler uses C++11 or newer by default, CXX11_STD will be blank.
+# CXX11_STD is the flag to select C++11, blank for compilers that
+# don't know how to do that
+# Also, if a compiler uses C++11 or newer by default, CXX11_STD will be blank.
 CXX11_STD := $(shell test $(DEF_CXX_VER) -lt 201103 && echo -std=gnu++11)
 CXX14_STD := $(shell test $(DEF_CXX_VER) -lt 201402 && echo -std=gnu++14)
 
@@ -155,7 +155,11 @@ ifeq ($(GNU_GPP_MAJOR_VERSION),4)
 endif
 
 COMP_CFLAGS += $(C_STD)
+ifneq ($(CHPL_MAKE_LLVM_VERSION),16)
 COMP_CXXFLAGS += $(CXX14_STD)
+else
+# get the C++ standard flag from CMake
+endif
 RUNTIME_CFLAGS += $(C_STD)
 RUNTIME_CXXFLAGS += $(CXX_STD)
 GEN_CFLAGS += $(C_STD)
@@ -266,6 +270,37 @@ endif
 ifeq ($(shell test $(GNU_GPP_MAJOR_VERSION) -eq 9; echo "$$?"),0)
 WARN_CXXFLAGS += -Wno-error=init-list-lifetime
 endif
+
+#
+# Avoid errors about uninitialized memory because they occur in LLVM headers
+# (should be fixed in LLVM 15 though).
+# We would like to know when this occurs, though, so don't turn off
+# the warning; just don't let it abort the build.
+#
+ifeq ($(shell test $(GNU_GPP_MAJOR_VERSION) -eq 12; echo "$$?"),0)
+WARN_CXXFLAGS += -Wno-error=uninitialized
+endif
+
+#
+# Avoid errors about dependent template name because they occur in LLVM headers
+# (should be fixed in LLVM 15 though).
+# We would like to know when this occurs, though, so don't turn off
+# the warning; just don't let it abort the build.
+#
+ifeq ($(shell test $(GNU_GPP_MAJOR_VERSION) -eq 12; echo "$$?"),0)
+WARN_CXXFLAGS += -Wno-error=missing-template-keyword
+endif
+
+#
+# Avoid errors like '&expression' will never be NULL
+# because they occur in LLVM headers.
+# We would like to know when this occurs, though, so don't turn off
+# the warning; just don't let it abort the build.
+#
+ifeq ($(shell test $(GNU_GPP_MAJOR_VERSION) -eq 12; echo "$$?"),0)
+WARN_CXXFLAGS += -Wno-error=address
+endif
+
 
 #
 # Avoid false positive warnings about use-after free with realloc

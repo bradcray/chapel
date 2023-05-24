@@ -4,18 +4,22 @@ ChapelSysCTypes
   from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.CTypes.ChapelSysCTypes
 Reflection
   from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.CTypes.Reflection
+AutoMath
+  from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.CTypes.Math.AutoMath
+Math
+  from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.CTypes.Math
 CTypes
   from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.CTypes
-ChapelTaskData
-  from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChapelTaskData
 Communication
   from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChplConfig.String.ByteBufferHelpers.Communication
 ByteBufferHelpers
   from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChplConfig.String.ByteBufferHelpers
 NVStringFactory
   from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChplConfig.String.BytesStringCommon.NVStringFactory
-SysBasic
-  from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChplConfig.String.BytesStringCommon.SysBasic
+POSIX
+  from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChplConfig.String.BytesStringCommon.OS.POSIX
+OS
+  from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChplConfig.String.BytesStringCommon.OS
 BytesCasts
   from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChplConfig.String.BytesStringCommon.Bytes.BytesCasts
 Bytes
@@ -30,6 +34,8 @@ String
   from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChplConfig.String
 ChplConfig
   from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChplConfig
+ChapelTaskData
+  from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase.ChapelTaskData
 ChapelBase
   from print-module-resolution.ChapelStandard.startInitCommDiags.ChapelBase
 CommDiagnostics
@@ -46,6 +52,8 @@ ChapelLocks
   from print-module-resolution.ChapelStandard.SharedObject.Errors.ChapelLocks
 Errors
   from print-module-resolution.ChapelStandard.SharedObject.Errors
+WeakPointer
+  from print-module-resolution.ChapelStandard.SharedObject.WeakPointer
 SharedObject
   from print-module-resolution.ChapelStandard.SharedObject
 NetworkAtomics
@@ -62,8 +70,6 @@ DSIUtil
   from print-module-resolution.ChapelStandard.ChapelTuple.DSIUtil
 ChapelTuple
   from print-module-resolution.ChapelStandard.ChapelTuple
-AutoMath
-  from print-module-resolution.ChapelStandard.ChapelRange.AutoMath
 ChapelIOStringifyHelper
   from print-module-resolution.ChapelStandard.ChapelRange.ChapelDebugPrint.ChapelIOStringifyHelper
 ChapelDebugPrint
@@ -90,20 +96,18 @@ ArrayViewReindex
   from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ArrayViewReindex
 ChapelPrivatization
   from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelPrivatization
-Memory
-  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.Initialization.Memory
-Initialization
-  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.Initialization
-OS
-  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.IO.POSIX.OS
-POSIX
-  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.IO.POSIX
+RegexIoSupport
+  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.MemMove.IO.FormattedIO.Regex.RegexIoSupport
 Regex
-  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.IO.FormattedIO.Regex
+  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.MemMove.IO.FormattedIO.Regex
 FormattedIO
-  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.IO.FormattedIO
+  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.MemMove.IO.FormattedIO
+Types
+  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.MemMove.IO.Types
 IO
-  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.IO
+  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.MemMove.IO
+MemMove
+  from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain.MemMove
 ChapelDomain
   from print-module-resolution.ChapelStandard.LocaleModel.LocaleModelHelpFlat.LocaleModelHelpSetup.DefaultRectangular.ChapelArray.ChapelDomain
 List
@@ -160,8 +164,6 @@ ChapelAutoLocalAccess
   from print-module-resolution.ChapelStandard.ChapelAutoLocalAccess
 ChapelIO
   from print-module-resolution.ChapelStandard.ChapelIO
-LocaleTree
-  from print-module-resolution.ChapelStandard.LocaleTree
 ChapelTaskID
   from print-module-resolution.ChapelStandard.ChapelTaskID
 ChapelTaskTable
@@ -180,8 +182,10 @@ CopyAggregation
   from print-module-resolution.ChapelStandard.ChapelAutoAggregation.CopyAggregation
 ChapelAutoAggregation
   from print-module-resolution.ChapelStandard.ChapelAutoAggregation
-Types
-  from print-module-resolution.ChapelStandard.Types
+GPU
+  from print-module-resolution.ChapelStandard.ChapelGpuSupport.GPU
+ChapelGpuSupport
+  from print-module-resolution.ChapelStandard.ChapelGpuSupport
 stopInitCommDiags
   from print-module-resolution.ChapelStandard.stopInitCommDiags
 ChapelStandard

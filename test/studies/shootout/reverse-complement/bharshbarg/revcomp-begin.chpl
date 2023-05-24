@@ -12,7 +12,7 @@ const newLine     = "\n".toByte();
 const greaterThan = ">".toByte();
 
 proc main(args: [] string) {
-  var inFile = openfd(0);
+  var inFile = new file(0);
   const fileLen = inFile.size;
   var data : [1..fileLen] uint(8);
   var r = inFile.reader(locking=false);
@@ -53,8 +53,8 @@ proc main(args: [] string) {
   }
 
   // Open a binary writer to stdout
-  var binout = openfd(1).writer(iokind.native, locking=false, 
-                                hints=ioHintSet.direct(QIO_CH_ALWAYS_UNBUFFERED));
+  var binout = (new file(1)).writer(iokind.native, locking=false,
+                                hints=ioHintSet.fromFlag(QIO_CH_ALWAYS_UNBUFFERED));
   binout.write(data);
 }
 

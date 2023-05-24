@@ -131,10 +131,10 @@ if [ -z "$BUILD_CONFIGS_CALLBACK" ]; then
     ( *runtime* )
         log_info "Building Chapel component: runtime"
 
-        compilers=gnu,llvm,cray,intel
+        compilers=gnu,llvm,intel
         comms=gasnet,none,ugni
         launchers=pbs-aprun,aprun,none,slurm-srun
-        substrates=aries,mpi,none
+        substrates=aries,none
         locale_models=flat
         auxfs=none,lustre
         libpics=none,pic
@@ -333,7 +333,7 @@ else
     function load_prgenv_intel() {
 
         local target_prgenv="PrgEnv-intel"
-        local target_compiler="intel"
+        local target_compiler="intel-classic"
         local target_version=$gen_version_intel
 
         # unload any existing PrgEnv
@@ -341,6 +341,8 @@ else
 
         # load target PrgEnv with compiler version
         load_module $target_prgenv
+        # unload clang-based intel so we can load intel-classic
+        unload_module intel
         load_module_version $target_compiler $target_version
     }
 
@@ -392,10 +394,6 @@ else
     ( intel )
         load_prgenv_intel
         export CHPL_TARGET_COMPILER=cray-prgenv-intel
-        ;;
-    ( cray )
-        load_prgenv_cray
-        export CHPL_TARGET_COMPILER=cray-prgenv-cray
         ;;
     ( compiler )
         load_prgenv_gnu

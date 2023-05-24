@@ -1,6 +1,7 @@
 use BitOps;
 use Random;
 use Time;
+use Math;
 
 use HPCCProblemSize;
 
@@ -36,13 +37,13 @@ proc main() {
 
   initVectors(Twiddles, z);
 
-  const startTime = getCurrentTime();
+  const startTime = timeSinceEpoch().totalSeconds();
 
   Z = conjg(z);
   bitReverseShuffle(Z);
   dfft(Z, Twiddles);
 
-  const execTime = getCurrentTime() - startTime;
+  const execTime = timeSinceEpoch().totalSeconds() - startTime;
 
   const validAnswer = verifyResults(z, Z, Twiddles);
   printResults(validAnswer, execTime);

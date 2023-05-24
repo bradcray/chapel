@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -56,14 +56,15 @@ module List {
   import ChapelLocks;
   private use HaltWrappers;
   private use Sort;
+  private use Math;
 
-  pragma "no doc"
+  @chpldoc.nodoc
   private const _initialCapacity = 8;
 
-  pragma "no doc"
+  @chpldoc.nodoc
   private const _initialArrayCapacity = 16;
 
-  pragma "no doc"
+  @chpldoc.nodoc
   private param _sanityChecks = false;
 
   //
@@ -81,14 +82,14 @@ module List {
   // contention (IE, lots of tasks trying to insert into the middle of this
   // list, or any operation that is O(n)).
   //
-  pragma "no doc"
+  @chpldoc.nodoc
   type _lockType = ChapelLocks.chpl_LocalSpinlock;
 
   //
   // Use a wrapper class to let list methods have a const ref receiver even
   // when `parSafe` is `true` and the list lock is used.
   //
-  pragma "no doc"
+  @chpldoc.nodoc
   class _LockWrapper {
     var lock$ = new _lockType();
 
@@ -102,20 +103,20 @@ module List {
   }
 
   /* Check that element type is supported by list */
-  pragma "no doc"
+  @chpldoc.nodoc
   proc _checkType(type eltType) param {
     if isGenericType(eltType) {
       compilerWarning("creating a list with element type " +
                       eltType:string);
-      if isClassType(eltType) && !isGenericType(borrowed eltType) {
-        compilerWarning("which now means class type with generic management");
+      if isClassType(eltType) && !isGenericType(eltType:borrowed) {
+        compilerWarning("which is a class type with generic management");
       }
       compilerError("list element type cannot currently be generic");
       // In the future we might support it if the list is not default-inited
     }
   }
 
-  pragma "no doc"
+  @chpldoc.nodoc
   proc _dummyFieldType(type t) type {
     if isBorrowedClass(t) {
       return t?;
@@ -147,19 +148,19 @@ module List {
     /* If `true`, this list will perform parallel safe operations. */
     param parSafe = false;
 
-    pragma "no doc"
+    @chpldoc.nodoc
     var _size = 0;
 
-    pragma "no doc"
+    @chpldoc.nodoc
     var _lock$ = if parSafe then new _LockWrapper() else none;
 
-    pragma "no doc"
+    @chpldoc.nodoc
     var _arrays: _ddata(_ddata(eltType)) = nil;
 
-    pragma "no doc"
+    @chpldoc.nodoc
     var _arrayCapacity = 0;
 
-    pragma "no doc"
+    @chpldoc.nodoc
     var _totalCapacity = 0;
 
     //
@@ -168,7 +169,7 @@ module List {
     // Otherwise, instantiate it as a `nothing` and let the compiler fold
     // it away. See #15575.
     //
-    pragma "no doc"
+    @chpldoc.nodoc
     var _dummyFieldToForceBorrowChecking: _dummyFieldType(eltType);
 
     /*
@@ -398,14 +399,14 @@ module List {
       _commonInitFromIterable(other);
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _commonInitFromIterable(iterable) lifetime this < iterable {
       this._firstTimeInitializeArrays();
       for x in iterable do
         append(x);
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _firstTimeInitializeArrays() {
       _sanity(_arrays == nil);
       _sanity(_totalCapacity == 0);
@@ -416,7 +417,7 @@ module List {
       _totalCapacity = _initialCapacity;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc deinit() {
       _fireAllDestructors();
       _freeAllArrays();
@@ -425,39 +426,39 @@ module List {
       _sanity(_arrays == nil);
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _destroy(ref item: eltType) {
       chpl__autoDestroy(item);
     }
 
-    pragma "no doc"
     pragma "unsafe"
+    @chpldoc.nodoc
     inline proc _move(ref src: ?t, ref dst: t) lifetime src == dst {
       __primitive("=", dst, src);
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _getArrayCapacity(array: int): int {
       const exp = array + log2(_initialCapacity);
       const result = 2 ** exp;
       return result;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _getArrayIdx(zpos: int): int {
       const adj = zpos + _initialCapacity;
       const result = log2(adj) - log2(_initialCapacity);
       return result;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _getLastArrayIdx(): int {
       const result = _getArrayIdx(_size - 1);
       _sanity(result >= 0);
       return result;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _getItemIdx(zpos: int): int {
       const adj = zpos + _initialCapacity;
       const result = adj ^ (1 << log2(adj));
@@ -468,7 +469,7 @@ module List {
     // A helper function for getting a reference to a list element.
     // May be less important now that lists use 0-based indexing(?).
     //
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc const ref _getRef(idx: int) ref {
       _sanity(idx >= 0 && idx < _totalCapacity);
       const arrayIdx = _getArrayIdx(idx);
@@ -479,19 +480,19 @@ module List {
       return result;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _enter() {
       if parSafe then
         _lock$.lock();
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _leave() {
       if parSafe then
         _lock$.unlock();
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc const _withinBounds(idx: int): bool {
       return (idx >= 0 && idx < _size);
     }
@@ -501,7 +502,7 @@ module List {
     // held (if parSafe==true), and releases it before throwing an error if
     // a bounds check fails.
     //
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc const _boundsCheckLeaveOnThrow(i: int, umsg: string="") throws {
       if !_withinBounds(i) {
         _leave();
@@ -512,17 +513,17 @@ module List {
       }
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _makeBlockArray(size: int) {
       return _ddata_allocate(_ddata(eltType), size);
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _freeBlockArray(data: _ddata(_ddata(eltType)), size: int) {
       _ddata_free(data, size);
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _makeArray(size: int) {
       var callPostAlloc = false;
       var ret = _ddata_allocate_noinit(eltType, size, callPostAlloc);
@@ -530,12 +531,12 @@ module List {
       return ret;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _freeArray(data: _ddata(eltType), size: int) {
       _ddata_free(data, size);
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _maybeAcquireMem(amount: int) {
 
       const remaining = _totalCapacity - _size;
@@ -595,7 +596,7 @@ module List {
     //
     // This method _does not_ fire destructors!
     //
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _maybeReleaseMem(amount: int) {
 
       //
@@ -629,7 +630,7 @@ module List {
     // `shift` positions to the right in memory, possibly resizing. May
     // expand memory if necessary.
     //
-    pragma "no doc"
+    @chpldoc.nodoc
     proc ref _expand(idx: int, shift: int=1) {
       _sanity(_withinBounds(idx));
 
@@ -654,7 +655,7 @@ module List {
     //
     // This method does not fire destructors, so do so before calling it.
     //
-    pragma "no doc"
+    @chpldoc.nodoc
     proc ref _collapse(idx: int) {
       _sanity(_withinBounds(idx));
 
@@ -682,7 +683,7 @@ module List {
     // attached so that you avoid firing a destructor early (and in the worst
     // case, fire it twice).
     //
-    pragma "no doc"
+    @chpldoc.nodoc
     proc ref _appendByRef(ref x: eltType) {
       _maybeAcquireMem(1);
       ref src = x;
@@ -714,7 +715,7 @@ module List {
       return result;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc ref _appendGeneric(collection) {
       var startSize: int;
       var endSize: int;
@@ -900,17 +901,17 @@ module List {
       return result;
     }
 
-    deprecated "list.extend is deprecated, please use list.append"
+    @deprecated(notes="list.extend is deprecated, please use list.append")
     proc ref extend(other: list(eltType, ?p)) lifetime this < other {
       append(other);
     }
 
-    deprecated "list.extend is deprecated, please use list.append"
+    @deprecated(notes="list.extend is deprecated, please use list.append")
     proc ref extend(other: [?d] eltType) lifetime this < other {
       append(other);
     }
 
-    deprecated "list.extend is deprecated, please use list.append"
+    @deprecated(notes="list.extend is deprecated, please use list.append")
     proc ref extend(other: range(eltType, ?b, ?d)) lifetime this < other {
       append(other);
     }
@@ -966,7 +967,7 @@ module List {
       return result;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc ref _insertGenericKnownSize(idx: int, items, size: int): bool {
       var result = false;
 
@@ -1150,7 +1151,7 @@ module List {
     // Not sure if strictly necessary, since we're probably only going to
     // call this from `pop`, but I added `unlockBeforeHalt` all the same.
     //
-    pragma "no doc"
+    @chpldoc.nodoc
     proc ref _popAtIndex(idx: int, unlockBeforeHalt=true): eltType {
 
       //
@@ -1245,7 +1246,7 @@ module List {
     // logical consistency, set size to zero once all destructors have been
     // fired.
     //
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _fireAllDestructors() {
       on this {
         for i in 0..#_size {
@@ -1257,7 +1258,7 @@ module List {
       return;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _freeAllArrays() {
 
       if _arrays == nil then
@@ -1287,7 +1288,7 @@ module List {
       return;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _clearLocked() {
       _fireAllDestructors();
       _freeAllArrays();
@@ -1313,33 +1314,6 @@ module List {
         _clearLocked();
         _leave();
       }
-    }
-
-    /*
-      Return a zero-based index into this list of the first item whose value
-      is equal to `x`. If no such element can be found or if the list is empty,
-      this method returns the value `-1`.
-
-      .. warning::
-
-        indexOf on lists is deprecated, use :proc:`find` instead.
-
-      :arg x: An element to search for.
-      :type x: `eltType`
-
-      :arg start: The start index to start searching from.
-      :type start: `int`
-
-      :arg end: The end index to stop searching at. A value less than
-                `0` will search the entire list.
-      :type end: `int`
-
-      :return: The index of the element to search for, or `-1` on error.
-      :rtype: `int`
-    */
-    deprecated "indexOf on lists is deprecated, use :proc:`find` instead; please let us know if this is problematic for you."
-    proc const indexOf(x: eltType, start: int=0, end: int=-1): int {
-      return find(x, start, end);
     }
 
     /*
@@ -1589,7 +1563,7 @@ module List {
       return updater(i, slot);
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _warnForParSafeIndexing() {
       if parSafe then
         compilerWarning('Indexing a list initialized with `parSafe=true` ' +
@@ -1630,7 +1604,7 @@ module List {
       return result;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc const ref this(i: int) const ref {
       _warnForParSafeIndexing();
 
@@ -1658,12 +1632,15 @@ module List {
         yield _getRef(i);
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     iter these(param tag: iterKind) ref where tag == iterKind.standalone {
       const osz = _size;
       const minChunkSize = 64;
       const hasOneChunk = osz <= minChunkSize;
-      const numTasks = if hasOneChunk then 1 else here.maxTaskPar;
+      const numTasks = if hasOneChunk then 1
+        else if dataParTasksPerLocale > 0
+          then dataParTasksPerLocale
+            else here.maxTaskPar;
       const chunkSize = floor(osz / numTasks):int;
       const trailing = osz - chunkSize * numTasks;
 
@@ -1676,7 +1653,7 @@ module List {
       }
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _computeChunk(tid, chunkSize, trailing) {
       var lo, hi = 0;
 
@@ -1691,12 +1668,15 @@ module List {
       return (lo..hi,);
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     iter these(param tag) ref where tag == iterKind.leader {
       const osz = _size;
       const minChunkSize = 32;
       const hasOneChunk = osz <= minChunkSize;
-      const numTasks = if hasOneChunk then 1 else dataParTasksPerLocale;
+      const numTasks = if hasOneChunk then 1
+        else if dataParTasksPerLocale > 0
+          then dataParTasksPerLocale
+            else here.maxTaskPar;
       const chunkSize = floor(osz / numTasks):int;
       const trailing = osz - chunkSize * numTasks;
 
@@ -1707,7 +1687,7 @@ module List {
       }
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     iter these(param tag, followThis) ref where tag == iterKind.follower {
 
       //
@@ -1723,31 +1703,56 @@ module List {
 
       :arg ch: A channel to write to.
     */
-    proc writeThis(ch: channel) throws {
+    proc writeThis(ch: fileWriter) throws {
       var isBinary = ch.binary();
+      const isJson = ch.styleElement(QIO_STYLE_ELEMENT_AGGREGATE) == QIO_AGGREGATE_FORMAT_JSON;
+
+      if isJson {
+        _writeJson(ch);
+        return;
+      }
 
       _enter();
 
       if isBinary {
         // Write the number of elements
-        ch <~> _size;
+        ch.write(_size);
       } else {
-        ch <~> new ioLiteral("[");
+        ch._writeLiteral("[");
       }
 
       for i in 0..(_size - 2) {
-        ch <~> _getRef(i);
+        ch.write(_getRef(i));
         if !isBinary {
-          ch <~> new ioLiteral(", ");
+          ch._writeLiteral(", ");
         }
       }
 
       if _size > 0 then
-        ch <~> _getRef(_size-1);
+        ch.write(_getRef(_size-1));
 
       if !isBinary {
-        ch <~> new ioLiteral("]");
+        ch._writeLiteral("]");
       }
+
+      _leave();
+    }
+
+    @chpldoc.nodoc
+    proc _writeJson(ch: fileWriter) throws {
+      _enter();
+
+      ch._writeLiteral("[");
+
+      for i in 0..(_size - 2) {
+        ch.writef("%jt", _getRef(i));
+        ch._writeLiteral(", ");
+      }
+
+      if _size > 0 then
+        ch.writef("%jt", _getRef(_size-1));
+
+      ch._writeLiteral("]");
 
       _leave();
     }
@@ -1757,12 +1762,17 @@ module List {
 
      :arg ch: A channel to read from.
      */
-    proc readThis(ch: channel) throws {
+    proc readThis(ch: fileReader) throws {
       //
       // Special handling for reading in order to handle reading an arbitrary
       // size.
       //
       const isBinary = ch.binary();
+      const isJson = ch.styleElement(QIO_STYLE_ELEMENT_AGGREGATE) == QIO_AGGREGATE_FORMAT_JSON;
+      if isJson then {
+        _readJson(ch);
+        return;
+      }
 
       _enter();
 
@@ -1770,19 +1780,17 @@ module List {
 
       if isBinary {
         // How many elements should we read (for binary mode)?
-        var num = 0;
-        ch <~> num;
+        const num = ch.read(int);
         for i in 0..#num {
           pragma "no auto destroy"
-          var elt: eltType;
-          ch <~> elt;
+          var elt: eltType = ch.read(eltType);
           _appendByRef(elt);
         }
       } else {
         var isFirst = true;
         var hasReadEnd = false;
 
-        ch <~> new ioLiteral("[");
+        ch._readLiteral("[");
 
         while !hasReadEnd {
           if isFirst {
@@ -1790,7 +1798,7 @@ module List {
 
             // Try reading an end bracket. If we don't, then continue on.
             try {
-              ch <~> new ioLiteral("]");
+              ch._readLiteral("]");
               hasReadEnd = true;
               break;
             } catch err: BadFormatError {
@@ -1800,7 +1808,7 @@ module List {
 
             // Try to read a comma. Break if we don't.
             try {
-              ch <~> new ioLiteral(",");
+              ch._readLiteral(",");
             } catch err: BadFormatError {
               break;
             }
@@ -1808,17 +1816,52 @@ module List {
 
           // read an element
           pragma "no auto destroy"
-          var elt: eltType;
-          ch <~> elt;
+          var elt: eltType = ch.read(eltType);
           _appendByRef(elt);
         }
 
         if !hasReadEnd {
-          ch <~> new ioLiteral("]");
+          ch._readLiteral("]");
         }
       }
 
       _leave();
+    }
+
+    @chpldoc.nodoc
+    proc _readJson(ch: fileReader) throws {
+      var isFirst = true;
+      var hasReadEnd = false;
+
+      _enter();
+      _clearLocked();
+
+      ch._readLiteral("[");
+
+      while !ch.matchLiteral("]") {
+        if isFirst {
+          isFirst = false;
+        } else {
+          ch._readLiteral(",");
+        }
+
+        // read an element
+        pragma "no auto destroy"
+        var elt: eltType;
+        ch.readf("%jt", elt);
+        _appendByRef(elt);
+      }
+
+      _leave();
+    }
+
+    //
+    // TODO: rewrite to use formatter interface
+    //
+    @chpldoc.nodoc
+    proc init(type eltType, param parSafe : bool, r: fileReader) {
+      this.init(eltType, parSafe);
+      try! readThis(r);
     }
 
     /*
@@ -1974,4 +2017,3 @@ module List {
 
 
 } // End module "Lists".
-

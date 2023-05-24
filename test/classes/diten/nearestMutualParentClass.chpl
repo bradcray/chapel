@@ -1,4 +1,4 @@
-proc object.myName: string return "object";
+proc object.myName: string do return "object";
 proc object.ddName(): string { return "object"; }
 
 class A {
@@ -71,8 +71,8 @@ proc nearestMutualParentClass(type car, type cdr...?k) type where k != 1 {
 }
 
 proc main {
-  var c: nearestMutualParentClass(borrowed E, borrowed D, borrowed C, borrowed C2, borrowed F) = new borrowed E();
-  var d: nearestMutualParentClass(borrowed E, borrowed D, borrowed C) = new borrowed E();
+  var c: nearestMutualParentClass(borrowed E, borrowed D, borrowed C, borrowed C2, borrowed F) = (new owned E()).borrow();
+  var d: nearestMutualParentClass(borrowed E, borrowed D, borrowed C) = (new owned E()).borrow();
   writeln(c.myName);
   writeln(c.ddName());
   writeln(d.myName);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -317,15 +317,15 @@ override proc BlockCyclic.dsiNewRectangularDom(param rank: int, type idxType,
 // output distribution
 //
 proc BlockCyclic.writeThis(x) throws {
-  x <~> "BlockCyclic\n";
-  x <~> "-------\n";
-  x <~> "distributes: " <~> lowIdx <~> "..." <~> "\n";
-  x <~> "in chunks of: " <~> blocksize <~> "\n";
-  x <~> "across locales: " <~> targetLocales <~> "\n";
-  x <~> "indexed via: " <~> targetLocDom <~> "\n";
-  x <~> "resulting in: " <~> "\n";
+  x.writeln("BlockCyclic");
+  x.writeln("-------");
+  x.writeln("distributes: ", lowIdx, "...");
+  x.writeln("in chunks of: ", blocksize);
+  x.writeln("across locales: ", targetLocales);
+  x.writeln("indexed via: ", targetLocDom);
+  x.writeln("resulting in: ");
   for locid in targetLocDom do
-    x <~> "  [" <~> locid <~> "] " <~> locDist(locid) <~> "\n";
+    x.writeln("  [", locid, "] ", locDist(locid));
 }
 
 //
@@ -429,7 +429,7 @@ proc BlockCyclic.init(other: BlockCyclic, privatizeData,
   dataParTasksPerLocale = privatizeData[3];
 }
 
-override proc BlockCyclic.dsiSupportsPrivatization() param return true;
+override proc BlockCyclic.dsiSupportsPrivatization() param do return true;
 
 proc BlockCyclic.dsiGetPrivatizeData() {
   return (lowIdx, blocksize, targetLocDom.dims(), dataParTasksPerLocale);
@@ -452,7 +452,7 @@ class LocBlockCyclic {
   // to use lclIdxType here is wrong since we're talking about
   // the section of the global index space owned by the locale.
   //
-  const myStarts: rank*range(idxType, BoundedRangeType.boundedLow, stridable=true);
+  const myStarts: rank*range(idxType, boundKind.low, stridable=true);
 
   //
   // Initializer computes what chunk of index(0) is owned by the
@@ -465,7 +465,7 @@ class LocBlockCyclic {
     this.rank = rank;
     this.idxType = idxType;
 
-    var myStarts: rank*range(idxType, BoundedRangeType.boundedLow, stridable=true);
+    var myStarts: rank*range(idxType, boundKind.low, stridable=true);
       for param i in 0..rank-1 {
         const locid_i = if isTuple(locid) then locid(i) else locid;
         const lo = lowIdx(i) + (locid_i * blocksize(i));
@@ -488,7 +488,7 @@ proc LocBlockCyclic.writeThis(x) throws {
   on this {
     localeid = here.id;
   }
-  x <~> "locale " <~> localeid <~> " owns blocks: " <~> myStarts;
+  x.write("locale ", localeid, " owns blocks: ", myStarts);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -506,7 +506,7 @@ class BlockCyclicDom: BaseRectangularDom {
   //
   var locDomsNil: [dist.targetLocDom] unmanaged LocBlockCyclicDom(rank, idxType, stridable)?;
 
-  inline proc locDoms(idx) return locDomsNil(idx)!;
+  inline proc locDoms(idx) do return locDomsNil(idx)!;
 
   //
   // a domain describing the complete domain
@@ -621,25 +621,25 @@ proc BlockCyclicDom.dsiBuildArray(type eltType, param initElts:bool) {
 proc BlockCyclicDom.parSafe param {
   compilerError("this domain type does not support 'parSafe'");
 }
-override proc BlockCyclicDom.dsiLow           return whole.lowBound;
-override proc BlockCyclicDom.dsiHigh          return whole.highBound;
-override proc BlockCyclicDom.dsiAlignedLow    return whole.alignedLow;
-override proc BlockCyclicDom.dsiAlignedHigh   return whole.alignedHigh;
-override proc BlockCyclicDom.dsiFirst         return whole.first;
-override proc BlockCyclicDom.dsiLast          return whole.last;
-override proc BlockCyclicDom.dsiStride        return whole.stride;
-override proc BlockCyclicDom.dsiAlignment     return whole.alignment;
-proc BlockCyclicDom.dsiNumIndices    return whole.sizeAs(uint);
-proc BlockCyclicDom.dsiDim(d)        return whole.dim(d);
-proc BlockCyclicDom.dsiDim(param d)  return whole.dim(d);
-proc BlockCyclicDom.dsiDims()        return whole.dims();
-proc BlockCyclicDom.dsiGetIndices()  return whole.getIndices();
-proc BlockCyclicDom.dsiMember(i)     return whole.contains(i);
-proc BlockCyclicDom.doiToString()    return whole:string;
+override proc BlockCyclicDom.dsiLow do           return whole.lowBound;
+override proc BlockCyclicDom.dsiHigh do          return whole.highBound;
+override proc BlockCyclicDom.dsiAlignedLow do    return whole.low;
+override proc BlockCyclicDom.dsiAlignedHigh do   return whole.high;
+override proc BlockCyclicDom.dsiFirst do         return whole.first;
+override proc BlockCyclicDom.dsiLast do          return whole.last;
+override proc BlockCyclicDom.dsiStride do        return whole.stride;
+override proc BlockCyclicDom.dsiAlignment do     return whole.alignment;
+proc BlockCyclicDom.dsiNumIndices do    return whole.sizeAs(uint);
+proc BlockCyclicDom.dsiDim(d) do        return whole.dim(d);
+proc BlockCyclicDom.dsiDim(param d) do  return whole.dim(d);
+proc BlockCyclicDom.dsiDims() do        return whole.dims();
+proc BlockCyclicDom.dsiGetIndices() do  return whole.getIndices();
+proc BlockCyclicDom.dsiMember(i) do     return whole.contains(i);
+proc BlockCyclicDom.doiToString() do    return whole:string;
 proc BlockCyclicDom.dsiSerialWrite(x) { x.write(whole); }
-proc BlockCyclicDom.dsiLocalSlice(param stridable, ranges) return whole((...ranges));
-override proc BlockCyclicDom.dsiIndexOrder(i)              return whole.indexOrder(i);
-override proc BlockCyclicDom.dsiMyDist()                   return dist;
+proc BlockCyclicDom.dsiLocalSlice(param stridable, ranges) do return whole((...ranges));
+override proc BlockCyclicDom.dsiIndexOrder(i) do              return whole.indexOrder(i);
+override proc BlockCyclicDom.dsiMyDist() do                   return dist;
 
 //
 // INTERFACE NOTES: Could we make setIndices() for a rectangular
@@ -712,9 +712,9 @@ proc type BlockCyclicDom.chpl__deserialize(data) {
            data);
 }
 
-override proc BlockCyclicDom.dsiSupportsPrivatization() param return true;
+override proc BlockCyclicDom.dsiSupportsPrivatization() param do return true;
 
-proc BlockCyclicDom.dsiGetPrivatizeData() return dist.pid;
+proc BlockCyclicDom.dsiGetPrivatizeData() do return dist.pid;
 
 proc BlockCyclicDom.dsiPrivatize(privatizeData) {
   var privateDist = chpl_getPrivatizedCopy(dist.type, privatizeData);
@@ -724,7 +724,7 @@ proc BlockCyclicDom.dsiPrivatize(privatizeData) {
   return c;
 }
 
-proc BlockCyclicDom.dsiGetReprivatizeData() return 0;
+proc BlockCyclicDom.dsiGetReprivatizeData() do return 0;
 
 proc BlockCyclicDom.dsiReprivatize(other, reprivatizeData) {
   locDomsNil = other.locDomsNil;
@@ -775,7 +775,7 @@ proc LocBlockCyclicDom.computeFlatInds() {
 // output local domain piece
 //
 proc LocBlockCyclicDom.writeThis(x) throws {
-  x <~> myStarts;
+  x.write(myStarts);
 }
 
 proc LocBlockCyclicDom.enumerateBlocks() {
@@ -810,11 +810,11 @@ proc LocBlockCyclicDom.size {
 }
 
 proc LocBlockCyclicDom.low {
-  return myStarts.alignedLow;
+  return myStarts.low;
 }
 
 proc LocBlockCyclicDom.high {
-  return myStarts.alignedHigh;
+  return myStarts.high;
 }
 
 proc LocBlockCyclicDom._lens {
@@ -859,7 +859,7 @@ class BlockCyclicArr: BaseRectangularArr {
   var myLocArr: unmanaged LocBlockCyclicArr(eltType, rank, idxType, stridable)?;
 }
 
-override proc BlockCyclicArr.dsiGetBaseDom() return dom;
+override proc BlockCyclicArr.dsiGetBaseDom() do return dom;
 
 override proc BlockCyclicArr.dsiIteratorYieldsLocalElements() param {
   return true;
@@ -923,9 +923,9 @@ proc type BlockCyclicArr.chpl__deserialize(data) {
            data);
 }
 
-override proc BlockCyclicArr.dsiSupportsPrivatization() param return true;
+override proc BlockCyclicArr.dsiSupportsPrivatization() param do return true;
 
-proc BlockCyclicArr.dsiGetPrivatizeData() return 0;
+proc BlockCyclicArr.dsiGetPrivatizeData() do return 0;
 
 proc BlockCyclicArr.dsiPrivatize(privatizeData) {
   var privdom = chpl_getPrivatizedCopy(dom.type, dom.pid);
@@ -1047,8 +1047,8 @@ proc BlockCyclic.dsiTargetLocales() const ref {
 }
 
 
-proc BlockCyclicArr.dsiHasSingleLocalSubdomain() param return false;
-proc BlockCyclicDom.dsiHasSingleLocalSubdomain() param return false;
+proc BlockCyclicArr.dsiHasSingleLocalSubdomain() param do return false;
+proc BlockCyclicDom.dsiHasSingleLocalSubdomain() param do return false;
 
 // essentially enumerateBlocks()
 // basically add blocksize to the start indices
@@ -1279,7 +1279,7 @@ proc LocBlockCyclicArr.this(i) ref {
 //
 proc LocBlockCyclicArr.writeThis(x) throws {
   // note on this fails; see writeThisUsingOn.chpl
-  x <~> myElems;
+  x.write(myElems);
 }
 
 // sungeun: This doesn't appear to be used yet, so I left it, but it
@@ -1289,7 +1289,7 @@ proc LocBlockCyclicArr.writeThis(x) throws {
 // helper function for blocking index ranges
 //
 proc _computeBlockCyclic(waylo, numelems, lo, wayhi, numblocks, blocknum) {
-  proc procToData(x, lo)
+  proc procToData(x, lo) do
     return lo + (x:lo.type) + (x:real != x:int:real):lo.type;
 
   const blo =

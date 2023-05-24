@@ -1,7 +1,7 @@
 ============================
 README file for GASNet tools
 ============================
-GASNet tools specification version: 1.19
+GASNet tools specification version: 1.20 // work-in-progress, not "closed".
 Authors: Dan Bonachea <dobonachea@lbl.gov>
          Paul H. Hargrove <PHHargrove@lbl.gov>
 
@@ -165,6 +165,9 @@ system-specific support, where available.
     * GASNET_TSC_RATE_HARD_TOLERANCE
       This environment variable functions like GASNET_TSC_RATE_TOLERANCE, except
       that exceeeding this value results in a fatal error.
+
+    * GASNET_TSC_VERBOSE
+      This boolean setting requests console output regarding calibration activity
 
 -----
 Sleep

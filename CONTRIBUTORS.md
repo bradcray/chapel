@@ -1,37 +1,34 @@
 Chapel Contributors
 ===================
 
-The following people have contributed to the implementation of the
-most recent Chapel release:
+The following people have contributed to Chapel releases:
 
-Contributors to the Chapel 1.27.0 release
+Contributors to the Chapel 1.30.0 release
 -----------------------------------------
-* Gabriel Brown, individual contributor
+* Jade Abraham, [HPE]
 * Paul Cassella, [HPE]
 * [Brad Chamberlain], [HPE]
 * Soohoon Choi, [HPE]
-* Andrew Consroe, [HPE]
 * Jeremiah Corrado, [HPE]
 * Lydia Duncan, [HPE]
+* Daniel Fedorin, [HPE]
 * Michael Ferguson, [HPE]
-* Luca Ferranti, individual contributor
 * Ben Harshbarger, [HPE]
 * John Hartman, [HPE]
 * David Iten, [HPE]
+* Bhavani Jayakumaran, [HPE]
 * Engin Kayraklioglu, [HPE]
-* Shreyas Khandekar, [HPE] intern from [University of Arizona]
 * Vassily Litvinov, [HPE]
 * David Longnecker, [HPE]
 * Ben McDonald, [HPE] (former intern from [Gonzaga University])
-* Josh Milthorpe, [ORNL]
-* Brandon Neth, [HPE] intern from [University of Arizona]
-* Sarah Nguyen, [HPE]
 * Ahmad Rezaii, [HPE]
+* Anna Rift, [HPE]
 * Elliot Ronaghan, [HPE]
+* Erik Schierboom, individual contributor
 * Andy Stone, [HPE] (former [Cray Inc.] intern from [Colorado State University])
 * Michelle Mills Strout, [HPE]
-* Greg Titus, [HPE]
 * Karlon West, [HPE]
+* Vanessa Zambrano, [HPE]
 * Tim Zinsky, [HPE]
 
 Contributors to previous releases
@@ -53,6 +50,7 @@ Contributors to previous releases
 * Robert Bocchino, [Cray Inc.] intern from [University of Illinois, Urbana-Champaign]
 * Dan Bonachea, [UC Berkeley]
 * Kyle Brady, [Cray Inc.]
+o Gabriel Brown, individual contributor
 * Daniel Buettner, [LTS]
 * John Byrne, [HPE]
 * Zixian Cai, individual contributor
@@ -63,6 +61,7 @@ Contributors to previous releases
 * Sung-Eun Choi, [Cray Inc.]
 * Mike Chu, [Advanced Micro Devices, Inc.]
 * Cristian-loan Condruz, individual contributor
+* Andrew Consroe, [HPE]
 * Anway De, individual contributor
 * Steve Deitz, [Cray Inc.]
 * Laura Delaney, [Cray Inc.] intern from [Whitworth University]
@@ -76,6 +75,7 @@ Contributors to previous releases
 * Prasanth Duvvuri, [GSoC 2021] student from [Northeastern University] (former individual contributor)
 * Saliya Ekanayake, [Indiana University]
 * Omar Elawady, individual contributor
+* Luca Ferranti, individual contributor
 * Samuel Figueroa[*](#footnote), [Cray Inc.]
 * Roald Frederickx, individual contributor
 * Rahul Ghangas, [GSoC 2020] student from [Australian National University]
@@ -100,6 +100,7 @@ Contributors to previous releases
 * Avneet Kaur, [RGSoC 2018] student from [Indraprastha Institute of Information Technology, Delhi]
 * David Keaton, [Cray Inc.]
 * Krishna Keshav, individual contributor
+* Shreyas Khandekar, [HPE] intern from [University of Arizona]
 * Sagar Khatri, individual contributor
 * Lee Killough, [HPE]
 * John Koenig, [Cray Inc.]
@@ -121,6 +122,7 @@ Contributors to previous releases
 * Cory McCartan, [Cray Inc.] intern from Sammamish High School
 * Damian McGuckin, [Pacific Engineering Systems International]
 * Erin Melia, individual contributor
+* Josh Milthorpe, [ORNL]
 * Kyle Milz, individual contributor
 * Barry Moore, [University of Pittsburgh]
 * Sarthak Munshi, individual contributor / [GSoC 2017] student from [Pune Institute of Computer Technology]
@@ -131,6 +133,8 @@ Contributors to previous releases
 * Divye Nayyar, individual contributor and [GSoC 2021] student from [Indian Institute of Technology Roorkee]
 * Jacob Nelson, [Cray Inc.] intern from [University of Washington]
 * [Phil Nelson], [Western Washington University] / [Cray Inc.] contractor
+* Brandon Neth, [HPE] intern from [University of Arizona]
+* Sarah Nguyen, [HPE]
 * Michael Noakes, [Cray Inc.]
 * Joshua Olson, individual contributor
 * Nikhil Padmanabhan, [Yale University]
@@ -151,8 +155,10 @@ Contributors to previous releases
 * Lee Prokowich, [Cray Inc.]
 * David Qian, individual contributor
 * Yujia Qiao, individual contributor and [GSoC 2020] student from [Huazhong University of Science and Technology]
+* Nikki Rad, [HPE] intern from [Texas A&M University]
 * Venkatavaradan Raghuraman, individual contributor
 * Yash Raj, individual contributor
+* Thomas Rolinger, individual contributor
 * Brandon Ross, [University at Buffalo]
 * Preston Sahabu, [Cray Inc.]
 * Sara Salem, [Cairo University]
@@ -174,6 +180,7 @@ Contributors to previous releases
 * [Kenjiro Taura], [University of Tokyo]
 * Chris Taylor, [DOD]
 * Akash Thorat, individual contributor
+* Greg Titus, [HPE]
 * David Tjong, individual contributor
 * B. Kerim Tshimanga, individual contributor
 * Jonathan Turner, [Cray Inc.] intern from [CU Boulder]
@@ -185,6 +192,7 @@ Contributors to previous releases
 * Branch Vincent, individual contributor
 * Chris Wailes, [Indiana University]
 * Tony Wallace, [Cray Inc.]
+o Vivian Wang, individual contributor, [GHC] 2022 Open Source Day
 * Alvis Wong, [GSoC 2019] student from [University of Waterloo]
 * Wayne Wong, [Cray Inc.]
 * Tong Xu, individual contributor
@@ -243,6 +251,7 @@ implementation.
 [ETI]: http://www.etinternational.com/
 [George Washington University]: https://www.gwu.edu/
 [Georgia Tech]: http://www.cc.gatech.edu/
+[GHC]: https://ghc.anitab.org/
 [Gonzaga University]: https://www.gonzaga.edu/
 [GSoC 2016]: https://summerofcode.withgoogle.com/archive/2016/organizations/4704629866627072/
 [GSoC 2017]: https://summerofcode.withgoogle.com/archive/2017/organizations/4757669491507200/
@@ -274,6 +283,7 @@ implementation.
 [Rice University]: http://www.cs.rice.edu/
 [Royal Global University]: https://www.rgu.ac/
 [Sandia National Laboratories]: http://www.sandia.gov/
+[Texas A&M University]: https://www.tamu.edu/
 [Unicorn Enterprises SA]: http://www.unicorn-enterprises.com/
 [University of Arizona]: https://www.cs.arizona.edu/
 [University at Buffalo]: https://www.cse.buffalo.edu/

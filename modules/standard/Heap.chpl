@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -37,6 +37,7 @@
   ``top`` will return the minimal element.
 
 */
+@unstable("The 'Heap' module is unstable")
 module Heap {
   import ChapelLocks;
   private use HaltWrappers;
@@ -54,14 +55,14 @@ module Heap {
   // contention (IE, lots of tasks trying to call toArray on the heap
   // or any operation that is O(n)).
   //
-  pragma "no doc"
+  @chpldoc.nodoc
   type _lockType = ChapelLocks.chpl_LocalSpinlock;
 
   //
   // Use a wrapper class to let heap methods have a const ref receiver even
   // when `parSafe` is `true` and the heap lock is used.
   //
-  pragma "no doc"
+  @chpldoc.nodoc
   class _LockWrapper {
     var lock$ = new _lockType();
 
@@ -74,14 +75,14 @@ module Heap {
     }
   }
 
-  pragma "no doc"
+  @chpldoc.nodoc
   proc _checkType(type eltType) {
     //NOTE: This is borrowed from List.chpl
     if isGenericType(eltType) {
       compilerWarning("creating a heap with element type " +
                       eltType:string);
-      if isClassType(eltType) && !isGenericType(borrowed eltType) {
-        compilerWarning("which now means class type with generic management");
+      if isClassType(eltType) && !isGenericType(eltType:borrowed) {
+        compilerWarning("which is a class type with generic management");
       }
       compilerError("heap element type cannot currently be generic");
       // In the future we might support it if the list is not default-inited
@@ -102,20 +103,20 @@ module Heap {
     */
     var comparator: record;
 
-    pragma "no doc"
+    @chpldoc.nodoc
     var _lock$ = if parSafe then new _LockWrapper() else none;
 
     /*
       Use a list to store elements.
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     var _data: list(eltType);
 
     /*
       Build the heap from elements that have been stored, from bottom to top
       in O(N)
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _commonInitFromIterable(iterable)
     lifetime this < iterable {
       _data = new list(eltType);
@@ -165,13 +166,13 @@ module Heap {
     /*
       Locks operations
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _enter() {
       if parSafe then
         _lock$.lock();
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _leave() {
       if parSafe then
         _lock$.unlock();
@@ -228,7 +229,7 @@ module Heap {
     /*
       Wrapper of comparing elements
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _greater(x: eltType, y: eltType) {
       return chpl_compare(x, y, comparator) > 0;
     }
@@ -236,7 +237,7 @@ module Heap {
     /*
       Helper procedures to maintain the heap
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _heapify_up(in pos: int) {
       while (pos) {
         var parent = pos / 2;
@@ -248,7 +249,7 @@ module Heap {
       }
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _heapify_down(in pos: int) {
       while (pos < _data.size) {
         // find the child node with greater value
@@ -270,7 +271,7 @@ module Heap {
       }
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _push(in element: eltType)
     lifetime this < element {
       _data.append(element);
@@ -378,9 +379,9 @@ module Heap {
 
       :arg ch: A channel to write to.
     */
-    proc writeThis(ch: channel) throws {
+    proc writeThis(ch: fileWriter) throws {
       _enter();
-      ch <~> this._data;
+      ch.write(this._data);
       _leave();
     }
   }

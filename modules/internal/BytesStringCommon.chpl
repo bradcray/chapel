@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -67,10 +67,10 @@ module BytesStringCommon {
   enum encodePolicy { unescape, pass };
 
 
-  pragma "no doc"
+  @chpldoc.nodoc
   config param showStringBytesInitDeprWarnings = true;
 
-  pragma "no doc"
+  @chpldoc.nodoc
   param surrogateEscape = 0xdc:byteType;
 
   private proc isBytesOrStringType(type t) param: bool {
@@ -107,9 +107,9 @@ module BytesStringCommon {
   */
   proc decodeByteBuffer(buff: bufferType, length: int, policy: decodePolicy)
       throws {
-    import SysBasic.{syserr};
+    import OS.{errorCode};
     pragma "fn synchronization free"
-    extern proc qio_encode_char_buf(dst: c_void_ptr, chr: int(32)): syserr;
+    extern proc qio_encode_char_buf(dst: c_void_ptr, chr: int(32)): errorCode;
     pragma "fn synchronization free"
     extern proc qio_nbytes_char(chr: int(32)): c_int;
 
@@ -176,7 +176,7 @@ module BytesStringCommon {
                                                      expectedSize);
             for i in 0..#nInvalidBytes {
               qio_encode_char_buf(newBuff+decodedIdx,
-                                  0xdc00+buff[thisIdx-nInvalidBytes+i]);
+                                  0xdc00+(buff[thisIdx-nInvalidBytes+i]:int(32)));
               decodedIdx += 3;
             }
 
@@ -211,7 +211,7 @@ module BytesStringCommon {
   /*
     This function decodeHelp is used to create a wrapper for
     qio_decode_char_buf* and qio_decode_char_buf_esc and return
-    the value of syserr , cp and nBytes.
+    the value of errorCode , cp and nBytes.
 
       :arg buff: Buffer to decode
 
@@ -224,23 +224,23 @@ module BytesStringCommon {
                       escaped sequences in the string
 
     :returns: Tuple of decodeRet, chr and nBytes
-              decodeRet : error code : syserr
+              decodeRet : error code : errorCode
               chr : corresponds to codepoint
               nBytes : number of bytes of corresponding UTF-8 encoding
    */
   proc decodeHelp(buff:c_ptr(uint(8)), buffLen:int,
                   offset:int, allowEsc: bool ) {
-    import SysBasic.{syserr};
+    import OS.{errorCode};
     pragma "fn synchronization free"
     extern proc qio_decode_char_buf(ref chr:int(32),
                                     ref nBytes:c_int,
                                     buf:c_string,
-                                    buflen:c_ssize_t): syserr;
+                                    buflen:c_ssize_t): errorCode;
     pragma "fn synchronization free"
     extern proc qio_decode_char_buf_esc(ref chr:int(32),
                                         ref nBytes:c_int,
                                         buf:c_string,
-                                        buffLen:c_ssize_t): syserr;
+                                        buffLen:c_ssize_t): errorCode;
     // esc chooses between qio_decode_char_buf_esc and
     // qio_decode_char_buf as a single wrapper function
     var chr: int(32);
@@ -248,7 +248,7 @@ module BytesStringCommon {
     var start = offset:c_int;
     var multibytes = (buff + start): c_string;
     var maxbytes = (buffLen - start): c_ssize_t;
-    var decodeRet: syserr;
+    var decodeRet: errorCode;
     if(allowEsc) then
       decodeRet = qio_decode_char_buf_esc(chr, nBytes,
                                           multibytes,
@@ -276,7 +276,7 @@ module BytesStringCommon {
         // if other is remote, copy and own the buffer no matter what
         x.isOwned = true;
         x.buff = bufferCopyRemote(other.locale_id, other.buff, otherLen);
-        x.buffLen = otherLen+1;
+        x.buffSize = otherLen+1;
         if t == string then x.cachedNumCodepoints = other.cachedNumCodepoints;
       }
       else {
@@ -372,7 +372,7 @@ module BytesStringCommon {
     proc simpleCaseHelper() {
       // cast the argument r to `int` to make sure that we are not dealing with
       // byteIndex
-      const intR = r:range(int, r.boundedType, r.stridable);
+      const intR = r:range(int, r.bounds, r.stridable);
       if boundsChecking {
         if !x.byteIndices.boundsCheck(intR) {
           halt("range ", r, " out of bounds for " + t:string + " with length ",
@@ -428,7 +428,7 @@ module BytesStringCommon {
 
       // cast the argument r to `int` to make sure that we are not dealing with
       // codepointIdx
-      const intR = r:range(int, r.boundedType, r.stridable);
+      const intR = r:range(int, r.bounds, r.stridable);
       if boundsChecking {
         if !x.indices.boundsCheck(intR) {
           halt("range ", r, " out of bounds for string with length ", x.size);
@@ -437,11 +437,11 @@ module BytesStringCommon {
 
       // find the byte range of the given codepoint range
       var cpCount = 0;
-      const cpIdxLow = if intR.hasLowBound() && intR.alignedLow:int >= 0
-                          then intR.alignedLow:int
+      const cpIdxLow = if intR.hasLowBound() && intR.low:int >= 0
+                          then intR.low:int
                           else 0;
       const cpIdxHigh = if intR.hasHighBound()
-                           then intR.alignedHigh:int
+                           then intR.high:int
                            else x.buffLen-1;
 
       var byteLow = x.buffLen;  // empty range if bounds outside string
@@ -516,13 +516,13 @@ module BytesStringCommon {
           size=buffSize, numCodepoints=numCodepoints);
     }
     else {
-      return createBytesWithOwnedBuffer(x=buff, length=buffLen, size=buffSize);
+      return bytes.createAdoptingBuffer(x=buff, length=buffLen, size=buffSize);
     }
   }
 
   proc getIndexType(type t) type {
     import Bytes, String;
-    if t==bytes then return Bytes.idxType;
+    if t==bytes then return int;
     else if t==string then return String.byteIndex;
     else compilerError("This function should only be used by bytes or string");
   }
@@ -629,7 +629,7 @@ module BytesStringCommon {
     var chunk : t;
 
     var inChunk : bool = false;
-    var chunkStart : idxType;
+    var chunkStart : int;
 
     // emit whole string, unless all whitespace
     // TODO Engin: Why is noSplit check inside the loop?
@@ -792,7 +792,7 @@ module BytesStringCommon {
   // TODO: could use a multi-pattern search or some variant when there are
   // multiple needles. Probably wouldn't be worth the overhead for small
   // needles though
-  pragma "no doc"
+  @chpldoc.nodoc
   inline proc startsEndsWith(const ref x: ?t, needles,
                              param fromLeft: bool) : bool
                              where isHomogeneousTuple(needles) &&
@@ -901,7 +901,7 @@ module BytesStringCommon {
                                                   numCodepoints=numCodepoints);
       }
       else {
-        return createBytesWithOwnedBuffer(x=newBuff,
+        return bytes.createAdoptingBuffer(x=newBuff,
                                           length=joinedSize,
                                           size=allocSize);
       }
@@ -1207,7 +1207,7 @@ module BytesStringCommon {
                                                 x.cachedNumCodepoints*n);
     }
     else {
-      return createBytesWithOwnedBuffer(buff, buffLen, allocSize);
+      return bytes.createAdoptingBuffer(buff, buffLen, allocSize);
     }
   }
 
@@ -1244,8 +1244,8 @@ module BytesStringCommon {
     const localX: t = x.localize();
     const localChars: t = chars.localize();
 
-    var start: idxType = 0;
-    var end: idxType = localX.buffLen-1;
+    var start: int = 0;
+    var end: int = localX.buffLen-1;
 
     if leading {
       label outer for (i, xChar) in zip(x.indices, localX.bytes()) {
@@ -1377,7 +1377,7 @@ module BytesStringCommon {
     Returns true if the argument is a valid initial byte of a UTF-8
     encoded multibyte character.
   */
-  pragma "no doc"
+  @chpldoc.nodoc
   inline proc isInitialByte(b: uint(8)) : bool {
     return (b & 0xc0) != 0x80;
   }
@@ -1426,6 +1426,9 @@ module BytesStringCommon {
         }
       }
     }
+
+    // ensure that there is a null byte at the end of the buffer
+    if x.buffLen > 0 then x.buff[x.buffLen] = 0;
   }
 
   private proc _isSingleWord(const ref x: ?t) {

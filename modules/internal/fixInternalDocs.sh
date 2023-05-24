@@ -130,11 +130,11 @@ function removeUsage() {
 
 ## ChapelTuple ##
 
-file=ChapelTuple.rst
+file="./ChapelTuple.rst"
 removePrefixFunctions $file
 removePattern "param size" $file
 removePattern "record:: _tuple" $file
-fixTitle "Tuples" $file
+removeTitle $file
 removeUsage $file
 
 ## End ChapelTuple ##
@@ -158,7 +158,7 @@ file="./ChapelSyncvar.rst"
 replace "_syncvar" "sync" $file
 replace "_singlevar" "single" $file
 removePrefixFunctions $file
-fixTitle "Synchronization Variables" $file
+removeTitle $file
 removeUsage $file
 
 ## End ChapelSyncvar ##
@@ -214,7 +214,7 @@ removeUsage $file
 ## String ##
 
 file="./String.rst"
-fixTitle "Strings" $file
+removeTitle $file
 removeUsage $file
 replace "chpl_bytes" "bytes" $file
 
@@ -223,15 +223,15 @@ replace "chpl_bytes" "bytes" $file
 ## Bytes ##
 
 file="./Bytes.rst"
-fixTitle "Bytes" $file
-removeUsage $file
 replace "chpl_bytes" "bytes" $file
+removeTitle $file
+removeUsage $file
 
 ## End of Bytes ##
 
 ## OwnedObject ##
 file=OwnedObject.rst
-fixTitle "owned" $file
+removeTitle $file
 replace "_owned" "owned" $file
 replace "chpl_t" "t" $file
 removeUsage $file
@@ -239,9 +239,15 @@ removeUsage $file
 
 ## SharedObject ##
 file=SharedObject.rst
-fixTitle "shared" $file
+removeTitle $file
 replace "_owned" "owned" $file
 replace "_shared" "shared" $file
 replace "chpl_t" "t" $file
 removeUsage $file
 ## End of SharedObject ##
+
+## WeakPointer ##
+file=WeakPointer.rst
+replace "_shared" "shared" $file
+removeUsage $file
+## End of WeakPointer ##

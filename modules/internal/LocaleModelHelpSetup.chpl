@@ -1,6 +1,6 @@
 /*
  * Copyright 2017 Advanced Micro Devices, Inc.
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -148,7 +148,7 @@ module LocaleModelHelpSetup {
     extern proc chpl_nodeName(): c_string;
     var _node_name: string;
     try! {
-      _node_name = createStringWithNewBuffer(chpl_nodeName());
+      _node_name = string.createCopyingBuffer(chpl_nodeName());
     }
     const _node_id = (chpl_nodeID: int): string;
 
@@ -234,6 +234,14 @@ module LocaleModelHelpSetup {
       numSublocales: int, type GPULocale){
 
     local_name = getNodeName();
+
+    extern proc chpl_topo_getNumCPUsPhysical(accessible_only: bool): c_int;
+    dst.nPUsPhysAcc = chpl_topo_getNumCPUsPhysical(true);
+    dst.nPUsPhysAll = chpl_topo_getNumCPUsPhysical(false);
+
+    extern proc chpl_topo_getNumCPUsLogical(accessible_only: bool): c_int;
+    dst.nPUsLogAcc = chpl_topo_getNumCPUsLogical(true);
+    dst.nPUsLogAll = chpl_topo_getNumCPUsLogical(false);
 
     // Cyclic (and likely other) distributions uses this variable to determine
     // how many data-parallel tasks to have per locale. If this gets set to 0

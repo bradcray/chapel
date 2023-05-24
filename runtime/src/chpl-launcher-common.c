@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -121,11 +121,13 @@ chpl_run_utility1K(const char *command, char *const argv[], char *outbuf, int ou
   int rv, numRead;
 
   if (pipe(fdo) < 0) {
-    sprintf(buf, "Unable to run '%s' (pipe failed): %s\n", command, strerror(errno));
+    snprintf(buf, sizeof(buf), "Unable to run '%s' (pipe failed): %s\n",
+             command, strerror(errno));
     chpl_internal_error(buf);
   }
   if (pipe(fde) < 0) {
-    sprintf(buf, "Unable to run '%s' (pipe failed): %s\n", command, strerror(errno));
+    snprintf(buf, sizeof(buf), "Unable to run '%s' (pipe failed): %s\n",
+             command, strerror(errno));
     chpl_internal_error(buf);
   }
 
@@ -135,7 +137,7 @@ chpl_run_utility1K(const char *command, char *const argv[], char *outbuf, int ou
     close(fdo[0]);
     if (fdo[1] != STDOUT_FILENO) {
       if (dup2(fdo[1], STDOUT_FILENO) != STDOUT_FILENO) {
-        sprintf(buf, "Unable to run '%s' (dup2 failed): %s",
+        snprintf(buf, sizeof(buf), "Unable to run '%s' (dup2 failed): %s",
                 command, strerror(errno));
         chpl_internal_error(buf);
       }
@@ -143,18 +145,18 @@ chpl_run_utility1K(const char *command, char *const argv[], char *outbuf, int ou
     close(fde[0]);
     if (fde[1] != STDERR_FILENO) {
       if (dup2(fde[1], STDERR_FILENO) != STDERR_FILENO) {
-        sprintf(buf, "Unable to run '%s' (dup2 failed): %s",
+        snprintf(buf, sizeof(buf), "Unable to run '%s' (dup2 failed): %s",
                 command, strerror(errno));
         chpl_internal_error(buf);
       }
     }
     execvp(command, argv);
     // should only return on error
-    sprintf(buf, "Unable to run '%s': %s",
+    snprintf(buf, sizeof(buf), "Unable to run '%s': %s",
                 command, strerror(errno));
     chpl_internal_error(buf);
   case -1:
-    sprintf(buf, "Unable to run '%s' (fork failed): %s",
+    snprintf(buf, sizeof(buf), "Unable to run '%s' (fork failed): %s",
             command, strerror(errno));
     chpl_warning(buf, 0, 0);
     return -1;
@@ -180,7 +182,7 @@ chpl_run_utility1K(const char *command, char *const argv[], char *outbuf, int ou
           cur += rv;
           numRead += rv;
         } else {
-          sprintf(buf, "Unable to run '%s' (read failed): %s",
+          snprintf(buf, sizeof(buf), "Unable to run '%s' (read failed): %s",
                   command, strerror(errno));
           chpl_warning(buf, 0, 0);
           return -1;
@@ -195,7 +197,7 @@ chpl_run_utility1K(const char *command, char *const argv[], char *outbuf, int ou
           cur += rv;
           numRead += rv;
         } else {
-          sprintf(buf, "Unable to run '%s' (read failed): %s",
+          snprintf(buf, sizeof(buf), "Unable to run '%s' (read failed): %s",
                   command, strerror(errno));
           chpl_warning(buf, 0, 0);
           return -1;
@@ -214,7 +216,8 @@ chpl_run_utility1K(const char *command, char *const argv[], char *outbuf, int ou
         return -1;
       }
     } else {
-      sprintf(buf, "Unable to run '%s' (no bytes read)", command);
+      snprintf(buf, sizeof(buf), "Unable to run '%s' (no bytes read)",
+               command);
       chpl_warning(buf, 0, 0);
       return -1;
     }
@@ -303,9 +306,11 @@ void chpl_launcher_record_env_var(const char* evName, const char *evVal) {
   evList = chpl_mem_realloc(evList, evListSize,
                             CHPL_RT_MD_COMMAND_BUFFER, -1, 0);
   if (evListSizeWas == 0) {
-    sprintf(evList, "%s=%s", evName, evVal);
+    snprintf(evList, (size_t) evListSize, "%s=%s", evName, evVal);
   } else {
-    sprintf(evList + evListSizeWas - 1, " %s=%s", evName, evVal);
+    snprintf(evList + evListSizeWas - 1,
+             (size_t) (evListSize - (evListSizeWas - 1)),
+             " %s=%s", evName, evVal);
   }
 }
 
@@ -486,7 +491,8 @@ int chpl_launch_using_exec(const char* command, char * const argv1[], const char
   execvp(command, argv1);
   {
     char msg[256];
-    sprintf(msg, "execvp() failed for command %s: %s", command, strerror(errno));
+    snprintf(msg, sizeof(msg), "execvp() failed for command %s: %s", command,
+             strerror(errno));
     chpl_internal_error(msg);
   }
   return -1;
@@ -502,14 +508,14 @@ int chpl_launch_using_fork_exec(const char* command, char * const argv1[], const
   case -1:
   {
     char msg[256];
-    sprintf(msg, "fork() failed: %s", strerror(errno));
+    snprintf(msg, sizeof(msg), "fork() failed: %s", strerror(errno));
     chpl_internal_error(msg);
   }
   default:
     {
       if (waitpid(pid, &status, 0) != pid) {
         char msg[256];
-        sprintf(msg, "waitpid() failed: %s", strerror(errno));
+        snprintf(msg, sizeof(msg), "waitpid() failed: %s", strerror(errno));
         chpl_internal_error(msg);
       }
     }
@@ -567,62 +573,6 @@ char* chpl_get_enviro_keys(char sep)
   }
 
   return ret;
-}
-
-static const int charset_env_nargs = 4;
-
-int chpl_get_charset_env_nargs()
-{
-  return charset_env_nargs;
-}
-
-//
-// Populate the argv array and return the number of arguments added.
-// Return the number of arguments populated.
-//
-int chpl_get_charset_env_args(char *argv[])
-{
-  // If any of the relevant character set environment variables
-  // are set, replicate the state of all of them.  This needs to
-  // be done separately from the -E mechanism because Perl
-  // launchers modify the character set environment, losing our
-  // settings.
-  //
-  // Note that if we are setting these variables, and one or more
-  // of them is empty, we must set it with explicitly empty
-  // contents (e.g. LC_ALL= instead of -u LC_ALL) so that the
-  // Chapel launch mechanism will not overwrite it.
-  char *lang = getenv("LANG");
-  char *lc_all = getenv("LC_ALL");
-  char *lc_collate = getenv("LC_COLLATE");
-  if (!lang && !lc_all && !lc_collate)
-    return 0;
-
-  argv[0] = (char *)"env";
-  if (lang == NULL)
-    lang = (char *)"";
-  char *lang_buf = chpl_mem_allocMany(sizeof("LANG=") + strlen(lang),
-                        sizeof(char), CHPL_RT_MD_COMMAND_BUFFER, -1, 0);
-  strcpy(lang_buf, "LANG=");
-  strcat(lang_buf, lang);
-  argv[1] = lang_buf;
-  if (lc_all == NULL)
-    lc_all = (char *)"";
-  char *lc_all_buf = chpl_mem_allocMany(sizeof("LC_ALL=") + strlen(lc_all),
-                        sizeof(char), CHPL_RT_MD_COMMAND_BUFFER, -1, 0);
-  strcpy(lc_all_buf, "LC_ALL=");
-  strcat(lc_all_buf, lc_all);
-  argv[2] = lc_all_buf;
-  if (lc_collate == NULL)
-    lc_collate = (char *)"";
-  char *lc_collate_buf = chpl_mem_allocMany(
-                        sizeof("LC_COLLATE=") + strlen(lc_collate),
-                        sizeof(char), CHPL_RT_MD_COMMAND_BUFFER, -1, 0);
-  strcpy(lc_collate_buf, "LC_COLLATE=");
-  strcat(lc_collate_buf, lc_collate);
-  argv[3] = lc_collate_buf;
-
-  return charset_env_nargs;
 }
 
 

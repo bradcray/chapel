@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -91,6 +91,7 @@
     to its own file, with a dot ('.') and the locale ID appended to
     this path.
  */
+@deprecated("The Memory.Diagnostics module is deprecated - please use :mod:`MemDiagnostics` instead")
 module Diagnostics {
 
 pragma "insert line file info"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -238,7 +238,7 @@ static void printMakefileLibraries(fileinfo makefile, std::string name) {
   std::string libraries = getCompilelineOption("libraries");
   std::string libname = getLibname(name);
 
-  std::string requires = getRequireLibraries();
+  std::string requires_ = getRequireLibraries();
 
   fprintf(makefile.fptr, "CHPL_LDFLAGS = -L%s %s",
           libDir,
@@ -256,8 +256,8 @@ static void printMakefileLibraries(fileinfo makefile, std::string name) {
     fprintf(makefile.fptr, " %s", deps.c_str());
   }
 
-  if (requires != "") {
-    fprintf(makefile.fptr, "%s", requires.c_str());
+  if (requires_ != "") {
+    fprintf(makefile.fptr, "%s", requires_.c_str());
   }
 
   //
@@ -315,7 +315,7 @@ static void printCMakeListsLibraries(fileinfo cmakelists, std::string name) {
   std::string libraries = getCompilelineOption("libraries");
   std::string libname = getLibname(name);
 
-  std::string requires = getRequireLibraries();
+  std::string requires_ = getRequireLibraries();
 
   varValue += "-L${CMAKE_CURRENT_LIST_DIR}";
   varValue += " ";
@@ -334,9 +334,9 @@ static void printCMakeListsLibraries(fileinfo cmakelists, std::string name) {
     varValue += deps;
   }
 
-  if (requires != "") {
+  if (requires_ != "") {
     varValue += " ";
-    varValue += requires;
+    varValue += requires_;
   }
 
   //
@@ -378,15 +378,17 @@ void codegen_library_cmakelists() {
   printCMakeListsIncludes(cmakelists, name);
   printCMakeListsLibraries(cmakelists, name);
 
-  std::string compiler = getCompilelineOption("compiler");
+  // get the various options and convert any $(FOO) to ${FOO} at the same time.
+  // needed because cmake doesn't understand $(FOO)
+  std::string compiler = makeToCMake(getCompilelineOption("compiler"));
   removeTrailingNewlines(compiler);
   fprintf(cmakelists.fptr, "set(CHPL_COMPILER %s)\n", compiler.c_str());
 
-  std::string linker = getCompilelineOption("linker");
+  std::string linker = makeToCMake(getCompilelineOption("linker"));
   removeTrailingNewlines(linker);
   fprintf(cmakelists.fptr, "set(CHPL_LINKER %s)\n", linker.c_str());
 
-  std::string linkerShared = getCompilelineOption("linkershared");
+  std::string linkerShared = makeToCMake(getCompilelineOption("linkershared"));
   removeTrailingNewlines(linkerShared);
   fprintf(cmakelists.fptr, "set(CHPL_LINKERSHARED %s)\n", linkerShared.c_str());
 

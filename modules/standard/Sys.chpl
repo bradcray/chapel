@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -42,9 +42,8 @@
    will be returned through the final ``ret_out`` argument.
 
  */
-deprecated "The 'Sys' module has been deprecated; please find replacement symbols in the 'OS' and  'Socket' modules"
+@deprecated(notes="The 'Sys' module has been deprecated; please find replacement symbols in the 'OS' and  'Socket' modules")
 module Sys {
-  import SysBasic.{qio_err_t, fd_t};
   private use CTypes;
   private use OS;
 
@@ -65,132 +64,81 @@ module Sys {
   extern const F_GETFD:c_int;
   extern const F_SETFD:c_int;
 
-  // basic file flags
-  pragma "last resort"
-  deprecated "'Sys.O_RDONLY' is deprecated; please use 'OS.POSIX.O_RDONLY' instead"
-  extern const O_RDONLY:c_int;
-
-  pragma "last resort"
-  deprecated "'Sys.O_WRONLY' is deprecated; please use 'OS.POSIX.O_WRONLY' instead"
-  extern const O_WRONLY:c_int;
-
-  pragma "last resort"
-  deprecated "'Sys.O_RDWR' is deprecated; please use 'OS.POSIX.O_RDWR' instead"
-  extern const O_RDWR:c_int;
-
-  // POSIX flags
-  // It is expected that a new module for Posix interface functionality
-  // will likely be introduced. Much of this code would be moved to that
-  // module at that time.
-
-  pragma "last resort"
-  deprecated "'Sys.O_APPEND' is deprecated; please use 'OS.POSIX.O_APPEND' instead"
-  extern const O_APPEND:c_int;
-
-  pragma "last resort"
-  deprecated "'Sys.O_CREAT' is deprecated; please use 'OS.POSIX.O_CREAT' instead"
-  extern const O_CREAT:c_int;
-
-  pragma "last resort"
-  deprecated "'Sys.O_DSYNC' is deprecated; please use 'OS.POSIX.O_DSYNC' instead"
-  extern const O_DSYNC:c_int;
-
-  pragma "last resort"
-  deprecated "'Sys.O_EXCL' is deprecated; please use 'OS.POSIX.O_EXCL' instead"
-  extern const O_EXCL:c_int;
-
-  pragma "last resort"
-  deprecated "'Sys.O_NOCTTY' is deprecated; please use 'OS.POSIX.O_NOCTTY' instead"
-  extern const O_NOCTTY:c_int;
-
-  pragma "last resort"
-  deprecated "'Sys.O_NONBLOCK' is deprecated; please use 'OS.POSIX.O_NONBLOCK' instead"
-  extern const O_NONBLOCK:c_int;
-
-  extern const O_RSYNC:c_int;
-
-  pragma "last resort"
-  deprecated "'Sys.O_SYNC' is deprecated; please use 'OS.POSIX.O_SYNC' instead"
-  extern const O_SYNC:c_int;
-
-  pragma "last resort"
-  deprecated "'Sys.O_TRUNC' is deprecated; please use 'OS.POSIX.O_TRUNC' instead"
-  extern const O_TRUNC:c_int;
 
   // Signals as required by POSIX.1-2008, 2013 edition
   // See note below about signals intentionally not included
 
   pragma "last resort"
-  deprecated "'Sys.SIGABRT' is deprecated; please use 'OS.POSIX.SIGABRT' instead"
+  @deprecated(notes="'Sys.SIGABRT' is deprecated; please use 'OS.POSIX.SIGABRT' instead")
   extern const SIGABRT: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGALRM' is deprecated; please use 'OS.POSIX.SIGALRM' instead"
+  @deprecated(notes="'Sys.SIGALRM' is deprecated; please use 'OS.POSIX.SIGALRM' instead")
   extern const SIGALRM: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGBUS' is deprecated; please use 'OS.POSIX.SIGBUS' instead"
+  @deprecated(notes="'Sys.SIGBUS' is deprecated; please use 'OS.POSIX.SIGBUS' instead")
   extern const SIGBUS: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGCHLD' is deprecated; please use 'OS.POSIX.SIGCHLD' instead"
+  @deprecated(notes="'Sys.SIGCHLD' is deprecated; please use 'OS.POSIX.SIGCHLD' instead")
   extern const SIGCHLD: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGCONT' is deprecated; please use 'OS.POSIX.SIGCONT' instead"
+  @deprecated(notes="'Sys.SIGCONT' is deprecated; please use 'OS.POSIX.SIGCONT' instead")
   extern const SIGCONT: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGFPE' is deprecated; please use 'OS.POSIX.SIGFPE' instead"
+  @deprecated(notes="'Sys.SIGFPE' is deprecated; please use 'OS.POSIX.SIGFPE' instead")
   extern const SIGFPE: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGHUP' is deprecated; please use 'OS.POSIX.SIGHUP' instead"
+  @deprecated(notes="'Sys.SIGHUP' is deprecated; please use 'OS.POSIX.SIGHUP' instead")
   extern const SIGHUP: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGILL' is deprecated; please use 'OS.POSIX.SIGILL' instead"
+  @deprecated(notes="'Sys.SIGILL' is deprecated; please use 'OS.POSIX.SIGILL' instead")
   extern const SIGILL: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGINT' is deprecated; please use 'OS.POSIX.SIGINT' instead"
+  @deprecated(notes="'Sys.SIGINT' is deprecated; please use 'OS.POSIX.SIGINT' instead")
   extern const SIGINT: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGKILL' is deprecated; please use 'OS.POSIX.SIGKILL' instead"
+  @deprecated(notes="'Sys.SIGKILL' is deprecated; please use 'OS.POSIX.SIGKILL' instead")
   extern const SIGKILL: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGPIPE' is deprecated; please use 'OS.POSIX.SIGPIPE' instead"
+  @deprecated(notes="'Sys.SIGPIPE' is deprecated; please use 'OS.POSIX.SIGPIPE' instead")
   extern const SIGPIPE: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGQUIT' is deprecated; please use 'OS.POSIX.SIGQUIT' instead"
+  @deprecated(notes="'Sys.SIGQUIT' is deprecated; please use 'OS.POSIX.SIGQUIT' instead")
   extern const SIGQUIT: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGSEGV' is deprecated; please use 'OS.POSIX.SIGSEGV' instead"
+  @deprecated(notes="'Sys.SIGSEGV' is deprecated; please use 'OS.POSIX.SIGSEGV' instead")
   extern const SIGSEGV: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGSTOP' is deprecated; please use 'OS.POSIX.SIGSTOP' instead"
+  @deprecated(notes="'Sys.SIGSTOP' is deprecated; please use 'OS.POSIX.SIGSTOP' instead")
   extern const SIGSTOP: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGTERM' is deprecated; please use 'OS.POSIX.SIGTERM' instead"
+  @deprecated(notes="'Sys.SIGTERM' is deprecated; please use 'OS.POSIX.SIGTERM' instead")
   extern const SIGTERM: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGTRAP' is deprecated; please use 'OS.POSIX.SIGTRAP' instead"
+  @deprecated(notes="'Sys.SIGTRAP' is deprecated; please use 'OS.POSIX.SIGTRAP' instead")
   extern const SIGTRAP: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGTSTP' is deprecated; please use 'OS.POSIX.SIGTSTP' instead"
+  @deprecated(notes="'Sys.SIGTSTP' is deprecated; please use 'OS.POSIX.SIGTSTP' instead")
   extern const SIGTSTP: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGTTIN' is deprecated; please use 'OS.POSIX.SIGTTIN' instead"
+  @deprecated(notes="'Sys.SIGTTIN' is deprecated; please use 'OS.POSIX.SIGTTIN' instead")
   extern const SIGTTIN: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGTTOU' is deprecated; please use 'OS.POSIX.SIGTTOU' instead"
+  @deprecated(notes="'Sys.SIGTTOU' is deprecated; please use 'OS.POSIX.SIGTTOU' instead")
   extern const SIGTTOU: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGURG' is deprecated; please use 'OS.POSIX.SIGURG' instead"
+  @deprecated(notes="'Sys.SIGURG' is deprecated; please use 'OS.POSIX.SIGURG' instead")
   extern const SIGURG: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGUSR1' is deprecated; please use 'OS.POSIX.SIGUSR1' instead"
+  @deprecated(notes="'Sys.SIGUSR1' is deprecated; please use 'OS.POSIX.SIGUSR1' instead")
   extern const SIGUSR1: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGUSR2' is deprecated; please use 'OS.POSIX.SIGUSR2' instead"
+  @deprecated(notes="'Sys.SIGUSR2' is deprecated; please use 'OS.POSIX.SIGUSR2' instead")
   extern const SIGUSR2: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGXCPU' is deprecated; please use 'OS.POSIX.SIGXCPU' instead"
+  @deprecated(notes="'Sys.SIGXCPU' is deprecated; please use 'OS.POSIX.SIGXCPU' instead")
   extern const SIGXCPU: c_int;
   pragma "last resort"
-  deprecated "'Sys.SIGXFSZ' is deprecated; please use 'OS.POSIX.SIGXFSZ' instead"
+  @deprecated(notes="'Sys.SIGXFSZ' is deprecated; please use 'OS.POSIX.SIGXFSZ' instead")
   extern const SIGXFSZ: c_int;
 
   // These signals are not strictly required by POSIX.1.2008 2013 edition
@@ -241,10 +189,10 @@ module Sys {
 
   // --- deprecated and moved to Socket ---
   pragma "last resort"
-  deprecated "'Sys.AF_INET' is deprecated; please use 'Socket.AF_INET' instead"
+  @deprecated(notes="'Sys.AF_INET' is deprecated; please use 'Socket.AF_INET' instead")
   extern const AF_INET:c_int;
   pragma "last resort"
-  deprecated "'Sys.AF_INET6' is deprecated; please use 'Socket.AF_INET6' instead"
+  @deprecated(notes="'Sys.AF_INET6' is deprecated; please use 'Socket.AF_INET6' instead")
   extern const AF_INET6:c_int;
 
   // socket types
@@ -294,43 +242,43 @@ module Sys {
   // socket options
   // --- deprecated and moved to Socket ---
   pragma "last resort"
-  deprecated "'Sys.SO_ACCEPTCONN' is deprecated; please use 'Socket.SO_ACCEPTCONN' instead"
+  @deprecated(notes="'Sys.SO_ACCEPTCONN' is deprecated; please use 'Socket.SO_ACCEPTCONN' instead")
   extern const SO_ACCEPTCONN:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_BROADCAST' is deprecated; please use 'Socket.SO_BROADCAST' instead"
+  @deprecated(notes="'Sys.SO_BROADCAST' is deprecated; please use 'Socket.SO_BROADCAST' instead")
   extern const SO_BROADCAST:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_DEBUG' is deprecated; please use 'Socket.SO_DEBUG' instead"
+  @deprecated(notes="'Sys.SO_DEBUG' is deprecated; please use 'Socket.SO_DEBUG' instead")
   extern const SO_DEBUG:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_ERROR' is deprecated; please use 'Socket.SO_ERROR' instead"
+  @deprecated(notes="'Sys.SO_ERROR' is deprecated; please use 'Socket.SO_ERROR' instead")
   extern const SO_ERROR:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_KEEPALIVE' is deprecated; please use 'Socket.SO_KEEPALIVE' instead"
+  @deprecated(notes="'Sys.SO_KEEPALIVE' is deprecated; please use 'Socket.SO_KEEPALIVE' instead")
   extern const SO_KEEPALIVE:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_LINGER' is deprecated; please use 'Socket.SO_LINGER' instead"
+  @deprecated(notes="'Sys.SO_LINGER' is deprecated; please use 'Socket.SO_LINGER' instead")
   extern const SO_LINGER:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_OOBINLINE' is deprecated; please use 'Socket.SO_OOBINLINE' instead"
+  @deprecated(notes="'Sys.SO_OOBINLINE' is deprecated; please use 'Socket.SO_OOBINLINE' instead")
   extern const SO_OOBINLINE:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_RCVBUF' is deprecated; please use 'Socket.SO_RCVBUF' instead"
+  @deprecated(notes="'Sys.SO_RCVBUF' is deprecated; please use 'Socket.SO_RCVBUF' instead")
   extern const SO_RCVBUF:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_RCVTIMEO' is deprecated; please use 'Socket.SO_RCVTIMEO' instead"
+  @deprecated(notes="'Sys.SO_RCVTIMEO' is deprecated; please use 'Socket.SO_RCVTIMEO' instead")
   extern const SO_RCVTIMEO:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_REUSEADDR' is deprecated; please use 'Socket.SO_REUSEADDR' instead"
+  @deprecated(notes="'Sys.SO_REUSEADDR' is deprecated; please use 'Socket.SO_REUSEADDR' instead")
   extern const SO_REUSEADDR:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_SNDBUF' is deprecated; please use 'Socket.SO_SNDBUF' instead"
+  @deprecated(notes="'Sys.SO_SNDBUF' is deprecated; please use 'Socket.SO_SNDBUF' instead")
   extern const SO_SNDBUF:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_SNDTIMEO' is deprecated; please use 'Socket.SO_SNDTIMEO' instead"
+  @deprecated(notes="'Sys.SO_SNDTIMEO' is deprecated; please use 'Socket.SO_SNDTIMEO' instead")
   extern const SO_SNDTIMEO:c_int;
   pragma "last resort"
-  deprecated "'Sys.SO_SECINFO' is deprecated; please use 'Socket.SO_SECINFO' instead"
+  @deprecated(notes="'Sys.SO_SECINFO' is deprecated; please use 'Socket.SO_SECINFO' instead")
   extern const SO_SECINFO:c_int;
 
   // IP socket options
@@ -403,22 +351,22 @@ module Sys {
   // standard ipv4 addresses
   // --- deprecated and moved to Socket ---
   pragma "last resort"
-  deprecated "'Sys.INADDR_ANY' is deprecated; please use 'Socket.INADDR_ANY' instead"
+  @deprecated(notes="'Sys.INADDR_ANY' is deprecated; please use 'Socket.INADDR_ANY' instead")
   extern const INADDR_ANY:sys_in_addr_t;
   pragma "last resort"
-  deprecated "'Sys.INADDR_BROADCAST' is deprecated; please use 'Socket.INADDR_BROADCAST' instead"
+  @deprecated(notes="'Sys.INADDR_BROADCAST' is deprecated; please use 'Socket.INADDR_BROADCAST' instead")
   extern const INADDR_BROADCAST:sys_in_addr_t;
   pragma "last resort"
-  deprecated "'Sys.INADDR_LOOPBACK' is deprecated; please use 'Socket.INADDR_LOOPBACK' instead"
+  @deprecated(notes="'Sys.INADDR_LOOPBACK' is deprecated; please use 'Socket.INADDR_LOOPBACK' instead")
   extern const INADDR_LOOPBACK:sys_in_addr_t;
 
   // standard ipv6 addresses
   // --- deprecated and moved to Socket ---
   pragma "last resort"
-  deprecated "'Sys.in6addr_any' is deprecated; please use 'Socket.in6addr_any' instead"
+  @deprecated(notes="'Sys.in6addr_any' is deprecated; please use 'Socket.in6addr_any' instead")
   extern const in6addr_any:sys_in6_addr_t;
   pragma "last resort"
-  deprecated "'Sys.in6addr_loopback' is deprecated; please use 'Socket.in6addr_loopback' instead"
+  @deprecated(notes="'Sys.in6addr_loopback' is deprecated; please use 'Socket.in6addr_loopback' instead")
   extern const in6addr_loopback:sys_in6_addr_t;
 
   // UDP socket options
@@ -428,10 +376,10 @@ module Sys {
   /* SOCKET STRUCTURE TYPES */
   // --- deprecated and moved to Socket ---
   pragma "last resort"
-  deprecated "'Sys.sys_in_addr_t' is deprecated; please use 'Socket.sys_in_addr_t' instead"
+  @deprecated(notes="'Sys.sys_in_addr_t' is deprecated; please use 'Socket.sys_in_addr_t' instead")
   extern type sys_in_addr_t;
   pragma "last resort"
-  deprecated "'Sys.sys_in6_addr_t' is deprecated; please use 'Socket.sys_in6_addr_t' instead"
+  @deprecated(notes="'Sys.sys_in6_addr_t' is deprecated; please use 'Socket.sys_in6_addr_t' instead")
   extern type sys_in6_addr_t;
 
   // --- deprecated and moved to Socket ---
@@ -464,7 +412,7 @@ module Sys {
     :throws IllegalArgumentError: Upon failure to provide a compatible
                                   `host` and `family`.
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     proc set(host: c_string, port: c_uint, family: c_int) throws {
       var err_out = sys_set_sys_sockaddr_t(this, host, port, family);
       if err_out != 1 {
@@ -484,7 +432,7 @@ module Sys {
     :arg port: port number
     :type port: `c_uint`
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     proc set(host: sys_in_addr_t, port: c_uint) {
       sys_set_sys_sockaddr_in_t(this, host, port);
     }
@@ -501,7 +449,7 @@ module Sys {
     :arg port: port number
     :type port: `c_uint`
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     proc set(host: sys_in6_addr_t, port: c_uint) {
       sys_set_sys_sockaddr_in6_t(this, host, port);
     }
@@ -515,7 +463,7 @@ module Sys {
     :throws Error: If record was uninitialized and has no information
                    about `host` or `port`.
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     proc const ref numericHost() throws {
 
       var buffer = c_calloc(c_char, NI_MAXHOST);
@@ -523,10 +471,10 @@ module Sys {
 
       var err_out = sys_host_sys_sockaddr_t(this, buffer, NI_MAXHOST, length);
       if err_out != 0 {
-        throw SystemError.fromSyserr(err_out);
+        throw createSystemError(err_out);
       }
 
-      return createStringWithOwnedBuffer(buffer, length, NI_MAXHOST);
+      return string.createAdoptingBuffer(buffer, length, NI_MAXHOST);
     }
 
     /*
@@ -538,13 +486,13 @@ module Sys {
     :throws Error: If record was uninitialized and has no information
                    about `host` or `port`.
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     proc const ref port() throws {
       var port:c_uint;
 
       var err_out = sys_port_sys_sockaddr_t(this, port);
       if err_out != 0 {
-        throw SystemError.fromSyserr(err_out);
+        throw createSystemError(err_out);
       }
 
       return port;
@@ -606,7 +554,7 @@ module Sys {
     :returns: 1 if ``name`` is defined and 0 if not
     :rtype: `c_int`
    */
-  deprecated "'Sys.sys_getenv' is deprecated; please use 'OS.sys_getenv' instead"
+  @deprecated(notes="'Sys.sys_getenv' is deprecated")
   extern proc sys_getenv(name:c_string, ref string_out:c_string):c_int;
 
   /* The type corresponding to C's mode_t */
@@ -615,55 +563,48 @@ module Sys {
 
   // not used outside of Sys
   // --- deprecated with no replacement ---
-  extern proc sys_open(pathname:c_string, flags:c_int, mode:mode_t, ref fd_out:fd_t):qio_err_t;
+  extern proc sys_open(pathname:c_string, flags:c_int, mode:mode_t, ref fd_out:c_int):qio_err_t;
 
   // --- deprecated and moved to Socket as private ---
-  extern proc sys_close(fd:fd_t):qio_err_t;
+  extern proc sys_close(fd:c_int):qio_err_t;
 
   /* The type corresponding to C's off_t */
   // --- has replacement in OS.POSIX ---
   extern type off_t = int(64);
 
   // --- deprecated with no replacement ---
-  extern proc sys_mmap(addr:c_void_ptr, length:c_size_t, prot:c_int, flags:c_int, fd:fd_t, offset:off_t, ref ret_out:c_void_ptr):qio_err_t;
+  extern proc sys_mmap(addr:c_void_ptr, length:c_size_t, prot:c_int, flags:c_int, fd:c_int, offset:off_t, ref ret_out:c_void_ptr):qio_err_t;
   extern proc sys_munmap(addr:c_void_ptr, length:c_size_t):qio_err_t;
-  extern proc sys_fcntl_ptr(fd:fd_t, cmd:c_int, arg:c_void_ptr, ref ret_out:c_int):qio_err_t;
-  extern proc sys_dup(oldfd:fd_t, ref fd_out:fd_t):qio_err_t;
-  extern proc sys_dup2(oldfd:fd_t, newfd:fd_t, ref fd_out:fd_t):qio_err_t;
-  extern proc sys_pipe(ref read_fd_out:fd_t, ref write_fd_out:fd_t):qio_err_t;
+  extern proc sys_fcntl_ptr(fd:c_int, cmd:c_int, arg:c_void_ptr, ref ret_out:c_int):qio_err_t;
+  extern proc sys_dup(oldfd:c_int, ref fd_out:c_int):qio_err_t;
+  extern proc sys_dup2(oldfd:c_int, newfd:c_int, ref fd_out:c_int):qio_err_t;
+  extern proc sys_pipe(ref read_fd_out:c_int, ref write_fd_out:c_int):qio_err_t;
   extern proc sys_getaddrinfo_protocol(res:sys_addrinfo_ptr_t):c_int;
   extern proc sys_getnameinfo(ref addr:sys_sockaddr_t, ref host_out:c_string, ref serv_outc_:c_string, flags:c_int):qio_err_t;
-  extern proc sys_socketpair(_domain:c_int, _type:c_int, protocol:c_int, ref sockfd_out_a:fd_t, ref sockfd_out_b:fd_t):qio_err_t;
-  extern proc sys_shutdown(sockfd:fd_t, how:c_int):qio_err_t;
+  extern proc sys_socketpair(_domain:c_int, _type:c_int, protocol:c_int, ref sockfd_out_a:c_int, ref sockfd_out_b:c_int):qio_err_t;
+  extern proc sys_shutdown(sockfd:c_int, how:c_int):qio_err_t;
 
   // --- deprecated and moved to Socket as private ---
-  extern proc sys_fcntl(fd:fd_t, cmd:c_int, ref ret_out:c_int):qio_err_t;
-  extern proc sys_fcntl_long(fd:fd_t, cmd:c_int, arg:c_long, ref ret_out:c_int):qio_err_t;
-  extern proc sys_accept(sockfd:fd_t, ref add_out:sys_sockaddr_t, ref fd_out:fd_t):qio_err_t;
-  extern proc sys_bind(sockfd:fd_t, const ref addr:sys_sockaddr_t):qio_err_t;
-  extern proc sys_connect(sockfd:fd_t, const ref addr:sys_sockaddr_t):qio_err_t;
+  extern proc sys_fcntl(fd:c_int, cmd:c_int, ref ret_out:c_int):qio_err_t;
+  extern proc sys_fcntl_long(fd:c_int, cmd:c_int, arg:c_long, ref ret_out:c_int):qio_err_t;
+  extern proc sys_accept(sockfd:c_int, ref add_out:sys_sockaddr_t, ref fd_out:c_int):qio_err_t;
+  extern proc sys_bind(sockfd:c_int, const ref addr:sys_sockaddr_t):qio_err_t;
+  extern proc sys_connect(sockfd:c_int, const ref addr:sys_sockaddr_t):qio_err_t;
   extern proc getaddrinfo(node:c_string, service:c_string, ref hints:sys_addrinfo_t, ref res_out:sys_addrinfo_ptr_t):qio_err_t;
   extern proc sys_freeaddrinfo(res:sys_addrinfo_ptr_t);
-  extern proc sys_getpeername(sockfd:fd_t, ref addr:sys_sockaddr_t):qio_err_t;
-  extern proc sys_getsockname(sockfd:fd_t, ref addr:sys_sockaddr_t):qio_err_t;
+  extern proc sys_getpeername(sockfd:c_int, ref addr:sys_sockaddr_t):qio_err_t;
+  extern proc sys_getsockname(sockfd:c_int, ref addr:sys_sockaddr_t):qio_err_t;
   // TODO -- these should be generic, assuming caller knows what they
   // are doing.
-  extern proc sys_getsockopt(sockfd:fd_t, level:c_int, optname:c_int, optval:c_void_ptr, ref optlen:socklen_t):qio_err_t;
-  extern proc sys_setsockopt(sockfd:fd_t, level:c_int, optname:c_int, optval:c_void_ptr, optlen:socklen_t):qio_err_t;
-  extern proc sys_listen(sockfd:fd_t, backlog:c_int):qio_err_t;
-  extern proc sys_socket(_domain:c_int, _type:c_int, protocol:c_int, ref sockfd_out:fd_t):qio_err_t;
+  extern proc sys_getsockopt(sockfd:c_int, level:c_int, optname:c_int, optval:c_void_ptr, ref optlen:socklen_t):qio_err_t;
+  extern proc sys_setsockopt(sockfd:c_int, level:c_int, optname:c_int, optval:c_void_ptr, optlen:socklen_t):qio_err_t;
+  extern proc sys_listen(sockfd:c_int, backlog:c_int):qio_err_t;
+  extern proc sys_socket(_domain:c_int, _type:c_int, protocol:c_int, ref sockfd_out:c_int):qio_err_t;
   extern proc sys_getaddrinfo_addr(res:sys_addrinfo_ptr_t):sys_sockaddr_t;
   extern proc sys_getaddrinfo_next(res:sys_addrinfo_ptr_t):sys_addrinfo_ptr_t;
   extern proc sys_getaddrinfo_flags(res:sys_addrinfo_ptr_t):c_int;
   extern proc sys_getaddrinfo_family(res:sys_addrinfo_ptr_t):c_int;
   extern proc sys_getaddrinfo_socktype(res:sys_addrinfo_ptr_t):c_int;
-
-  pragma "last resort"
-  deprecated "'Sys.fd_set' is deprecated; please use 'OS.POSIX.fd_set' instead"
-  proc fd_set type {
-    import OS.POSIX;
-    return POSIX.fd_set;
-  }
 
   extern type time_t = c_long;
   extern type suseconds_t = c_long;
@@ -676,18 +617,6 @@ module Sys {
   import OS.POSIX.fd_set;
   // --- has replacement in OS.POSIX ---
   extern proc sys_select(nfds:c_int, readfds:c_ptr(fd_set), writefds:c_ptr(fd_set), exceptfds:c_ptr(fd_set), timeout:c_ptr(timeval), ref nset:c_int):qio_err_t;
-
-  deprecated "'Sys.sys_fd_clr' is deprecated; please use 'OS.POSIX.FD_CLR' instead"
-  extern proc sys_fd_clr(fd:c_int, ref set:fd_set);
-
-  deprecated "'Sys.sys_fd_isset' is deprecated; please use 'OS.POSIX.FD_ISSET' instead"
-  extern proc sys_fd_isset(fd:c_int, ref set:fd_set):c_int;
-
-  deprecated "'Sys.sys_fd_set' is deprecated; please use 'OS.POSIX.FD_SET' instead"
-  extern proc sys_fd_set(fd:c_int, ref set:fd_set);
-
-  deprecated "'Sys.sys_fd_zero' is deprecated; please use 'OS.POSIX.FD_ZERO' instead"
-  extern proc sys_fd_zero(ref set:fd_set);
 
   // recv, recvfrom, recvmsg, send, sendto, sendmsg are in io
 }

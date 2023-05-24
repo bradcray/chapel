@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -24,7 +24,6 @@
 #include "astutil.h"
 #include "bb.h"
 #include "CollapseBlocks.h"
-#include "docsDriver.h"
 #include "driver.h"
 #include "expandVarArgs.h"
 #include "iterator.h"
@@ -101,7 +100,7 @@ void FnSymbol::verify() {
   if (_this && _this->defPoint->parentSymbol != this)
     INT_FATAL(this, "Each method must contain a 'this' declaration.");
 
-  if (normalized) {
+  if (!this->hasFlag(FLAG_NO_FN_BODY) && normalized) {
     CallExpr* last = toCallExpr(body->body.last());
 
     if (last == NULL || last->isPrimitive(PRIM_RETURN) == false) {
@@ -241,6 +240,7 @@ FnSymbol* FnSymbol::copyInnerCore(SymbolMap* map) {
    */
   newFn->copyFlags(this);
   newFn->deprecationMsg = this->deprecationMsg;
+  newFn->unstableMsg = this->unstableMsg;
 
   if (this->throwsError() == true) {
     newFn->throwsErrorInit();
@@ -344,23 +344,29 @@ FnSymbol* FnSymbol::partialCopy(SymbolMap* map) {
    * finalizeCopy method will replace their corresponding nodes from the body
    * appropriately.
    */
-  if (this->getReturnSymbol() == gVoid) {
+  auto sym = this->getReturnSymbol();
+
+  if (sym == nullptr) {
+    // Case 0: Function has no body, and thus no RVV.
+    newFn->retSymbol = nullptr;
+
+  } else if (sym == gVoid) {
     // Case 1: Function returns void.
     newFn->retSymbol = gVoid;
 
-  } else if (this->getReturnSymbol() == this->_this) {
+  } else if (sym == this->_this) {
     // Case 2: Function returns _this.
     newFn->retSymbol = newFn->_this;
 
-  } else if (Symbol* replacementRet = map->get(this->getReturnSymbol())) {
+  } else if (Symbol* replacementRet = map->get(sym)) {
     // Case 3: Function returns a formal argument.
     newFn->retSymbol = replacementRet;
 
   } else {
     // Case 4: Function returns a symbol defined in the body.
-    DefExpr* defPoint = this->getReturnSymbol()->defPoint;
+    DefExpr* defPoint = sym->defPoint;
 
-    newFn->retSymbol = COPY_INT(this->getReturnSymbol());
+    newFn->retSymbol = COPY_INT(sym);
 
     newFn->retSymbol->defPoint = new DefExpr(newFn->retSymbol,
                                              COPY_INT(defPoint->init),
@@ -559,13 +565,17 @@ void FnSymbol::insertAtTail(const char* format, ...) {
 Symbol* FnSymbol::getReturnSymbol() {
   Symbol* retval = this->retSymbol;
 
+  if (this->hasFlag(FLAG_NO_FN_BODY)) {
+    INT_ASSERT(retval == nullptr);
+    return nullptr;
+  }
+
   if (retval == NULL) {
     CallExpr* ret = toCallExpr(body->body.last());
 
     if (ret != NULL && ret->isPrimitive(PRIM_RETURN) == true) {
       if (SymExpr* sym = toSymExpr(ret->get(1))) {
         retval = sym->symbol();
-
       } else {
         INT_FATAL(this, "function is not normal");
       }
@@ -577,6 +587,12 @@ Symbol* FnSymbol::getReturnSymbol() {
   }
 
   return retval;
+}
+
+FunctionType* FnSymbol::computeAndSetType() {
+  auto ret = FunctionType::get(this);
+  this->type = ret;
+  return ret;
 }
 
 // Removes all statements from body and adds all statements from block.
@@ -982,6 +998,14 @@ bool FnSymbol::isResolved() const {
   return hasFlag(FLAG_RESOLVED);
 }
 
+bool FnSymbol::isSignature() const {
+  return hasFlag(FLAG_ANONYMOUS_FN) && hasFlag(FLAG_NO_FN_BODY);
+}
+
+bool FnSymbol::isAnonymous() const {
+  return hasFlag(FLAG_ANONYMOUS_FN) || hasFlag(FLAG_LEGACY_LAMBDA);
+}
+
 void FnSymbol::accept(AstVisitor* visitor) {
   if (visitor->enterFnSym(this) == true) {
 
@@ -1097,6 +1121,7 @@ bool FnSymbol::isPostInitializer() const {
 
 bool FnSymbol::isDefaultInit() const {
   return hasFlag(FLAG_COMPILER_GENERATED) &&
+         hasFlag(FLAG_DEFAULT_INIT) &&
          hasFlag(FLAG_COPY_INIT) == false &&
          isInitializer();
 }
@@ -1123,112 +1148,6 @@ QualifiedType FnSymbol::getReturnQualType() const {
   else if(retTag == RET_CONST_REF)
     q = isWideRef ? QUAL_CONST_WIDE_REF : QUAL_CONST_REF;
   return QualifiedType(retType, q);
-}
-
-
-std::string FnSymbol::docsDirective() {
-  if (fDocsTextOnly) {
-    return "";
-  }
-
-  if (this->isMethod() && this->isIterator()) {
-    return ".. itermethod:: ";
-  } else if (this->isIterator()) {
-    return ".. iterfunction:: ";
-  } else if (this->isMethod()) {
-    return ".. method:: ";
-  } else {
-    return ".. function:: ";
-  }
-}
-
-
-void FnSymbol::printDocs(std::ostream* file, unsigned int tabs) {
-  if (this->noDocGen() == false) {
-    // Print the rst directive, if one is needed.
-    this->printTabs(file, tabs);
-
-    *file << this->docsDirective();
-
-    // Print export. Externs do not get a prefix, since the user doesn't
-    // care whether it's an extern or not (they just want to use the function).
-    // Inlines don't get a prefix for symmetry in modules like Math.chpl and
-    // due to the argument that it's of negligible value in most cases.
-    if (this->hasFlag(FLAG_EXPORT)) {
-      *file << "export ";
-    }
-
-    if (this->hasFlag(FLAG_OVERRIDE)) {
-      *file << "override ";
-    }
-
-    // Print iter/proc.
-    if (this->isIterator()) {
-      *file << "iter ";
-
-    } else {
-      *file << "proc ";
-    }
-
-    // Print name and arguments.
-    AstToText info;
-
-    info.appendNameAndFormals(this);
-
-    *file << info.text();
-
-    // Print return intent, if one exists.
-    switch (this->retTag) {
-    case RET_REF:
-      *file << " ref";
-      break;
-
-    case RET_CONST_REF:
-      *file << " const ref";
-      break;
-
-    case RET_PARAM:
-      *file << " param";
-      break;
-
-    case RET_TYPE:
-      *file << " type";
-      break;
-
-    default:
-      break;
-    }
-
-    // Print return type.
-    if (this->retExprType != NULL) {
-      AstToText info;
-
-      info.appendExpr(this->retExprType->body.tail, true);
-      *file << ": ";
-      *file << info.text();
-    }
-
-    // Print throws
-    if (this->throwsError()) {
-      *file << " throws";
-    }
-
-    *file << std::endl;
-
-    if (!fDocsTextOnly) {
-      *file << std::endl;
-    }
-
-    if (this->doc != NULL) {
-      this->printDocsDescription(this->doc, file, tabs + 1);
-      *file << std::endl;
-    }
-
-    if (this->hasFlag(FLAG_DEPRECATED)) {
-      this->printDocsDeprecation(this->doc, file, tabs + 1,
-                                 this->getDeprecationMsg(), true);
-    }
-  }
 }
 
 void FnSymbol::throwsErrorInit() {
@@ -1431,6 +1350,8 @@ static std::string argToString(FnSymbol* fn,
         char buf[bufSize];
         snprint_imm(buf, bufSize, *imm);
         value = buf;
+        if (is_imag_type(t))
+          value += 'i';
       }
     }
 

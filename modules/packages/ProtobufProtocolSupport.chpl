@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -36,7 +36,7 @@ module ProtobufProtocolSupport {
   public use RepeatedFields;
   private use CTypes;
 
-  pragma "no doc"
+  @chpldoc.nodoc
   module WireEncoding {
     /*
       This module contains the implementation of encoding/decoding algorithms
@@ -47,8 +47,8 @@ module ProtobufProtocolSupport {
     use IO;
     use CTypes;
 
-    type writingChannel = channel(true,iokind.little,false);
-    type readingChannel = channel(false,iokind.little,false);
+    type writingChannel = fileWriter(iokind.little,false);
+    type readingChannel = fileReader(iokind.little,false);
 
     // wireTypes
     const varint = 0;
@@ -179,7 +179,7 @@ module ProtobufProtocolSupport {
     proc bytesConsumeBase(ch: readingChannel): bytes throws {
       const (byteLen, len) = unsignedVarintConsume(ch);
       var s:bytes;
-      ch.readbytes(s, byteLen:int);
+      ch.readBytes(s, byteLen:int);
       return s;
     }
 
@@ -290,7 +290,7 @@ module ProtobufProtocolSupport {
                            memReader:readingChannel) throws {
      var s: bytes;
      var (payloadLength, _) = unsignedVarintConsume(ch);
-     ch.readbytes(s, payloadLength:int);
+     ch.readBytes(s, payloadLength:int);
      memWriter.write(s);
      memWriter.close();
      messageObj._deserialize(memReader);
@@ -299,20 +299,20 @@ module ProtobufProtocolSupport {
     proc serializeHelper(ref message, ch) throws {
       ch.lock();
       defer { ch.unlock(); }
-      var binCh: channel(writing=true, kind=iokind.little, locking=false) = ch;
+      var binCh: fileWriter(kind=iokind.little, locking=false) = ch;
       message._serialize(binCh);
     }
 
     proc deserializeHelper(ref message, ch) throws {
       ch.lock();
       defer { ch.unlock(); }
-      var binCh: channel(writing=false, kind=iokind.little, locking=false) = ch;
+      var binCh: fileReader(kind=iokind.little, locking=false) = ch;
       message._deserialize(binCh);
     }
 
   }
 
-  pragma "no doc"
+  @chpldoc.nodoc
   module Fields {
     /*
       This module contains functions for encoding/decoding simple non-repetitive protobuf
@@ -508,7 +508,7 @@ module ProtobufProtocolSupport {
     }
 
     proc messageConsume(ch:readingChannel, type messageType) throws {
-      var tmpMem = openmem();
+      var tmpMem = openMemFile();
       var memWriter = tmpMem.writer(kind=iokind.little, locking=false);
       var memReader = tmpMem.reader(kind=iokind.little, locking=false);
 
@@ -520,7 +520,7 @@ module ProtobufProtocolSupport {
 
     proc mapAppend(val, fieldNumber: int, param protoKeyType: string,
       param protoValueType: string, ch:writingChannel) throws {
-      for (key, value) in val.items() {
+      for (key, value) in zip(val.keys(), val.values()) {
         tagAppend(fieldNumber, lengthDelimited, ch);
         var initialOffset = ch.offset();
         ch.mark();
@@ -629,7 +629,7 @@ module ProtobufProtocolSupport {
       encoded as bytes and written to `tmpMem`.
       */
       var s: bytes;
-      var tmpMem = openmem();
+      var tmpMem = openMemFile();
       var memWriter = tmpMem.writer(kind=iokind.little, locking=false);
       var memReader = tmpMem.reader(kind=iokind.little, locking=false);
 
@@ -649,7 +649,7 @@ module ProtobufProtocolSupport {
       }
 
       memWriter.close();
-      memReader.readbytes(s);
+      memReader.readAll(s);
       tmpMem.close();
       return s;
     }
@@ -660,13 +660,13 @@ module ProtobufProtocolSupport {
 
       proc pack(messageObj) throws {
         var s: bytes;
-        var tmpMem = openmem();
+        var tmpMem = openMemFile();
         var memWriter = tmpMem.writer(kind=iokind.little, locking=false);
         var memReader = tmpMem.reader(kind=iokind.little, locking=false);
 
         messageAppend(messageObj, 2, memWriter);
         memWriter.close();
-        memReader.readbytes(s);
+        memReader.readAll(s);
         tmpMem.close();
 
         this.value = s;
@@ -679,7 +679,7 @@ module ProtobufProtocolSupport {
           throw new owned IllegalArgumentError("input message type does not match destination message type");
         }
 
-        var tmpMem = openmem();
+        var tmpMem = openMemFile();
         var memWriter = tmpMem.writer(kind=iokind.little, locking=false);
         var memReader = tmpMem.reader(kind=iokind.little, locking=false);
 
@@ -710,7 +710,7 @@ module ProtobufProtocolSupport {
               this.typeUrl = stringConsume(binCh);
             }
             when 2 {
-              binCh.readbytes(this.value);
+              binCh.readAll(this.value);
             }
             when -1 {
               break;
@@ -723,7 +723,7 @@ module ProtobufProtocolSupport {
 
   }
 
-  pragma "no doc"
+  @chpldoc.nodoc
   module RepeatedFields {
     /*
       This module contains functions for encoding/decoding repetitive protobuf
@@ -1152,7 +1152,7 @@ module ProtobufProtocolSupport {
 
     proc messageRepeatedConsume(ch: readingChannel, type messageType) throws {
       var returnList: list(messageType);
-      var tmpMem = openmem();
+      var tmpMem = openMemFile();
       var memWriter = tmpMem.writer(kind=iokind.little, locking=false);
       var memReader = tmpMem.reader(kind=iokind.little, locking=false);
 

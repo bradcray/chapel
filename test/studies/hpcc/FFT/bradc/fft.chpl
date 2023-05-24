@@ -8,6 +8,7 @@
 use BitOps;
 use Random;
 use Time;
+use Math;
 
 
 // problem size configs
@@ -55,12 +56,12 @@ proc main() {
 
 
   // TIMED SECTION
-  var startTime = getCurrentTime();
+  var startTime = timeSinceEpoch().totalSeconds();
 
   bitReverseShuffle(Z);
   dfft(Z, Twiddles);
 
-  var execTime = getCurrentTime() - startTime;
+  var execTime = timeSinceEpoch().totalSeconds() - startTime;
 
   verifyResults(z, Z, execTime, Twiddles);
 }

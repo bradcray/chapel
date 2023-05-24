@@ -1,4 +1,4 @@
-# Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 # Copyright 2004-2019 Cray Inc.
 # Other additional copyright holders may be indicated within.
 #
@@ -74,11 +74,12 @@ MODULES_TO_DOCUMENT = \
 	standard/BitOps.chpl \
 	standard/ChapelIO.chpl \
 	standard/ChplConfig.chpl \
+	standard/Collectives.chpl \
 	standard/CommDiagnostics.chpl \
 	standard/Communication.chpl \
-	standard/GPUDiagnostics.chpl \
+	standard/GpuDiagnostics.chpl \
+	standard/GPU.chpl \
 	standard/CTypes.chpl \
-	standard/DateTime.chpl \
 	standard/DynamicIters.chpl \
 	standard/Errors.chpl \
 	standard/FileSystem.chpl \
@@ -89,7 +90,9 @@ MODULES_TO_DOCUMENT = \
 	standard/List.chpl \
 	standard/Map.chpl \
 	standard/Math.chpl \
+	standard/MemMove.chpl \
 	standard/Memory.chpl \
+	standard/MemDiagnostics.chpl \
 	standard/Memory/Diagnostics.chpl \
 	standard/Memory/Initialization.chpl \
 	standard/OS.chpl \
@@ -98,11 +101,9 @@ MODULES_TO_DOCUMENT = \
 	standard/Reflection.chpl \
 	standard/Regex.chpl \
 	standard/Set.chpl \
-	standard/Spawn.chpl \
 	standard/Subprocess.chpl \
 	standard/Sys.chpl \
 	standard/SysBasic.chpl \
-	standard/SysError.chpl \
 	standard/Time.chpl \
 	standard/Types.chpl \
 	standard/VectorizingIterator.chpl \
@@ -209,7 +210,6 @@ documentation: $(SYS_CTYPES_MODULE_DOC)
 	@cp -rf ${MODULE_SPHINX}/source/modules/layouts    ${DOC_BUILD}/modules
 	@cp -rf ${DOC_RST}/meta/modules/* ${DOC_BUILD}/modules
 	@cp -rf ${MODULE_SPHINX}/source/modules/internal/* ${DOC_BUILD}/builtins
-	@cp -rf ${DOC_RST}/meta/builtins/* ${DOC_BUILD}/builtins
 	@echo "Updating generated module documentation in ${DOC_RST}"
 	@mkdir -p ${DOC_RST}/modules
 	@mkdir -p ${DOC_RST}/builtins

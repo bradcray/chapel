@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -25,12 +25,13 @@
 #include "build.h"
 #include "DecoratedClassType.h"
 #include "expr.h"
+#include "passes.h"
 #include "preFold.h"
 #include "resolution.h"
 #include "stringutil.h"
 #include "symbol.h"
 
-#include "../dyno/lib/immediates/prim_data.h"
+#include "../../frontend/lib/immediates/prim_data.h"
 
 static Expr* postFoldNormal(CallExpr* call);
 
@@ -111,10 +112,22 @@ Expr* postFold(Expr* expr) {
 
     } else if (call->isPrimitive() == true) {
       retval = postFoldPrimop(call);
+
+    // If the type construction call contains a runtime type, we need
+    // to hold onto that for later. Otherwise, fold the call away.
     } else if (SymExpr* se = toSymExpr(call->baseExpr)) {
       if (se->symbol()->hasFlag(FLAG_TYPE_VARIABLE)) {
-        retval = se->copy();
-        call->replace(retval);
+        bool doFoldAway = true;
+
+        if (auto fn = toFnSymbol(se->parentSymbol))
+          if (fn->name != astrNew)
+            if (isTypeConstructorWithRuntimeTypeActual(call))
+              doFoldAway = false;
+
+        if (doFoldAway) {
+          retval = se->copy();
+          call->replace(retval);
+        }
       }
     }
 
@@ -174,7 +187,8 @@ static Expr* postFoldNormal(CallExpr* call) {
       // Put the call back in the AST for better errors unless we're trying
       // to ignore multiple error messages (in which case we hope for a
       // successful compilation).
-      if (fatalErrorsEncountered() && !inGenerousResolutionForErrors() && !fIgnoreNilabilityErrors) {
+      if (fatalErrorsEncountered() && !inGenerousResolutionForErrors() &&
+          !fIgnoreNilabilityErrors) {
         retval->getStmtExpr()->insertBefore(call);
       }
     }
@@ -632,6 +646,42 @@ static Expr* postFoldPrimop(CallExpr* call) {
 
     call->replace(retval);
 
+  } else if (call->isPrimitive(PRIM_REAL64_AS_UINT64)) {
+    Expr* realArg = call->get(1);
+    Immediate* realVal = getSymbolImmediate(toSymExpr(realArg)->symbol());
+    double f = realVal->v_float64;
+    uint64_t ui;
+    INT_ASSERT(sizeof(f) == sizeof(ui));
+    memcpy(&ui, &f, sizeof(f));
+    retval = new SymExpr(new_UIntSymbol(ui, INT_SIZE_64));
+    call->replace(retval);
+  } else if (call->isPrimitive(PRIM_REAL32_AS_UINT32)) {
+    Expr* realArg = call->get(1);
+    Immediate* realVal = getSymbolImmediate(toSymExpr(realArg)->symbol());
+    float f = realVal->v_float32;
+    uint32_t ui;
+    INT_ASSERT(sizeof(f) == sizeof(ui));
+    memcpy(&ui, &f, sizeof(f));
+    retval = new SymExpr(new_UIntSymbol(ui, INT_SIZE_32));
+    call->replace(retval);
+  } else if (call->isPrimitive(PRIM_UINT64_AS_REAL64)) {
+    Expr* uintArg = call->get(1);
+    Immediate* uintVal = getSymbolImmediate(toSymExpr(uintArg)->symbol());
+    uint64_t ui = uintVal->v_uint64;;
+    double f;
+    INT_ASSERT(sizeof(f) == sizeof(ui));
+    memcpy(&f, &ui, sizeof(f));
+    retval = new SymExpr(new_RealSymbol(f));
+    call->replace(retval);
+  } else if (call->isPrimitive(PRIM_UINT32_AS_REAL32)) {
+    Expr* uintArg = call->get(1);
+    Immediate* uintVal = getSymbolImmediate(toSymExpr(uintArg)->symbol());
+    uint32_t ui = uintVal->v_uint32;
+    float f;
+    INT_ASSERT(sizeof(f) == sizeof(ui));
+    memcpy(&f, &ui, sizeof(f));
+    retval = new SymExpr(new_RealSymbol(f));
+    call->replace(retval);
   }
 
   return retval;
@@ -751,7 +801,8 @@ static bool postFoldMoveUpdateForParam(CallExpr* call, Symbol* lhsSym) {
           rhsSym == gUninstantiated) {
         paramMap.put(lhsSym, rhsSym);
 
-        lhsSym->defPoint->remove();
+        // Do not remove the definition point or the param is pruned.
+        // lhsSym->defPoint->remove();
 
         call->convertToNoop();
 
@@ -830,6 +881,22 @@ static void updateFlagTypeVariable(CallExpr* call, Symbol* lhsSym) {
 
     } else if (rhs->isPrimitive(PRIM_GET_MEMBER_VALUE) == true) {
       isTypeVar = isTypeExpr(rhs);
+
+    // Check for type construction calls that have not been replaced by a
+    // SymExpr pointing to the appropriate TypeSymbol. If found, then it
+    // is because the type construction call contains one or more runtime
+    // types in it. In this case, propagate FLAG_TYPE_VARIABLE to the LHS.
+    // We need to preserve the type construction call so that the actuals
+    // can be used later.
+    } else if (auto se = toSymExpr(rhs->baseExpr)) {
+      if (se->symbol()->hasFlag(FLAG_TYPE_VARIABLE)) {
+        if (isTypeConstructorWithRuntimeTypeActual(rhs)) {
+          isTypeVar = true;
+        } else {
+          INT_FATAL("Unexpected type constructor after prefold in '%s'",
+                    __FUNCTION__);
+        }
+      }
     }
 
   } else {

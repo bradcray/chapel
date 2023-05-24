@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -677,7 +677,7 @@ static void widenTupleField(CallExpr* tupleCall, SymExpr* wideThing) {
 //
 // Returns true if the symbol is used within a function that might be remote
 //
-// Only really used for module-scope variables.
+// Only used for module-scope variables.
 //
 static FnSymbol* usedInOn(Symbol* sym) {
   for_defs(def, defMap, sym) {
@@ -777,6 +777,17 @@ static void buildWideClasses()
       buildWideClass(ct);
     }
   }
+}
+
+
+static void addExportFnsToDownstreamFromOn() {
+  forv_Vec(FnSymbol, fn, gFnSymbols)
+    if (fn->hasFlag(FLAG_EXPORT))
+      // Exclude internal exports to avoid accidental widening.
+      // Exclude chpl_gen_main() because it is always invoked from Locale 0.
+      if (!(fn->getModule()->modTag == MOD_INTERNAL ||
+            fn->hasFlag(FLAG_GEN_MAIN_FUNC)))
+        downstreamFromOn[fn] = true;
 }
 
 
@@ -905,6 +916,20 @@ static void addKnownWides() {
   forv_Vec(VarSymbol, var, gVarSymbols) {
     //if (!typeCanBeWide(var)) continue;
     Symbol* defParent = var->defPoint->parentSymbol;
+
+    if (usingGpuLocaleModel()) {
+      if (var->type->symbol->hasFlag(FLAG_DATA_CLASS)) {
+        if (FnSymbol* fn = usedInOn(var)) {
+          debug(var, "GPU variable used in on-statement\n");
+          if (typeCanBeWide(var)) {
+            setWide(fn, var);
+          }
+          if (isRecord(var->type) && !canWidenRecord(var)) {
+            widenSubAggregateTypes(fn, var->type);
+          }
+        }
+      }
+    }
 
     //
     // FLAG_LOCALE_PRIVATE variables can be used within an on-statement without
@@ -2204,6 +2229,15 @@ static void fixAST() {
         makeMatch(lhs, rhs);
         makeMatch(rhs, lhs);
       }
+      else if (call->isPrimitive(PRIM_GPU_KERNEL_LAUNCH_FLAT)) {
+        // currently, we don't pass wide references to GPU kernels as we don't
+        // know how to handle them. This'll change
+        for_actuals (actual, call) {
+          if (hasSomeWideness(actual)) {
+            insertLocalTemp(actual);
+          }
+        }
+      }
     }
   }
 }
@@ -2454,6 +2488,7 @@ insertWideReferences(void) {
   //
   // Track functions downstream in the call-chain from a wrapon_fn
   //
+  bool gotExternFns = false;
   forv_Vec(CallExpr, call, gCallExprs) {
     if (FnSymbol* fn = call->resolvedFunction()) {
       if (fn->hasFlag(FLAG_ON_BLOCK) && !fn->hasFlag(FLAG_LOCAL_ON)) { // wrapon_fn
@@ -2461,10 +2496,15 @@ insertWideReferences(void) {
         collectUsedFnSymbols(call, downstream);
         for_set(FnSymbol, on, downstream) {
           downstreamFromOn[on] = true;
+          if (on->hasFlag(FLAG_EXTERN))
+            gotExternFns = true;
         }
       }
     }
   }
+  // An 'extern' function potentially can call any 'export' function.
+  if (gotExternFns)
+    addExportFnsToDownstreamFromOn();
 
   debugTimer.start();
   for (Symbol* sym : heapVars) {

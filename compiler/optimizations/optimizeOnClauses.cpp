@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -149,6 +149,7 @@ classifyPrimitive(CallExpr *call) {
   case PRIM_FINISH_RMEM_FENCE:
 
   case PRIM_CAST_TO_VOID_STAR:
+  case PRIM_CAST_TO_TYPE:
   case PRIM_SIZEOF_BUNDLE:
   case PRIM_SIZEOF_DDATA_ELEMENT:
 
@@ -298,6 +299,7 @@ classifyPrimitive(CallExpr *call) {
   case PRIM_GPU_GRIDDIM_Z:
   case PRIM_GPU_ALLOC_SHARED:
   case PRIM_GPU_SYNC_THREADS:
+  case PRIM_ASSERT_ON_GPU:
   case PRIM_GET_REQUESTED_SUBLOC:
     return FAST_AND_LOCAL;
 

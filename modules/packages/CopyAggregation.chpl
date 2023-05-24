@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -105,7 +105,7 @@ module CopyAggregation {
    */
   record DstAggregator {
     type elemType;
-    pragma "no doc"
+    @chpldoc.nodoc
     var agg: if aggregate then DstAggregatorImpl(elemType) else nothing;
     inline proc copy(ref dst: elemType, const in srcVal: elemType) {
       if aggregate then agg.copy(dst, srcVal);
@@ -123,7 +123,7 @@ module CopyAggregation {
    */
   record SrcAggregator {
     type elemType;
-    pragma "no doc"
+    @chpldoc.nodoc
     var agg: if aggregate then SrcAggregatorImpl(elemType) else nothing;
     inline proc copy(ref dst: elemType, const ref src: elemType) {
       if aggregate then agg.copy(dst, src);
@@ -134,12 +134,13 @@ module CopyAggregation {
     }
   }
 
-  pragma "no doc"
+  @chpldoc.nodoc
   record DstAggregatorImpl {
     type elemType;
     type aggType = (c_ptr(elemType), elemType);
     const bufferSize = dstBuffSize;
     const myLocaleSpace = 0..<numLocales;
+    var lastLocale: int;
     var opsUntilYield = yieldFrequency;
     var lBuffers: c_ptr(c_ptr(aggType));
     var rBuffers: [myLocaleSpace] remoteBuffer(aggType);
@@ -165,7 +166,8 @@ module CopyAggregation {
     }
 
     proc flush() {
-      for loc in myLocaleSpace {
+      for offsetLoc in myLocaleSpace + lastLocale {
+        const loc = offsetLoc % numLocales;
         _flushBuffer(loc, bufferIdxs[loc], freeData=true);
       }
     }
@@ -176,6 +178,7 @@ module CopyAggregation {
       }
       // Get the locale of dst and the local address on that locale
       const loc = dst.locale.id;
+      lastLocale = loc;
       const dstAddr = getAddr(dst);
 
       // Get our current index into the buffer for dst's locale
@@ -226,19 +229,19 @@ module CopyAggregation {
     }
   }
 
-  pragma "no doc"
+  @chpldoc.nodoc
   record SrcAggregatorImpl {
     type elemType;
     type aggType = c_ptr(elemType);
     const bufferSize = srcBuffSize;
     const myLocaleSpace = 0..<numLocales;
+    var lastLocale: int;
     var opsUntilYield = yieldFrequency;
     var dstAddrs: c_ptr(c_ptr(aggType));
     var lSrcAddrs: c_ptr(c_ptr(aggType));
     var lSrcVals: [myLocaleSpace][0..#bufferSize] elemType;
     var rSrcAddrs: [myLocaleSpace] remoteBuffer(aggType);
     var rSrcVals: [myLocaleSpace] remoteBuffer(elemType);
-
     var bufferIdxs: c_ptr(int);
 
     proc postinit() {
@@ -266,7 +269,8 @@ module CopyAggregation {
     }
 
     proc flush() {
-      for loc in myLocaleSpace {
+      for offsetLoc in myLocaleSpace + lastLocale {
+        const loc = offsetLoc % numLocales;
         _flushBuffer(loc, bufferIdxs[loc], freeData=true);
       }
     }
@@ -281,6 +285,7 @@ module CopyAggregation {
       const dstAddr = getAddr(dst);
 
       const loc = src.locale.id;
+      lastLocale = loc;
       const srcAddr = getAddr(src);
 
       ref bufferIdx = bufferIdxs[loc];
@@ -332,8 +337,8 @@ module CopyAggregation {
       myRSrcVals.GET(myLSrcVals, myBufferIdx);
 
       // Assign the srcVal to the dstAddrs
-      var dstAddrPtr = c_ptrTo(dstAddrs[loc][0]);
-      var srcValPtr = c_ptrTo(myLSrcVals[0]);
+      var dstAddrPtr = c_addrOf(dstAddrs[loc][0]);
+      var srcValPtr = c_addrOf(myLSrcVals[0]);
       for i in 0..<myBufferIdx {
         dstAddrPtr[i].deref() = srcValPtr[i];
       }
@@ -344,7 +349,7 @@ module CopyAggregation {
 }
 
 
-pragma "no doc"
+@chpldoc.nodoc
 module AggregationPrimitives {
   use CTypes;
   use Communication;

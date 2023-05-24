@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -56,7 +56,7 @@ module Set {
   private use ChapelHashtable;
   private use HaltWrappers;
 
-  pragma "no doc"
+  @chpldoc.nodoc
   private param _sanityChecks = true;
 
   //
@@ -73,14 +73,14 @@ module Set {
   // is suboptimal in cases where long critical sections have high
   // contention.
   //
-  pragma "no doc"
+  @chpldoc.nodoc
   type _lockType = ChapelLocks.chpl_LocalSpinlock;
 
   //
   // Use a wrapper class to let set methods have a const ref receiver even
   // when `parSafe` is `true` and the set lock is used.
   //
-  pragma "no doc"
+  @chpldoc.nodoc
   class _LockWrapper {
     var lock$ = new _lockType();
 
@@ -93,7 +93,7 @@ module Set {
     }
   }
 
-  pragma "no doc"
+  @chpldoc.nodoc
   proc _checkElementType(type t) {
     // In the future we might support it if the set is not default-inited.
     if isGenericType(t) {
@@ -103,7 +103,7 @@ module Set {
   }
 
   // If we have "chpl__serialize", assume we have "chpl__deserialize".
-  pragma "no doc"
+  @chpldoc.nodoc
   proc _isSerializable(type T) param {
     use Reflection;
     pragma "no init"
@@ -156,10 +156,10 @@ module Set {
     */
     const resizeThreshold = defaultHashTableResizeThreshold;
 
-    pragma "no doc"
+    @chpldoc.nodoc
     var _lock$ = if parSafe then new _LockWrapper() else none;
 
-    pragma "no doc"
+    @chpldoc.nodoc
     var _htb: chpl__hashtable(eltType, nothing);
 
     /*
@@ -260,7 +260,7 @@ module Set {
 
     // Do things the slow/copy way if the element is serializable.
     // See issue: #17477
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _addElem(in elem: eltType): bool
     where _isSerializable(eltType) {
         var result = false;
@@ -279,9 +279,9 @@ module Set {
 
     // For types that aren't serializable, avoid an extra copy by moving
     // the value across locales.
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _addElem(pragma "no auto destroy" in elem: eltType): bool {
-      use Memory.Initialization;
+      use MemMove;
 
       var result = false;
 
@@ -290,7 +290,7 @@ module Set {
         // TODO: The following variation gets lifetime errors in
         // '.../Set/types/testNilableTuple.chpl':
         //
-        // var moved = moveToValue(elem);
+        // var moved = moveFrom(elem);
         // var (isFullSlot, idx) = _htb.findAvailableSlot(moved);
         //
         var (isFullSlot, idx) = _htb.findAvailableSlot(elem);
@@ -298,7 +298,7 @@ module Set {
         if !isFullSlot {
 
           // This line moves the bits over, 'elem' is dead past this point.
-          var moved = moveToValue(elem);
+          var moved = moveFrom(elem);
           _htb.fillSlot(idx, moved, none);
           result = true;
         } else {
@@ -311,7 +311,7 @@ module Set {
       return result;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _enter() {
       if parSafe then
         on this {
@@ -319,7 +319,7 @@ module Set {
         }
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc _leave() {
       if parSafe then
         on this {
@@ -363,7 +363,7 @@ module Set {
     /*
      As above, but parSafe lock must be held and must be called "on this".
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     proc const _contains(const ref element: eltType): bool {
       var (hasFoundSlot, _) = _htb.findFullSlot(element);
       return hasFoundSlot;
@@ -477,14 +477,14 @@ module Set {
         if _htb.isSlotFull(idx) then yield _htb.table[idx].key;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     iter const these(param tag) const ref where tag == iterKind.standalone {
       var space = 0..#_htb.tableSize;
       foreach idx in space.these(tag) do
         if _htb.isSlotFull(idx) then yield _htb.table[idx].key;
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     iter const these(param tag) where tag == iterKind.leader {
       var space = 0..#_htb.tableSize;
       for followThis in space.these(tag) {
@@ -492,7 +492,7 @@ module Set {
       }
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     iter const these(param tag, followThis) const ref
     where tag == iterKind.follower {
       foreach idx in followThis(0) do
@@ -504,23 +504,23 @@ module Set {
 
       :arg ch: A channel to write to.
     */
-    proc const writeThis(ch: channel) throws {
+    proc const writeThis(ch: fileWriter) throws {
       on this {
         _enter(); defer _leave();
 
         var count = 1;
-        ch <~> "{";
+        ch.write("{");
 
         for x in this {
           if count <= (_htb.tableNumFullSlots - 1) {
             count += 1;
-            ch <~> x <~> ", ";
+            ch.write(x); ch.write(", ");
           } else {
-            ch <~> x;
+            ch.write(x);
           }
         }
 
-        ch <~> "}";
+        ch.write("}");
       }
     }
 
@@ -559,7 +559,7 @@ module Set {
       As above, but the parSafe lock must be held, and must be called
       "on this".
     */
-    pragma "no doc"
+    @chpldoc.nodoc
     inline proc const _size {
       return _htb.tableNumFullSlots;
     }
@@ -876,7 +876,7 @@ module Set {
     return result;
   }
 
-  pragma "no doc"
+  @chpldoc.nodoc
   operator set.:(x: set(?et1, ?p1), type t: set(?et2, ?p2)) {
     // TODO: Allow coercion between element types? If we do then init=
     // should also be changed accordingly.

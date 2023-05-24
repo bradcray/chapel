@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -1162,6 +1162,9 @@ static bool      needToAddCoercion(Type*      actualType,
                                    ArgSymbol* formal,
                                    FnSymbol*  fn);
 
+static bool      needConversionForTupleArg(Symbol*    actualSym,
+                                           ArgSymbol* formal,
+                                           FnSymbol*  fn);
 
 static void      addArgCoercion(FnSymbol*  fn,
                                 CallExpr*  call,
@@ -1257,8 +1260,12 @@ static bool needToAddCoercion(Type*      actualType,
                               FnSymbol*  fn) {
   Type* formalType = formal->type;
 
-  if (actualType == formalType)
-    return false;
+  if (actualType == formalType) {
+    if (actualType->symbol->hasFlag(FLAG_TUPLE))
+      return needConversionForTupleArg(actualSym, formal, fn);
+    else
+      return false;
+  }
 
   // If we have an actual of ref(formalType) and
   // a REF or CONST REF argument intent, no coercion is necessary.
@@ -1315,6 +1322,58 @@ static bool needToAddCoercion(Type*      actualType,
   return false;
 }
 
+static bool isBlankOrConstArg(Symbol* sym) {
+  if (ArgSymbol* arg = toArgSymbol(sym))
+    return arg->intent == INTENT_BLANK || arg->intent == INTENT_CONST;
+  else
+    return false;
+}
+
+static bool isSingleResultOfTupleInit(Symbol* sym) {
+  if (sym->getSingleUse() != nullptr) // otherwise there may be complications
+   if (SymExpr* defSE = sym->getSingleDef())
+    if (CallExpr* move = toCallExpr(defSE->parentExpr))
+     if (move->isPrimitive(PRIM_MOVE))
+      if (CallExpr* defCall = toCallExpr(move->get(2)))
+       if (FnSymbol* defFn = defCall->resolvedFunction())
+        if (defFn->hasFlag(FLAG_INIT_TUPLE))
+         return true;
+
+  return false;
+}
+
+// When the actual and the formal types are the same tuple type
+// and the formal has the default or const intent,
+// need to treat int/bool/etc. components as if passed by in-intent:
+//   test/types/tuple/tupleDefaultIntent.chpl
+// Assumes actual->type == formal->type .
+// Skips a few cases where copying is unnecessary or detrimental.
+static bool needConversionForTupleArg(Symbol*    actualSym,
+                                      ArgSymbol* formal,
+                                      FnSymbol*  fn) {
+  if (formal->intent == INTENT_BLANK ||
+      formal->intent == INTENT_CONST  )
+    return !(
+      // do NOT convert in these cases:
+      // nothing to do for types
+      formal->hasFlag(FLAG_TYPE_VARIABLE) ||
+      // default-intent arguments can be passed through: copying is not needed
+      // because the tuple's non-ref components are already copies
+      isBlankOrConstArg(actualSym)        ||
+      // no need to copy a temp
+      actualSym->hasFlag(FLAG_TEMP)       ||
+      // avoid potential infinite recursion
+      fn->hasFlag(FLAG_TUPLE_CAST_FN)     ||
+      fn->hasFlag(FLAG_INIT_COPY_FN)      ||
+      fn->hasFlag(FLAG_AUTO_COPY_FN)      ||
+      // no need to copy a tuple if we just created it
+      isSingleResultOfTupleInit(actualSym)
+    );
+
+  // not applicable to other intents
+  return false;
+}
+
 static IntentTag getIntent(ArgSymbol* formal) {
   IntentTag retval = formal->intent;
 
@@ -1365,6 +1424,11 @@ static void errorIfValueCoercionToRef(CallExpr* call, Symbol* actual,
     return;
   }
 
+  // Ignore this class of error for first class functions.
+  if (formal->getValType()->symbol->hasFlag(FLAG_FUNCTION_CLASS)) {
+    return;
+  }
+
   // Not an error for inout our out intent
   // (the compiler should be managing the conversion on the way in
   //  to the function with implicit conversion and on the way out
@@ -1375,20 +1439,6 @@ static void errorIfValueCoercionToRef(CallExpr* call, Symbol* actual,
 
   // Error for coerce->value passed to ref / out / etc
   if (argumentCanModifyActual(intent) || isRefFormal) {
-    USR_FATAL_CONT(call, "in call to '%s', cannot pass result of coercion "
-                         "by reference",
-                         calledFn->name);
-
-    USR_PRINT(call, "implicit coercion from '%s' to '%s'",
-                    atype->symbol->name,
-                    ftype->symbol->name);
-
-    USR_PRINT(formal, "when passing to %s formal '%s'",
-                      intentDescrString(intent),
-                      formal->name);
-
-
-  } else if (isRefFormal) {
     USR_FATAL_CONT(call, "in call to '%s', cannot pass result of coercion "
                          "by reference",
                          calledFn->name);
@@ -1411,6 +1461,10 @@ static void addArgCoercion(FnSymbol*  fn,
                            SymExpr*   actual,
                            bool&      checkAgain) {
   SET_LINENO(actual);
+
+  // generate a warning in some cases for int->uint implicit conversion
+  warnForIntUintConversion(call, formal->type, actual->symbol()->type,
+                           actual->symbol());
 
   Symbol*     prevActual = actual->symbol();
   TypeSymbol* ats        = prevActual->type->symbol;
@@ -1861,8 +1915,6 @@ static void handleInIntent(FnSymbol* fn, CallExpr* call,
 static void handleOutIntents(FnSymbol* fn, CallExpr* call,
                              SymbolMap& inTmpToActualMap) {
 
-  int j = 0;
-
   // Function with no actuals can't use out intent
   // Returning early in that event simplifies the following code.
   if (call->numActuals() == 0)
@@ -1957,7 +2009,6 @@ static void handleOutIntents(FnSymbol* fn, CallExpr* call,
     }
 
     currActual = nextActual;
-    j++;
   }
 }
 
@@ -2217,6 +2268,12 @@ static FnSymbol* promotionWrap(FnSymbol* fn,
     resolveSignature(retval);
 
     addCache(promotionsCache, promotion.fn, promotion.wrapperFn, &promotion.subs);
+  } else {
+    // Because we have to generate the deprecation/unstable warnings when the
+    // promotion wrapper is created to avoid duplicate warnings, we want to also
+    // generate the warnings when we re-use the cached version
+    promotion.fn->maybeGenerateDeprecationWarning(info.call);
+    promotion.fn->maybeGenerateUnstableWarning(info.call);
   }
 
   addSetIteratorShape(promotion, info.call);
@@ -2319,6 +2376,12 @@ static FnSymbol* buildPromotionWrapper(PromotionInfo& promotion,
   initPromotionWrapper(promotion, instantiationPt);
   FnSymbol*  retval     = promotion.wrapperFn;
   FnSymbol*  fn         = promotion.fn;
+
+  // Check against the deprecation/unstable warning here, otherwise we either:
+  // A. won't generate the warning or
+  // B. will generate it too many times
+  fn->maybeGenerateDeprecationWarning(info.call);
+  fn->maybeGenerateUnstableWarning(info.call);
 
   BlockStmt* loop = buildPromotionLoop(promotion, instantiationPt, info,
                                        fastFollowerChecks);

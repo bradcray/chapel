@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -163,7 +163,8 @@ proc absPath(path: string): string throws {
   :throws SystemError: Upon failure to get the current working directory.
 */
 proc absPath(f: file): string throws {
-  return try absPath(f.path);
+  // switch this to "return try f.path" after relative path deprecation is removed
+  return try f._abspath;
 }
 
 /* Returns the file name portion of the path provided.  For instance:
@@ -392,7 +393,7 @@ proc dirname(path: string): string {
              value = "${" + env_var + "}";
            } else {
              try! {
-               value = createStringWithNewBuffer(value_c,
+               value = string.createCopyingBuffer(value_c,
                                                  policy=decodePolicy.escape);
              }
            }
@@ -413,7 +414,7 @@ proc dirname(path: string): string {
            value = "$" + env_var;
          } else {
            try! {
-             value = createStringWithNewBuffer(value_c,
+             value = string.createCopyingBuffer(value_c,
                                                policy=decodePolicy.escape);
            }
          }
@@ -586,13 +587,13 @@ proc normPath(path: string): string {
    :throws SystemError: If one occurs.
 */
 proc realPath(path: string): string throws {
-  import SysBasic.syserr;
-  extern proc chpl_fs_realpath(path: c_string, ref shortened: c_string): syserr;
+  import OS.errorCode;
+  extern proc chpl_fs_realpath(path: c_string, ref shortened: c_string): errorCode;
 
   var res: c_string;
   var err = chpl_fs_realpath(unescape(path).c_str(), res);
   if err then try ioerror(err, "realPath", path);
-  const ret = createStringWithNewBuffer(res, policy=decodePolicy.escape);
+  const ret = string.createCopyingBuffer(res, policy=decodePolicy.escape);
   // res was qio_malloc'd by chpl_fs_realpath, so free it here
   chpl_free_c_string(res);
   return ret;
@@ -612,16 +613,16 @@ proc realPath(path: string): string throws {
    :throws SystemError: If one occurs.
 */
 proc realPath(f: file): string throws {
-  import SysBasic.syserr;
-  extern proc chpl_fs_realpath_file(path: qio_file_ptr_t, ref shortened: c_string): syserr;
+  import OS.errorCode;
+  extern proc chpl_fs_realpath_file(path: qio_file_ptr_t, ref shortened: c_string): errorCode;
 
   if (is_c_nil(f._file_internal)) then
-    try ioerror(EBADF:syserr, "in realPath with a file argument");
+    try ioerror(EBADF:errorCode, "in realPath with a file argument");
 
   var res: c_string;
   var err = chpl_fs_realpath_file(f._file_internal, res);
   if err then try ioerror(err, "in realPath with a file argument");
-  return createStringWithOwnedBuffer(res);
+  return string.createAdoptingBuffer(res);
 }
 
 /* Compute the common prefix length between two lists of path components. */

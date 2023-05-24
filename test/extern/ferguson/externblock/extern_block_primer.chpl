@@ -20,10 +20,12 @@ config const n = 100000;
 // for the Chapel code below to use.
 extern {
 
+  #include <stdint.h>
+
   // make puts available for the example below
   #include <stdio.h>
 
-  // make gethostname available for example below 
+  // make gethostname available for example below
   #include <unistd.h>
 
    // this function can be inlined into the Chapel code that uses
@@ -43,7 +45,7 @@ var A = [i in 1..n] i;
 
 var sum_chapel: int;
 var sum_c: int;
-var t: Timer;
+var t: stopwatch;
 
 // compare timings between serial C and Chapel array sums:
 t.start();
@@ -91,13 +93,13 @@ c_free(hostname_ptr);
 // but should be in the standard modules.
 
 // allow casts from c_ptr(c_char) to c_string
-pragma "no doc"
+@chpldoc.nodoc
 inline operator :(x, type t) where isSubtype(t,c_string) && isSubtype(x.type,c_ptr(c_char)) {
     return __primitive("cast", t, x);
 }
 
 // allow casts from c_string to c_ptr(c_char)
-pragma "no doc"
+@chpldoc.nodoc
 inline operator :(x, type t) where isSubtype(t,c_ptr(c_char)) && isSubtype(x.type,c_string) {
     return __primitive("cast", t, x);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -80,11 +80,12 @@ static ShadowVarSymbol* buildShadowVariable(ShadowVarPrefix prefix,
       // This keyword is for a TPV.
       // Whereas the user provided neither a type nor an init.
       USR_FATAL_CONT(ovar, "a task private variable '%s'"
-                     "requires a type and/or initializing expression", name);
+                     " requires a type and/or initializing expression", name);
       break;
   }
 
   ShadowVarSymbol* result = new ShadowVarSymbol(intent, name, NULL);
+  result->svExplicit = true;
   new DefExpr(result); // set result->defPoint
   return result;
 }
@@ -147,6 +148,7 @@ static ShadowVarSymbol* buildTaskPrivateVariable(ShadowVarPrefix prefix,
 
   // We will call autoDestroy from deinitBlock() explicitly.
   result->addFlag(FLAG_NO_AUTO_DESTROY);
+  result->svExplicit = true;
 
   new DefExpr(result, init, type); // set result->defPoint
 
@@ -175,9 +177,6 @@ ShadowVarSymbol* ShadowVarSymbol::buildForPrefix(ShadowVarPrefix prefix,
   else
     INT_FATAL("case not handled");
 
-  if (nameString == astrThis)
-    USR_FATAL_CONT(nameExp, "cannot currently apply a forall or task intent to 'this'");
-
   if (type == NULL && init == NULL)
     // non-TPV forall intent
     return buildShadowVariable(prefix, nameString, nameExp);
@@ -198,6 +197,7 @@ ShadowVarSymbol* ShadowVarSymbol::buildFromReduceIntent(Expr* ovar,
     INT_FATAL("case not handled");
 
   ShadowVarSymbol* result = new ShadowVarSymbol(TFI_REDUCE, name, NULL, riExpr);
+  result->svExplicit = true;
   new DefExpr(result); // set result->defPoint
   return result;
 }

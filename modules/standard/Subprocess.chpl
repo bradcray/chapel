@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -133,7 +133,6 @@ module Subprocess {
   use OS;
   use CTypes;
   use OS.POSIX;
-  import SysBasic.{syserr, ENOERR};
 
   private extern proc qio_openproc(argv:c_ptr(c_string),
                                    env:c_ptr(c_string),
@@ -141,13 +140,13 @@ module Subprocess {
                                    ref stdin_fd:c_int,
                                    ref stdout_fd:c_int,
                                    ref stderr_fd:c_int,
-                                   ref pid:int(64)):syserr;
+                                   ref pid:int(64)):errorCode;
   private extern proc qio_waitpid(pid:int(64),
-    blocking:c_int, ref done:c_int, ref exitcode:c_int):syserr;
+    blocking:c_int, ref done:c_int, ref exitcode:c_int):errorCode;
   private extern proc qio_proc_communicate(threadsafe:c_int,
                                            input:qio_channel_ptr_t,
                                            output:qio_channel_ptr_t,
-                                           error:qio_channel_ptr_t):syserr;
+                                           error:qio_channel_ptr_t):errorCode;
 
   // When spawning, we need to allocate the command line
   // and environment to spawn with the C allocator (instead
@@ -183,7 +182,7 @@ module Subprocess {
        for any channels that are necessary. */
     param locking:bool;
 
-    pragma "no doc"
+    @chpldoc.nodoc
     var home:locale = here;
 
     /* The Process ID number of the spawned process */
@@ -193,19 +192,19 @@ module Subprocess {
        is the file descriptor for the write end of a pipe
        connected to the child's standard input.
      */
-    pragma "no doc"
+    @chpldoc.nodoc
     var inputfd:c_int;
     /* If the subprocess is configured to use pipes, outputfd
        is the file descriptor for the read end of a pipe
        connected to the child's standard output.
      */
-    pragma "no doc"
+    @chpldoc.nodoc
     var outputfd:c_int;
     /* If the subprocess is configured to use pipes, errorfd
        is the file descriptor for the read end of a pipe
        connected to the child's standard error.
      */
-    pragma "no doc"
+    @chpldoc.nodoc
     var errorfd:c_int;
 
 
@@ -217,43 +216,43 @@ module Subprocess {
 
     // the channels
     // TODO -- these could be private to this module
-    pragma "no doc"
+    @chpldoc.nodoc
     var stdin_pipe:bool;
     // true if we are currently buffering up stdin, meaning that
     // we need to 'commit' in order to actually send the data.
-    pragma "no doc"
+    @chpldoc.nodoc
     var stdin_buffering:bool;
-    pragma "no doc"
-    var stdin_channel:channel(writing=true, kind=kind, locking=locking);
-    pragma "no doc"
+    @chpldoc.nodoc
+    var stdin_channel:fileWriter(kind=kind, locking=locking);
+    @chpldoc.nodoc
     var stdout_pipe:bool;
-    pragma "no doc"
+    @chpldoc.nodoc
     var stdout_file:file;
-    pragma "no doc"
-    var stdout_channel:channel(writing=false, kind=kind, locking=locking);
-    pragma "no doc"
+    @chpldoc.nodoc
+    var stdout_channel:fileReader(kind=kind, locking=locking);
+    @chpldoc.nodoc
     var stderr_pipe:bool;
-    pragma "no doc"
+    @chpldoc.nodoc
     var stderr_file:file;
-    pragma "no doc"
-    var stderr_channel:channel(writing=false, kind=kind, locking=locking);
+    @chpldoc.nodoc
+    var stderr_channel:fileReader(kind=kind, locking=locking);
 
     // Ideally we don't have the _file versions, but they
     // are there now because of issues with when the reference counts
     // for the file are updated.
 
-    pragma "no doc"
-    var spawn_error:syserr;
+    @chpldoc.nodoc
+    var spawn_error:errorCode;
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _stop_stdin_buffering() {
       if this.stdin_buffering && this.stdin_pipe {
-        this.stdin_channel._commit();
+        this.stdin_channel.commit();
         this.stdin_buffering = false; // Don't commit again on close again
       }
     }
 
-    pragma "no doc"
+    @chpldoc.nodoc
     proc _throw_on_launch_error() throws {
       if !running {
         try ioerror(spawn_error,
@@ -271,7 +270,7 @@ module Subprocess {
     proc stdin throws {
       try _throw_on_launch_error();
       if stdin_pipe == false {
-        throw SystemError.fromSyserr(
+        throw createSystemError(
             EINVAL, "subprocess was not configured with a stdin pipe");
       }
       return stdin_channel;
@@ -287,7 +286,7 @@ module Subprocess {
     proc stdout throws {
       try _throw_on_launch_error();
       if stdout_pipe == false {
-        throw SystemError.fromSyserr(
+        throw createSystemError(
             EINVAL, "subprocess was not configured with a stdout pipe");
       }
       return stdout_channel;
@@ -303,7 +302,7 @@ module Subprocess {
     proc stderr throws {
       try _throw_on_launch_error();
       if stderr_pipe == false {
-        throw SystemError.fromSyserr(
+        throw createSystemError(
             EINVAL, "subprocess was not configured with a stderr pipe");
       }
       return stderr_channel;
@@ -358,21 +357,6 @@ module Subprocess {
     else if style == pipeStyle.bufferAll then return QIO_FD_BUFFERED_PIPE;
     else return -1;
   }
-
-  deprecated "'FORWARD' is deprecated, please use 'pipeStyle.forward' instead"
-  const FORWARD = QIO_FD_FORWARD;
-
-  deprecated "'CLOSE' is deprecated, please use 'pipeStyle.close' instead"
-  const CLOSE = QIO_FD_CLOSE;
-
-  deprecated "'PIPE' is deprecated, please use 'pipeStyle.pipe' instead"
-  const PIPE = QIO_FD_PIPE;
-
-  deprecated "'STDOUT' is deprecated, please use 'pipeStyle.stdout' instead"
-  const STDOUT = QIO_FD_TO_STDOUT;
-
-  deprecated "'BUFFERED_PIPE' is deprecated, please use 'pipeStyle.bufferAll' instead"
-  const BUFFERED_PIPE = QIO_FD_BUFFERED_PIPE;
 
   private const empty_env:[1..0] string;
 
@@ -477,7 +461,7 @@ module Subprocess {
     var stdout_pipe = false;
     var stderr_pipe = false;
     var pid:int;
-    var err:syserr;
+    var err:errorCode;
 
     if stdin.type == pipeStyle || isIntegralType(stdin.type) then
       stdin_fd = pipeStyleToInt(stdin);
@@ -507,9 +491,9 @@ module Subprocess {
           var env_c_str:c_string;
           var env_str:string;
           if sys_getenv(c"PE_PRODUCT_LIST", env_c_str)==1 {
-            env_str = createStringWithNewBuffer(env_c_str);
+            env_str = string.createCopyingBuffer(env_c_str);
             if env_str.count("HUGETLB") > 0 then
-              throw SystemError.fromSyserr(
+              throw createSystemError(
                   EINVAL,
                   "spawn with more than 1 locale for CHPL_COMM=ugni with hugepages currently requires stdin, stdout, stderr=pipeStyle.forward");
           }
@@ -569,7 +553,7 @@ module Subprocess {
       ret.spawn_error = err;
       return ret;
     }
-    ret.spawn_error = ENOERR;
+    ret.spawn_error = 0;
 
     // open the QIO files if a pipe was used.
 
@@ -582,7 +566,7 @@ module Subprocess {
       // goes out of scope, but the channel will still keep
       // the file alive by referring to it.
       try {
-        var stdin_file = openfd(stdin_fd, hints=ioHintSet.direct(QIO_HINT_OWNED));
+        var stdin_file = new file(stdin_fd, own=true);
         ret.stdin_channel = stdin_file.writer();
       } catch e: SystemError {
         ret.spawn_error = e.err;
@@ -596,7 +580,7 @@ module Subprocess {
         // mark stdin so that we don't actually send any data
         // until communicate() is called.
 
-        err = ret.stdin_channel._mark();
+        err = ret.stdin_channel.mark();
         if err {
           ret.spawn_error = err; return ret;
         }
@@ -607,7 +591,7 @@ module Subprocess {
     if stdout_pipe {
       ret.stdout_pipe = true;
       try {
-        var stdout_file = openfd(stdout_fd, hints=ioHintSet.direct(QIO_HINT_OWNED));
+        var stdout_file = new file(stdout_fd, own=true);
         ret.stdout_channel = stdout_file.reader();
       } catch e: SystemError {
         ret.spawn_error = e.err;
@@ -621,7 +605,7 @@ module Subprocess {
     if stderr_pipe {
       ret.stderr_pipe = true;
       try {
-        ret.stderr_file = openfd(stderr_fd, hints=ioHintSet.direct(QIO_HINT_OWNED));
+        ret.stderr_file = new file(stderr_fd, own=true);
         ret.stderr_channel = ret.stderr_file.reader();
       } catch e: SystemError {
         ret.spawn_error = e.err;
@@ -726,7 +710,7 @@ module Subprocess {
   proc subprocess.poll() throws {
     try _throw_on_launch_error();
 
-    var err:syserr = ENOERR;
+    var err:errorCode = 0;
     on home {
       // check if child process has terminated.
       var done:c_int = 0;
@@ -770,7 +754,7 @@ module Subprocess {
 
     :arg buffer: if `true`, buffer input and output pipes (see above).
 
-    :throws BlockingIOError: when there weren't sufficient resources to perform
+    :throws BlockingIoError: when there weren't sufficient resources to perform
                              one of the required actions
     :throws InterruptedError: when the call was interrupted in some way.
     :throws BrokenPipeError: when a pipe for the subprocess closed early.
@@ -794,10 +778,10 @@ module Subprocess {
       return;
     }
 
-    var stdin_err:syserr  = ENOERR;
-    var wait_err:syserr   = ENOERR;
-    var stdout_err:syserr = ENOERR;
-    var stderr_err:syserr = ENOERR;
+    var stdin_err:errorCode  = 0;
+    var wait_err:errorCode   = 0;
+    var stdout_err:errorCode = 0;
+    var stderr_err:errorCode = 0;
 
     on home {
       // Close stdin.
@@ -891,7 +875,7 @@ module Subprocess {
     of the child process as necessary while waiting for
     it to terminate.
 
-    :throws BlockingIOError: when there weren't sufficient resources to perform
+    :throws BlockingIoError: when there weren't sufficient resources to perform
                              one of the required actions
     :throws InterruptedError: when the call was interrupted in some way.
     :throws BrokenPipeError: when a pipe for the subprocess closed early.
@@ -909,7 +893,7 @@ module Subprocess {
       return;
     }
 
-    var err:syserr = ENOERR;
+    var err:errorCode = 0;
     on home {
       if this.stdin_pipe {
         // send data to stdin
@@ -943,7 +927,7 @@ module Subprocess {
    */
   proc subprocess.close() throws {
     // TODO: see subprocess.wait() for more on this error handling approach
-    var err: syserr = ENOERR;
+    var err: errorCode = 0;
 
     // Close stdin.
     if this.stdin_pipe {
@@ -980,118 +964,8 @@ module Subprocess {
     if err then try ioerror(err, "in subprocess.close");
   }
 
-  // Signals as required by POSIX.1-2008, 2013 edition
-  // See note below about signals intentionally not included.
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGABRT' is deprecated. Use 'OS.POSIX.SIGABRT' instead."
-  extern const SIGABRT: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGALRM' is deprecated. Use 'OS.POSIX.SIGALRM' instead."
-  extern const SIGALRM: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGBUS' is deprecated. Use 'OS.POSIX.SIGBUS' instead."
-  extern const SIGBUS: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGCHLD' is deprecated. Use 'SOS.POSIX.SIGCHLD' instead."
-  extern const SIGCHLD: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGCONT' is deprecated. Use 'OS.POSIX.SIGCONT' instead."
-  extern const SIGCONT: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGFPE' is deprecated. Use 'OS.POSIX.SIGFPE' instead."
-  extern const SIGFPE: c_int;
-  pragma "no doc"
-  deprecated "'Subprocess.SIGHUP' is deprecated. Use 'OS.POSIX.SIGHUP' instead."
-  extern const SIGHUP: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGILL' is deprecated. Use 'OS.POSIX.SIGILL' instead."
-  extern const SIGILL: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGINT' is deprecated. Use 'OS.POSIX.SIGINT' instead."
-  extern const SIGINT: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGKILL' is deprecated. Use 'OS.POSIX.SIGKILL' instead."
-  extern const SIGKILL: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGPIPE' is deprecated. Use 'OS.POSIX.SIGPIPE' instead."
-  extern const SIGPIPE: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGQUIT' is deprecated. Use 'OS.POSIX.SIGQUIT' instead."
-  extern const SIGQUIT: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGSEGV' is deprecated. Use 'OS.POSIX.SIGSEGV' instead."
-  extern const SIGSEGV: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGSTOP' is deprecated. Use 'OS.POSIX.SIGSTOP' instead."
-  extern const SIGSTOP: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGTERM' is deprecated. Use 'OS.POSIX.SIGTERM' instead."
-  extern const SIGTERM: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGTRAP' is deprecated. Use 'OS.POSIX.SIGTRAP' instead."
-  extern const SIGTRAP: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGTSTP' is deprecated. Use 'OS.POSIX.SIGTSTP' instead."
-  extern const SIGTSTP: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGTTIN' is deprecated. Use 'OS.POSIX.SIGTTIN' instead."
-  extern const SIGTTIN: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGTTOU' is deprecated. Use 'OS.POSIX.SIGTTOU' instead."
-  extern const SIGTTOU: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGURG' is deprecated. Use 'OS.POSIX.SIGURG' instead."
-  extern const SIGURG: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGUSR1' is deprecated. Use 'OS.POSIX.SIGUSR1' instead."
-  extern const SIGUSR1: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGUSR2' is deprecated. Use 'OS.POSIX.SIGUSR2' instead."
-  extern const SIGUSR2: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGXCPU' is deprecated. Use 'OS.POSIX.SIGXCPU' instead."
-  extern const SIGXCPU: c_int;
-  pragma "no doc"
-  pragma "last resort"
-  deprecated "'Subprocess.SIGXFSZ' is deprecated. Use 'OS.POSIX.SIGXFSZ' instead."
-  extern const SIGXFSZ: c_int;
+  private extern proc qio_send_signal(pid: int(64), sig: c_int): errorCode;
 
-  // These signals are not strictly required by POSIX.1.2008 2013 edition
-  // and so should not be included here:
-
-  // SIGPOLL is Obsolescent and optional as part of XSI STREAMS
-  // SIGPROF is Obsolescent and optional as part of XSI STREAMS
-  // SIGSYS is optional as part of X/Open Systems Interface
-  // SIGVTALRM is optional as part of X/Open Systems Interface
-
-  private extern proc qio_send_signal(pid: int(64), sig: c_int): syserr;
-
-  deprecated "'send_signal' is deprecated, please use 'sendPosixSignal' instead"
-  proc subprocess.send_signal(signal:int) throws {
-    sendPosixSignal(signal);
-  }
   /*
     Send a signal to a child process.
 
@@ -1120,7 +994,7 @@ module Subprocess {
   proc subprocess.sendPosixSignal(signal:int) throws {
     try _throw_on_launch_error();
 
-    var err: syserr = ENOERR;
+    var err: errorCode = 0;
     on home {
       err = qio_send_signal(pid, signal:c_int);
     }

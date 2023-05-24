@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -34,7 +34,7 @@ module Communication {
 
   // This module may be used from internal modules that are resolved before
   // Locale-related modules. So, we can't use `numLocales` or `Locales` here.
-  pragma "no doc"
+  @chpldoc.nodoc
   private extern const chpl_numNodes: int(32);
 
   /*

@@ -18,7 +18,7 @@ config const fileName = "test.txt";
 config const debug = true;
 
 // Open up a file to work with.
-var f = open(fileName, iomode.cwr);
+var f = open(fileName, ioMode.cwr);
 
 
 // Let's create a few records and store them in an array.
@@ -87,9 +87,6 @@ var B: [0..#3] MyRecord;
    - f is a Writer or a Reader
    - the compiler will generate readThis/writeThis for you if you don't
      provide one
-   - the I/O operator <~> is available to read or write (depending
-     on which situation we are being called in). This operator will soon
-     be deprecated
  */
 proc MyRecord.readThis(f) throws {
   readWriteHelper(f);
@@ -100,10 +97,14 @@ proc MyRecord.writeThis(f) throws {
 }
 
 proc MyRecord.readWriteHelper(f) throws {
-  f <~> i;
-  f <~> new ioLiteral("\t");
-  f <~> r;
-  f <~> new ioLiteral("\t");
+  proc rwLiteral(lit:string) {
+    if f.writing then f.writeLiteral(lit); else f.readLiteral(lit);
+  }
+
+  if f.writing then f.write(i); else i = f.read(int);
+  rwLiteral("\t");
+  if f.writing then f.write(r); else r = f.read(real);
+  rwLiteral("\t");
 
   // When doing the string I/O, we need to specify that we'd like
   // the string to be single-quoted. Unfortunately, readf is
@@ -111,9 +112,19 @@ proc MyRecord.readWriteHelper(f) throws {
   // on the caller setting the string formatting with the channel's
   // style.
   // In the future, we hope to allow readf in this situation. 
-  f <~> s;
+  if f.writing then f.write(s); else s = f.read(string);
 
-  f <~> new ioLiteral("\n");
+  rwLiteral("\n");
+}
+proc MyRecord.init(i: int = 0, r: real = 0.0, s: string = "") {
+  this.i = i;
+  this.r = r;
+  this.s = s;
+}
+
+proc MyRecord.init(r: fileReader) throws {
+  this.init();
+  readThis(r);
 }
 
 {

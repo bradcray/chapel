@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.  *
  * The entirety of this work is licensed under the Apache License,
@@ -24,30 +24,45 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include "chpl-env-gen.h"
 
 #include "cuda-utils.h"
 
 static inline
-void* chpl_gpu_getKernel(const char* fatbinData, const char* kernelName) {
+void* chpl_gpu_load_module(const char* fatbin_data) {
+  CUmodule cuda_module;
 
-  CUmodule    cudaModule;
-  CUfunction  function;
+  CUDA_CALL(cuModuleLoadData(&cuda_module, fatbin_data));
+  assert(cuda_module);
 
-  // Create module for object
-  CUDA_CALL(cuModuleLoadData(&cudaModule, fatbinData));
+  return (void*)cuda_module;
+}
 
-  // Get kernel function
-  CUDA_CALL(cuModuleGetFunction(&function, cudaModule, kernelName));
+static inline
+void* chpl_gpu_load_function(CUmodule cuda_module, const char* kernel_name) {
+  CUfunction function;
+
+  CUDA_CALL(cuModuleGetFunction(&function, cuda_module, kernel_name));
+  assert(function);
 
   return (void*)function;
 }
 
 // this is part of the interface (used by the module code as an extern)
 static inline
-bool chpl_gpu_common_is_device_ptr(void* ptr) {
+bool chpl_gpu_common_is_device_ptr(const void* ptr) {
 
   unsigned int res;
 
+#ifdef CHPL_GPU_MEM_STRATEGY_ARRAY_ON_DEVICE
+    // We call CUDA_CALL later, because we want to treat some error codes
+    // separately
+  CUresult ret_val = cuPointerGetAttribute(&res, CU_POINTER_ATTRIBUTE_MAPPED,
+                                           (CUdeviceptr)ptr);
+
+  if (ret_val == CUDA_SUCCESS) {
+    return res;
+#else
   // We call CUDA_CALL later, because we want to treat some error codes
   // separately
   CUresult ret_val = cuPointerGetAttribute(&res, CU_POINTER_ATTRIBUTE_MEMORY_TYPE,
@@ -55,6 +70,7 @@ bool chpl_gpu_common_is_device_ptr(void* ptr) {
 
   if (ret_val == CUDA_SUCCESS) {
     return res == CU_MEMORYTYPE_DEVICE || res == CU_MEMORYTYPE_UNIFIED;
+#endif
   }
   else if (ret_val == CUDA_ERROR_INVALID_VALUE ||
            ret_val == CUDA_ERROR_NOT_INITIALIZED ||

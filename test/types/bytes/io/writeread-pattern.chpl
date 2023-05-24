@@ -22,14 +22,14 @@ proc test(byteRange) {
   }
   buf[nBytes] = 0;
 
-  const randomBytes = createBytesWithOwnedBuffer(buf, length=nBytes,
+  const randomBytes = bytes.createAdoptingBuffer(buf, length=nBytes,
                                                       size=nBytes+1);
 
   if randomBytes.size != nBytes {
     halt("Error creating bytes object with correct length");
   }
 
-  var bytesChannel = opentmp();
+  var bytesChannel = openTempFile();
 
   {
     // write them to a channel

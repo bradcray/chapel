@@ -12,7 +12,7 @@ var Space = files.domain dmapped Block(files.domain);
 var DistFiles:[Space] string = files;
 
 for f in files {
-  var openf = open(f, iomode.cw);
+  var openf = open(f, ioMode.cw);
   openf.close();
 }
 
@@ -21,7 +21,7 @@ for f in DistFiles {
     var from = f;
     var base = basename(f);
     const uname = getenv(c"USER"):c_string;
-    var to = "/tmp/" + createStringWithNewBuffer(uname)+ base;
+    var to = "/tmp/" + string.createCopyingBuffer(uname)+ base;
     if verbose then writeln("on ", here.id, " copying from ", from, " to ", to);
     copy(from, to);
     f = to;
@@ -31,7 +31,7 @@ for f in DistFiles {
 for f in DistFiles {
   on f {
     if verbose then writeln("on ", here.id, " opening ", f);
-    var openf = open(f, iomode.r);
+    var openf = open(f, ioMode.r);
     if verbose then writeln("on ", here.id, " done opening ", f);
   }
 }

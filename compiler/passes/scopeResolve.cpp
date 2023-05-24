@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2020-2023 Hewlett Packard Enterprise Development LP
  * Copyright 2004-2019 Cray Inc.
  * Other additional copyright holders may be indicated within.
  *
@@ -174,39 +174,36 @@ static void handleReceiverFormals() {
   forv_Vec(FnSymbol, fn, gFnSymbols) {
 
     if (fn->_this == NULL) continue; // not a method
+    SET_LINENO(fn->_this);
 
     if (fn->_this->type == dtUnknown) {
       Expr* stmt = toArgSymbol(fn->_this)->typeExpr->body.only();
 
-      if (UnresolvedSymExpr* sym = toUnresolvedSymExpr(stmt)) {
-        SET_LINENO(fn->_this);
-
-        Symbol* rsym = lookup(sym->unresolved, sym);
-        if (TypeSymbol* ts = toTypeSymbol(rsym)) {
-          sym->replace(new SymExpr(ts));
-
-          fn->_this->type = ts->type;
-          fn->_this->type->methods.add(fn);
-
-          AggregateType::setCreationStyle(ts, fn);
-
-        } else if (InterfaceSymbol* isym = toInterfaceSymbol(rsym)) {
-          // Convert fn(this: IFC, ...) to
-          //   fn(this: ?t_IFC, ...) where t_IFC implements IFC
-          TypeSymbol* ctSym = desugarInterfaceAsType(fn,
-                                toArgSymbol(fn->_this), sym, isym);
-          sym->replace(new SymExpr(ctSym));
-          fn->_this->type = ctSym->type;
-          recordIfcThis(isym, fn, ctSym);
-        }
-
-      } else if (SymExpr* sym = toSymExpr(stmt)) {
-        fn->_this->type = sym->symbol()->type;
-        fn->_this->type->methods.add(fn);
-
-        AggregateType::setCreationStyle(sym->symbol()->type->symbol, fn);
+      UnresolvedSymExpr* unresolvedSymExpr = toUnresolvedSymExpr(stmt);
+      Symbol* symbol = nullptr;
+      if (unresolvedSymExpr) {
+        symbol = lookup(unresolvedSymExpr->unresolved, unresolvedSymExpr);
+      } else if (SymExpr* symExpr = toSymExpr(stmt)) {
+        symbol = symExpr->symbol();
       }
 
+      if (TypeSymbol* ts = toTypeSymbol(symbol)) {
+        if (unresolvedSymExpr) unresolvedSymExpr->replace(new SymExpr(ts));
+
+        fn->_this->type = ts->type;
+        fn->_this->type->methods.add(fn);
+
+        AggregateType::setCreationStyle(ts, fn);
+
+      } else if (InterfaceSymbol* isym = toInterfaceSymbol(symbol)) {
+        // Convert fn(this: IFC, ...) to
+        //   fn(this: ?t_IFC, ...) where t_IFC implements IFC
+        TypeSymbol* ctSym = desugarInterfaceAsType(fn,
+                              toArgSymbol(fn->_this), stmt, isym);
+        if (unresolvedSymExpr) unresolvedSymExpr->replace(new SymExpr(ctSym));
+        fn->_this->type = ctSym->type;
+        recordIfcThis(isym, fn, ctSym);
+      }
     } else {
       AggregateType::setCreationStyle(fn->_this->type->symbol, fn);
     }
@@ -275,7 +272,8 @@ static void processGenericFields() {
 // to handle chpl__Program with little or no special casing.
 
 static void addToSymbolTable() {
-  rootScope = ResolveScope::getRootModule();
+  rootScope = ResolveScope::getScopeFor(theProgram->block);
+  if (!rootScope) rootScope = ResolveScope::getRootModule();
 
   // Extend the rootScope with every top-level definition
   for_alist(stmt, theProgram->block->body) {
@@ -452,7 +450,9 @@ static void scopeResolve(FnSymbol*           fn,
     scopeResolve(fn->retExprType, scope);
   }
 
-  scopeResolve(fn->body, scope);
+  if (fn->body && !fn->hasFlag(FLAG_NO_FN_BODY)) {
+    scopeResolve(fn->body, scope);
+  }
 }
 
 static void scopeResolve(TypeSymbol*         typeSym,
@@ -928,9 +928,8 @@ static void resolveUnresolvedSymExpr(UnresolvedSymExpr* usymExpr,
       }
     }
 
-    if (sym->hasFlag(FLAG_DEPRECATED)) {
-      sym->generateDeprecationWarning(usymExpr);
-    }
+    sym->maybeGenerateDeprecationWarning(usymExpr);
+    sym->maybeGenerateUnstableWarning(usymExpr);
 
     symExpr = new SymExpr(sym);
     usymExpr->replace(symExpr);
@@ -966,23 +965,32 @@ static void resolveUnresolvedSymExpr(UnresolvedSymExpr* usymExpr,
     CallExpr* call = toCallExpr(parent);
 
     if (call == NULL || call->baseExpr != usymExpr) {
-      CallExpr* primFn = NULL;
+      CallExpr* prim = NULL;
 
-      // Avoid duplicate wrapping with PRIM_CAPTURE_FN_*
-      if (call != NULL && (call->isPrimitive(PRIM_CAPTURE_FN_FOR_C) ||
-                           call->isPrimitive(PRIM_CAPTURE_FN_FOR_CHPL)))
+      // Avoid duplicate wrapping.
+      if (call && (call->isPrimitive(PRIM_CAPTURE_FN) ||
+                   call->isPrimitive(PRIM_CAPTURE_FN_TO_CLASS))) {
         return;
-
-      // Wrap the FN in the appropriate way
-      if (call != NULL && call->isNamed("c_ptrTo") == true) {
-        primFn = new CallExpr(PRIM_CAPTURE_FN_FOR_C);
-      } else {
-        primFn = new CallExpr(PRIM_CAPTURE_FN_FOR_CHPL);
       }
 
-      usymExpr->replace(primFn);
+      // Right now we need this primitive because the scope resolver is
+      // not reporting the correct number of lookups for overloaded
+      // function symbols.
+      prim = new CallExpr(PRIM_CAPTURE_FN, usymExpr->copy());
 
-      primFn->insertAtTail(usymExpr);
+      // This business is necessary because of normalizing. If we are the
+      // child of a "c_ptrTo" call, we need to know to do some pattern
+      // matching later. This used to be 'PRIM_CAPTURE_FN_FOR_C', but I've
+      // bundled it into the main capture primitive because the semantics
+      // of capturing C pointers to functions may change (and in general
+      // it's nicer to intercept all the function capture primitives in a
+      // single place during resolution).
+      if (call && call->isNamed("c_ptrTo")) {
+        prim->insertAtTail(new SymExpr(gTrue));
+      }
+
+      INT_ASSERT(prim);
+      usymExpr->replace(prim);
 
     } else {
       updateMethod(usymExpr, sym);
@@ -1494,10 +1502,13 @@ static void resolveModuleCall(CallExpr* call) {
 
         if (sym != NULL) {
           if (sym->isVisible(call) == true) {
-            if (sym->hasFlag(FLAG_DEPRECATED) && !isFnSymbol(sym)) {
+            if (!fDynoScopeResolve) {
               // Function symbols will generate a warning during function
               // resolution, no need to warn here.
-              sym->generateDeprecationWarning(call);
+              if (!isFnSymbol(sym)) {
+                sym->maybeGenerateDeprecationWarning(call);
+                sym->maybeGenerateUnstableWarning(call);
+              }
             }
 
             if (FnSymbol* fn = toFnSymbol(sym)) {
@@ -1626,9 +1637,8 @@ static void resolveEnumeratedTypes() {
 
             for_enums(constant, type) {
               if (!strcmp(constant->sym->name, name)) {
-                if (constant->sym->hasFlag(FLAG_DEPRECATED)) {
-                  constant->sym->generateDeprecationWarning(call);
-                }
+                constant->sym->maybeGenerateDeprecationWarning(call);
+                constant->sym->maybeGenerateUnstableWarning(call);
 
                 call->replace(new SymExpr(constant->sym));
               }
@@ -3092,7 +3102,9 @@ void scopeResolve() {
 
   resolveGotoLabels();
 
-  resolveUnresolvedSymExprs();
+  if (!fDynoScopeResolve || fDynoScopeProduction) {
+    resolveUnresolvedSymExprs();
+  }
 
   resolveEnumeratedTypes();
 
@@ -3121,4 +3133,9 @@ void scopeResolve() {
   detectUserDefinedBorrowMethods();
 
   removeUnusedModules();
+
+  // Clear the cache so that functions can be removed
+  // (e.g. in normalize cloneParameterizedPrimitive)
+  // without leading to invalid memory accesses.
+  modSymsCache.clear();
 }

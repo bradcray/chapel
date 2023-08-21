@@ -58,7 +58,7 @@ module DefaultAssociative {
     type idxType;
     param parSafe: bool;
 
-    var dist: unmanaged DefaultDist;
+    var dist: unmanaged DefaultDistImpl;
 
     // We explicitly use processor atomics here since this is not
     // by design a distributed data structure
@@ -79,7 +79,7 @@ module DefaultAssociative {
 
     proc init(type idxType,
               param parSafe: bool,
-              dist: unmanaged DefaultDist) {
+              dist: unmanaged DefaultDistImpl) {
       this.idxType = idxType;
       this.parSafe = parSafe;
       this.dist = dist;

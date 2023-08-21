@@ -1558,7 +1558,7 @@ module ChapelArray {
       // change this in the future when we have better syntax for
       // indicating a generic domain map)..
       //
-      if (formalDom.distribution._value.type != unmanaged DefaultDist) {
+      if (formalDom.distribution._value.type != unmanaged DefaultDistImpl) {
         //
         // First, at compile-time, check that the domain's types are
         // the same:

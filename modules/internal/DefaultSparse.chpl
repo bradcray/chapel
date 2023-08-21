@@ -33,7 +33,7 @@ module DefaultSparse {
   config param defaultSparseSupportsAutoLocalAccess = true;
 
   class DefaultSparseDom: BaseSparseDomImpl(?) {
-    var dist: unmanaged DefaultDist;
+    var dist: unmanaged DefaultDistImpl;
     var _nnz = 0;
 
     pragma "local field"
@@ -42,7 +42,7 @@ module DefaultSparse {
     override proc linksDistribution() param do return false;
     override proc dsiLinksDistribution() do return false;
 
-    proc init(param rank, type idxType, dist: unmanaged DefaultDist,
+    proc init(param rank, type idxType, dist: unmanaged DefaultDistImpl,
         parentDom: domain) {
       super.init(rank, idxType, parentDom);
 

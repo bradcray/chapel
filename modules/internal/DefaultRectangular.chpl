@@ -94,7 +94,7 @@ module DefaultRectangular {
     return ret;
   }
 
-  class DefaultDist: BaseDist {
+  class DefaultDistImpl: BaseDist {
     override proc dsiNewRectangularDom(param rank: int, type idxType,
                                        param strides: strideKind, inds) {
       const dom = new unmanaged DefaultRectangularDom(rank, idxType, strides,
@@ -120,7 +120,7 @@ module DefaultRectangular {
 
     proc dsiAssign(other: this.type) { }
 
-    proc dsiEqualDMaps(d:unmanaged DefaultDist) param do return true;
+    proc dsiEqualDMaps(d:unmanaged DefaultDistImpl) param do return true;
     proc dsiEqualDMaps(d) param do return false;
 
     proc trackDomains() param do return false;
@@ -136,24 +136,24 @@ module DefaultRectangular {
   // model initialization
   //
   pragma "locale private"
-  var defaultDist = new dmap(new unmanaged DefaultDist());
+  var defaultDist = new dmap(new unmanaged DefaultDistImpl());
 
   proc chpl_defaultDistInitPrivate() {
     if defaultDist._value==nil {
       // FIXME benharsh: Here's what we want to do:
-      //   defaultDist = new dmap(new DefaultDist());
+      //   defaultDist = new dmap(new DefaultDistImpl());
       // The problem is that the LHS of the "proc =" for _distributions
       // loses its ref intent in the removeWrapRecords pass.
       //
       // The code below is copied from the contents of the "proc =".
-      const nd = new dmap(new unmanaged DefaultDist());
+      const nd = new dmap(new unmanaged DefaultDistImpl());
       __primitive("move", defaultDist, chpl__autoCopy(nd.clone(),
                                                       definedConst=false));
     }
   }
 
   class DefaultRectangularDom: BaseRectangularDom(?) {
-    var dist: unmanaged DefaultDist;
+    var dist: unmanaged DefaultDistImpl;
     var ranges : rank*range(idxType,boundKind.both,strides);
 
     override proc linksDistribution() param do return false;

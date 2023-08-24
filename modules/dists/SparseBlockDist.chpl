@@ -389,7 +389,7 @@ class LocSparseBlockDom {
 //
 class SparseBlockArr: BaseSparseArr(?) {
   param strides: strideKind;
-  type sparseLayoutType = unmanaged DefaultDist;
+  type sparseLayoutType = DefaultDist;
 
   // INIT TODO: Can we address this constructor/initializer issue now?
   // ideally I wanted to have `var locArr: [dom.dist.targetLocDom]`. However,

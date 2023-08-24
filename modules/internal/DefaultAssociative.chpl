@@ -428,6 +428,10 @@ module DefaultAssociative {
     override proc dsiSupportsAutoLocalAccess() param {
       return defaultAssociativeSupportsAutoLocalAccess;
     }
+
+    proc dsiGetDist() {
+      return new DefaultDist();
+    }
   }
 
   class DefaultAssociativeArr: AbsBaseArr(?) {

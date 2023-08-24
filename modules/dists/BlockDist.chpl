@@ -324,7 +324,7 @@ pragma "ignore noinit"
 record Block {
   param rank: int;
   type idxType = int;
-  type sparseLayoutType = unmanaged DefaultDist;
+  type sparseLayoutType = DefaultDist;
 
   forwarding const chpl_distHelp: chpl_PrivatizedDistHelper(unmanaged BlockImpl(rank, idxType, _to_unmanaged(sparseLayoutType)));
 
@@ -335,7 +335,7 @@ record Block {
             dataParMinGranularity=getDataParMinGranularity(),
             param rank = boundingBox.rank,
             type idxType = boundingBox.idxType,
-            type sparseLayoutType = unmanaged DefaultDist) {
+            type sparseLayoutType = DefaultDist) {
     const value = new unmanaged BlockImpl(boundingBox, targetLocales,
                                           dataParTasksPerLocale,
                                           dataParIgnoreRunningTasks,
@@ -429,7 +429,7 @@ class BlockImpl : BaseDist {
   var dataParTasksPerLocale: int;
   var dataParIgnoreRunningTasks: bool;
   var dataParMinGranularity: int;
-  type sparseLayoutType = unmanaged DefaultDist;
+  type sparseLayoutType = DefaultDist;
 }
 
 //
@@ -578,7 +578,7 @@ proc BlockImpl.init(boundingBox: domain,
                 dataParMinGranularity=getDataParMinGranularity(),
                 param rank = boundingBox.rank,
                 type idxType = boundingBox.idxType,
-                type sparseLayoutType = unmanaged DefaultDist) {
+                type sparseLayoutType = DefaultDist) {
   this.rank = rank;
   this.idxType = idxType;
   if rank != boundingBox.rank then
@@ -1754,16 +1754,16 @@ private proc canDoAnyToBlock(Dest, destDom, Src, srcDom) param : bool {
 
 // Block = this
 proc BlockArr.doiBulkTransferToKnown(srcDom, destClass:BlockArr, destDom) : bool
-where this.sparseLayoutType == unmanaged DefaultDist &&
-      destClass.sparseLayoutType == unmanaged DefaultDist &&
+where this.sparseLayoutType == DefaultDist &&
+      destClass.sparseLayoutType == DefaultDist &&
       !disableBlockDistBulkTransfer {
   return _doSimpleBlockTransfer(destClass, destDom, this, srcDom);
 }
 
 // this = Block
 proc BlockArr.doiBulkTransferFromKnown(destDom, srcClass:BlockArr, srcDom) : bool
-where this.sparseLayoutType == unmanaged DefaultDist &&
-      srcClass.sparseLayoutType == unmanaged DefaultDist &&
+where this.sparseLayoutType == DefaultDist &&
+      srcClass.sparseLayoutType == DefaultDist &&
       !disableBlockDistBulkTransfer {
   return _doSimpleBlockTransfer(this, destDom, srcClass, srcDom);
 }

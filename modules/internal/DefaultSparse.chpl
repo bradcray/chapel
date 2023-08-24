@@ -533,6 +533,9 @@ module DefaultSparse {
     }
   }
 
+  proc DefaultSparseDom.dsiGetDist() {
+    return new DefaultDist();
+  }
 
   proc DefaultSparseDom.dsiSerialWrite(f, printBrackets=true) throws {
     if (rank == 1) {

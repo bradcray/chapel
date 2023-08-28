@@ -1178,14 +1178,14 @@ module ChapelDomain {
     /* Return the domain map that implements this domain */
     pragma "return not owned"
     proc distribution {
-//      use Reflection;
-//      if canResolveMethod(_value, "dsiGetDist") {
+      use Reflection;
+      if canResolveMethod(_value, "dsiGetDist") {
         return _value.dsiGetDist();
-//      } else {
+      } else {
         // TODO: Remove this branch and conditional once _distribution is
         // retired
-//        return _getDistribution(_value.dist);
-//      }
+        return _getDistribution(_value.dist);
+      }
     }
 
     @deprecated("domain.dist is deprecated, please use domain.distribution instead")

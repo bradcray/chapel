@@ -333,7 +333,7 @@ private proc getDefaultSparseDist(type sparseLayoutType) {
   if isSubtype(_to_nonnil(sparseLayoutType), DefaultDist) {
     return defaultDist;
   } else {
-    return new dmap(new sparseLayoutType());
+    return new sparseLayoutType();
   }
 }
 

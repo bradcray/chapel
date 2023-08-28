@@ -95,73 +95,34 @@ module DefaultRectangular {
   }
 
   record DefaultDist {
-    forwarding const _value = new DefaultDistImpl();
-
-  /* This is a workaround for an internal failure I experienced when
-     this code was part of newRectangularDom() and relied on split init:
-     var x;
-     if __prim(...) then x = ...;
-     else if __prim(...) then x = ...;
-     else compilerError(...); */
-  proc chpl_dsiNRDhelp(param rank, type idxType, param strides, ranges) {
-
-    // Due to a bug, see library/standard/Reflection/primitives/ResolvesDmap
-    // we use "method call resolves" instead of just "resolves".
-    if __primitive("method call resolves", _value, "dsiNewRectangularDom",
-                   rank, idxType, strides, ranges) {
-      return _value.dsiNewRectangularDom(rank, idxType, strides, ranges);
+    forwarding const chpl_distHelp: chpl_LocalDistHelper(unmanaged DefaultDistImpl);
+    proc init(other: unmanaged DefaultDistImpl = new unmanaged DefaultDistImpl()) {
+      this.chpl_distHelp = new chpl_LocalDistHelper(other);
     }
 
-    // The following supports deprecation by Vass in 1.31 to implement #17131
-    // Once range.stridable is removed, replace chpl_dsiNRDhelp() with
-    //   var x = _value.dsiNewRectangularDom(..., strides, ranges);
-    // and uncomment proc dsiNewRectangularDom() in ChapelDistribution.chpl
-
-    param stridable = strides.toStridable();
-    const ranges2 = chpl_convertRangeTuple(ranges, stridable);
-    if __primitive("method call resolves", _value, "dsiNewRectangularDom",
-                   rank, idxType, stridable, ranges2) {
-
-      compilerWarning("the domain map '", _value.type:string,
-                      "' needs to be updated from 'stridable: bool' to",
-                      " 'strides: strideKind' because 'stridable' is deprecated");
-
-      return _value.dsiNewRectangularDom(rank, idxType, stridable, ranges2);
+    proc init=(const ref other : DefaultDist) {
+      this.init(other._value.dsiClone());
     }
 
-    compilerError("rectangular domains are not supported by",
-                  " the distribution ", this.type:string);
-  }
-
-  proc newRectangularDom(param rank: int, type idxType,
-                         param strides: strideKind,
-                         ranges: rank*range(idxType, boundKind.both, strides),
-                         definedConst: bool = false) {
-    var x = chpl_dsiNRDhelp(rank, idxType, strides, ranges);
-
-    x.definedConst = definedConst;
-
-    if x.linksDistribution() {
-      _value.add_dom(x);
+    proc clone() {
+      return new DefaultDist();
     }
-    return x;
-  }
 
-  proc newRectangularDom(param rank: int, type idxType,
-                         param strides: strideKind,
-                         definedConst: bool = false) {
-    var ranges: rank*range(idxType, boundKind.both, strides);
-    return newRectangularDom(rank, idxType, strides, ranges, definedConst);
-  }
-
-  proc newSparseDom(param rank: int, type idxType, dom: domain) {
-    var x = _value.dsiNewSparseDom(rank, idxType, dom);
-    if x.linksDistribution() {
-      _value.add_dom(x);
+    @chpldoc.nodoc
+    inline operator ==(d1: DefaultDist, d2: DefaultDist) {
+      if (d1._value == d2._value) then
+        return true;
+      return d1._value.dsiEqualDMaps(d2._value);
     }
-    return x;
-  }
 
+    @chpldoc.nodoc
+    inline operator !=(d1: DefaultDist, d2: DefaultDist) {
+      return !(d1 == d2);
+    }
+
+    proc writeThis(x) {
+      chpl_distHelp.writeThis(x);
+    }
   }
 
   class DefaultDistImpl: BaseDist {
@@ -206,17 +167,17 @@ module DefaultRectangular {
   // model initialization
   //
   pragma "locale private"
-  var defaultDist = new dmap(new unmanaged DefaultDistImpl());
+  var defaultDist = new DefaultDist();
 
   proc chpl_defaultDistInitPrivate() {
     if defaultDist._value==nil {
       // FIXME benharsh: Here's what we want to do:
-      //   defaultDist = new dmap(new DefaultDistImpl());
+      //   defaultDist = new DefaultDist();
       // The problem is that the LHS of the "proc =" for _distributions
       // loses its ref intent in the removeWrapRecords pass.
       //
       // The code below is copied from the contents of the "proc =".
-      const nd = new dmap(new unmanaged DefaultDistImpl());
+      const nd = new DefaultDist();
       __primitive("move", defaultDist, chpl__autoCopy(nd.clone(),
                                                       definedConst=false));
     }

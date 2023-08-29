@@ -815,6 +815,10 @@ record chpl_LocalDistHelper {
                      // in which case, the record destructor should
                      // not attempt to delete the _instance.
 
+  inline proc _instance ref do return _value;
+
+  proc _pid do return nullPid;
+
   inline proc _do_destroy() {
     if ! _unowned && ! _value.singleton() {
       on _value {
@@ -893,6 +897,14 @@ record chpl_LocalDistHelper {
 
   proc newSparseDom(param rank: int, type idxType, dom: domain) {
     var x = _value.dsiNewSparseDom(rank, idxType, dom);
+    if x.linksDistribution() {
+      _value.add_dom(x);
+    }
+    return x;
+  }
+
+  proc newAssociativeDom(type idxType, param parSafe: bool=true) {
+    var x = _value.dsiNewAssociativeDom(idxType, parSafe);
     if x.linksDistribution() {
       _value.add_dom(x);
     }

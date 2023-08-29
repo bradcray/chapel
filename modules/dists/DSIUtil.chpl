@@ -815,7 +815,7 @@ record chpl_LocalDistHelper {
                      // in which case, the record destructor should
                      // not attempt to delete the _instance.
 
-  inline proc _instance ref do return _value;
+  inline proc const ref _instance const ref do return _value;
 
   proc _pid do return nullPid;
 

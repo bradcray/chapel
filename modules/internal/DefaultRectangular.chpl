@@ -35,7 +35,7 @@ module DefaultRectangular {
   use DSIUtil;
   public use ChapelArray;
   use ChapelDistribution, ChapelRange, OS, CTypes, CTypes;
-  use ChapelDebugPrint, ChapelLocks, OwnedObject, IO;
+  use ChapelDebugPrint, ChapelLocks, OwnedObject;
   use DefaultSparse, DefaultAssociative;
   public use ExternalArray; // OK: currently expected to be available by
                             // default... though... why 'use' it here?
@@ -1718,7 +1718,7 @@ module DefaultRectangular {
   }
 
   proc DefaultRectangularDom.dsiSerialWrite(f) throws
-  where _supportsSerializers(f) && f.serializerType != IO.defaultSerializer {
+  where _supportsSerializers(f) {
     if chpl_warnUnstable then
       compilerWarning("Serialization of rectangular domains with non-default Serializer is unstable, and may change in the future");
     var ser = f.serializer.startList(f, rank);
@@ -1729,7 +1729,7 @@ module DefaultRectangular {
   // TODO: There is currently a bug when returning domains from
   // 'deserializeFrom', so this isn't tested yet.
   proc DefaultRectangularDom.dsiSerialRead(f) throws
-  where _supportsSerializers(f) && f.deserializerType != IO.defaultDeserializer {
+  where _supportsSerializers(f) {
     if chpl_warnUnstable then
       compilerWarning("Deserialization of rectangular domains with non-default Deserializer is unstable, and may change in the future");
     var des = f.deserializer.startList(f);

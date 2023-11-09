@@ -1695,12 +1695,12 @@ extern type fdflag_t = c_int;
 //  QIO_HINT_CACHED,
 //  QIO_HINT_NOREUSE
 
-private const IOHINTS_NONE:        c_int = 0;
-private const IOHINTS_SEQUENTIAL:  c_int = QIO_HINT_SEQUENTIAL;
-private const IOHINTS_RANDOM:      c_int = QIO_HINT_RANDOM;
-private const IOHINTS_PREFETCH:    c_int = QIO_HINT_CACHED;
-private const IOHINTS_MMAP:        c_int = QIO_METHOD_MMAP;
-private const IOHINTS_NOMMAP:      c_int = QIO_METHOD_PREADPWRITE;
+private param IOHINTS_NONE:        c_int = 0;
+private param IOHINTS_SEQUENTIAL:  c_int = QIO_HINT_SEQUENTIAL;
+private param IOHINTS_RANDOM:      c_int = QIO_HINT_RANDOM;
+private param IOHINTS_PREFETCH:    c_int = QIO_HINT_CACHED;
+private param IOHINTS_MMAP:        c_int = QIO_METHOD_MMAP;
+private param IOHINTS_NOMMAP:      c_int = QIO_METHOD_PREADPWRITE;
 
 /* A value of the :record:`ioHintSet` type defines a set of hints to provide
   information about the operations that a :record:`file`, :record:`fileReader`
@@ -9073,7 +9073,8 @@ proc fileWriter.writeBinary(const ref data: [?d] ?t, param endian:ioendian = ioe
     // Allow either DefaultRectangular arrays or dense slices of DR arrays
     if !data._value.isDataContiguous(d._value) {
       err = "writeBinary() array data must be contiguous";
-    } else if data.locale.id != this._home.id {
+//    } else if data.locale.id != this._home.id {
+    } else if data.locale != this._home {
       err = "writeBinary() array data must be on same locale as 'fileWriter'";
     } else if endian == ioendian.native {
       if data.size > 0 {
@@ -9339,7 +9340,7 @@ proc fileReader.readBinary(ref data: [?d] ?t, param endian = ioendian.native): i
 
     if !data._value.isDataContiguous(d._value) {
       err = "readBinary() array data must be contiguous";
-    } else if data.locale.id != this._home.id {
+    } else if data.locale != this._home {
       err = "readBinary() array data must be on same locale as 'fileReader'";
     } else if endian == ioendian.native {
       if data.size > 0 {
@@ -9891,6 +9892,13 @@ record itemReaderInternal {
 }
 
 // And now, the toplevel items.
+
+if here == dummyLocale then
+  halt("Trying to set up stdin/stdout/stderr before locales");
+else {
+  extern proc printf(x...);
+  printf("console IO setup OK\n");
+}
 
 /* A locking :record:`fileReader` instance that reads from standard input. */
 const stdin:fileReader(true);

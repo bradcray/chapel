@@ -127,8 +127,6 @@ module List {
     }
   }
 
-  private use IO;
-
   /*
     A list is a lightweight container suitable for building up and iterating
     over a collection of elements in a structured manner. Unlike a stack, the
@@ -1804,7 +1802,7 @@ module List {
 
       :arg ch: A channel to write to.
     */
-    proc writeThis(ch: fileWriter) throws {
+    proc writeThis(ch) throws {
       var isBinary = ch._binary();
       const isJson = ch.styleElement(QIO_STYLE_ELEMENT_AGGREGATE) == QIO_AGGREGATE_FORMAT_JSON;
 
@@ -1840,7 +1838,7 @@ module List {
     }
 
     @chpldoc.nodoc
-    proc _writeJson(ch: fileWriter) throws {
+    proc _writeJson(ch) throws {
       _enter();
 
       ch.writeLiteral("[");
@@ -1859,7 +1857,7 @@ module List {
     }
 
     @chpldoc.nodoc
-    proc serialize(writer: fileWriter(?), ref serializer) throws {
+    proc serialize(writer, ref serializer) throws {
       _enter();
 
       var ser = serializer.startList(writer, this._size);
@@ -1875,7 +1873,7 @@ module List {
 
      :arg ch: A channel to read from.
      */
-    proc ref readThis(ch: fileReader) throws {
+    proc ref readThis(ch) throws {
       //
       // Special handling for reading in order to handle reading an arbitrary
       // size.
@@ -1914,7 +1912,7 @@ module List {
               ch.readLiteral("]");
               hasReadEnd = true;
               break;
-            } catch err: BadFormatError {
+            } catch err /*: BadFormatError */ {
               // Continue on if we didn't read an end bracket.
             }
           } else {
@@ -1922,7 +1920,7 @@ module List {
             // Try to read a comma. Break if we don't.
             try {
               ch.readLiteral(",");
-            } catch err: BadFormatError {
+            } catch /* err: BadFormatError */ {
               break;
             }
           }
@@ -1942,7 +1940,7 @@ module List {
     }
 
     @chpldoc.nodoc
-    proc ref _readJson(ch: fileReader) throws {
+    proc ref _readJson(ch) throws {
       var isFirst = true;
       var hasReadEnd = false;
 
@@ -1969,7 +1967,7 @@ module List {
     }
 
     @chpldoc.nodoc
-    proc init(type eltType, param parSafe : bool, reader: fileReader, ref deserializer) throws {
+    proc init(type eltType, param parSafe : bool, reader, ref deserializer) throws {
       this.init(eltType, parSafe);
       // TODO: a couple of silly initializer things I noticed:
       // - why can't we have a try with a catch? probably old rule...
@@ -1978,7 +1976,7 @@ module List {
     }
 
     @chpldoc.nodoc
-    proc ref _readHelper(r: fileReader, ref deserializer) throws {
+    proc ref _readHelper(r, ref deserializer) throws {
       _enter();
 
       _clearLocked();
@@ -1999,7 +1997,7 @@ module List {
     }
 
     @chpldoc.nodoc
-    proc ref deserialize(reader: fileReader, ref deserializer) throws {
+    proc ref deserialize(reader, ref deserializer) throws {
       _readHelper(reader, deserializer);
     }
 

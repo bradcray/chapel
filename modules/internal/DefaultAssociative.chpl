@@ -25,7 +25,7 @@ module DefaultAssociative {
 
   use DSIUtil;
   use ChapelDistribution, ChapelRange, ChapelArray;
-  use ChapelBase, ChapelLocks, IO;
+  use ChapelBase, ChapelLocks;
   use ChapelHashing, ChapelHashtable;
   use OS;
 
@@ -40,8 +40,11 @@ module DefaultAssociative {
   }
 
   private proc _isDefaultDeser(f) param : bool {
+    return false;
+    /*
     if f._writing then return f.serializerType == IO.defaultSerializer;
     else return f.deserializerType == IO.defaultDeserializer;
+    */
   }
 
   // helps to move around array elements when rehashing the domain

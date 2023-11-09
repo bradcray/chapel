@@ -512,6 +512,9 @@ static int moduleUseIndex(ModuleSymbol* mod, ModuleSymbol* usedModule) {
 // long at ChapelStandard always appears first in the list
 void ModuleSymbol::moduleUseAdd(ModuleSymbol* mod) {
   if (mod != this && moduleUseIndex(this, mod) < 0) {
+    if (strcmp(mod->name, "IO") == 0) {
+      gdbShouldBreakHere();
+    }
     if (mod == standardModule) {
       modUseList.insert(modUseList.begin(), mod);
 
@@ -552,6 +555,8 @@ void ModuleSymbol::deadCodeModuleUseRemove(ModuleSymbol* mod) {
           block->useListAdd(modUsedByDeadMod, false);
         }
 
+        printf("Adding use of %s to %s because %s is dead\n",
+               modUsedByDeadMod->name, this->name, mod->name);
         modUseList.push_back(modUsedByDeadMod);
       }
     }

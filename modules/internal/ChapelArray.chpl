@@ -918,13 +918,6 @@ module ChapelArray {
     return true;
   }
 
-  // This alternative declaration of Sort.defaultComparator
-  // prevents transitive use of module Sort.
-  proc chpl_defaultComparator() {
-    use Sort;
-    return defaultComparator;
-  }
-
   @chpldoc.nodoc
   proc shouldReturnRvalueByValue(type t) param {
     if !PODValAccess then return false;
@@ -1770,24 +1763,6 @@ module ChapelArray {
       return _value.IRV;
     }
 
-    /* Yield the array elements in sorted order. */
-    @deprecated(notes="'Array.sorted' is deprecated - use Sort.sort instead")
-    iter sorted(comparator:?t = chpl_defaultComparator()) {
-      if Reflection.canResolveMethod(_value, "dsiSorted", comparator) {
-        for i in _value.dsiSorted(comparator) {
-          yield i;
-        }
-      } else if Reflection.canResolveMethod(_value, "dsiSorted") {
-        compilerError(_value.type:string + " does not support dsiSorted(comparator)");
-      } else {
-        use Sort;
-        var copy = this;
-        sort(copy, comparator=comparator);
-        for ind in copy do
-          yield ind;
-      }
-    }
-
     @chpldoc.nodoc
     proc displayRepresentation() { _value.dsiDisplayRepresentation(); }
 
@@ -2206,14 +2181,6 @@ module ChapelArray {
     // The would-be param version of proc =, inlined.
     chpl__transferArray(result, arg);
     return result;
-  }
-
-  // How to cast arrays to strings
-  @chpldoc.nodoc
-  @deprecated(notes="casting arrays to string is deprecated; please use 'try! \"%?\".format()' from IO.FormattedIO instead")
-  operator :(x: [], type t:string) {
-    import IO.FormattedIO.string;
-    return try! "%?".format(x);
   }
 
   pragma "last resort"

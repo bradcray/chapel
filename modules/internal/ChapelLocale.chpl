@@ -740,6 +740,8 @@ module ChapelLocale {
     if rootLocale._instance != nil then
       return (rootLocale._instance:borrowed AbstractRootLocale?)!.localeIDtoLocale(id);
     else {
+//      extern proc printf(x...);
+//      printf("Using dummy locale\n");
       // For code prior to rootLocale initialization
       // in cases where we capture functions as FCF, module initialization order
       // changes in a way that IO is inited too early. In that scenario, we
@@ -748,6 +750,7 @@ module ChapelLocale {
       if dummyLocale._instance == nil {
         dummyLocale._instance = new unmanaged DummyLocale();
       }
+//      halt("Trying to use 'here' before locales are set up");
       return dummyLocale;
     }
   }

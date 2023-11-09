@@ -22,7 +22,6 @@ module ChapelDistribution {
 
   use ChapelArray, ChapelRange;
   use ChapelLocks;
-  use ChapelHashtable;
 
   //
   // Abstract distribution class
@@ -539,6 +538,7 @@ module ChapelDistribution {
     // (1) sorts indices if !dataSorted
     // (2) verifies the flags are set correctly if boundsChecking
     // (3) checks OOB if boundsChecking
+    /*
     proc bulkAdd_prepareInds(ref inds, dataSorted, isUnique, cmp) {
       use Sort;
       if !dataSorted then sort(inds, comparator=cmp);
@@ -566,6 +566,7 @@ module ChapelDistribution {
         for i in inds do boundsCheck(i);
       }
     }
+    */
 
     // this is a helper function for bulkAdd functions in sparse subdomains, which
     // store the nonzeros in order based on their major and minor index

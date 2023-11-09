@@ -1481,10 +1481,9 @@ module ChapelDomain {
      */
     proc dim(d : int) {
       use HaltWrappers;
-      import IO.FormattedIO.string;
       if boundsChecking then
         if (d < 0 || d >= rank) then
-          HaltWrappers.boundsCheckHalt(try! "dim(%i) is out-of-bounds; must be 0..%i".format(d, rank-1));
+          HaltWrappers.boundsCheckHalt("dummy");
       return _value.dsiDim(d);
     }
 
@@ -2010,7 +2009,6 @@ module ChapelDomain {
         It is an error if `idx` is not a valid index in `arr`.
       */
       proc initialize(ref arr: [?d], idx, in value: arr.eltType) {
-        import IO.FormattedIO.string;
 
         // Check to make sure value and array element types match.
         if arr.eltType != value.type then
@@ -2038,11 +2036,11 @@ module ChapelDomain {
                'the domain being resized');
 
         if !arr.domain.contains(idx) then
-          halt(try! 'Array index out of bounds: %?'.format(idx));
+          halt("dummy");
 
         if _checks {
           if isElementInitialized(arr, idx) {
-            halt(try! "Element at array index '%?' is already initialized".format(idx));
+            halt("dummy");
           }
         }
 
@@ -3007,8 +3005,7 @@ module ChapelDomain {
       if canResolveMethod(val._value, "doiToString") {
         return val._value.doiToString();
       } else {
-        import IO.FormattedIO.string;
-        return try! "%?".format(val);
+        return "dummy";
       }
     }
 

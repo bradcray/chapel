@@ -41,7 +41,7 @@
 //   classes... should I?
 //
 module ArrayViewRankChange {
-  private use ChapelStandard;
+  use ChapelDistribution, ChapelDomain;
 
   //
   // This class represents a distribution that knows how to create

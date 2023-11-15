@@ -228,6 +228,7 @@ module ChapelTuple {
   iter _tuple.these(param tag:iterKind)
       where tag == iterKind.leader
   {
+    use ChapelDataPar;
 
     const numTasks = if dataParTasksPerLocale==0 then here.maxTaskPar
                      else dataParTasksPerLocale;

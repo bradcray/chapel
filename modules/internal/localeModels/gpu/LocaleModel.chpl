@@ -30,6 +30,7 @@
 @unstable("The GPU locale interface is unstable and expected to change in the forthcoming releases")
 module LocaleModel {
 
+  use ChapelDefaultDist;
   public use LocaleModelHelpGPU;
 
   use IO, CTypes;

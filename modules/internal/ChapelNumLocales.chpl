@@ -21,7 +21,7 @@
 // ChapelNumLocales.chpl
 //
 module ChapelNumLocales {
-  private use ChapelBase;
+  private use ChapelBase, ChapelConfig;
 
   extern proc chpl_comm_default_num_locales(): int;
 

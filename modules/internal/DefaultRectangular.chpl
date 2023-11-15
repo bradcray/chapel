@@ -21,16 +21,8 @@
 // DefaultRectangular.chpl
 //
 module DefaultRectangular {
+  use ChapelDefaultDist;
   import HaltWrappers;
-  @unstable("The variable 'dataParTasksPerLocale' is unstable and its interface is subject to change in the future")
-  config const dataParTasksPerLocale = 0;
-  @unstable("The variable 'dataParIgnoreRunningTasks' is unstable and its interface is subject to change in the future")
-  config const dataParIgnoreRunningTasks = false;
-  @unstable("The variable 'dataParMinGranularity' is unstable and its interface is subject to change in the future")
-  config const dataParMinGranularity: int = 1;
-
-  if dataParTasksPerLocale<0 then halt("dataParTasksPerLocale must be >= 0");
-  if dataParMinGranularity<=0 then halt("dataParMinGranularity must be > 0");
 
   use DSIUtil;
   public use ChapelArray;
@@ -40,8 +32,6 @@ module DefaultRectangular {
   public use ExternalArray; // OK: currently expected to be available by
                             // default... though... why 'use' it here?
 
-  config param debugDefaultDist = false;
-  config param debugDefaultDistBulkTransfer = false;
   config param debugDataPar = false;
   config param debugDataParNuma = false;
   config param disableArrRealloc = false;
@@ -96,66 +86,6 @@ module DefaultRectangular {
     return ret;
   }
 
-
-  @unstable("DefaultDist is unstable and may change in the future")
-  class DefaultDist: BaseDist {
-    override proc dsiNewRectangularDom(param rank: int, type idxType,
-                                       param strides: strideKind, inds) {
-      const dom = new unmanaged DefaultRectangularDom(rank, idxType, strides,
-                                                      _to_unmanaged(this));
-      dom.dsiSetIndices(inds);
-      return dom;
-    }
-
-    override proc dsiNewAssociativeDom(type idxType, param parSafe: bool) do
-      return new unmanaged DefaultAssociativeDom(idxType, parSafe, _to_unmanaged(this));
-
-    override proc dsiNewSparseDom(param rank: int, type idxType, dom: domain) do
-      return new unmanaged DefaultSparseDom(rank, idxType, _to_unmanaged(this), dom);
-
-    proc dsiTargetLocales() const ref {
-      return EachLocSingletonArr[this.locale.id];
-    }
-
-    proc dsiIndexToLocale(ind) do return this.locale;
-
-    // Right now, the default distribution acts like a singleton.
-    // So we don't have to copy it when a clone is requested.
-    proc dsiClone() do return _to_unmanaged(this);
-
-    proc dsiAssign(other: this.type) { }
-
-    proc dsiEqualDMaps(d:unmanaged DefaultDist) param do return true;
-    proc dsiEqualDMaps(d) param do return false;
-
-    proc trackDomains() param do return false;
-    override proc dsiTrackDomains() do    return false;
-
-    override proc singleton() param do return true;
-
-    override proc dsiIsLayout() param do return true;
-  }
-
-  //
-  // Replicated copies are set up in chpl_initOnLocales() during locale
-  // model initialization
-  //
-  pragma "locale private"
-  var defaultDist = new dmap(new unmanaged DefaultDist());
-
-  proc chpl_defaultDistInitPrivate() {
-    if defaultDist._value==nil {
-      // FIXME benharsh: Here's what we want to do:
-      //   defaultDist = new dmap(new DefaultDist());
-      // The problem is that the LHS of the "proc =" for _distributions
-      // loses its ref intent in the removeWrapRecords pass.
-      //
-      // The code below is copied from the contents of the "proc =".
-      const nd = new dmap(new unmanaged DefaultDist());
-      __primitive("move", defaultDist, chpl__autoCopy(nd.clone(),
-                                                      definedConst=false));
-    }
-  }
 
   class DefaultRectangularDom: BaseRectangularDom(?) {
     var dist: unmanaged DefaultDist;

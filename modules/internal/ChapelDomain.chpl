@@ -22,8 +22,8 @@
 //
 module ChapelDomain {
 
-  public use ChapelBase;
-  use ArrayViewRankChange, ChapelTuple;
+  public use ChapelBase, ChapelDefaultDist;
+  use ArrayViewRankChange, ChapelTuple, ChapelConfig;
 
   /*
      Fractional value that specifies how full this domain can be
@@ -202,50 +202,6 @@ module ChapelDomain {
         return false;
     }
     return true;
-  }
-
-  proc chpl__buildDomainExpr(ranges..., definedConst)
-  where chpl__isTupleOfRanges(ranges) {
-    param rank = ranges.size;
-    for param i in 1..rank-1 do
-      if ranges(0).idxType != ranges(i).idxType then
-        compilerError("idxType varies among domain's dimensions");
-    for param i in 0..rank-1 do
-      if ranges(i).bounds != boundKind.both then
-        compilerError("one of domain's dimensions is not a bounded range");
-    var d: domain(rank, ranges(0).idxType, chpl_strideUnion(ranges));
-    d.setIndices(ranges);
-    if definedConst then
-      chpl__setDomainConst(d);
-    return d;
-  }
-
-  private proc chpl__setDomainConst(dom: domain) {
-    dom._value.definedConst = true;
-  }
-
-  // definedConst is added only for interface consistency
-  @unstable("Associative domains are unstable and their behavior may change in the future")
-  proc chpl__buildDomainExpr(const keys..., definedConst) {
-    param count = keys.size;
-    // keyType of string literals is assumed to be type string
-    type keyType = keys(0).type;
-    for param i in 1..count-1 do
-      if keyType != keys(i).type {
-        compilerError("Associative domain element " + i:string +
-                      " expected to be of type " + keyType:string +
-                      " but is of type " + keys(i).type:string);
-      }
-
-    //Initialize the domain with a size appropriate for the number of keys.
-    //This prevents resizing as keys are added.
-    var D : domain(keyType);
-    D.requestCapacity(count);
-
-    for param i in 0..count-1 do
-      D += keys(i);
-
-    return D;
   }
 
   //

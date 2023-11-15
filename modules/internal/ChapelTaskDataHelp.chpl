@@ -25,6 +25,7 @@ module ChapelTaskDataHelp {
   private use ChapelStandard;
   private use CTypes;
   private use OS.POSIX;
+  use ChapelTasking;
 
   extern type chpl_task_infoChapel_t;
   pragma "fn synchronization free"

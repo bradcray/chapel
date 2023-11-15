@@ -20,17 +20,7 @@
 
 // Useful functions for implementing distributions
 
-inline proc getDataParTasksPerLocale() {
-  return dataParTasksPerLocale;
-}
-
-inline proc getDataParIgnoreRunningTasks() {
-  return dataParIgnoreRunningTasks;
-}
-
-inline proc getDataParMinGranularity() {
-  return dataParMinGranularity;
-}
+public use ChapelDataPar;
 
 //
 // return a rank*t tuple initialized to val
@@ -117,6 +107,7 @@ proc _computeNumChunks(maxTasks, ignoreRunning, minSize, numElems): int {
 
 // How many tasks should be spawned to service numElems elements.
 proc _computeNumChunks(numElems): int {
+  use ChapelDataPar;
   // copy some machinery from DefaultRectangularDom
   var numTasks = if dataParTasksPerLocale==0
                  then here.maxTaskPar

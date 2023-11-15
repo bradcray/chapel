@@ -22,6 +22,8 @@
 //
 module ChapelRange {
 
+  public use ChapelDataPar;
+
   use ChapelBase, HaltWrappers;
 
   use AutoMath, DSIUtil, Reflection;
@@ -3852,6 +3854,7 @@ private proc isBCPindex(type t) param do
   @chpldoc.nodoc
   iter range.these(param tag: iterKind) where tag == iterKind.leader
   {
+    use ChapelDataPar;
     if !(hasLowBoundForIter(this) && hasHighBoundForIter(this)) then
       compilerError("parallel iteration is not currently supported over ranges without bounds");
 

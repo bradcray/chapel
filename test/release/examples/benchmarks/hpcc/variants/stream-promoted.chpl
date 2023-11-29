@@ -2,7 +2,7 @@
 // Use standard modules for Block distributions, Timing routines, Type
 // utility functions, and Random numbers
 //
-use BlockDist, Time, Types, Random;
+use BlockDist, Time, Types, NPBRandom;
 
 //
 // Use shared user module for computing HPCC problem sizes
@@ -34,8 +34,7 @@ config const numTrials = 10,
 // pseudo-random seed (based on the clock) or a fixed seed; and to
 // specify the fixed seed explicitly
 //
-config const useRandomSeed = true,
-             seed = if useRandomSeed then SeedGenerator.oddCurrentTime else 314159265;
+config const useRandomSeed = true;
 
 //
 // Configuration constants to control what's printed -- benchmark
@@ -59,7 +58,7 @@ proc main() {
   // the set of locales.  The ProblemSpace domain also contains the
   // indices 1..m.
   //
-  const ProblemSpace: domain(1) dmapped Block(boundingBox={1..m}) = {1..m};
+  const ProblemSpace: domain(1) dmapped blockDist(boundingBox={1..m}) = {1..m};
 
   //
   // A, B, and C are the three distributed vectors, declared to store
@@ -102,8 +101,10 @@ proc printConfiguration() {
 // Initialize vectors B and C using a random stream of values and
 // optionally print them to the console
 //
-proc initVectors(B, C) {
-  var randlist = new NPBRandomStream(eltType=real, seed=seed);
+proc initVectors(ref B, ref C) {
+  var randlist = if useRandomSeed
+    then new NPBRandomStream(eltType=real)
+    else new NPBRandomStream(eltType=real, 314159265);
 
   randlist.fillRandom(B);
   randlist.fillRandom(C);
@@ -117,7 +118,7 @@ proc initVectors(B, C) {
 //
 // Verify that the computation is correct
 //
-proc verifyResults(A, B, C) {
+proc verifyResults(A, ref B, C) {
   if (printArrays) then writeln("A is:     ", A, "\n");  // optionally print A
 
   //

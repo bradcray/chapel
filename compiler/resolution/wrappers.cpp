@@ -860,14 +860,6 @@ static Symbol* createDefaultedActual(FnSymbol*  fn,
     newCall->insertAtTail(new SymExpr(mapTo));
   }
 
-  // If the new call throws and it was in a 'try'/'try!' before
-  // we moved it, put it into a new 'try'/'try!'
-  if (throws && call->tryTag == TRY_TAG_IN_TRYBANG)
-    newCall = new CallExpr(PRIM_TRYBANG_EXPR, newCall);
-
-  if (throws && call->tryTag == TRY_TAG_IN_TRY)
-    newCall = new CallExpr(PRIM_TRY_EXPR, newCall);
-
   size_t nUsedFormals = entry->usedFormals.size();
   for (size_t i = 0; i < nUsedFormals; i++) {
     Symbol* usedFormal = entry->usedFormals[i].first;
@@ -875,6 +867,14 @@ static Symbol* createDefaultedActual(FnSymbol*  fn,
     INT_ASSERT(mapTo); // Should have another actual!
     newCall->insertAtTail(new SymExpr(mapTo));
   }
+
+  // If the new call throws and it was in a 'try'/'try!' before
+  // we moved it, put it into a new 'try'/'try!'
+  if (throws && call->tryTag == TRY_TAG_IN_TRYBANG)
+    newCall = new CallExpr(PRIM_TRYBANG_EXPR, newCall);
+
+  if (throws && call->tryTag == TRY_TAG_IN_TRY)
+    newCall = new CallExpr(PRIM_TRY_EXPR, newCall);
 
   body->insertAtTail(new CallExpr(PRIM_MOVE, temp, newCall));
 
@@ -2252,9 +2252,14 @@ bool isPromotionRequired(FnSymbol* fn, CallInfo& info,
       if (isRecordWrappedType(actualType) == true) {
         makeRefType(actualType);
 
-        actualType = actualType->refType;
+        if (actualType->refType == nullptr) {
+          // ex. the tuple type `(domain(?), int)`
+          // todo: when can we have promotion in this case?
+          INT_ASSERT(actualType->symbol->hasFlag(FLAG_GENERIC));
+          continue;
+        }
 
-        INT_ASSERT(actualType);
+        actualType = actualType->refType;
       }
 
       // Operator calls are allowed to have actuals for a method token and
@@ -2416,6 +2421,11 @@ static FnSymbol* buildPromotionWrapper(PromotionInfo& promotion,
   // B. will generate it too many times
   fn->maybeGenerateDeprecationWarning(info.call);
   fn->maybeGenerateUnstableWarning(info.call);
+
+  // if the fn is marked with NO_PROMOTION_WHEN_BY_REF, mark the wrapper
+  if (fn->hasFlag(FLAG_NO_PROMOTION_WHEN_BY_REF)) {
+    retval->addFlag(FLAG_NO_PROMOTION_WHEN_BY_REF);
+  }
 
   BlockStmt* loop = buildPromotionLoop(promotion, instantiationPt, info,
                                        fastFollowerChecks);

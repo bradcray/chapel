@@ -22,9 +22,11 @@
 //
 module DefaultRectangular {
   import HaltWrappers;
-
+  @unstable("The variable 'dataParTasksPerLocale' is unstable and its interface is subject to change in the future")
   config const dataParTasksPerLocale = 0;
+  @unstable("The variable 'dataParIgnoreRunningTasks' is unstable and its interface is subject to change in the future")
   config const dataParIgnoreRunningTasks = false;
+  @unstable("The variable 'dataParMinGranularity' is unstable and its interface is subject to change in the future")
   config const dataParMinGranularity: int = 1;
 
   if dataParTasksPerLocale<0 then halt("dataParTasksPerLocale must be >= 0");
@@ -94,6 +96,7 @@ module DefaultRectangular {
     return ret;
   }
 
+  @unstable("DefaultDist is unstable and may change in the future")
   record DefaultDist {
     forwarding const chpl_distHelp: chpl_LocalDistHelper(unmanaged DefaultDistImpl);
     proc init(other: unmanaged DefaultDistImpl = new unmanaged DefaultDistImpl()) {
@@ -118,10 +121,6 @@ module DefaultRectangular {
     @chpldoc.nodoc
     inline operator !=(d1: DefaultDist, d2: DefaultDist) {
       return !(d1 == d2);
-    }
-
-    proc writeThis(x) {
-      chpl_distHelp.writeThis(x);
     }
   }
 
@@ -824,7 +823,7 @@ module DefaultRectangular {
 
     proc hasUnitStride() param do return strides == strideKind.one;
 
-    inline proc theData ref {
+    inline proc ref theData ref {
       if ! hasUnitStride() {
         return data;
       } else {
@@ -896,14 +895,14 @@ module DefaultRectangular {
     }
   }
 
-  proc _remoteAccessData.computeFactoredOffs() {
+  proc ref _remoteAccessData.computeFactoredOffs() {
     factoredOffs = 0;
     for param i in 0..rank-1 do {
       factoredOffs = factoredOffs + blk(i) * chpl__idxToInt(off(i)):int;
     }
   }
 
-  proc _remoteAccessData.initShiftedData() {
+  proc ref _remoteAccessData.initShiftedData() {
     if earlyShiftData && hasUnitStride() {
       type idxSignedType = chpl__signedType(chpl__idxTypeToIntIdxType(idxType));
       const shiftDist = if isIntType(idxType) then origin - factoredOffs
@@ -919,7 +918,7 @@ module DefaultRectangular {
   proc _remoteAccessData.strideAlignDown(hi, r) do
     return hi - (hi - r.lowBound) % abs(r.stride):idxType;
 
-  proc _remoteAccessData.initDataFrom(other : _remoteAccessData) {
+  proc ref _remoteAccessData.initDataFrom(other : _remoteAccessData) {
     this.data = other.data;
   }
 
@@ -1118,7 +1117,7 @@ module DefaultRectangular {
       this.callPostAlloc = false;
       this.deinitElts = deinitElts;
 
-      this.complete();
+      init this;
       this.setupFieldsAndAllocate(initElts);
     }
 
@@ -1735,7 +1734,7 @@ module DefaultRectangular {
 
   proc DefaultRectangularDom.dsiSerialReadWrite(f /*: Reader or Writer*/) throws {
     inline proc rwLiteral(lit:string) throws {
-      if f._writing then f._writeLiteral(lit); else f._readLiteral(lit);
+      if f._writing then f.writeLiteral(lit); else f.readLiteral(lit);
     }
 
     rwLiteral("{");
@@ -1748,6 +1747,26 @@ module DefaultRectangular {
       else ranges(i) = f.read(ranges(i).type);
     }
     rwLiteral("}");
+  }
+
+  proc DefaultRectangularDom.dsiSerialWrite(f) throws
+  where _supportsSerializers(f) && f.serializerType != IO.defaultSerializer {
+    if chpl_warnUnstable then
+      compilerWarning("Serialization of rectangular domains with non-default Serializer is unstable, and may change in the future");
+    var ser = f.serializer.startList(f, rank);
+    for i in 0..<rank do ser.writeElement(dsiDim(i));
+    ser.endList();
+  }
+
+  // TODO: There is currently a bug when returning domains from
+  // 'deserializeFrom', so this isn't tested yet.
+  proc DefaultRectangularDom.dsiSerialRead(f) throws
+  where _supportsSerializers(f) && f.deserializerType != IO.defaultDeserializer {
+    if chpl_warnUnstable then
+      compilerWarning("Deserialization of rectangular domains with non-default Deserializer is unstable, and may change in the future");
+    var des = f.deserializer.startList(f);
+    for i in 0..<rank do ranges(i) = des.readElement(ranges(i).type);
+    des.endList();
   }
 
   proc DefaultRectangularDom.doiToString() {
@@ -1808,21 +1827,14 @@ module DefaultRectangular {
 
   proc chpl_serialReadWriteRectangularHelper(f, arr, dom) throws
   where _supportsSerializers(f) {
-    if arr.isDefaultRectangular() && !chpl__isArrayView(arr) &&
-       _isSimpleIoType(arr.eltType) && _supportsBulkElements(f, arr) &&
-       arr.isDataContiguous(dom) {
-      _readWriteBulk(f, arr, dom);
-    } else {
-      _readWriteHelper(f, arr, dom);
-    }
-  }
-
-  proc _readWriteHelper(f, arr, dom) throws {
     param rank = arr.rank;
     type idxType = arr.idxType;
     type idxSignedType = chpl__signedType(chpl__idxTypeToIntIdxType(idxType));
 
-    ref fmt = if f._writing then f.serializer else f.deserializer;
+    var helper = if f._writing then
+      f.serializer.startArray(f, dom.dsiNumIndices:int)
+    else
+      f.deserializer.startArray(f);
 
     proc recursiveArrayReaderWriter(in idx: rank*idxType, dim=0, in last=false) throws {
 
@@ -1830,18 +1842,18 @@ module DefaultRectangular {
       const makeStridePositive = if dom.dsiDim(dim).stride > 0 then 1:strType else (-1):strType;
 
       if f._writing then
-        fmt.startArrayDim(f, dom.dsiDim(dim).sizeAs(uint));
+        helper.startDim(dom.dsiDim(dim).size);
       else
-        fmt.startArrayDim(f);
+        helper.startDim();
 
       // The simple 1D case
       if dim == rank-1 {
         for j in dom.dsiDim(dim) by makeStridePositive {
           idx(dim) = j;
           if f._writing then
-            fmt.writeArrayElement(f, arr.dsiAccess(idx));
+            helper.writeElement(arr.dsiAccess(idx));
           else {
-            arr.dsiAccess(idx) = fmt.readArrayElement(f, arr.eltType);
+            arr.dsiAccess(idx) = helper.readElement(arr.eltType);
           }
         }
       } else {
@@ -1855,37 +1867,32 @@ module DefaultRectangular {
         }
       }
 
-      fmt.endArrayDim(f);
+      helper.endDim();
     }
 
-    if f._writing then
-      fmt.startArray(f, dom.dsiNumIndices:uint);
-    else
-      fmt.startArray(f);
+    use Reflection;
+    var dummy : c_ptr(arr.eltType);
+    param canResolveBulkElements = Reflection.canResolveMethod(helper, "writeBulkElements", dummy, 0) ||
+                                   Reflection.canResolveMethod(helper, "readBulkElements", dummy, 0);
+    param useBulkElements = canResolveBulkElements &&
+                            arr.isDefaultRectangular() &&
+                            !chpl__isArrayView(arr) &&
+                            _isSimpleIoType(arr.eltType);
 
-    const zeroTup: rank*idxType;
-    recursiveArrayReaderWriter(zeroTup);
-
-    fmt.endArray(f);
-  }
-
-  proc _readWriteBulk(f, arr, dom) throws {
-    ref fmt = if f._writing then f.serializer else f.deserializer;
-
-    const len = dom.dsiNumIndices:uint;
-    if f._writing then
-      fmt.startArray(f, len);
-    else
-      fmt.startArray(f);
-
-    var ptr = c_ptrTo(arr.dsiAccess(dom.dsiFirst));
-    if f._writing {
-      fmt.writeBulkElements(f, ptr, len);
+    const len = dom.dsiNumIndices:int;
+    if useBulkElements && arr.isDataContiguous(dom) && len > 0 {
+      var ptr = c_addrOf(arr.dsiAccess(dom.dsiFirst));
+      if f._writing then
+        helper.writeBulkElements(ptr, len);
+      else
+        helper.readBulkElements(ptr, len);
     } else {
-      fmt.readBulkElements(f, ptr, len);
+      // Otherwise, recursively read or write the array
+      const zeroTup: rank*idxType;
+      recursiveArrayReaderWriter(zeroTup);
     }
 
-    fmt.endArray(f);
+    helper.endArray();
   }
 
   proc chpl_serialReadWriteRectangularHelper(f, arr, dom) throws {
@@ -1897,7 +1904,7 @@ module DefaultRectangular {
     const isNative = f.styleElement(QIO_STYLE_ELEMENT_IS_NATIVE_BYTE_ORDER): bool;
 
     inline proc rwLiteral(lit:string) throws {
-      if f._writing then f._writeLiteral(lit); else f._readLiteral(lit);
+      if f._writing then f.writeLiteral(lit); else f.readLiteral(lit);
     }
 
     proc rwSpaces(dim:int) throws {
@@ -1908,7 +1915,7 @@ module DefaultRectangular {
 
     proc recursiveArrayReaderWriter(in idx: rank*idxType, dim=0, in last=false) throws {
 
-      var binary = f.binary();
+      var binary = f._binary();
       var arrayStyle = f.styleElement(QIO_STYLE_ELEMENT_ARRAY);
       var isspace = arrayStyle == QIO_ARRAY_FORMAT_SPACE && !binary;
       var isjson = arrayStyle == QIO_ARRAY_FORMAT_JSON && !binary;
@@ -1967,7 +1974,7 @@ module DefaultRectangular {
     }
 
     if arr.isDefaultRectangular() && !chpl__isArrayView(arr) &&
-       _isSimpleIoType(arr.eltType) && f.binary() &&
+       _isSimpleIoType(arr.eltType) && f._binary() &&
        isNative && arr.isDataContiguous(dom) {
 
       // If we can, we would like to read/write the array as a single write op
@@ -1987,9 +1994,9 @@ module DefaultRectangular {
       const size = len:c_ssize_t*elemSize:c_ssize_t;
       try {
         if f._writing {
-          f._writeBytes(_ddata_shift(arr.eltType, src, idx), size);
+          f.writeBinary(c_ptrTo(_ddata_shift(arr.eltType, src, idx)[0]), size);
         } else {
-          f._readBytes(_ddata_shift(arr.eltType, src, idx), size);
+          f.readBinary(c_ptrTo(_ddata_shift(arr.eltType, src, idx)[0]), size);
         }
       } catch err {
         // Setting errors in channels has no effect, so just rethrow.
@@ -2123,7 +2130,7 @@ module DefaultRectangular {
     // 2. we are either not doing communication or doing a PUT
     // See: https://github.com/Cray/chapel-private/issues/1365
     const isSizeAboveThreshold = len:int*elemsizeInBytes >= parallelAssignThreshold;
-    const isFullyLocal = Alocid == Blocid;
+    const isFullyLocal = Alocid == Blocid && Asublocid == Bsublocid;
     var doParallelAssign = isSizeAboveThreshold && isFullyLocal;
 
     if enableParallelGetsInAssignment || enableParallelPutsInAssignment {
@@ -2364,6 +2371,7 @@ module DefaultRectangular {
   // are on vs. where the source and destination are.
   //
   private proc complexTransferComm(A, B, stridelevels:int(32), dstStride, srcStride, count, AFirst, BFirst) {
+    use ChplConfig;
     if debugDefaultDistBulkTransfer {
       chpl_debug_writeln("BulkTransferStride with values:\n",
                     try! "\tLocale        = %?\n".format(here.id),
@@ -2384,7 +2392,9 @@ module DefaultRectangular {
     const cnt    = count._value.data;
 
     if dest.locale.id == here.id {
-      const srclocale = src.locale.id : int(32);
+      const srclocale = src.locale.id;
+      const src_subloc = if CHPL_LOCALE_MODEL != "gpu" then c_sublocid_any else
+                         chpl_sublocFromLocaleID(src.locale.chpl_localeid());
 
       if debugBulkTransfer {
         chpl_debug_writeln("BulkTransferStride: On LHS - GET from ", srclocale);
@@ -2394,13 +2404,16 @@ module DefaultRectangular {
                   dest[AO],
                   dststr[0],
                   srclocale,
+                  src_subloc,
                   src[BO],
                   srcstr[0],
                   cnt[0],
                   stridelevels);
     }
     else {
-      const destlocale = dest.locale.id : int(32);
+      const destlocale = dest.locale.id;
+      const dest_subloc = if CHPL_LOCALE_MODEL != "gpu" then c_sublocid_any else
+                          chpl_sublocFromLocaleID(dest.locale.chpl_localeid());
 
       if debugDefaultDistBulkTransfer {
         assert(src.locale.id == here.id,
@@ -2416,6 +2429,7 @@ module DefaultRectangular {
                   dest[AO],
                   dststr[0],
                   destlocale,
+                  dest_subloc,
                   src[BO],
                   srcstr[0],
                   cnt[0],
@@ -2499,7 +2513,7 @@ module DefaultRectangular {
   // task, and the scanned results of each task's scan.  This is
   // broken out into a helper function in order to be made use of by
   // distributed array scans.
-  proc DefaultRectangularArr.chpl__preScan(op, res: [] ?resType, dom) {
+  proc DefaultRectangularArr.chpl__preScan(op, ref res: [] ?resType, dom) {
     import RangeChunk;
     // Compute who owns what
     const rng = dom.dim(0);
@@ -2514,7 +2528,7 @@ module DefaultRectangular {
     var state: [rngs.domain] resType;
 
     // Take first pass over data doing per-chunk scans
-    coforall tid in rngs.domain {
+    coforall tid in rngs.domain with (ref state) {
       const current: resType;
       const myop = op.clone();
       for i in rngs[tid] {
@@ -2549,7 +2563,7 @@ module DefaultRectangular {
   // the result vector adding the prefix state computed by the earlier
   // tasks.  This is broken out into a helper function in order to be
   // made use of by distributed array scans.
-  proc DefaultRectangularArr.chpl__postScan(op, res, numTasks, rngs, state) {
+  proc DefaultRectangularArr.chpl__postScan(op, ref res, numTasks, rngs, state) {
     coforall tid in rngs.domain {
       const myadjust = state[tid];
       for i in rngs[tid] {

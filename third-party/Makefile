@@ -87,11 +87,14 @@ test-venv: FORCE
 chpldoc-venv: FORCE
 	cd chpl-venv && $(MAKE) chpldoc-venv
 
-chpldef-venv: FORCE
-	cd chpl-venv && $(MAKE) chpldef-venv
-
 c2chapel-venv: FORCE
 	cd chpl-venv && $(MAKE) c2chapel-venv
+
+chapel-py-venv: FORCE
+	cd chpl-venv && $(MAKE) chapel-py-venv
+
+chplcheck-venv: FORCE
+	cd chpl-venv && $(MAKE) chplcheck-venv
 
 # See gasnet/Makefile for explanation of the post-install step
 gasnet: $(GASNET_INSTALL_DIR)

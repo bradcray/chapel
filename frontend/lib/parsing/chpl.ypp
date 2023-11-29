@@ -89,6 +89,9 @@
     int processNewline(yyscan_t scanner);
   }
 
+  // Include the already defined parser location type so that we can use it.
+  #include "parser-yyltype.h"
+
   #endif
 }
 
@@ -180,6 +183,7 @@
     Decl::Visibility visibility;
     Module::Kind kind;
     PODUniqueString name;
+    TextLocation locName;
   };
 
   // A struct to thread along some pieces of a type before it is built.
@@ -191,6 +195,7 @@
     AttributeGroup* attributeGroup;
     PODUniqueString name;
     asttags::AstTag tag;
+    TextLocation locName;
   };
 
   // This is produced by do_stmt. It records whether the do_stmt statements
@@ -209,17 +214,19 @@
   struct MaybeNamedActual {
     AstNode* expr;
     PODUniqueString name;
+    TextLocation locName;
   };
-  static inline
-  MaybeNamedActual makeMaybeNamedActual(AstNode* expr,
-                                        PODUniqueString name) {
-    MaybeNamedActual ret = {expr, name};
+
+  static inline MaybeNamedActual
+  makeMaybeNamedActual(AstNode* expr, PODUniqueString name,
+                       TextLocation locName=TextLocation::create()) {
+    MaybeNamedActual ret = {expr, name, locName};
     return ret;
   }
   static inline
   MaybeNamedActual makeMaybeNamedActual(AstNode* expr) {
     PODUniqueString emptyName = PODUniqueString::get();
-    MaybeNamedActual ret = {expr, emptyName};
+    MaybeNamedActual ret = {expr, emptyName, TextLocation::create()};
     return ret;
   }
 
@@ -273,28 +280,18 @@
   };
 
   // Put our types in a different namespace to avoid conflicting with the
-  // production compiler parser's YYSTYPE/YYLTYPE.
+  // production compiler parser's YYSTYPE.
   #define YYSTYPE YYCHPL_STYPE
-  #define YYLTYPE YYCHPL_LTYPE
 
   // Note that the 'YYSTYPE_IS_TRIVIAL' macro tells the generated parser
   // that YYSTYPE only contains simple scalars (it can be bitcopied).
   // This is normally communicated by the '%union' directive, but we
   // stopped using that.
   #define YYCHPL_STYPE_IS_TRIVIAL 1
+  #define YYSTYPE_IS_TRIVIAL 1
 
   #endif
 }
-
-// YYLTYPE is the type that represents a source code location.
-// It is possible to define YYLTYPE (and this grammar used to in
-// order to handle chpldoc comments). This parser uses instead the
-// strategy of saving doc-comments in ParserContext.
-// The default YYLTYPE includes:
-//   first_line
-//   first_column
-//   last_line
-//   last_column
 
 //
 // Definition of the additional parameter to yypush_parse
@@ -387,7 +384,7 @@
 %token <uniqueStr> TELSE TENUM TEXCEPT TEXPORT TEXTERN
 %token <uniqueStr> TFALSE TFOR TFORALL TFOREACH TFORWARDING
 %token <uniqueStr> TIF TIMAG TIMPORT TIN TINCLUDE
-%token <uniqueStr> TINDEX TINLINE TINOUT TINT TITER TINITEQUALS
+%token <uniqueStr> TINDEX TINLINE TINOUT TINT TITER TINIT TINITEQUALS
 %token <uniqueStr> TIMPLEMENTS TINTERFACE
 %token <uniqueStr> TLABEL TLAMBDA TLET TLIFETIME TLOCAL TLOCALE
 %token <uniqueStr> TMANAGE TMINUSMINUS TMODULE
@@ -450,7 +447,7 @@
 // Add the 'internal_type_type_def' types here to resolve s/r for
 // function types/exprs, as well as TIDENT.
 %nonassoc TBOOL TINT TUINT TREAL TIMAG TCOMPLEX TBYTES TSTRING
-          TDOMAIN TINDEX TLOCALE TNOTHING TVOID TIDENT
+          TDOMAIN TINDEX TLOCALE TNOTHING TVOID TIDENT TINIT
 %nonassoc TFALSE TNONE TTHIS TTRUE
 
 %left TFOR TFORALL TFOREACH TIF TATOMIC TSYNC TSINGLE
@@ -702,6 +699,14 @@ stmt_base:
   }
 | try_stmt                  { $$ = context->finishStmt(@$, $1); }
 | return_stmt               { $$ = context->finishStmt($1); }
+| TINIT TTHIS TSEMI
+  {
+    auto comments = context->gatherComments(@1);
+    auto ident = Identifier::build(BUILDER, LOC(@2), $2);
+    auto node = Init::build(BUILDER, LOC(@$), std::move(ident));
+    CommentsAndStmt cs = { .comments=comments, .stmt=node.release() };
+    $$ = context->finishStmt(cs);
+  }
 | TBREAK opt_label_ident TSEMI
   {
     auto comments = context->gatherComments(@1);
@@ -747,19 +752,7 @@ tryable_stmt:
 | stmt_level_expr TSEMI     { $$ = context->finishStmt(STMT(@$,$1)); }
 | throw_stmt                { $$ = context->finishStmt($1); }
 | TBEGIN opt_task_intent_ls stmt
-  {
-    std::vector<ParserComment>* comments;
-    ParserExprList* exprLst;
-    BlockStyle blockStyle;
-    YYLTYPE locBodyAnchor = context->makeLocationAtLast(@2);
-    context->prepareStmtPieces(comments, exprLst, blockStyle, @1,
-                               false, locBodyAnchor, $3);
-    auto stmts = context->consumeAndFlattenTopLevelBlocks(exprLst);
-    auto node = Begin::build(BUILDER, LOC(@$), toOwned($2), blockStyle,
-                             std::move(stmts));
-    CommentsAndStmt ret = { .comments=comments, .stmt=node.release() };
-    $$ = context->finishStmt(ret);
-  }
+  { $$ = context->buildBeginStmt(@$, @1, @2, @3, $2, $3); }
 | TCOBEGIN opt_task_intent_ls block_stmt
   {
     std::vector<ParserComment>* comments;
@@ -888,23 +881,7 @@ attribute_decl_stmt_ls:
 attribute_decl_stmt:
  attribute_decl_begin opt_attribute_decl_toolspace opt_attribute_actuals
  {
-  context->noteAttribute(@1, $1, true, $2, $3);
- }
- | attribute_decl_begin opt_attribute_decl_toolspace
- {
-  // this allows us to distinguish between @attribute() and @attribute
-  // but should not be needed once `@unstable "msg"` is deprecated and gone
-  auto lst = new MaybeNamedActualList();
-  context->noteAttribute(@1, $1, false, $2, lst);
- }
- | attribute_decl_begin STRINGLITERAL
- {
-  // this allows us to maintain @unstable "message" without requiring parens
-  // but should not be needed once `@unstable "msg"` is deprecated and gone
-  auto lst = new MaybeNamedActualList();
-  auto actual = makeMaybeNamedActual($2);
-  lst->push_back(actual);
-  context->noteAttribute(@1, $1, false, context->makeList(), lst);
+  context->noteAttribute(@1, $1, $2, $3);
  }
 ;
 
@@ -935,6 +912,10 @@ opt_attribute_actuals:
   | TLP attribute_actuals_ls TRP
   {
     $$ = $2;
+  }
+  |
+  {
+    $$=new MaybeNamedActualList();
   }
 ;
 
@@ -1347,6 +1328,7 @@ assignment_stmt:
 opt_label_ident:
          { $$ = STR(""); }
 | TIDENT { $$ = $1; }
+| TINIT  { $$ = $1; } /* remove after init is no longer a valid identifier. */
 ;
 
 reserved_word_ident:
@@ -1359,6 +1341,7 @@ reserved_word_ident:
 
 ident_def:
   TIDENT
+| TINIT /* remove after init is no longer a valid identifier. */
 | reserved_word_ident
 ;
 
@@ -1372,6 +1355,7 @@ ident_def:
  */
 ident_use:
   TIDENT                   { $$ = $1; }
+| TINIT                    { $$ = $1; } /* remove after init is no longer a valid identifier. */
 | TTHIS                    { $$ = $1; }
 ;
 
@@ -1528,7 +1512,7 @@ extern_export_decl_stmt:
   extern_export_decl_stmt_start class_start opt_inherit
   TLCBR class_level_stmt_ls TRCBR
   {
-    $$ = context->buildAggregateTypeDecl(@1, $2, @3, $3, @4, $5, @6);
+    $$ = context->buildAggregateTypeDecl(@$, $2, @3, $3, @4, $5, @6);
     context->exitScope($2.tag, $2.name);
   }
 | extern_export_decl_stmt_start STRINGLITERAL class_start opt_inherit
@@ -1536,7 +1520,7 @@ extern_export_decl_stmt:
   {
     // Set the linkage name since it will be nullptr otherwise.
     $3.linkageName = $2;
-    $$ = context->buildAggregateTypeDecl(@1, $3, @4, $4, @5, $6, @7);
+    $$ = context->buildAggregateTypeDecl(@$, $3, @4, $4, @5, $6, @7);
     context->exitScope($3.tag, $3.name);
   }
 | extern_export_decl_stmt_start opt_expr fn_decl_stmt
@@ -1920,11 +1904,11 @@ implements_type_ident:
 | TLOCALE
 | TNOTHING
 | TVOID
-| implements_type_error_ident
-  {
-    context->syntax(@$, "type '%s' cannot implement an interface.", $1.c_str());
-    $$ = $1;
-  }
+| /* error handling moved to post-parse checks; the implements_type_error_ident
+     production is left intact to keep a reference list of things that shouldn't
+     go on the left of 'implements'.
+   */
+  implements_type_error_ident
 ;
 
 // these are not allowed as types in 'T implements IFC'
@@ -2136,7 +2120,7 @@ class_decl_stmt:
 class_start:
   class_tag ident_def
   {
-    $$ = context->enterScopeAndBuildTypeDeclParts(@1, $2, $1);
+    $$ = context->enterScopeAndBuildTypeDeclParts(@1, @2, $2, $1);
   }
 ;
 
@@ -2174,6 +2158,7 @@ class_level_stmt_ls:
   }
 ;
 
+// TODO: Move to builder methods, allow empty enums?
 enum_decl_stmt:
   enum_header_lcbr enum_ls TRCBR
     {
@@ -2186,6 +2171,7 @@ enum_decl_stmt:
                               parts.visibility,
                               parts.name,
                               context->consumeList(list));
+      BUILDER->noteDeclNameLocation(decl.get(), LOC(parts.locName));
       CommentsAndStmt cs = {parts.comments, decl.release()};
       $$ = cs;
       context->exitScope(asttags::Enum, parts.name);
@@ -2207,7 +2193,7 @@ enum_decl_stmt:
 enum_header_lcbr:
   TENUM ident_def TLCBR
   {
-    $$ = context->enterScopeAndBuildTypeDeclParts(@1, $2, asttags::Enum);
+    $$ = context->enterScopeAndBuildTypeDeclParts(@1, @2, $2, asttags::Enum);
   }
 ;
 
@@ -2751,6 +2737,7 @@ lifetime_expr:
 
 lifetime_ident:
   TIDENT { $$ = context->buildIdent(@1, $1); }
+| TINIT  { $$ = context->buildIdent(@1, $1); } /* remove after init is no longer a valid identifier. */
 | TTHIS  { $$ = context->buildIdent(@1, $1); }
 ;
 
@@ -3295,9 +3282,7 @@ opt_task_intent_ls:
 task_intent_clause:
   TWITH TLP task_intent_ls TRP
   {
-    auto exprs = context->consumeList($3);
-    auto node = WithClause::build(BUILDER, LOC(@$), std::move(exprs));
-    $$ = node.release();
+    $$ = context->buildWithClause(@$, @1, @2, @3, @4, $3);
   }
 ;
 
@@ -3603,25 +3588,17 @@ call_expr:
 
 dot_expr:
   expr TDOT ident_use
-    { $$ = Dot::build(BUILDER, LOC(@$), toOwned($1), $3).release(); }
+    { $$ = context->buildDot(@$, @1, @2, @3, $1, $3); }
 | expr TDOT TTYPE
-    { $$ = Dot::build(BUILDER, LOC(@$), toOwned($1), $3).release(); }
+    { $$ = context->buildDot(@$, @1, @2, @3, $1, $3); }
 | expr TDOT TDOMAIN
-    { $$ = Dot::build(BUILDER, LOC(@$), toOwned($1), $3).release(); }
+    { $$ = context->buildDot(@$, @1, @2, @3, $1, $3); }
 | expr TDOT TLOCALE
-    { $$ = Dot::build(BUILDER, LOC(@$), toOwned($1), $3).release(); }
+    { $$ = context->buildDot(@$, @1, @2, @3, $1, $3); }
 | expr TDOT TBYTES TLP TRP
-    {
-      $$ = FnCall::build(BUILDER, LOC(@$),
-                         Dot::build(BUILDER, LOC(@$), toOwned($1), $3),
-                         false).release();
-    }
+    { $$ = context->buildDot(@$, @1, @2, @3, $1, $3, true); }
 | expr TDOT TBYTES TLSBR TRSBR
-    {
-      $$ = FnCall::build(BUILDER, LOC(@$),
-                         Dot::build(BUILDER, LOC(@$), toOwned($1), $3),
-                         true).release();
-    }
+    { $$ = context->buildDot(@$, @1, @2, @3, $1, $3, true); }
 ;
 
 /* ( <expr> ) -- A parenthesized expression.  The parens are stripped.

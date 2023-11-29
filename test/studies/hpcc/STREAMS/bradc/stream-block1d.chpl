@@ -1,4 +1,4 @@
-use Time, Types, Random;
+use Time, Types, NPBRandom;
 use BlockDist;
 
 use HPCCProblemSize;
@@ -14,7 +14,7 @@ config const numTrials = 10,
              epsilon = 0.0;
 
 config const useRandomSeed = true,
-             seed = if useRandomSeed then SeedGenerator.oddCurrentTime else 314159265;
+             seed = if useRandomSeed then oddTimeSeed() else 314159265;
 
 config const printParams = true,
              printArrays = false,
@@ -26,7 +26,7 @@ proc main() {
   var t1, t2, t3: stopwatch;
 
   t1.start();
-  const BlockDist = new Block(rank=1, idxType=int(64), boundingBox={1..m}, targetLocales=Locales);
+  const BlockDist = new blockDist(rank=1, idxType=int(64), boundingBox={1..m}, targetLocales=Locales);
 
   const ProblemSpace: domain(1, int(64)) dmapped BlockDist = {1..m};
 
@@ -70,7 +70,7 @@ proc printConfiguration() {
 }
 
 
-proc initVectors(B, C) {
+proc initVectors(ref B, ref C) {
   var randlist = new NPBRandomStream(eltType=real, seed=seed);
 
   randlist.fillRandom(B);

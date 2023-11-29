@@ -43,11 +43,15 @@ namespace uast {
   The record itself (myRecord) is represented by a Record AST node.
  */
 class Record final : public AggregateDecl {
+ friend class AstNode;
+
  private:
   Record(AstList children, int attributeGroupChildNum, Decl::Visibility vis,
          Decl::Linkage linkage,
          int linkageNameChildNum,
          UniqueString name,
+         int inheritExprChildNum,
+         int numInheritExprs,
          int elementsChildNum,
          int numElements)
     : AggregateDecl(asttags::Record, std::move(children),
@@ -56,12 +60,16 @@ class Record final : public AggregateDecl {
                     linkage,
                     linkageNameChildNum,
                     name,
+                    inheritExprChildNum,
+                    numInheritExprs,
                     elementsChildNum,
-                    numElements) {
+                    numElements) {}
+
+  void serializeInner(Serializer& ser) const override {
+    aggregateDeclSerializeInner(ser);
   }
 
-  Record(Deserializer& des)
-    : AggregateDecl(asttags::Record, des) { }
+  explicit Record(Deserializer& des) : AggregateDecl(asttags::Record, des) { }
 
   bool contentsMatchInner(const AstNode* other) const override {
     const Record* lhs = this;
@@ -73,6 +81,8 @@ class Record final : public AggregateDecl {
     aggregateDeclMarkUniqueStringsInner(context);
   }
 
+  std::string dumpChildLabelInner(int i) const override;
+
  public:
   ~Record() override = default;
 
@@ -82,13 +92,8 @@ class Record final : public AggregateDecl {
                              Decl::Linkage linkage,
                              owned<AstNode> linkageName,
                              UniqueString name,
+                             AstList inheritExprs,
                              AstList contents);
-
-  void serialize(Serializer& ser) const override {
-    AggregateDecl::serialize(ser);
-  }
-
-  DECLARE_STATIC_DESERIALIZE(Record);
 };
 
 

@@ -146,8 +146,6 @@ static void virtualDispatchUpdateRoots(FnSymbol* pfn, FnSymbol* cfn);
 
 static bool isVirtualChild(FnSymbol* child, FnSymbol* parent);
 
-static bool isSubType(Type* sub, Type* super);
-
 static bool isOverrideableMethod(FnSymbol* fn);
 static bool isVirtualizableMethod(FnSymbol* fn);
 
@@ -234,7 +232,9 @@ static FnSymbol* getInstantiatedFunction(FnSymbol* pfn,
     // A smaller test case:
     //   types/type_variables/deitz/test_point_of_instantiation3.chpl
     //
-    fn->setInstantiationPoint(ct->symbol->instantiationPoint);
+    if (fn->instantiationPoint() == NULL) {
+      fn->setInstantiationPoint(ct->symbol->instantiationPoint);
+    }
 
     return fn;
   }
@@ -452,6 +452,7 @@ static void resolveOverrideAndAdjustMaps(FnSymbol* pfn, FnSymbol* cfn) {
       evaluateWhereClause(cfn) &&
       evaluateWhereClause(pfn)) {
 
+    resolveSpecifiedReturnType(cfn);
     resolveFunction(cfn);
 
     // check to see if we are using defaulted actual fns
@@ -611,7 +612,7 @@ static void overrideIterator(FnSymbol* pfn, FnSymbol* cfn) {
   }
 }
 
-static bool isSubType(Type* sub, Type* super) {
+bool isSubType(Type* sub, Type* super) {
   bool retval = false;
 
   if (sub == super) {
@@ -827,6 +828,7 @@ static void buildVirtualMethodTable() {
 static void addVirtualMethodTableEntry(Type*     type,
                                        FnSymbol* fn,
                                        bool      exclusive) {
+  type = type->getValType();
   Vec<FnSymbol*>* fns   = virtualMethodTable.get(type);
   bool            found = false;
 

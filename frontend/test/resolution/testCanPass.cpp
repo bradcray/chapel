@@ -149,43 +149,10 @@ static void test3() {
   Context* context = &ctx;
   Context* c = context;
 
-  QualifiedType bool0(QualifiedType::VAR, BoolType::get(context, 0));
-  QualifiedType bool8(QualifiedType::VAR, BoolType::get(context, 8));
-  QualifiedType bool16(QualifiedType::VAR, BoolType::get(context, 16));
-  QualifiedType bool32(QualifiedType::VAR, BoolType::get(context, 32));
-  QualifiedType bool64(QualifiedType::VAR, BoolType::get(context, 64));
+  QualifiedType bool0(QualifiedType::VAR, BoolType::get(context));
 
   CanPassResult r;
   r = canPass(c, bool0, bool0); assert(passesAsIs(r));
-  r = canPass(c, bool8, bool8); assert(passesAsIs(r));
-  r = canPass(c, bool16, bool16); assert(passesAsIs(r));
-  r = canPass(c, bool32, bool32); assert(passesAsIs(r));
-  r = canPass(c, bool64, bool64); assert(passesAsIs(r));
-
-  r = canPass(c, bool0, bool8); assert(passesNumeric(r));
-  r = canPass(c, bool0, bool16); assert(passesNumeric(r));
-  r = canPass(c, bool0, bool32); assert(passesNumeric(r));
-  r = canPass(c, bool0, bool64); assert(passesNumeric(r));
-
-  r = canPass(c, bool8, bool0); assert(passesNumeric(r));
-  r = canPass(c, bool8, bool16); assert(passesNumeric(r));
-  r = canPass(c, bool8, bool32); assert(passesNumeric(r));
-  r = canPass(c, bool8, bool64); assert(passesNumeric(r));
-
-  r = canPass(c, bool16, bool0); assert(passesNumeric(r));
-  r = canPass(c, bool16, bool8); assert(passesNumeric(r));
-  r = canPass(c, bool16, bool32); assert(passesNumeric(r));
-  r = canPass(c, bool16, bool64); assert(passesNumeric(r));
-
-  r = canPass(c, bool32, bool0); assert(passesNumeric(r));
-  r = canPass(c, bool32, bool8); assert(passesNumeric(r));
-  r = canPass(c, bool32, bool16); assert(passesNumeric(r));
-  r = canPass(c, bool32, bool64); assert(passesNumeric(r));
-
-  r = canPass(c, bool64, bool0); assert(passesNumeric(r));
-  r = canPass(c, bool64, bool8); assert(passesNumeric(r));
-  r = canPass(c, bool64, bool16); assert(passesNumeric(r));
-  r = canPass(c, bool64, bool32); assert(passesNumeric(r));
 }
 
 static void test4() {
@@ -263,7 +230,7 @@ static void test4() {
   r = canPass(c, oneUint64, int8); assert(passesParamNarrowing(r));
 
   r = canPass(c, oneInt0,  uint8); assert(passesParamNarrowing(r));
-  r = canPass(c, oneInt8,  uint8); assert(passesParamNarrowing(r));
+  r = canPass(c, oneInt8,  uint8); assert(passesNumeric(r));
   r = canPass(c, oneInt16, uint8); assert(passesParamNarrowing(r));
   r = canPass(c, oneInt32, uint8); assert(passesParamNarrowing(r));
   r = canPass(c, oneInt64, uint8); assert(passesParamNarrowing(r));
@@ -281,7 +248,7 @@ static void test4() {
   r = canPass(c, negInt64, int8); assert(passesParamNarrowing(r));
 
   r = canPass(c, negInt0,  uint8); assert(doesNotPass(r));
-  r = canPass(c, negInt8,  uint8); assert(doesNotPass(r));
+  r = canPass(c, negInt8,  uint8); assert(passesNumeric(r));
   r = canPass(c, negInt16, uint8); assert(doesNotPass(r));
   r = canPass(c, negInt32, uint8); assert(doesNotPass(r));
   r = canPass(c, negInt64, uint8); assert(doesNotPass(r));
@@ -330,29 +297,29 @@ static void test5() {
   QualifiedType real32(QualifiedType::VAR, RealType::get(context, 32));
 
   CanPassResult r;
-  r = canPass(c, m5,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, m4,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, m3,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, m2,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, m1,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, p0,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, p1,  real32); assert(doesNotPass(r));
-  r = canPass(c, p2,  real32); assert(doesNotPass(r));
-  r = canPass(c, p3,  real32); assert(doesNotPass(r));
-  r = canPass(c, p4,  real32); assert(doesNotPass(r));
-  r = canPass(c, p5,  real32); assert(doesNotPass(r));
+  r = canPass(c, m5,  real32); assert(passesNumeric(r));
+  r = canPass(c, m4,  real32); assert(passesNumeric(r));
+  r = canPass(c, m3,  real32); assert(passesNumeric(r));
+  r = canPass(c, m2,  real32); assert(passesNumeric(r));
+  r = canPass(c, m1,  real32); assert(passesNumeric(r));
+  r = canPass(c, p0,  real32); assert(passesNumeric(r));
+  r = canPass(c, p1,  real32); assert(passesNumeric(r));
+  r = canPass(c, p2,  real32); assert(passesNumeric(r));
+  r = canPass(c, p3,  real32); assert(passesNumeric(r));
+  r = canPass(c, p4,  real32); assert(passesNumeric(r));
+  r = canPass(c, p5,  real32); assert(passesNumeric(r));
 
-  r = canPass(c, n_m5,  real32); assert(doesNotPass(r));
-  r = canPass(c, n_m4,  real32); assert(doesNotPass(r));
-  r = canPass(c, n_m3,  real32); assert(doesNotPass(r));
-  r = canPass(c, n_m2,  real32); assert(doesNotPass(r));
-  r = canPass(c, n_m1,  real32); assert(doesNotPass(r));
-  r = canPass(c, n_p0,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, n_p1,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, n_p2,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, n_p3,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, n_p4,  real32); assert(passesParamNarrowing(r));
-  r = canPass(c, n_p5,  real32); assert(passesParamNarrowing(r));
+  r = canPass(c, n_m5,  real32); assert(passesNumeric(r));
+  r = canPass(c, n_m4,  real32); assert(passesNumeric(r));
+  r = canPass(c, n_m3,  real32); assert(passesNumeric(r));
+  r = canPass(c, n_m2,  real32); assert(passesNumeric(r));
+  r = canPass(c, n_m1,  real32); assert(passesNumeric(r));
+  r = canPass(c, n_p0,  real32); assert(passesNumeric(r));
+  r = canPass(c, n_p1,  real32); assert(passesNumeric(r));
+  r = canPass(c, n_p2,  real32); assert(passesNumeric(r));
+  r = canPass(c, n_p3,  real32); assert(passesNumeric(r));
+  r = canPass(c, n_p4,  real32); assert(passesNumeric(r));
+  r = canPass(c, n_p5,  real32); assert(passesNumeric(r));
 }
 
 static void test6() {
@@ -395,7 +362,7 @@ static void test7() {
 
   auto parentName = UniqueString::get(context, "Parent");
   auto childName = UniqueString::get(context, "Child");
-  auto basicObj = BasicClassType::getObjectType(context);
+  auto basicObj = BasicClassType::getRootClassType(context);
   auto basicParent = BasicClassType::get(context, emptyId, parentName,
                                          basicObj,
                                         /* instantiatedFrom */ nullptr,

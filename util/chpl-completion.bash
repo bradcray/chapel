@@ -43,6 +43,8 @@ _chpl ()
 --comm \
 --comm-substrate \
 --compile-time-nil-checking \
+--compiler-driver \
+--const-arg-checks \
 --copy-elision \
 --copy-propagation \
 --copyright \
@@ -56,6 +58,10 @@ _chpl ()
 --detailed-errors \
 --devel \
 --div-by-zero-checks \
+--driver-compilation-phase \
+--driver-debug-phase \
+--driver-makebinary-phase \
+--driver-tmp-dir \
 --dynamic \
 --dynamic-auto-local-access \
 --dyno \
@@ -74,6 +80,7 @@ _chpl ()
 --fast \
 --fast-followers \
 --force-vectorize \
+--foreach-intents \
 --formal-domain-checks \
 --gasnet-segment \
 --gdb \
@@ -145,6 +152,7 @@ _chpl ()
 --log \
 --log-deleted-ids-to \
 --log-dir \
+--log-fmt \
 --log-ids \
 --log-module \
 --log-pass \
@@ -170,6 +178,7 @@ _chpl ()
 --no-checks \
 --no-codegen \
 --no-compile-time-nil-checking \
+--no-const-arg-checks \
 --no-copy-elision \
 --no-copy-propagation \
 --no-count-tokens \
@@ -192,6 +201,7 @@ _chpl ()
 --no-explain-verbose \
 --no-fast-followers \
 --no-force-vectorize \
+--no-foreach-intents \
 --no-formal-domain-checks \
 --no-gen-ids \
 --no-gpu-specialization \
@@ -402,12 +412,14 @@ _chpl ()
 --codegen \
 --comm \
 --comm-substrate \
+--const-arg-checks \
 --copy-propagation \
 --copyright \
 --count-tokens \
 --cpp-lines \
 --dead-code-elimination \
 --debug \
+--detailed-errors \
 --devel \
 --div-by-zero-checks \
 --dynamic \
@@ -461,11 +473,13 @@ _chpl ()
 --no-cast-checks \
 --no-checks \
 --no-codegen \
+--no-const-arg-checks \
 --no-copy-propagation \
 --no-count-tokens \
 --no-cpp-lines \
 --no-dead-code-elimination \
 --no-debug \
+--no-detailed-errors \
 --no-devel \
 --no-div-by-zero-checks \
 --no-dynamic-auto-local-access \

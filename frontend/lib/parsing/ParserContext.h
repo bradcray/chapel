@@ -35,9 +35,11 @@ struct AttributeGroupParts {
   std::set<PragmaTag>* pragmas;
   bool isDeprecated;
   bool isUnstable;
+  bool isParenfulDeprecated;
   bool isStable;
   UniqueString deprecationMessage;
   UniqueString unstableMessage;
+  UniqueString parenfulDeprecationMessage;
 };
 
 struct ParserContext {
@@ -84,6 +86,9 @@ struct ParserContext {
   // note when EOF is reached
   bool atEOF;
 
+  // an easier-to-use copy of Context::Configuration::includeComments
+  bool includeComments;
+
   ParserExprList* parenlessMarker;
 
   ParserContext(const char* filename, Builder* builder,
@@ -103,12 +108,14 @@ struct ParserContext {
     this->varDeclKind             = Variable::VAR;
     this->isBuildingFormal        = false;
     this->isVarDeclConfig         = false;
-    this->attributeGroupParts     = {nullptr, nullptr, false, false, false, UniqueString(), UniqueString() };
+    this->attributeGroupParts     = {nullptr, nullptr, false, false, false, false, UniqueString(), UniqueString(), UniqueString() };
     this->hasAttributeGroupParts  = false;
     this->numAttributesBuilt      = 0;
     YYLTYPE emptyLoc = {0};
     this->declStartLocation       = emptyLoc;
     this->atEOF                   = false;
+    this->includeComments =
+      builder->context()->configuration().includeComments;
     this->parenlessMarker         = new ParserExprList();
     this->parseStats              = parseStats;
   }
@@ -132,12 +139,10 @@ struct ParserContext {
   owned<AstNode> consumeVarDeclLinkageName(void);
 
   void noteAttribute(YYLTYPE loc, AstNode* firstIdent,
-                     bool usedParens,
                      ParserExprList* toolspace,
                      MaybeNamedActualList* actuals);
 
   owned<Attribute> buildAttribute(YYLTYPE loc, AstNode* firstIdent,
-                                  bool usedParens,
                                   ParserExprList* toolspace,
                                   MaybeNamedActualList* actuals);
   owned<AttributeGroup> popLoopAttributeGroup();
@@ -198,9 +203,15 @@ struct ParserContext {
   ErroneousExpression* error(YYLTYPE loc, const char* fmt, ...);
   ErroneousExpression* syntax(YYLTYPE loc, const char* fmt, ...);
 
+  // This overload deep copies 'data' and will also deallocate 'data'.
   void noteComment(YYLTYPE loc, const char* data, long size);
+
+  // This overload takes ownership and does not deep copy 'pc'.
+  void noteComment(ParserComment pc);
+
   std::vector<ParserComment>* gatherComments(YYLTYPE location);
   void clearCommentsBefore(YYLTYPE loc);
+  void clearCommentsAfter(YYLTYPE loc);
   void clearComments(std::vector<ParserComment>* comments);
   void clearComments(ParserExprList* comments);
   void clearComments();
@@ -272,6 +283,18 @@ struct ParserContext {
 
   Location convertLocation(YYLTYPE location);
 
+  WithClause* buildWithClause(YYLTYPE location, YYLTYPE locWith,
+                              YYLTYPE locLeftParen,
+                              YYLTYPE locTaskIntentList,
+                              YYLTYPE locRightParen,
+                              ParserExprList* exprList);
+
+  CommentsAndStmt buildBeginStmt(YYLTYPE location, YYLTYPE locBegin,
+                                 YYLTYPE locWithClause,
+                                 YYLTYPE locStmt,
+                                 WithClause* withClause,
+                                 CommentsAndStmt stmt);
+
   Identifier* buildEmptyIdent(YYLTYPE location);
   Identifier* buildIdent(YYLTYPE location, PODUniqueString name);
 
@@ -281,6 +304,12 @@ struct ParserContext {
                      AstNode* lhs, PODUniqueString op, AstNode* rhs);
   OpCall* buildUnaryOp(YYLTYPE location,
                        PODUniqueString op, AstNode* expr);
+
+  AstNode* buildDot(YYLTYPE location, YYLTYPE locReceiver, YYLTYPE locPeriod,
+                    YYLTYPE locDotField,
+                    AstNode* receiver,
+                    UniqueString field,
+                    bool wrapInCall=false);
 
   AstNode* buildManagerExpr(YYLTYPE location, AstNode* expr,
                             Variable::Kind kind,
@@ -561,6 +590,7 @@ struct ParserContext {
   buildVarOrMultiDeclStmt(YYLTYPE locEverything, ParserExprList* vars);
 
   TypeDeclParts enterScopeAndBuildTypeDeclParts(YYLTYPE locStart,
+                                                YYLTYPE locName,
                                                 PODUniqueString name,
                                                 asttags::AstTag tag);
 

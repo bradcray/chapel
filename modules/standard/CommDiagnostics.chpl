@@ -183,6 +183,7 @@
   often necessary to run a small test program twice, once with that
   module present and once without it.
  */
+@unstable("The CommDiagnostics module is unstable and may change in the future")
 module CommDiagnostics
 {
   /*
@@ -314,6 +315,7 @@ module CommDiagnostics
     */
     var cache_readahead_waited : uint(64);
 
+    @chpldoc.nodoc
     proc writeThis(c) throws {
       use Reflection;
 
@@ -332,12 +334,19 @@ module CommDiagnostics
       if first then c.write("<no communication>");
       c.write(")");
     }
+
+    @chpldoc.nodoc
+    proc serialize(writer, ref serializer) throws {
+      writeThis(writer);
+    }
   };
 
   /*
     The Chapel record type inherits the comm layer definition of it.
    */
   type commDiagnostics = chpl_commDiagnostics;
+
+  commDiagnostics implements writeSerializable;
 
   private extern proc chpl_comm_startVerbose(stacktrace: bool,
                                              print_unstable: bool);

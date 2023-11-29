@@ -27,7 +27,9 @@
 
 #include <cstdio>
 #include <map>
+#include <set>
 #include <string>
+#include <unordered_set>
 
 class Timer;
 
@@ -52,6 +54,7 @@ extern bool fIgnoreNilabilityErrors;
 extern bool fOverloadSetsChecks;
 extern bool fNoStackChecks;
 extern bool fNoCastChecks;
+extern bool fNoConstArgChecks;
 extern bool fNoDivZeroChecks;
 extern bool fMungeUserIdents;
 extern bool fEnableTaskTracking;
@@ -160,6 +163,12 @@ extern char fExplainInstantiation[256];
 /// resolution.
 extern bool fExplainVerbose;
 extern bool fParseOnly;
+// begin compiler driver control flags
+extern bool fDriverDoMonolithic;
+extern bool fDriverCompilationPhase;
+extern bool fDriverMakeBinaryPhase;
+extern char driverTmpDir[FILENAME_MAX];
+// end compiler driver control flags
 extern bool fPrintAllCandidates;
 extern bool fPrintCallGraph;
 extern bool fPrintCallStackOnError;
@@ -261,16 +270,17 @@ extern int breakOnID;
 extern int breakOnRemoveID;
 
 extern int fGPUBlockSize;
-const int gpuArchNameLen = 16;
+const int gpuArchNameLen = 256;
 extern char fGpuArch[gpuArchNameLen+1];
 extern bool fGpuPtxasEnforceOpt;
 extern bool fGpuSpecialization;
 extern const char* gGpuSdkPath;
-extern char gpuArch[gpuArchNameLen+1];
+extern std::set<std::string> gpuArches;
 
 extern char stopAfterPass[128];
 
 // code generation strings
+extern const char* compileCommandFilename;
 extern const char* compileCommand;
 extern char compileVersion[64];
 
@@ -294,7 +304,7 @@ extern std::vector<std::string> llvmRemarksFunctionsToShow;
 
 extern bool fPrintAdditionalErrors;
 
-extern bool fDynoResolve;
+extern bool fDynoCompilerLibrary;
 extern bool fDynoScopeResolve;
 extern bool fDynoScopeProduction;
 extern bool fDynoScopeBundled;
@@ -317,5 +327,11 @@ extern std::vector<std::pair<std::string, std::string>> gDynoParams;
 
 extern std::vector<std::string> gDynoPrependInternalModulePaths;
 extern std::vector<std::string> gDynoPrependStandardModulePaths;
+
+extern std::string gDynoGenLibOutput;
+extern std::vector<UniqueString> gDynoGenLibSourcePaths;
+extern std::unordered_set<const char*> gDynoGenLibModuleNameAstrs;
+
+extern bool fForeachIntents;
 
 #endif

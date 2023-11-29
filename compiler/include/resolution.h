@@ -24,6 +24,7 @@
 #include "baseAST.h"
 #include "symbol.h"
 #include "expr.h"
+#include "ForallStmt.h"
 
 #include <map>
 #include <vector>
@@ -65,6 +66,8 @@ bool       isTupleContainingOnlyReferences(Type* t);
 bool       isTupleContainingAnyReferences(Type* t);
 
 void       ensureEnumTypeResolved(EnumType* etype);
+
+bool       tryingToResolve();
 
 void       resolveFnForCall(FnSymbol* fn, CallExpr* call);
 FnSymbol*  tryResolveFunction(FnSymbol* fn);
@@ -167,7 +170,7 @@ void  resolveForallStmts2();
 Expr* replaceForWithForallIfNeeded(ForLoop* forLoop);
 void  setReduceSVars(ShadowVarSymbol*& PRP, ShadowVarSymbol*& PAS,
                      ShadowVarSymbol*& RP, ShadowVarSymbol* AS);
-void setupAndResolveShadowVars(ForallStmt* fs);
+void setupAndResolveShadowVars(LoopWithShadowVarsInterface *fs);
 bool preserveShadowVar(Symbol* var);
 void adjustNothingShadowVariables();
 Expr* lowerPrimReduce(CallExpr* call);
@@ -184,6 +187,11 @@ Expr* resolveCallToAssociatedType(CallExpr* call, ConstrainedType* recv);
 struct ConstraintSat { ImplementsStmt* istm; IfcConstraint* icon; int indx;
   ConstraintSat(ImplementsStmt* s): istm(s), icon(0), indx(0) { }
   ConstraintSat(IfcConstraint* c, int i): istm(0), icon(c), indx(i) { } };
+ConstraintSat trySatisfyConstraintAtCallsite(CallExpr*      callsite,
+                                             Expr*          addlSite,
+                                             IfcConstraint* constraint,
+                                             SymbolMap&     substitutions);
+bool tryingToImplementInterface();
 ConstraintSat constraintIsSatisfiedAtCallSite(CallExpr* call, Expr* addlSite,
                                               IfcConstraint* constraint,
                                               SymbolMap& substitutions);

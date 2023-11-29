@@ -90,16 +90,16 @@ proc test_gemm_helper(type t) {
         C : [{0.. #m, 0.. #n}]t,
         D : [{0.. #m, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(B);
-    rng.fillRandom(C);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
+    rng.fill(B);
+    rng.fill(C);
     D = C;
     const alpha = rng.getNext(),
           beta = rng.getNext();
 
     gemm(A,B,C,alpha,beta);
-    forall (i,j) in D.domain do D[i,j] = beta*D[i,j]+alpha*(+ reduce (A[i,..]*B[..,j]));
+    forall (i,j) in D.domain with (ref D) do D[i,j] = beta*D[i,j]+alpha*(+ reduce (A[i,..]*B[..,j]));
     var err = max reduce abs(C-D);
     trackErrors(name, err, errorThreshold, passed, failed, tests);
   }
@@ -115,16 +115,16 @@ proc test_gemm_helper(type t) {
         C : [{0.. #m, 0.. #n}]t,
         D : [{0.. #m, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(B);
-    rng.fillRandom(C);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
+    rng.fill(B);
+    rng.fill(C);
     D = C;
     const alpha = rng.getNext(),
           beta = rng.getNext();
 
     gemm(A,B,C,alpha,beta, opA=Op.T);
-    forall (i,j) in D.domain do D[i,j] = beta*D[i,j]+alpha*(+ reduce (A[..,i]*B[..,j]));
+    forall (i,j) in D.domain with (ref D) do D[i,j] = beta*D[i,j]+alpha*(+ reduce (A[..,i]*B[..,j]));
     var err = max reduce abs(C-D);
     trackErrors(name, err, errorThreshold, passed, failed, tests);
   }
@@ -140,16 +140,16 @@ proc test_gemm_helper(type t) {
         C : [{0.. #m, 0.. #n}]t,
         D : [{0.. #m, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(B);
-    rng.fillRandom(C);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
+    rng.fill(B);
+    rng.fill(C);
     D = C;
     const alpha = rng.getNext(),
           beta = rng.getNext();
 
     gemm(A,B,C,alpha,beta, opB=Op.H);
-    forall (i,j) in D.domain do D[i,j] = beta*D[i,j]+alpha*(+ reduce (A[i,..]*conj(B[j,..])));
+    forall (i,j) in D.domain with (ref D) do D[i,j] = beta*D[i,j]+alpha*(+ reduce (A[i,..]*conj(B[j,..])));
     var err = max reduce abs(C-D);
     trackErrors(name, err, errorThreshold, passed, failed, tests);
   }
@@ -166,16 +166,16 @@ proc test_gemm_helper(type t) {
         C : [{0.. #m, 0.. #ld}]t,
         D : [{0.. #m, 0.. #ld}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(B);
-    rng.fillRandom(C);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
+    rng.fill(B);
+    rng.fill(C);
     D = C;
     const alpha = rng.getNext(),
           beta = rng.getNext();
 
     gemm(A[..,0.. #k], B[..,0.. #n], C[..,0.. #n], alpha,beta);
-    forall (i,j) in {0.. #m, 0.. #n} do
+    forall (i,j) in {0.. #m, 0.. #n} with (ref D) do
       D[i,j] = beta*D[i,j]+alpha*(+ reduce (A[i,0.. #k]*B[..,j]));
     var err = max reduce abs(C-D);
     trackErrors(name, err, errorThreshold, passed, failed, tests);
@@ -202,11 +202,11 @@ proc test_symm_helper(type t) {
         C : [{0.. #m, 0.. #n}]t,
         D : [{0.. #m, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
     makeSymm(A);
-    rng.fillRandom(B);
-    rng.fillRandom(C);
+    rng.fill(B);
+    rng.fill(C);
     var saveC = C;
     D = C;
     const alpha = rng.getNext(),
@@ -236,11 +236,11 @@ proc test_symm_helper(type t) {
         C : [{0.. #m, 0.. #n}]t,
         D : [{0.. #m, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
     makeSymm(A);
-    rng.fillRandom(B);
-    rng.fillRandom(C);
+    rng.fill(B);
+    rng.fill(C);
     var saveC = C;
     D = C;
     const alpha = rng.getNext(),
@@ -280,11 +280,11 @@ proc test_hemm_helper(type t) {
         C : [{0.. #m, 0.. #n}]t,
         D : [{0.. #m, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
     makeHerm(A);
-    rng.fillRandom(B);
-    rng.fillRandom(C);
+    rng.fill(B);
+    rng.fill(C);
     var saveC = C;
     D = C;
     const alpha = rng.getNext(),
@@ -314,11 +314,11 @@ proc test_hemm_helper(type t) {
         C : [{0.. #m, 0.. #n}]t,
         D : [{0.. #m, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
     makeHerm(A);
-    rng.fillRandom(B);
-    rng.fillRandom(C);
+    rng.fill(B);
+    rng.fill(C);
     var saveC = C;
     D = C;
     const alpha = rng.getNext(),
@@ -355,10 +355,10 @@ proc test_syrk_helper(type t) {
         C : [{0.. #n, 0.. #n}]t,
         D : [{0.. #n, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
     var B = A;
-    rng.fillRandom(C);
+    rng.fill(C);
     makeSymm(C);
     var saveC = C;
     D = C;
@@ -421,10 +421,10 @@ proc test_herk_helper(type t) {
         C : [{0.. #n, 0.. #n}]t,
         D : [{0.. #n, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
     var B = A;
-    rng.fillRandom(C);
+    rng.fill(C);
     makeHerm(C);
     var saveC = C;
     D = C;
@@ -491,10 +491,10 @@ proc test_syr2k_helper(type t) {
         C : [{0.. #n, 0.. #n}]t,
         D : [{0.. #n, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(B);
-    rng.fillRandom(C);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
+    rng.fill(B);
+    rng.fill(C);
     makeSymm(C);
     var saveC = C;
     D = C;
@@ -563,10 +563,10 @@ proc test_her2k_helper(type t) {
         C : [{0.. #n, 0.. #n}]t,
         D : [{0.. #n, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(B);
-    rng.fillRandom(C);
+    var rng = new randomStream(eltType=t);
+    rng.fill(A);
+    rng.fill(B);
+    rng.fill(C);
     makeHerm(C);
     var saveC = C;
     D = C;
@@ -639,8 +639,8 @@ proc test_trmm_helper(type t) {
         B : [{0.. #n, 0.. #n}]t,
         C : [{0.. #n, 0.. #n}]t;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(B);
+    var rng = new randomStream(eltType=t);
+    rng.fill(B);
     var saveB = B;
     const alpha = rng.getNext();
 
@@ -706,8 +706,8 @@ proc test_trsm_helper(type t) {
 
     makeUnit(Id, 5.0);
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(B);
+    var rng = new randomStream(eltType=t);
+    rng.fill(B);
     var saveB = B;
     const alpha = rng.getNext();
 

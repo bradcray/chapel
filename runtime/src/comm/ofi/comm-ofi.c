@@ -102,11 +102,11 @@ int chpl_comm_ofi_abort_on_error;
 //
 
 //
-// This is used to check that the libfabric version the runtime is
-// linked with in a user program is the same one it was compiled
-// against.
+// This is used as the API version to request in fi_getinfo(). We don't support
+// versions older than this and requesting an older version allows using
+// different versions at build and user compile time.
 //
-#define COMM_OFI_FI_VERSION FI_VERSION(FI_MAJOR_VERSION, FI_MINOR_VERSION)
+#define COMM_OFI_FI_VERSION FI_VERSION(1, 9)
 
 
 ////////////////////////////////////////
@@ -991,20 +991,6 @@ static chpl_bool mrGetKey(uint64_t*, uint64_t*, int, void*, size_t);
 static chpl_bool mrGetLocalKey(void*, size_t);
 static chpl_bool mrGetDesc(void**, void*, size_t);
 
-void chpl_comm_pre_topo_init(void) {
-  chpl_comm_ofi_abort_on_error =
-    (chpl_env_rt_get("COMM_OFI_ABORT_ON_ERROR", NULL) != NULL);
-  time_init();
-  chpl_comm_ofi_oob_init();
-  DBG_INIT();
-  int32_t rank;
-  int32_t count = chpl_comm_ofi_oob_locales_on_node(&rank);
-  chpl_set_num_locales_on_node(count);
-  if (rank != -1) {
-    chpl_set_local_rank(rank);
-  }
-}
-
 void chpl_comm_init(int *argc_p, char ***argv_p) {
   //
   // Gather run-invariant environment info as early as possible.
@@ -1046,6 +1032,18 @@ void chpl_comm_init(int *argc_p, char ***argv_p) {
     }
   }
 
+  chpl_comm_ofi_abort_on_error =
+    (chpl_env_rt_get("COMM_OFI_ABORT_ON_ERROR", NULL) != NULL);
+  time_init();
+  chpl_comm_ofi_oob_init();
+  DBG_INIT();
+  int32_t rank;
+  int32_t count = chpl_comm_ofi_oob_locales_on_node(&rank);
+  chpl_set_num_locales_on_node(count);
+  if (rank != -1) {
+    chpl_set_local_rank(rank);
+  }
+
   pthread_that_inited = pthread_self();
 }
 
@@ -1053,8 +1051,8 @@ void chpl_comm_init(int *argc_p, char ***argv_p) {
 void chpl_comm_pre_mem_init(void) {
   //
   // Reserve cores for the AM handlers. This is done here because it has to
-  // happen after chpl_topo_init has been called, but before other functions
-  // access information about the cores, such as pinning the heap.
+  // happen after the topology layer has been initialized, but before other
+  // functions access information about the cores, such as pinning the heap.
   //
   init_ofiReserveCores();
 }
@@ -2985,18 +2983,31 @@ static void init_amHandling(void);
 
 static
 void init_ofiForAms(void) {
+
+  // Specify the amount of space we should allocate for AM landing zones. We
+  // should have enough that we needn't re-post the multi-receive buffer more
+  // often than, say, every tenth of a second. The original value was 40MB as
+  // explained in the comment below. The default is now 64MB and it's
+  // configurable, although more experiments are necessary to perform a
+  // similar size computation on more modern hardware.
   //
-  // Compute the amount of space we should allow for AM landing zones.
-  // We should have enough that we needn't re-post the multi-receive
-  // buffer more often than, say, every tenth of a second.  We know from
-  // the Chapel performance/comm/low-level/many-to-one test that the
-  // comm=ugni AM handler can handle just over 150k "fast" AM requests
-  // in 0.1 sec.  Assuming an average AM request size of 256 bytes, a 40
-  // MiB buffer is enough to give us the desired 0.1 sec lifetime before
-  // it needs renewing.  We actually then split this in half and create
-  // 2 half-sized buffers (see below), so reflect that here also.
+  // Original comment:
+  // We know from the Chapel performance/comm/low-level/many-to-one test that
+  // the comm=ugni AM handler can handle just over 150k "fast" AM requests in
+  // 0.1 sec.  Assuming an average AM request size of 256 bytes, a 40 MiB
+  // buffer is enough to give us the desired 0.1 sec lifetime before it needs
+  // renewing.  We actually then split this in half and create 2 half-sized
+  // buffers (see below), so reflect that here also.
   //
-  const size_t amLZSize = ((size_t) 40 << 20) / 2;
+  size_t amLZSize = chpl_env_rt_get_size("COMM_OFI_AM_LZ_SIZE",
+                                               (size_t) 64 << 20);
+#ifdef CHPL_COMM_DEBUG
+    char buf[10];
+    DBG_PRINTF(DBG_AM_BUF, "AM LZ size %s (%#zx)",
+               chpl_snprintf_KMG_z(buf, sizeof(buf), amLZSize), amLZSize);
+#endif
+
+  amLZSize /= 2;
 
   //
   // Set the minimum multi-receive buffer space.  Make it big enough to

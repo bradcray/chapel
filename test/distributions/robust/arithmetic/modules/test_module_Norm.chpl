@@ -1,12 +1,12 @@
 // Test the standard module Norm
 
 use driver_real_arrays;
-use Random;
+use NPBRandom;
 use LinearAlgebra;
 
 config const is2D2Norm = false;
 
-var rng = createRandomStream(314159265, eltType=real(64), algorithm=RNG.NPB);
+var rng = new NPBRandomStream(314159265, eltType=real(64), parSafe=false);
 
 rng.fillRandom(R1D);
 rng.fillRandom(R2D);
@@ -96,7 +96,7 @@ doNorm(aR2D32, 3);
 
 
 writeln("Vector norm reindexed arrays");
-proc foo(D: domain, A: [D], loc) {
+proc foo(D: domain(?), A: [D], loc) {
   doNorm(A, loc);
 }
 const TD1D: domain(1) = Space1.translate(-o5);

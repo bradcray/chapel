@@ -164,13 +164,17 @@ CMAKE_FLAGS_NO_NDEBUG=$(subst -DNDEBUG,,$(CMAKE_FLAGS))
 frontend: FORCE $(CHPL_CONFIG_CHECK) $(COMPILER_BUILD)
 	@cd $(COMPILER_BUILD) && $(CMAKE) $(CHPL_MAKE_HOME) $(CMAKE_FLAGS) && $(MAKE) ChplFrontend
 
+frontend-shared: FORCE $(CHPL_CONFIG_CHECK) $(COMPILER_BUILD)
+	@cd $(COMPILER_BUILD) && $(CMAKE) $(CHPL_MAKE_HOME) $(CMAKE_FLAGS) && $(MAKE) ChplFrontendShared
+
 test-frontend: FORCE $(CHPL_CONFIG_CHECK) $(COMPILER_BUILD)
 	@echo "Making and running the frontend tests..."
 	@cd $(COMPILER_BUILD) && $(CMAKE) $(CHPL_MAKE_HOME) $(CMAKE_FLAGS_NO_NDEBUG) && $(MAKE) tests
-	JOBSFLAG=`echo "$$MAKEFLAGS" | sed -n 's/.*\(-j\|--jobs=\) *\([0-9][0-9]*\).*/-j\2/p'` ; \
-	  cd $(COMPILER_BUILD)/frontend/test && ctest $$JOBSFLAG . ;
 	@echo "Making symbolic link to frontend tests in build/frontend-test"
 	@cd ../build && rm -f frontend-test && ln -s $(COMPILER_BUILD)/frontend/test frontend-test
+	JOBSFLAG=`echo "$$MAKEFLAGS" | sed -n 's/.*\(-j\|--jobs=\) *\([0-9][0-9]*\).*/-j\2/p'` ; \
+	  cd $(COMPILER_BUILD)/frontend/test && ctest $$JOBSFLAG . ;
+	@echo "frontend tests are available in build/frontend-test"
 
 COPY_IF_DIFFERENT = $(CHPL_MAKE_PYTHON) $(CHPL_MAKE_HOME)/util/config/update-if-different --quiet --copy
 
@@ -205,10 +209,23 @@ $(CHPLDOC): FORCE $(COMPILER_BUILD) $(MAKEALLCHPLDOCSUBDIRS) | $(CHPL_BIN_DIR)
 
 chpldoc: FORCE $(CHPLDOC)
 
-$(CHPLDEF): FORCE $(CHPLDEF_OBJS) | $(CHPL_BIN_DIR) $(CHPL)
+MAKEALLCHPLDEFSUBDIRS = $(CHPLDEF_SUBDIRS:%=%.makedir)
+
+$(CHPLDEF): FORCE $(COMPILER_BUILD) $(MAKEALLCHPLDEFSUBDIRS) | $(CHPL_BIN_DIR)
 	@cd $(COMPILER_BUILD) && $(CMAKE) $(CHPL_MAKE_HOME) $(CMAKE_FLAGS) && $(MAKE) chpldef
 
 chpldef: FORCE $(CHPLDEF)
+
+chpldef-fast: FORCE
+	@cd $(COMPILER_BUILD) && $(MAKE) chpldef
+
+test-chpldef: FORCE $(CHPLDEF)
+	@echo "Making and running the chpldef tests..."
+	@cd $(COMPILER_BUILD) && $(CMAKE) $(CHPL_MAKE_HOME) $(CMAKE_FLAGS_NO_NDEBUG) && $(MAKE) chpldef-tests
+	@echo "Making symbolic link to chpldef tests in build/chpldef-test"
+	@cd ../build && rm -f chpldef-test && ln -s $(COMPILER_BUILD)/tools/chpldef/test chpldef-test
+	JOBSFLAG=`echo "$$MAKEFLAGS" | sed -n 's/.*\(-j\|--jobs=\) *\([0-9][0-9]*\).*/-j\2/p'` ; \
+	  cd $(COMPILER_BUILD)/tools/chpldef/test && ctest $$JOBSFLAG . ;
 
 $(COMPILER_BUILD):
 	mkdir -p $@
@@ -217,6 +234,11 @@ $(CHPL_BIN_DIR):
 	mkdir -p $@
 
 install-chpl-chpldoc: $(CHPL) $(CHPLDOC)
+# this target is called from the install.sh script, bypassing the normal
+# way of building chpldoc.  So we need to make sure the venv is built
+	@if [ -z "$$CHPL_DONT_BUILD_CHPLDOC_VENV" ]; then \
+	cd $(CHPL_MAKE_HOME)/third-party && $(MAKE) chpldoc-venv; \
+	fi
 	@cd $(COMPILER_BUILD) && $(CMAKE) $(CHPL_MAKE_HOME) $(CMAKE_FLAGS) && $(MAKE) install
 
 #

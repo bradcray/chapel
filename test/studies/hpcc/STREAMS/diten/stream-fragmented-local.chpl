@@ -1,4 +1,4 @@
-use Time, Types, Random;
+use Time, Types, NPBRandom;
 use hpccMultilocale;
 
 use HPCCProblemSize;
@@ -15,7 +15,7 @@ config const numTrials = 10,
              epsilon = 0.0;
 
 config const useRandomSeed = true,
-             seed = if useRandomSeed then SeedGenerator.oddCurrentTime else 314159265;
+             seed = if useRandomSeed then oddTimeSeed() else 314159265;
 
 config const printParams = true,
              printArrays = false,
@@ -30,7 +30,7 @@ proc main() {
   var   allExecTime: [LocaleSpace] [1..numTrials] real;
   var   allValidAnswer: [LocaleSpace] bool;
   
-  coforall loc in Locales {
+  coforall loc in Locales with (ref allExecTime, ref allValidAnswer) {
     on loc {
       const MyProblemSpace: domain(1, indexType) 
                           = BlockPartition(ProblemSpace, here.id, numLocales);
@@ -66,7 +66,7 @@ proc printConfiguration() {
 }
 
 
-proc initVectors(B, C, ProblemSpace) {
+proc initVectors(ref B, ref C, ProblemSpace) {
   var randlist = new NPBRandomStream(eltType=real, seed=seed);
 
   randlist.skipToNth(B.domain.low-1);

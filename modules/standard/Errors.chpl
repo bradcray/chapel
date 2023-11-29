@@ -86,6 +86,9 @@ module Errors {
     }
   }
 
+  /*
+    A `NilClassError` is thrown if a cast from a `nil` class is made.
+  */
   class NilClassError : Error {
     @chpldoc.nodoc
     override proc message() {
@@ -93,6 +96,10 @@ module Errors {
     }
   }
 
+  /*
+    A `ClassCastError` is thrown if a cast between class types fails and the
+    destination is not nilable.
+  */
   class ClassCastError : Error {
     @chpldoc.nodoc
     override proc message() {
@@ -102,8 +109,8 @@ module Errors {
 
   /*
    A `DecodeError` is thrown if an attempt to create a string with non-UTF8 byte
-   sequences are made at runtime. This includes calling the
-   `bytes.decode(decodePolicy.strict)` method on a bytes with non-UTF8 byte
+   sequences is made at runtime. This includes calling the
+   `bytes.decode(decodePolicy.strict)` method on a ``bytes`` with non-UTF8 byte
    sequences.
    */
   class DecodeError: Error {
@@ -114,9 +121,15 @@ module Errors {
     }
   }
 
+  /*
+    An `IllegalArgumentError` is thrown if bad arguments are passed as arguments
+    to procedures.
+  */
   class IllegalArgumentError : Error {
+    @chpldoc.nodoc
     proc init() {}
 
+    @chpldoc.nodoc
     proc init(msg: string) {
       super.init(msg);
     }
@@ -149,10 +162,12 @@ module Errors {
     with codepoint boundaries.
   */
   class CodepointSplitError: Error {
+    @chpldoc.nodoc
     proc init(info: string) {
       super.init(info);
     }
 
+    @chpldoc.nodoc
     override proc message() {
       return "Attempting to split a multi-byte codepoint. " + _msg;
     }
@@ -179,7 +194,7 @@ module Errors {
     var _head: unmanaged Error? = nil;
     var _errorsLock: chpl_LocalSpinlock;
 
-    proc append(err: unmanaged Error) {
+    proc ref append(err: unmanaged Error) {
       on this {
         _errorsLock.lock();
         var tmp = _head;
@@ -225,7 +240,7 @@ module Errors {
     proc init(ref group:chpl_TaskErrors) {
       var head: unmanaged Error? = group._head;
       group._head = nil;
-      this.complete();
+      init this;
 
       var cur: unmanaged Error?;
 
@@ -280,7 +295,7 @@ module Errors {
     proc init(err: unmanaged Error) {
       nErrors = 1;
       errorsArray = allocate(owned Error?, 1, clear=true);
-      this.complete();
+      init this;
       err._next = nil;
       errorsArray[0] = owned.adopt(err);
     }
@@ -291,6 +306,7 @@ module Errors {
       errorsArray = nil;
     }
 
+    @chpldoc.nodoc
     proc deinit() {
       if errorsArray {
         for i in 0..#nErrors {
@@ -571,10 +587,9 @@ module Errors {
 
   pragma "insert line file info"
   pragma "always propagate line file info"
-  proc chpl_enum_cast_error_no_int(enumName: string, constName: string) throws {
+  proc chpl_enum_cast_error_no_int(enumName: string, constName: string): int throws {
     throw new owned IllegalArgumentError("bad cast: enum '" + enumName + "." +
                                           constName + "' has no integer value");
-    return 0;
   }
 
 

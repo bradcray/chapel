@@ -28,8 +28,33 @@ module ChapelBase {
   // ChapelBase so that you don't have to 'import CTypes' to see the type
   // 'c_string' (which could break a lot of programs). This is OK because
   // after the deprecation period we can just remove 'c_string' entirely.
-  @deprecated(notes="the type 'c_string' is deprecated; please 'import CTypes' and use 'c_ptrConst(c_char)' instead")
+  pragma "last resort"
+  @deprecated(notes="the type 'c_string' is deprecated; please 'use CTypes' and replace 'c_string' with 'c_ptrConst(c_char)'")
   type c_string = chpl_c_string;
+
+  // c_fn_ptr stuff
+
+  // although it can just be a compiler-inserted primitive,
+  // we declare it so we can mark it unstable
+  @chpldoc.nodoc
+  @unstable("'c_fn_ptr' is unstable, and may be replaced by first-class procedure functionality")
+  type c_fn_ptr = chpl_c_fn_ptr;
+
+  @chpldoc.nodoc
+  @unstable
+  inline operator c_fn_ptr.=(ref a:c_fn_ptr, b:c_fn_ptr) {
+    __primitive("=", a, b);
+  }
+  @chpldoc.nodoc
+  @unstable
+  proc c_fn_ptr.this() {
+    compilerError("Can't call a C function pointer within Chapel");
+  }
+  @chpldoc.nodoc
+  @unstable
+  proc c_fn_ptr.this(args...) {
+    compilerError("Can't call a C function pointer within Chapel");
+  }
 
   pragma "locale private"
   @chpldoc.nodoc
@@ -38,10 +63,6 @@ module ChapelBase {
   public use ChapelStandard;
   use CTypes;
   use ChplConfig;
-
-  @chpldoc.nodoc
-  @deprecated(notes="the '_file' type is deprecated; please use 'CTypes.c_FILE' instead")
-  type _file = c_FILE_internal;
 
   config param enablePostfixBangChecks = false;
 
@@ -81,7 +102,7 @@ module ChapelBase {
   //
   // assignment on primitive types
   //
-  inline operator =(ref a: bool(?), b: bool) { __primitive("=", a, b); }
+  inline operator =(ref a: bool, b: bool) { __primitive("=", a, b); }
 
   inline operator =(ref a: int(8), b: int(8)) do __primitive("=", a, b);
   inline operator =(ref a: int(16), b: int(16)) do __primitive("=", a, b);
@@ -152,6 +173,8 @@ module ChapelBase {
   inline operator ==(a: complex(64), b: complex(64)) do return a.re == b.re && a.im == b.im;
   inline operator ==(a: complex(128), b: complex(128)) do return a.re == b.re && a.im == b.im;
   inline operator ==(a: borrowed RootClass?, b: borrowed RootClass?) do return __primitive("ptr_eq", a, b);
+  inline operator ==(a: borrowed RootClass?, b: _nilType) do return __primitive("==", a, nil);
+  inline operator ==(a: _nilType, b: borrowed RootClass?) do return __primitive("==", b, nil);
   inline operator ==(a: enum, b: enum) where (a.type == b.type) {
     return __primitive("==", a, b);
   }
@@ -183,6 +206,8 @@ module ChapelBase {
   inline operator !=(a: complex(64), b: complex(64)) do return a.re != b.re || a.im != b.im;
   inline operator !=(a: complex(128), b: complex(128)) do return a.re != b.re || a.im != b.im;
   inline operator !=(a: borrowed RootClass?, b: borrowed RootClass?) do return __primitive("ptr_neq", a, b);
+  inline operator !=(a: borrowed RootClass?, b: _nilType) do return __primitive("!=", a, nil);
+  inline operator !=(a: _nilType, b: borrowed RootClass?) do return __primitive("!=", b, nil);
   inline operator !=(a: enum, b: enum) where (a.type == b.type) {
     return __primitive("!=", a, b);
   }
@@ -1819,17 +1844,18 @@ module ChapelBase {
   config param commDiagsTrackEndCounts = false;
 
   pragma "no default functions"
-  record endCountDiagsManager {
+  record endCountDiagsManager : contextManager {
     var taskInfo: c_ptr(chpl_task_infoChapel_t);
     var prevDiagsDisabledVal: bool;
-    inline proc enterThis() : void {
+
+    inline proc ref enterContext() {
       if !commDiagsTrackEndCounts {
         taskInfo = chpl_task_getInfoChapel();
         prevDiagsDisabledVal = chpl_task_data_setCommDiagsTemporarilyDisabled(taskInfo, true);
       }
     }
 
-    inline proc leaveThis(in unused: owned Error?) {
+    inline proc exitContext(in unused: owned Error?) {
       if !commDiagsTrackEndCounts {
         chpl_task_data_setCommDiagsTemporarilyDisabled(taskInfo, prevDiagsDisabledVal);
       }
@@ -1971,6 +1997,12 @@ module ChapelBase {
   pragma "down end count fn"
   proc _downEndCount(e: _EndCount, err: unmanaged Error?) {
     chpl_save_task_error(e, err);
+    if CHPL_LOCALE_MODEL == "gpu" {
+      pragma "task complete impl fn"
+      extern proc chpl_gpu_task_end(): void;
+
+      chpl_gpu_task_end();
+    }
     chpl_comm_task_end();
     // inform anybody waiting that we're done
     e.sub(1, memoryOrder.release);
@@ -2142,21 +2174,19 @@ module ChapelBase {
            isIntegralType(t) ||
            isRealType(t);
 
-  inline operator :(x:chpl_anybool, type t:chpl_anybool) do
+  inline operator :(x:bool, type t:integral) do
     return __primitive("cast", t, x);
-  inline operator :(x:chpl_anybool, type t:integral) do
-    return __primitive("cast", t, x);
-  inline operator :(x:chpl_anybool, type t:chpl_anyreal) do
+  inline operator :(x:bool, type t:chpl_anyreal) do
     return __primitive("cast", t, x);
 
-  inline operator :(x:integral, type t:chpl_anybool) do
+  inline operator :(x:integral, type t:bool) do
     return __primitive("cast", t, x);
   inline operator :(x:integral, type t:integral) do
     return __primitive("cast", t, x);
   inline operator :(x:integral, type t:chpl_anyreal) do
     return __primitive("cast", t, x);
 
-  inline operator :(x:chpl_anyreal, type t:chpl_anybool) do
+  inline operator :(x:chpl_anyreal, type t:bool) do
     return __primitive("cast", t, x);
   inline operator :(x:chpl_anyreal, type t:integral) do
     return __primitive("cast", t, x);
@@ -2164,7 +2194,7 @@ module ChapelBase {
     return __primitive("cast", t, x);
 
   @unstable("enum-to-bool casts are likely to be deprecated in the future")
-  inline operator :(x:enum, type t:chpl_anybool) throws {
+  inline operator :(x: enum, type t:bool) throws {
     return x: int: bool;
   }
   // operator :(x: enum, type t:integral)
@@ -2437,7 +2467,7 @@ module ChapelBase {
   inline operator :(x: chpl_anyimag, type t:integral) do
     return __primitive("cast", t, x);
 
-  inline operator :(x: chpl_anyimag, type t:chpl_anybool) do
+  inline operator :(x: chpl_anyimag, type t:bool) do
     return if x != 0i then true else false;
 
   pragma "init copy fn"
@@ -2546,7 +2576,7 @@ module ChapelBase {
 
   // implements 'delete' statement
   pragma "no borrow convert"
-  proc chpl__delete(arg) {
+  proc chpl__delete(const arg) {
 
     if chpl_isDdata(arg.type) then
       compilerError("cannot delete data class");
@@ -2573,13 +2603,13 @@ module ChapelBase {
     }
   }
 
-  proc chpl__delete(arr: []) {
+  proc chpl__delete(const arr: []) {
     forall a in arr do
       chpl__delete(a);
   }
 
   // delete two or more things
-  proc chpl__delete(arg, args...) {
+  proc chpl__delete(arg, const args...) {
     chpl__delete(arg);
     for param i in 0..args.size-1 do
       chpl__delete(args(i));
@@ -3281,9 +3311,9 @@ module ChapelBase {
   extern const QIO_TUPLE_FORMAT_JSON:int;
 
   // Support for module deinit functions.
-  class chpl_ModuleDeinit {
+  class chpl_ModuleDeinit : writeSerializable {
     const moduleName: c_ptrConst(c_char); // for debugging; non-null, not owned
-    const deinitFun:  c_fn_ptr;          // module deinit function
+    const deinitFun:  chpl_c_fn_ptr;          // module deinit function
     const prevModule: unmanaged chpl_ModuleDeinit?; // singly-linked list / LIFO queue
     proc writeThis(ch) throws {
       try {
@@ -3292,6 +3322,9 @@ module ChapelBase {
       catch e: DecodeError { // let IoError propagate
         halt("Module name is not valid string!");
       }
+    }
+    override proc serialize(writer, ref serializer) throws {
+      writeThis(writer);
     }
   }
   var chpl_moduleDeinitFuns = nil: unmanaged chpl_ModuleDeinit?;
@@ -3433,19 +3466,5 @@ module ChapelBase {
 
   inline proc chpl_field_gt(a, b) where !isArrayType(a.type) {
     return a > b;
-  }
-
-  // c_fn_ptr stuff
-  @chpldoc.nodoc
-  inline operator c_fn_ptr.=(ref a:c_fn_ptr, b:c_fn_ptr) {
-    __primitive("=", a, b);
-  }
-  @chpldoc.nodoc
-  proc c_fn_ptr.this() {
-    compilerError("Can't call a C function pointer within Chapel");
-  }
-  @chpldoc.nodoc
-  proc c_fn_ptr.this(args...) {
-    compilerError("Can't call a C function pointer within Chapel");
   }
 }

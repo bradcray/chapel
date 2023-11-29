@@ -19,91 +19,67 @@
  */
 
 /*
-This module provides mathematical constants and functions.
 
-It includes wrappers for many of the constants and functions in
-the C Math library, which is part of the C Language Standard (ISO/IEC 9899)
-as described in Section 7.12.  Please consult that standard for an
-authoritative description of the expected properties of those constants and
-routines.
-
-In general, where the C math library provides a *double* and a *float* version
-of a function, the float version has a suffix 'f'.  In the Chapel interface,
-the suffix is dropped, and the type of the operand determines which version is
-called -- according to the usual function overloading and resolution rules.
-Normally, the result has the same precision
-as the argument(s).  Please consult the C standard for specifics.
-
-Rounding -- The rounding mode for floating-point addition (subtraction) is
-implementation-defined.
-
-Error Handling -- At present, Chapel does not provide control over error
-handling in the AutoMath module.  The default behavior is as if the macro
-``math_errhandling`` is set to 0: Given erroneous input at run-time,
-all math functions will return an implementation-defined value; no
-exception will be generated.
+Automatically included Math symbols
 
 .. _automath-roots:
 
 Roots
------
-:proc:`cbrt`
-:proc:`sqrt`
+^^^^^
+:proc:`~Math.cbrt`
+:proc:`~Math.sqrt`
 
 .. _automath-rounding:
 
 Rounding
---------
-:proc:`ceil`
-:proc:`floor`
-:proc:`round`
-:proc:`trunc`
+^^^^^^^^
+:proc:`~Math.ceil`
+:proc:`~Math.floor`
+:proc:`~Math.round`
+:proc:`~Math.trunc`
 
 .. _automath-complex:
 
 Computations Involving Complex Numbers
---------------------------------------
-:proc:`carg`
-:proc:`conj`
-:proc:`cproj`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+:proc:`~Math.conj`
+:proc:`~Math.phase`
+:proc:`~Math.riemProj`
 
 .. _automath-inf-nan:
 
 Infinity and NaN
-----------------
-:var:`INFINITY`
-:var:`NAN`
-:proc:`isfinite`
-:proc:`isinf`
-:proc:`isnan`
+^^^^^^^^^^^^^^^^
+:proc:`~Math.inf`
+:proc:`~Math.nan`
+:proc:`~Math.isFinite`
+:proc:`~Math.isInf`
+:proc:`~Math.isNan`
 
 .. _automath-comparison:
 
 Comparison Functions
---------------------
-:proc:`max`
-:proc:`min`
-:proc:`isClose`
+^^^^^^^^^^^^^^^^^^^^
+:proc:`~Math.max`
+:proc:`~Math.min`
+:proc:`~Math.isClose`
 
 .. _automath-sign:
 
 Sign Functions
---------------
-:proc:`sgn`
-:proc:`signbit`
+^^^^^^^^^^^^^^
+:proc:`~Math.sgn`
+:proc:`~Math.signbit`
 
 .. _automath-other:
 
 Remaining Functions
--------------------
-:proc:`abs`
-:proc:`mod`
-
-Constant and Function Definitions
----------------------------------
-
+^^^^^^^^^^^^^^^^^^^
+:proc:`~Math.abs`
+:proc:`~Math.mod`
 */
 pragma "module included by default"
+@unstable("The module name 'AutoMath' is unstable.  If you want to use qualified naming on the symbols within it, please 'use' or 'import' the :mod:`Math` module")
 module AutoMath {
   import HaltWrappers;
   private use CTypes;
@@ -254,7 +230,7 @@ module AutoMath {
 
   /* Returns the magnitude (often called modulus) of complex `x`.
 
-     In concert with the related :proc:`carg`, the phase (a.k.a. argument)
+     In concert with the related :proc:`phase` (a.k.a. argument)
      of `x`, it can be used to recompute `x`.
 
      :rtype: ``real(w/2)`` when `x` has a type of ``complex(w)``.
@@ -313,7 +289,7 @@ module AutoMath {
 
   /* Returns the magnitude (often called modulus) of complex `z`.
 
-     In concert with the related :proc:`carg`, the phase (a.k.a. argument)
+     In concert with the related :proc:`phase` (a.k.a. argument)
      of `z`, it can be used to recompute `z`.
 
      :rtype: ``real(w/2)`` when `z` has a type of ``complex(w)``.
@@ -324,28 +300,6 @@ module AutoMath {
     return abs(z);
   }
 
-  /* Returns the phase (often called `argument`) of complex `x`, an angle (in
-     radians).
-
-     In concert with the related :proc:`abs`, the magnitude (a.k.a.
-     modulus) of `x`, it can be used to recompute `x`.
-
-     :rtype: ``real(w/2)`` when `x` has a type of ``complex(w)``.
-  */
-
-  inline proc carg(x: complex(?w)): real(w/2) {
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc cargf(x: complex(64)): real(32);
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc carg(x: complex(128)): real(64);
-    if w == 64 then
-      return cargf(x);
-    else
-      return carg(x);
-  }
-
   /* Returns the phase (often called `argument`) of complex `z`, an angle (in
      radians).
 
@@ -354,10 +308,9 @@ module AutoMath {
 
      :rtype: ``real(w/2)`` when `z` has a type of ``complex(w)``.
   */
-  pragma "last resort"
-  @deprecated("The argument name 'z' is deprecated for 'carg', please use 'x' instead")
+  @deprecated("'carg' is deprecated, please use :proc:`phase` instead")
   inline proc carg(z: complex(?w)): real(w/2) {
-    return carg(z);
+    return phase(z);
   }
 
 
@@ -369,6 +322,7 @@ module AutoMath {
      It is an error if `x` is less than -1 or greater than 1.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'acos' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc acos(x: real(64)): real(64) {
     return chpl_acos(x);
@@ -392,6 +346,7 @@ module AutoMath {
      It is an error if `x` is less than -1 or greater than 1.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'acos' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc acos(x : real(32)): real(32) {
     return chpl_acos(x);
@@ -409,6 +364,7 @@ module AutoMath {
   // module.
   /* Returns the arc cosine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'acos' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc acos(z: complex(64)): complex(64) {
     return chpl_acos(z);
@@ -426,6 +382,7 @@ module AutoMath {
   // module.
   /* Returns the arc cosine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'acos' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc acos(z: complex(128)): complex(128) {
     return chpl_acos(z);
@@ -447,6 +404,7 @@ module AutoMath {
      It is an error if `x` is less than 1.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'acosh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc acosh(x: real(64)): real(64) {
     return chpl_acosh(x);
@@ -470,6 +428,7 @@ module AutoMath {
      It is an error if `x` is less than 1.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'acosh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc acosh(x : real(32)): real(32) {
     return chpl_acosh(x);
@@ -487,6 +446,7 @@ module AutoMath {
   // module.
   /* Returns the inverse hyperbolic cosine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'acosh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc acosh(z: complex(64)): complex(64) {
     return chpl_acosh(z);
@@ -504,6 +464,7 @@ module AutoMath {
   // module.
   /* Returns the inverse hyperbolic cosine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'acosh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc acosh(z: complex(128)): complex(128) {
     return chpl_acosh(z);
@@ -525,6 +486,7 @@ module AutoMath {
      It is an error if `x` is less than -1 or greater than 1.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'asin' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc asin(x: real(64)): real(64) {
     return chpl_asin(x);
@@ -548,6 +510,7 @@ module AutoMath {
      It is an error if `x` is less than -1 or greater than 1.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'asin' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc asin(x : real(32)): real(32) {
     return chpl_asin(x);
@@ -565,6 +528,7 @@ module AutoMath {
   // module.
   /* Returns the arc sine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'asin' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc asin(z: complex(64)): complex(64) {
     return chpl_asin(z);
@@ -582,6 +546,7 @@ module AutoMath {
   // module.
   /* Returns the arc sine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'asin' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc asin(z: complex(128)): complex(128) {
     return chpl_asin(z);
@@ -600,6 +565,7 @@ module AutoMath {
   // module.
   /* Returns the inverse hyperbolic sine of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'asinh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc asinh(x: real(64)): real(64) {
     return chpl_asinh(x);
@@ -620,6 +586,7 @@ module AutoMath {
   // module.
   /* Returns the inverse hyperbolic sine of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'asinh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc asinh(x : real(32)): real(32) {
     return chpl_asinh(x);
@@ -637,6 +604,7 @@ module AutoMath {
   // module.
   /* Returns the inverse hyperbolic sine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'asinh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc asinh(z: complex(64)): complex(64) {
     return chpl_asinh(z);
@@ -654,6 +622,7 @@ module AutoMath {
   // module.
   /* Returns the inverse hyperbolic sine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'asinh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc asinh(z: complex(128)): complex(128) {
     return chpl_asinh(z);
@@ -673,6 +642,7 @@ module AutoMath {
   // module.
   /* Returns the arc tangent of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'atan' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc atan(x: real(64)): real(64) {
     return chpl_atan(x);
@@ -693,6 +663,7 @@ module AutoMath {
   // module.
   /* Returns the arc tangent of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'atan' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc atan(x : real(32)): real(32) {
     return chpl_atan(x);
@@ -710,6 +681,7 @@ module AutoMath {
   // module.
   /* Returns the arc tangent of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'atan' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc atan(z: complex(64)): complex(64) {
     return chpl_atan(z);
@@ -727,6 +699,7 @@ module AutoMath {
   // module.
   /* Returns the arc tangent of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'atan' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc atan(z: complex(128)): complex(128) {
     return chpl_atan(z);
@@ -749,6 +722,7 @@ module AutoMath {
      the arc tangent of `y` / `x` except that the signs of `y`
      and `x` are used to determine the quadrant of the result. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'atan2' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc atan2(y: real(64), x: real(64)): real(64) {
     return chpl_atan2(y, x);
@@ -773,6 +747,7 @@ module AutoMath {
      the arc tangent of `y` / `x` except that the signs of `y`
      and `x` are used to determine the quadrant of the result. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'atan2' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc atan2(y : real(32), x: real(32)): real(32) {
     return chpl_atan2(y, x);
@@ -793,6 +768,7 @@ module AutoMath {
 
      It is an error if `x` is less than -1 or greater than 1. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'atanh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc atanh(x: real(64)): real(64) {
     return chpl_atanh(x);
@@ -815,6 +791,7 @@ module AutoMath {
 
      It is an error if `x` is less than -1 or greater than 1. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'atanh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc atanh(x : real(32)): real(32) {
     return chpl_atanh(x);
@@ -832,6 +809,7 @@ module AutoMath {
   // module.
   /* Returns the inverse hyperbolic tangent of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'atanh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc atanh(z: complex(64)): complex(64) {
     return chpl_atanh(z);
@@ -849,6 +827,7 @@ module AutoMath {
   // module.
   /* Returns the inverse hyperbolic tangent of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'atanh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc atanh(z: complex(128)): complex(128) {
     return chpl_atanh(z);
@@ -967,25 +946,10 @@ module AutoMath {
     return conj(z);
   }
 
-  /* Returns the projection of `x` on a Riemann sphere. */
-  inline proc cproj(x: complex(?w)): complex(w) {
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc cprojf(x: complex(64)): complex(64);
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc cproj(x: complex(128)): complex(128);
-    if w == 64 then
-      return cprojf(x);
-    else
-      return cproj(x);
-  }
-
   /* Returns the projection of `z` on a Riemann sphere. */
-  pragma "last resort"
-  @deprecated("The argument name 'z' is deprecated for 'cproj', please use 'x' instead")
+  @deprecated("'cproj' has been deprecated, please use :proc:`riemProj` instead")
   inline proc cproj(z: complex(?w)): complex(w) {
-    return cproj(z);
+    return riemProj(z);
   }
 
   // When removing this deprecated function, be sure to remove chpl_cos and
@@ -993,6 +957,7 @@ module AutoMath {
   // module.
   /* Returns the cosine of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'cos' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc cos(x: real(64)): real(64) {
     return chpl_cos(x);
@@ -1013,6 +978,7 @@ module AutoMath {
   // module.
   /* Returns the cosine of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'cos' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc cos(x : real(32)): real(32) {
     return chpl_cos(x);
@@ -1030,6 +996,7 @@ module AutoMath {
   // module.
   /* Returns the cosine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'cos' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc cos(z : complex(64)): complex(64) {
     return chpl_cos(z);
@@ -1047,6 +1014,7 @@ module AutoMath {
   // module.
   /* Returns the cosine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'cos' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc cos(z : complex(128)): complex(128) {
     return chpl_cos(z);
@@ -1065,6 +1033,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic cosine of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'cosh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc cosh(x: real(64)): real(64) {
     return chpl_cosh(x);
@@ -1085,6 +1054,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic cosine of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'cosh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc cosh(x : real(32)): real(32) {
     return chpl_cosh(x);
@@ -1102,6 +1072,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic cosine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'cosh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc cosh(z: complex(64)): complex(64) {
     return chpl_cosh(z);
@@ -1119,6 +1090,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic cosine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'cosh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc cosh(z: complex(128)): complex(128) {
     return chpl_cosh(z);
@@ -1142,7 +1114,8 @@ module AutoMath {
      fewer conditionals will be evaluated at run time.
   */
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'divceil' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Additionally its argument names will also change with this move")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'divceil' will no longer be included by default.  Please 'use' or 'import' the :mod:`Math` module to prepare for this move, noting that its name has changed to :proc:`~Math.divCeil` and its argument names have changed to 'x' and 'y'")
   proc divceil(param m: integral, param n: integral) param do
     return chpl_divceil(m, n);
 
@@ -1164,7 +1137,8 @@ module AutoMath {
      fewer conditionals will be evaluated at run time.
   */
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'divceil' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Additionally its argument names will also change with this move")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'divceil' will no longer be included by default.  Please 'use' or 'import' the :mod:`Math` module to prepare for this move, noting that its name has changed to :proc:`~Math.divCeil` and its argument names have changed to 'x' and 'y'")
   proc divceil(m: integral, n: integral) do return chpl_divceil(m, n);
 
   proc chpl_divceil(m: integral, n: integral) do return
@@ -1184,7 +1158,8 @@ module AutoMath {
     (not 0) and are of a signed integer type (not `uint`).
   */
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'divceilpos' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Additionally its argument names will also change with this move")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'divceilpos' will no longer be included by default.  Please 'use' or 'import' the :mod:`Math` module to prepare for this move, noting that its name has changed to :proc:`~Math.divCeilPos` and its argument names have changed to 'x' and 'y'")
   proc divceilpos(m: integral, n: integral) {
     return chpl_divceilpos(m, n);
   }
@@ -1205,7 +1180,8 @@ module AutoMath {
      fewer conditionals will be evaluated at run time.
   */
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'divfloor' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Additionally its argument names will also change with this move")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'divfloor' will no longer be included by default.  Please 'use' or 'import' the :mod:`Math` module to prepare for this move, noting that its name has changed to :proc:`~Math.divFloor` and its argument names have changed to 'x' and 'y'")
   proc divfloor(param m: integral, param n: integral) param do return
     chpl_divfloor(m, n);
 
@@ -1227,7 +1203,8 @@ module AutoMath {
      fewer conditionals will be evaluated at run time.
   */
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'divfloor' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Additionally its argument names will also change with this move")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'divfloor' will no longer be included by default.  Please 'use' or 'import' the :mod:`Math` module to prepare for this move, noting that its name has changed to :proc:`~Math.divFloor` and its argument names have changed to 'x' and 'y'")
   proc divfloor(m: integral, n: integral) do return chpl_divfloor(m, n);
 
   proc chpl_divfloor(m: integral, n: integral) do return
@@ -1247,7 +1224,8 @@ module AutoMath {
     (not 0) and are of a signed integer type (not `uint`).
   */
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'divfloorpos' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Additionally its argument names will also change with this move")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'divfloorpos' will no longer be included by default.  Please 'use' or 'import' the :mod:`Math` module to prepare for this move, noting that its name has changed to :proc:`~Math.divFloorPos` and its argument names have changed to 'x' and 'y'")
   proc divfloorpos(m: integral, n: integral) {
     return chpl_divfloorpos(m, n);
   }
@@ -1262,6 +1240,7 @@ module AutoMath {
   // move its contents into Math.chpl to reduce the symbols living in this
   // module.
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'erf' will no longer be included by default, please 'use' or 'import' the 'Math' module to call it")
   inline proc erf(x: real(64)): real(64) {
     return chpl_erf(x);
@@ -1281,6 +1260,7 @@ module AutoMath {
   // move its contents into Math.chpl to reduce the symbols living in this
   // module.
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'erf' will no longer be included by default, please 'use' or 'import' the 'Math' module to call it")
   inline proc erf(x : real(32)): real(32) {
     return chpl_erf(x);
@@ -1297,6 +1277,7 @@ module AutoMath {
   // move its contents into Math.chpl to reduce the symbols living in this
   // module.
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'erfc' will no longer be included by default, please 'use' or 'import' the 'Math' module to call it")
   inline proc erfc(x: real(64)): real(64) {
     return chpl_erfc(x);
@@ -1316,6 +1297,7 @@ module AutoMath {
   // move its contents into Math.chpl to reduce the symbols living in this
   // module.
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'erfc' will no longer be included by default, please 'use' or 'import' the 'Math' module to call it")
   inline proc erfc(x : real(32)): real(32) {
     return chpl_erfc(x);
@@ -1335,6 +1317,7 @@ module AutoMath {
   /* Returns the value of the Napierian `e` raised to the power of the
      argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'exp' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc exp(x: real(64)): real(64) {
     return chpl_exp(x);
@@ -1356,6 +1339,7 @@ module AutoMath {
   /* Returns the value of the Napierian `e` raised to the power of the
      argument. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'exp' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc exp(x : real(32)): real(32) {
     return chpl_exp(x);
@@ -1374,6 +1358,7 @@ module AutoMath {
   /* Returns the value of the Napierian `e` raised to the power of the
      argument. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'exp' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc exp(z: complex(64)): complex(64) {
     return chpl_exp(z);
@@ -1392,6 +1377,7 @@ module AutoMath {
   /* Returns the value of the Napierian `e` raised to the power of the
      argument. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'exp' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc exp(z: complex(128)): complex(128) {
     return chpl_exp(z);
@@ -1410,6 +1396,7 @@ module AutoMath {
   // module.
   /* Returns the value of `2` raised to the power of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'exp2' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc exp2(x: real(64)): real(64) {
     return chpl_exp2(x);
@@ -1430,6 +1417,7 @@ module AutoMath {
   // module.
   /* Returns the value of `2` raised to the power of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'exp2' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc exp2(x : real(32)): real(32) {
     return chpl_exp2(x);
@@ -1449,6 +1437,7 @@ module AutoMath {
   /* Returns one less than the value of the Napierian `e` raised to the power
      of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'expm1' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc expm1(x: real(64)): real(64) {
     return chpl_expm1(x);
@@ -1470,6 +1459,7 @@ module AutoMath {
   /* Returns one less than the value of the Napierian `e` raised to the power
      of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'expm1' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc expm1(x : real(32)): real(32) {
     return chpl_expm1(x);
@@ -1496,42 +1486,73 @@ module AutoMath {
     return floorf(x);
   }
 
+  /* Returns a value for which :proc:`isInf` will return `true`. */
+  inline proc inf param : real(64) do return chpl_INFINITY;
 
-  /* Returns a value for which :proc:`isinf` will return `true`. */
-  inline proc INFINITY param : real(64) do return chpl_INFINITY;
-
-
-  /* Returns `true` if the argument `x` is a representation of a finite value;
-     `false` otherwise. */
-  inline proc isfinite(x: real(64)): bool do return chpl_macro_double_isfinite(x):bool;
+  /* Returns a value for which :proc:`isInf` will return `true`. */
+  @deprecated(notes="'INFINITY' has been deprecated in favor of :proc:`inf`, please use that instead")
+  inline proc INFINITY param : real(64) do return inf;
 
   /* Returns `true` if the argument `x` is a representation of a finite value;
      `false` otherwise. */
-  inline proc isfinite(x: real(32)): bool do return chpl_macro_float_isfinite(x):bool;
+  inline proc isFinite(x: real(64)): bool do return chpl_macro_double_isfinite(x):bool;
 
+  /* Returns `true` if the argument `x` is a representation of a finite value;
+     `false` otherwise. */
+  inline proc isFinite(x: real(32)): bool do return chpl_macro_float_isfinite(x):bool;
+
+  /* Returns `true` if the argument `x` is a representation of a finite value;
+     `false` otherwise. */
+  @deprecated(notes="'isfinite' is deprecated in favor of :proc:`isFinite`, please use that instead")
+  inline proc isfinite(x: real(64)): bool do return isFinite(x):bool;
+
+  /* Returns `true` if the argument `x` is a representation of a finite value;
+     `false` otherwise. */
+  @deprecated(notes="'isfinite' is deprecated in favor of :proc:`isFinite`, please use that instead")
+  inline proc isfinite(x: real(32)): bool do return isFinite(x):bool;
 
   /* Returns `true` if the argument `x` is a representation of *infinity*;
      `false` otherwise. */
-  inline proc isinf(x: real(64)): bool do return chpl_macro_double_isinf(x):bool;
+  inline proc isInf(x: real(64)): bool do return chpl_macro_double_isinf(x):bool;
 
   /* Returns `true` if the argument `x` is a representation of *infinity*;
      `false` otherwise. */
-  inline proc isinf(x: real(32)): bool do return chpl_macro_float_isinf(x):bool;
+  inline proc isInf(x: real(32)): bool do return chpl_macro_float_isinf(x):bool;
 
+  /* Returns `true` if the argument `x` is a representation of *infinity*;
+     `false` otherwise. */
+  @deprecated(notes="'isinf' is deprecated in favor of :proc:`isInf`, please use that instead")
+  inline proc isinf(x: real(64)): bool do return isInf(x):bool;
+
+  /* Returns `true` if the argument `x` is a representation of *infinity*;
+     `false` otherwise. */
+  @deprecated(notes="'isinf' is deprecated in favor of :proc:`isInf`, please use that instead")
+  inline proc isinf(x: real(32)): bool do return isInf(x):bool;
 
   /* Returns `true` if the argument `x` does not represent a valid number;
      `false` otherwise. */
-  inline proc isnan(x: real(64)): bool do return chpl_macro_double_isnan(x):bool;
+  inline proc isNan(x: real(64)): bool do return chpl_macro_double_isnan(x):bool;
 
   /* Returns `true` if the argument `x` does not represent a valid number;
      `false` otherwise. */
-  inline proc isnan(x: real(32)): bool do return chpl_macro_float_isnan(x):bool;
+  inline proc isNan(x: real(32)): bool do return chpl_macro_float_isnan(x):bool;
+
+  /* Returns `true` if the argument `x` does not represent a valid number;
+     `false` otherwise. */
+  @deprecated(notes="'isnan' is deprecated in favor of :proc:`isNan`, please use that instead")
+  inline proc isnan(x: real(64)): bool do return isNan(x):bool;
+
+  /* Returns `true` if the argument `x` does not represent a valid number;
+     `false` otherwise. */
+  @deprecated(notes="'isnan' is deprecated in favor of :proc:`isNan`, please use that instead")
+  inline proc isnan(x: real(32)): bool do return isNan(x):bool;
 
   // When removing this deprecated function, be sure to remove chpl_ldexp and
   // move its contents into Math.chpl to reduce the symbols living in this
   // module.
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'ldexp' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'ldexp' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Note that the version in the Math module is now named 'ldExp'")
   inline proc ldexp(x:real(64), n:int(32)):real(64) {
     return chpl_ldexp(x, n);
   }
@@ -1550,7 +1571,8 @@ module AutoMath {
   // move its contents into Math.chpl to reduce the symbols living in this
   // module.
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'ldexp' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'ldexp' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Note that the version in the Math module is now named 'ldExp'")
   inline proc ldexp(x:real(32), n:int(32)):real(32) {
     return chpl_ldexp(x, n);
   }
@@ -1566,7 +1588,8 @@ module AutoMath {
   // move its contents into Math.chpl to reduce the symbols living in this
   // module.
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'lgamma' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'lgamma' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Note that the function has been renamed to 'lnGamma' there")
   inline proc lgamma(x: real(64)): real(64) {
     return chpl_lgamma(x);
   }
@@ -1585,7 +1608,8 @@ module AutoMath {
   // move its contents into Math.chpl to reduce the symbols living in this
   // module.
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'lgamma' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'lgamma' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Note that the function has been renamed to 'lnGamma' there")
   inline proc lgamma(x : real(32)): real(32) {
     return chpl_lgamma(x);
   }
@@ -1606,6 +1630,7 @@ module AutoMath {
      It is an error if `x` is less than or equal to zero.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'log' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc log(x: real(64)): real(64) {
     return chpl_log(x);
@@ -1629,6 +1654,7 @@ module AutoMath {
      It is an error if `x` is less than or equal to zero.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'log' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc log(x : real(32)): real(32) {
     return chpl_log(x);
@@ -1646,6 +1672,7 @@ module AutoMath {
   // module.
   /* Returns the natural logarithm of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'log' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc log(z: complex(64)): complex(64) {
     return chpl_log(z);
@@ -1663,6 +1690,7 @@ module AutoMath {
   // module.
   /* Returns the natural logarithm of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'log' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc log(z: complex(128)): complex(128) {
     return chpl_log(z);
@@ -1684,6 +1712,7 @@ module AutoMath {
      It is an error if `x` is less than or equal to zero.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'log10' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc log10(x: real(64)): real(64) {
     return chpl_log10(x);
@@ -1707,6 +1736,7 @@ module AutoMath {
      It is an error if `x` is less than or equal to zero.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'log10' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc log10(x : real(32)): real(32) {
     return chpl_log10(x);
@@ -1762,6 +1792,7 @@ module AutoMath {
      It is an error if `x` is less than or equal to zero.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'log2' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc log2(x: real(64)): real(64) {
     return chpl_log2(x);
@@ -1785,6 +1816,7 @@ module AutoMath {
      It is an error if `x` is less than or equal to zero.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'log2' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc log2(x : real(32)): real(32) {
     return chpl_log2(x);
@@ -1843,6 +1875,7 @@ module AutoMath {
      It is an error if `x` is less than or equal to zero.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'log2' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc log2(val: int(?w)) {
     return chpl_log2(val);
@@ -1865,6 +1898,7 @@ module AutoMath {
      It is an error if `x` is less than or equal to zero.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'log2' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc log2(val: uint(?w)) {
     return chpl_log2(val);
@@ -1899,9 +1933,9 @@ module AutoMath {
   inline proc max(x: uint(64), y: uint(64)) do return if x > y then x else y;
 
   @chpldoc.nodoc
-  inline proc max(x: real(32), y: real(32)) do return if (x > y) | isnan(x) then x else y;
+  inline proc max(x: real(32), y: real(32)) do return if (x > y) | isNan(x) then x else y;
   @chpldoc.nodoc
-  inline proc max(x: real(64), y: real(64)) do return if (x > y) | isnan(x) then x else y;
+  inline proc max(x: real(64), y: real(64)) do return if (x > y) | isNan(x) then x else y;
 
   @chpldoc.nodoc
   inline proc max(x: int(8), y: uint(8)) do return if x > y then x : uint(8) else y;
@@ -1929,7 +1963,7 @@ module AutoMath {
 
   /* Returns the maximum value of two arguments using the ``>`` operator
      for comparison.
-     If one of the arguments is :proc:`AutoMath.NAN`, the result is also NAN.
+     If one of the arguments is :proc:`Math.nan`, the result is also nan.
 
      :rtype: The type of `x`.
    */
@@ -1968,9 +2002,9 @@ module AutoMath {
   inline proc min(x: uint(64), y: uint(64)) do return if x < y then x else y;
 
   @chpldoc.nodoc
-  inline proc min(x: real(32), y: real(32)) do return if (x < y) | isnan(x) then x else y;
+  inline proc min(x: real(32), y: real(32)) do return if (x < y) | isNan(x) then x else y;
   @chpldoc.nodoc
-  inline proc min(x: real(64), y: real(64)) do return if (x < y) | isnan(x) then x else y;
+  inline proc min(x: real(64), y: real(64)) do return if (x < y) | isNan(x) then x else y;
 
   @chpldoc.nodoc
   inline proc min(x: int(8), y: uint(8)) do return if x < y then x else y : int(8);
@@ -2000,7 +2034,7 @@ module AutoMath {
   /* Returns the minimum value of two arguments using the ``<`` operator
      for comparison.
 
-     If one of the arguments is :proc:`AutoMath.NAN`, the result is also NAN.
+     If one of the arguments is :proc:`Math.nan`, the result is also nan.
 
      :rtype: The type of `x`.
    */
@@ -2052,6 +2086,10 @@ module AutoMath {
 
      The result is always >= 0 if `y` > 0.
      It is an error if `y` == 0.
+
+     .. note::
+        This does not have the same behavior as the :ref:`Modulus_Operators` (%)
+        when `y` is negative.
   */
   proc mod(param x: integral, param y: integral) param {
     param temp = x % y;
@@ -2075,6 +2113,10 @@ module AutoMath {
 
      The result is always >= 0 if `y` > 0.
      It is an error if `y` == 0.
+
+     .. note::
+        This does not have the same behavior as the :ref:`Modulus_Operators` (%)
+        when `y` is negative.
   */
   proc mod(x: integral, y: integral) {
     const temp = x % y;
@@ -2098,6 +2140,7 @@ module AutoMath {
     // Is there a more efficient implementation for reals?
     return x - y*floor(x/y);
   }
+
   /* Computes the mod operator on the two numbers, defined as
      ``mod(x,y) = x - y * floor(x / y)``.
   */
@@ -2107,9 +2150,12 @@ module AutoMath {
     return x - y*floor(x/y);
   }
 
+  /* Returns a value for which :proc:`isNan` will return `true`. */
+  inline proc nan param : real(64) do return chpl_NAN;
 
-  /* Returns a value for which :proc:`isnan` will return `true`. */
-  inline proc NAN param : real(64) do return chpl_NAN;
+  /* Returns a value for which :proc:`isNan` will return `true`. */
+  @deprecated(notes="'NAN' is deprecated in favor of :proc:`nan`, please use that instead")
+  inline proc NAN param : real(64) do return nan;
 
 
   // When removing this deprecated function, be sure to remove chpl_nearbyint
@@ -2120,6 +2166,7 @@ module AutoMath {
      floating-point exception.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'nearbyint' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc nearbyint(x: real(64)): real(64) {
     return chpl_nearbyint(x);
@@ -2143,6 +2190,7 @@ module AutoMath {
      floating-point exception.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'nearbyint' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc nearbyint(x : real(32)): real(32) {
     return chpl_nearbyint(x);
@@ -2155,6 +2203,40 @@ module AutoMath {
     return nearbyintf(x);
   }
 
+  /* Returns the phase (often called `argument`) of complex `x`, an angle (in
+     radians).
+
+     In concert with the related :proc:`abs`, the magnitude (a.k.a.
+     modulus) of `x`, it can be used to recompute `x`.
+
+     :rtype: ``real(w/2)`` when `x` has a type of ``complex(w)``.
+  */
+  inline proc phase(x: complex(?w)): real(w/2) {
+    pragma "fn synchronization free"
+    pragma "codegen for CPU and GPU"
+    extern proc cargf(x: complex(64)): real(32);
+    pragma "fn synchronization free"
+    pragma "codegen for CPU and GPU"
+    extern proc carg(x: complex(128)): real(64);
+    if w == 64 then
+      return cargf(x);
+    else
+      return carg(x);
+  }
+
+  /* Returns the projection of `x` on a Riemann sphere. */
+  inline proc riemProj(x: complex(?w)): complex(w) {
+    pragma "fn synchronization free"
+    pragma "codegen for CPU and GPU"
+    extern proc cprojf(x: complex(64)): complex(64);
+    pragma "fn synchronization free"
+    pragma "codegen for CPU and GPU"
+    extern proc cproj(x: complex(128)): complex(128);
+    if w == 64 then
+      return cprojf(x);
+    else
+      return cproj(x);
+  }
 
   // When removing this deprecated function, be sure to remove chpl_rint
   // and move its contents into Math.chpl to reduce the symbols living in this
@@ -2164,6 +2246,7 @@ module AutoMath {
      exception.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'rint' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc rint(x: real(64)): real(64) {
     return chpl_rint(x);
@@ -2187,6 +2270,7 @@ module AutoMath {
      exception.
   */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'rint' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc rint(x : real(32)): real(32) {
     return chpl_rint(x);
@@ -2270,6 +2354,7 @@ module AutoMath {
   // module.
   /* Returns the sine of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'sin' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc sin(x: real(64)): real(64) {
     return chpl_sin(x);
@@ -2290,6 +2375,7 @@ module AutoMath {
   // module.
   /* Returns the sine of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'sin' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc sin(x: real(32)): real(32) {
     return chpl_sin(x);
@@ -2307,6 +2393,7 @@ module AutoMath {
   // module.
   /* Returns the sine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'sin' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc sin(z: complex(64)): complex(64) {
     return chpl_sin(z);
@@ -2324,6 +2411,7 @@ module AutoMath {
   // module.
   /* Returns the sine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'sin' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc sin(z: complex(128)): complex(128) {
     return chpl_sin(z);
@@ -2342,6 +2430,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic sine of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'sinh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc sinh(x: real(64)): real(64) {
     return chpl_sinh(x);
@@ -2362,6 +2451,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic sine of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'sinh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc sinh(x : real(32)): real(32) {
     return chpl_sinh(x);
@@ -2379,6 +2469,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic sine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'sinh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc sinh(z: complex(64)): complex(64) {
     return chpl_sinh(z);
@@ -2396,6 +2487,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic sine of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'sinh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc sinh(z: complex(128)): complex(128) {
     return chpl_sinh(z);
@@ -2464,6 +2556,7 @@ module AutoMath {
   // module.
   /* Returns the tangent of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'tan' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc tan(x: real(64)): real(64) {
     return chpl_tan(x);
@@ -2484,6 +2577,7 @@ module AutoMath {
   // module.
   /* Returns the tangent of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'tan' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc tan(x : real(32)): real(32) {
     return chpl_tan(x);
@@ -2501,6 +2595,7 @@ module AutoMath {
   // module.
   /* Returns the tangent of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'tan' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc tan(z: complex(64)): complex(64) {
     return chpl_tan(z);
@@ -2518,6 +2613,7 @@ module AutoMath {
   // module.
   /* Returns the tangent of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'tan' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc tan(z: complex(128)): complex(128) {
     return chpl_tan(z);
@@ -2536,6 +2632,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic tangent of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'tanh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc tanh(x: real(64)): real(64) {
     return chpl_tanh(x);
@@ -2556,6 +2653,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic tangent of the argument `x`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'tanh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc tanh(x : real(32)): real(32) {
     return chpl_tanh(x);
@@ -2573,6 +2671,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic tangent of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'tanh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc tanh(z: complex(64)): complex(64) {
     return chpl_tanh(z);
@@ -2590,6 +2689,7 @@ module AutoMath {
   // module.
   /* Returns the hyperbolic tangent of the argument `z`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'tanh' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   inline proc tanh(z: complex(128)): complex(128) {
     return chpl_tanh(z);
@@ -2606,7 +2706,8 @@ module AutoMath {
   // move its contents into Math.chpl to reduce the symbols living in this
   // module.
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'tgamma' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'tgamma' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Note that the function has been renamed to 'gamma' there")
   inline proc tgamma(x: real(64)): real(64) {
     return chpl_tgamma(x);
   }
@@ -2625,7 +2726,8 @@ module AutoMath {
   // move its contents into Math.chpl to reduce the symbols living in this
   // module.
   pragma "last resort"
-  @deprecated(notes="In an upcoming release 'tgamma' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
+  @chpldoc.nodoc
+  @deprecated(notes="In an upcoming release 'tgamma' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it.  Note that the function has been renamed to 'gamma' there")
   inline proc tgamma(x : real(32)): real(32) {
     return chpl_tgamma(x);
   }
@@ -2659,20 +2761,17 @@ module AutoMath {
   /* Returns the greatest common divisor of the integer argument `a` and
      `b`. */
   pragma "last resort"
+  @chpldoc.nodoc
   @deprecated(notes="In an upcoming release 'gcd' will no longer be included by default, please 'use' or 'import' the :mod:`Math` module to call it")
   proc gcd(in a: int,in b: int): int {
+    (a, b) = (abs(a), abs(b));
     return chpl_gcd(a, b);
   }
 
-  proc chpl_gcd(in a: int,in b: int): int {
-     a = abs(a);
-     b = abs(b);
-     var r: int;
-     while(b != 0) {
-       r = a % b;
-       a = b;
-       b = r;
-     }
+  proc chpl_gcd(in a,in b) {
+    while(b != 0) {
+      (a, b) = (b, a % b);
+    }
     return a;
   }
 
@@ -2713,230 +2812,9 @@ module AutoMath {
     return ( (diff<=abs(rtol*y)) || (diff<=abs(rtol*x)) || (diff<=atol) );
   }
 
-  inline proc chpl_j0(x: real(32)): real(32) {
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc chpl_float_j0(x: real(32)): real(32);
-    return chpl_float_j0(x);
-  }
-
-  inline proc chpl_j0(x: real(64)): real(64) {
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc j0(x: real(64)): real(64);
-    return j0(x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_j0 and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="j0 will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc j0(x: real(32)): real(32) {
-    return chpl_j0(x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_j0 and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="j0 will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc j0(x: real(64)): real(64) {
-    return chpl_j0(x);
-  }
-
-  inline proc chpl_j1(x: real(32)): real(32) {
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc chpl_float_j1(x: real(32)): real(32);
-    return chpl_float_j1(x);
-  }
-
-  inline proc chpl_j1(x: real(64)): real(64) {
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc j1(x: real(64)): real(64);
-    return j1(x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_j1 and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="j1 will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc j1(x: real(32)): real(32) {
-    return chpl_j1(x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_j1 and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="j1 will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc j1(x: real(64)): real(64) {
-    return chpl_j1(x);
-  }
-
-  inline proc chpl_jn(n: int, x: real(32)): real(32) {
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc chpl_float_jn(n: c_int, x: real(32)): real(32);
-    return chpl_float_jn(n.safeCast(c_int), x);
-  }
-
-  inline proc chpl_jn(n: int, x: real(64)): real(64) {
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc jn(n: c_int, x: real(64)): real(64);
-    return jn(n.safeCast(c_int), x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_jn and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="jn will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc jn(n: int, x: real(32)): real(32) {
-    return chpl_jn(n, x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_jn and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="jn will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc jn(n: int, x: real(64)): real(64) {
-    return chpl_jn(n, x);
-  }
-
-  inline proc chpl_y0(x: real(32)): real(32) {
-    if boundsChecking && x < 0 then
-      HaltWrappers.boundsCheckHalt("Input value for y0() must be non-negative");
-
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc chpl_float_y0(x: real(32)): real(32);
-    return chpl_float_y0(x);
-  }
-
-  inline proc chpl_y0(x: real(64)): real(64) {
-    if boundsChecking && x < 0 then
-      HaltWrappers.boundsCheckHalt("Input value for y0() must be non-negative");
-
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc y0(x: real(64)): real(64);
-    return y0(x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_y0 and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="y0 will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc y0(x: real(32)): real(32) {
-    return chpl_y0(x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_y0 and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="y0 will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc y0(x: real(64)): real(64) {
-    return chpl_y0(x);
-  }
-
-  inline proc chpl_y1(x: real(32)): real(32) {
-    if boundsChecking && x < 0 then
-      HaltWrappers.boundsCheckHalt("Input value for y1() must be non-negative");
-
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc chpl_float_y1(x: real(32)): real(32);
-    return chpl_float_y1(x);
-  }
-
-  inline proc chpl_y1(x: real(64)): real(64) {
-    if boundsChecking && x < 0 then
-      HaltWrappers.boundsCheckHalt("Input value for y1() must be non-negative");
-
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc y1(x: real(64)): real(64);
-    return y1(x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_y1 and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="y1 will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc y1(x: real(32)): real(32) {
-    return chpl_y1(x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_y1 and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="y1 will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc y1(x: real(64)): real(64) {
-    return chpl_y1(x);
-  }
-
-  inline proc chpl_yn(n: int, x: real(32)): real(32) {
-    if boundsChecking && x < 0 then
-      HaltWrappers.boundsCheckHalt("Input value for yn() must be non-negative");
-
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc chpl_float_yn(n: c_int, x: real(32)): real(32);
-    return chpl_float_yn(n.safeCast(c_int), x);
-  }
-
-  inline proc chpl_yn(n: int, x: real(64)): real(64) {
-    if boundsChecking && x < 0 then
-      HaltWrappers.boundsCheckHalt("Input value for yn() must be non-negative");
-
-    pragma "fn synchronization free"
-    pragma "codegen for CPU and GPU"
-    extern proc yn(n: c_int, x: real(64)): real(64);
-    return yn(n.safeCast(c_int), x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_yn and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="yn will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc yn(n: int, x: real(32)): real(32) {
-    return chpl_yn(n, x);
-  }
-
-  // When removing this deprecated function, be sure to remove chpl_yn and
-  // move its contents into Math.chpl to reduce the symbols living in this
-  // module
-  pragma "last resort"
-  @chpldoc.nodoc
-  @deprecated(notes="yn will soon stop being included by default, please 'use' or 'import' the 'Math' module to call it")
-  inline proc yn(n: int, x: real(64)): real(64) {
-    return chpl_yn(n, x);
-  }
-
   /* Returns true if the sign of `x` is negative, else returns false. It detects
-     the sign bit of zeroes, infinities, and NANs */
+     the sign bit of zeroes, infinities, and nans */
+  @unstable("signbit is unstable and may change its name in the future")
   inline proc signbit(x : real(32)): bool {
     pragma "fn synchronization free"
     pragma "codegen for CPU and GPU"
@@ -2945,7 +2823,8 @@ module AutoMath {
   }
 
   /* Returns true if the sign of `x` is negative, else returns false. It detects
-     the sign bit of zeroes, infinities, and NANs */
+     the sign bit of zeroes, infinities, and nans */
+  @unstable("signbit is unstable and may change its name in the future")
   inline proc signbit(x : real(64)): bool {
     pragma "fn synchronization free"
     pragma "codegen for CPU and GPU"

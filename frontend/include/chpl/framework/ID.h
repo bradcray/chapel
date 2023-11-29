@@ -217,6 +217,8 @@ class ID final {
     return symbolPath_.isEmpty();
   }
 
+  inline explicit operator bool() const { return !isEmpty(); }
+
   size_t hash() const {
     (void)numChildIds_; // this field is intentionally not hashed
     std::hash<int> hasher;
@@ -249,13 +251,13 @@ class ID final {
 
   void serialize(Serializer& ser) const {
     ser.write(symbolPath_);
-    ser.write(postOrderId_);
-    ser.write(numChildIds_);
+    ser.writeVInt(postOrderId_);
+    ser.writeVInt(numChildIds_);
   }
   static ID deserialize(Deserializer& des) {
     auto path = des.read<UniqueString>();
-    auto poi = des.read<int>();
-    auto nci = des.read<int>();
+    auto poi = des.readVInt();
+    auto nci = des.readVInt();
     return ID(path, poi, nci);
   }
 };

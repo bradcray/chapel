@@ -66,6 +66,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
+#include <cstring>
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -85,8 +86,12 @@
 ********************************* | ********************************/
 
 // these are sets of astrs
-static std::set<const char*> llvmPrintIrNames;
+// Chapel function names requested to be disassembled, and whether they've been
+// matched to C symbol names.
+static std::unordered_map<const char*, bool> llvmPrintIrNames;
+// Corresponding C function names to disassemble
 static std::set<const char*> llvmPrintIrCNames;
+static const char* cnamesToPrintFilename = "cnamesToPrint.tmp";
 
 llvmStageNum_t llvmPrintIrStageNum = llvmStageNum::NOPRINT;
 
@@ -122,7 +127,7 @@ llvmStageNum_t llvmStageNumFromLlvmStageName(const char* stageName) {
 }
 
 void addNameToPrintLlvmIr(const char* name) {
-  llvmPrintIrNames.insert(astr(name));
+  llvmPrintIrNames.emplace(astr(name), false);
 }
 void addCNameToPrintLlvmIr(const char* name) {
   llvmPrintIrCNames.insert(astr(name));
@@ -136,7 +141,7 @@ bool shouldLlvmPrintIrName(const char* name) {
 }
 
 bool shouldLlvmPrintIrCName(const char* name) {
-  if (llvmPrintIrNames.empty())
+  if (llvmPrintIrCNames.empty())
     return false;
 
   return llvmPrintIrCNames.count(astr(name));
@@ -146,6 +151,9 @@ bool shouldLlvmPrintIrFn(FnSymbol* fn) {
   return shouldLlvmPrintIrName(fn->name) || shouldLlvmPrintIrCName(fn->cname);
 }
 
+// Collect the cnames to print into a vector with (lex) ordering.
+// Order of the list is non-deterministic otherwise, because it stores astrs
+// for performance.
 std::vector<std::string> gatherPrintLlvmIrCNames() {
   std::vector<std::string> ret;
   for (auto elt : llvmPrintIrCNames) {
@@ -191,6 +199,13 @@ void completePrintLlvmIrStage(llvmStageNum_t numStage) {
 #endif
 }
 
+void restorePrintIrCNames() {
+  assert(llvmPrintIrCNames.empty() &&
+         "tried to restore list of cnames to print from disk, but we already "
+         "have them in memory");
+
+  restoreDriverTmp(cnamesToPrintFilename, &addCNameToPrintLlvmIr);
+}
 
 void preparePrintLlvmIrForCodegen() {
   if (llvmPrintIrNames.empty() && llvmPrintIrCNames.empty())
@@ -202,7 +217,31 @@ void preparePrintLlvmIrForCodegen() {
   forv_Vec(FnSymbol, fn, gFnSymbols) {
     if (shouldLlvmPrintIrFn(fn)) {
       addCNameToPrintLlvmIr(fn->cname);
+      // mark Chapel symbol as found
+      llvmPrintIrNames[astr(fn->name)] = true;
     }
+  }
+
+  // Ensure cnames were found for all Chapel function names
+  std::vector<std::string> namesNotFound;
+  for (const auto& nameInfo : llvmPrintIrNames) {
+    if (nameInfo.second == false) {
+      namesNotFound.emplace_back(nameInfo.first);
+    }
+  }
+  // Emit warning for any symbols not found
+  if (!namesNotFound.empty()) {
+    // Deterministically order
+    std::sort(namesNotFound.begin(), namesNotFound.end());
+    std::string nameList;
+    for (auto it = namesNotFound.begin(); it != namesNotFound.end(); ++it) {
+      if (it != namesNotFound.begin()) {
+        nameList += ", ";
+      }
+      nameList += *it;
+    }
+    USR_WARN("Could not find requested symbol%s for disassembly: %s",
+             (namesNotFound.size() == 1 ? "" : "s"), nameList.c_str());
   }
 
   // Extend cnames with the cnames of task functions
@@ -228,6 +267,15 @@ void preparePrintLlvmIrForCodegen() {
       }
     }
   } while (changed);
+
+  // If running in compiler-driver mode, save cnames to print IR for to disk.
+  // This is so that handlePrintAsm can access them later from the makeBinary
+  // phase, when we don't have a way to determine name->cname correspondence.
+  if (fDriverCompilationPhase) {
+    saveDriverTmpMultiple(cnamesToPrintFilename,
+                          std::vector<const char*>(llvmPrintIrCNames.begin(),
+                                                   llvmPrintIrCNames.end()));
+  }
 }
 
 /******************************** | *********************************
@@ -266,24 +314,8 @@ llvm::Value* codegenImmediateLLVM(Immediate* i)
     case NUM_KIND_BOOL:
       switch(i->num_index) {
         case BOOL_SIZE_SYS:
-        case BOOL_SIZE_8:
           ret = llvm::ConstantInt::get(
               llvm::Type::getInt8Ty(info->module->getContext()),
-              i->bool_value());
-          break;
-        case BOOL_SIZE_16:
-          ret = llvm::ConstantInt::get(
-              llvm::Type::getInt16Ty(info->module->getContext()),
-              i->bool_value());
-          break;
-        case BOOL_SIZE_32:
-          ret = llvm::ConstantInt::get(
-              llvm::Type::getInt32Ty(info->module->getContext()),
-              i->bool_value());
-          break;
-        case BOOL_SIZE_64:
-          ret = llvm::ConstantInt::get(
-              llvm::Type::getInt64Ty(info->module->getContext()),
               i->bool_value());
           break;
       }
@@ -432,17 +464,7 @@ GenRet VarSymbol::codegenVarSymbol(bool lhsInSetReference) {
         const char* castString = "(";
         switch (immediate->num_index) {
         case BOOL_SIZE_SYS:
-        case BOOL_SIZE_8:
           castString = "UINT8(";
-          break;
-        case BOOL_SIZE_16:
-          castString = "UINT16(";
-          break;
-        case BOOL_SIZE_32:
-          castString = "UINT32(";
-          break;
-        case BOOL_SIZE_64:
-          castString = "UINT64(";
           break;
         default:
           INT_FATAL("Unexpected immediate->num_index: %d\n", immediate->num_index);
@@ -1026,7 +1048,11 @@ bool ArgSymbol::requiresCPtr(void) {
 static Type* getArgSymbolCodegenType(ArgSymbol* arg) {
   QualifiedType q = arg->qualType();
   Type* useType = q.type();
-
+  // TODO: this is a hack to make python module generation work by substituting
+  // `const char *` instead of `int8_t *` or `uint8_t *` in the exported header
+  if (isCPtrConstChar(useType)) {
+    return dtStringC;
+  }
   if (q.isRef() && !q.isRefType())
     useType = getOrMakeRefTypeDuringCodegen(useType);
 
@@ -2378,21 +2404,39 @@ namespace {
   struct MarkNonStackVisitor : public AstVisitorTraverse {
     LoopStmt* outermostOrderIndependentLoop;
     MarkNonStackVisitor() : outermostOrderIndependentLoop(NULL) { }
-    void handleLoopStmt(LoopStmt* loop);
+    bool enterLoopStmt(LoopStmt* loop);
+    void exitLoopStmt(LoopStmt* loop);
+
     bool exprPointsToNonStack(Expr* e);
     bool enterCallExpr(CallExpr* call) override;
-    bool enterWhileDoStmt(WhileDoStmt* loop) override;
-    bool enterDoWhileStmt(DoWhileStmt* loop) override;
-    bool enterCForLoop(CForLoop* loop) override;
-    bool enterForLoop(ForLoop* loop) override;
+
+    bool enterWhileDoStmt(WhileDoStmt* loop) override { return enterLoopStmt(loop); }
+    void exitWhileDoStmt(WhileDoStmt* loop) override { exitLoopStmt(loop); }
+
+    bool enterDoWhileStmt(DoWhileStmt* loop) override { return enterLoopStmt(loop); }
+    void exitDoWhileStmt(DoWhileStmt* loop) override { exitLoopStmt(loop); }
+
+    bool enterCForLoop(CForLoop* loop) override { return enterLoopStmt(loop); }
+    void exitCForLoop(CForLoop* loop) override { exitLoopStmt(loop); }
+
+    bool enterForLoop(ForLoop* loop) override { return enterLoopStmt(loop); }
+    void exitForLoop(ForLoop* loop) override { exitLoopStmt(loop); }
   };
 }
 
-void MarkNonStackVisitor::handleLoopStmt(LoopStmt* loop) {
+bool MarkNonStackVisitor::enterLoopStmt(LoopStmt* loop) {
   if (loop->isOrderIndependent() && outermostOrderIndependentLoop == NULL) {
     outermostOrderIndependentLoop = loop;
   }
+  return true;
 }
+
+void MarkNonStackVisitor::exitLoopStmt(LoopStmt* loop) {
+  if (outermostOrderIndependentLoop == loop) {
+    outermostOrderIndependentLoop = NULL;
+  }
+}
+
 
 bool MarkNonStackVisitor::exprPointsToNonStack(Expr* e) {
   if (SymExpr* se = toSymExpr(e)) {
@@ -2447,23 +2491,6 @@ bool MarkNonStackVisitor::enterCallExpr(CallExpr* call) {
     }
   }
   return false;
-}
-
-bool MarkNonStackVisitor::enterWhileDoStmt(WhileDoStmt* loop) {
-  handleLoopStmt(loop);
-  return true;
-}
-bool MarkNonStackVisitor::enterDoWhileStmt(DoWhileStmt* loop) {
-  handleLoopStmt(loop);
-  return true;
-}
-bool MarkNonStackVisitor::enterCForLoop(CForLoop* loop) {
-  handleLoopStmt(loop);
-  return true;
-}
-bool MarkNonStackVisitor::enterForLoop(ForLoop* loop) {
-  handleLoopStmt(loop);
-  return true;
 }
 
 void FnSymbol::codegenDef() {

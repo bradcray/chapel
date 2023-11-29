@@ -116,7 +116,7 @@ proc sys_sockaddr_t.init(in other: sys_sockaddr_t) {
   IPv4 and IPv6 addresses. ipAddr can be compared using
   `==` and `!=` operators.
 */
-record ipAddr {
+record ipAddr : writeSerializable {
   @chpldoc.nodoc
   var _addressStorage:sys_sockaddr_t;
 
@@ -237,6 +237,10 @@ inline operator ==(const ref lhs: ipAddr, const ref rhs: ipAddr) {
 proc ipAddr.writeThis(f) throws {
   f.write("(","family:",this.family,",host:",this.host,",port:",this.port,")");
 }
+@chpldoc.nodoc
+proc ipAddr.serialize(writer, ref serializer) throws {
+  writeThis(writer);
+}
 
 /*
   Get a :type:`~POSIX.struct_timeval` set for indefinite timeout.
@@ -254,6 +258,8 @@ private extern proc qio_get_fd(fl:qio_file_ptr_t, ref fd:c_int):errorCode;
 
 /* The type returned from :proc:`connect` */
 type tcpConn = file;
+
+tcpConn implements writeSerializable;
 
 /*
   Returns the file descriptor associated with socket
@@ -324,6 +330,10 @@ inline operator ==(const ref lhs: tcpConn,const ref rhs: tcpConn) {
 @chpldoc.nodoc
 proc tcpConn.writeThis(f) throws {
   f.write("(","addr:",this.addr,",fd:",this.socketFd,")");
+}
+@chpldoc.nodoc
+proc tcpConn.serialize(writer, ref serializer) throws {
+  writeThis(writer);
 }
 
 @chpldoc.nodoc
@@ -440,7 +450,7 @@ extern record sys_sockaddr_t {
   var len:socklen_t;
 
   proc init() {
-    this.complete();
+    init this;
     sys_init_sys_sockaddr_t(this);
   }
 
@@ -462,7 +472,7 @@ extern record sys_sockaddr_t {
                                 `host` and `family`.
   */
   @chpldoc.nodoc
-  proc set(host: c_ptrConst(c_char), port: c_uint, family: c_int) throws {
+  proc ref set(host: c_ptrConst(c_char), port: c_uint, family: c_int) throws {
     var err_out = sys_set_sys_sockaddr_t(this, host, port, family);
     if err_out != 1 {
       throw new IllegalArgumentError("Incompatible Address and Family");
@@ -482,7 +492,7 @@ extern record sys_sockaddr_t {
   :type port: `c_uint`
   */
   @chpldoc.nodoc
-  proc set(host: sys_in_addr_t, port: c_uint) {
+  proc ref set(host: sys_in_addr_t, port: c_uint) {
     sys_set_sys_sockaddr_in_t(this, host, port);
   }
 
@@ -499,7 +509,7 @@ extern record sys_sockaddr_t {
   :type port: `c_uint`
   */
   @chpldoc.nodoc
-  proc set(host: sys_in6_addr_t, port: c_uint) {
+  proc ref set(host: sys_in6_addr_t, port: c_uint) {
     sys_set_sys_sockaddr_in6_t(this, host, port);
   }
 
@@ -606,7 +616,7 @@ var event_loop_base:c_ptr(event_base);
   A record holding reference to a tcp socket
   bound and listening for connections.
 */
-record tcpListener {
+record tcpListener : writeSerializable {
   /*
     File Descriptor Associated with instance
   */
@@ -662,9 +672,9 @@ proc tcpListener.accept(in timeout: struct_timeval = indefiniteTimeout):tcpConn 
   if err_out == 0 {
     return new file(fdOut):tcpConn;
   }
-  var localSync$: sync c_short;
+  var localSync: sync c_short;
   // create event pending state
-  var internalEvent = event_new(event_loop_base, this.socketFd, EV_READ | EV_TIMEOUT, c_ptrTo(syncRWTCallback), c_ptrTo(localSync$):c_ptr(void));
+  var internalEvent = event_new(event_loop_base, this.socketFd, EV_READ | EV_TIMEOUT, c_ptrTo(syncRWTCallback), c_ptrTo(localSync):c_ptr(void));
   defer {
     // cleanup
     event_free(internalEvent);
@@ -679,7 +689,7 @@ proc tcpListener.accept(in timeout: struct_timeval = indefiniteTimeout):tcpConn 
       throw new Error("accept() failed");
     }
     // return value
-    var retval = localSync$.readFE();
+    var retval = localSync.readFE();
     // stop timer
     t.stop();
     // if error was timeout throw error
@@ -777,6 +787,10 @@ inline operator ==(const ref lhs: tcpListener,const ref rhs: tcpListener) {
 proc tcpListener.writeThis(f) throws {
   f.write("(","addr:",this.addr,",fd:",this.socketFd);
 }
+@chpldoc.nodoc
+proc tcpListener.serialize(writer, ref serializer) throws {
+  writeThis(writer);
+}
 
 @chpldoc.nodoc
 extern const SOMAXCONN: int;
@@ -857,9 +871,9 @@ proc connect(const ref address: ipAddr, in timeout = indefiniteTimeout): tcpConn
     setBlocking(socketFd, true);
     return new file(socketFd):tcpConn;
   }
-  var localSync$: sync int = 0;
-  localSync$.readFE();
-  var writerEvent = event_new(event_loop_base, socketFd, EV_WRITE | EV_TIMEOUT, c_ptrTo(syncRWTCallback), c_ptrTo(localSync$):c_ptr(void));
+  var localSync: sync int = 0;
+  localSync.readFE();
+  var writerEvent = event_new(event_loop_base, socketFd, EV_WRITE | EV_TIMEOUT, c_ptrTo(syncRWTCallback), c_ptrTo(localSync):c_ptr(void));
   defer {
     event_del(writerEvent);
     event_free(writerEvent);
@@ -868,7 +882,7 @@ proc connect(const ref address: ipAddr, in timeout = indefiniteTimeout): tcpConn
   if err_out != 0 {
     throw new Error("connect() failed");
   }
-  var retval = localSync$.readFE();
+  var retval = localSync.readFE();
   if retval & EV_TIMEOUT != 0 {
     throw createSystemError(ETIMEDOUT, "connect() timed out");
   }
@@ -986,7 +1000,7 @@ proc connect(in host: string, in port: uint(16), family: IPFamily = IPFamily.IPU
   A record holding reference to a udp socket
   bound to any available port.
 */
-record udpSocket {
+record udpSocket : writeSerializable {
   /*
     File Descriptor Associated with instance
   */
@@ -1056,8 +1070,8 @@ proc udpSocket.recvfrom(bufferLen: int, in timeout = indefiniteTimeout,
     deallocate(buffer);
     throw createSystemError(err_out,"recv failed");
   }
-  var localSync$: sync c_short;
-  var internalEvent = event_new(event_loop_base, this.socketFd, EV_READ | EV_TIMEOUT, c_ptrTo(syncRWTCallback), c_ptrTo(localSync$):c_ptr(void));
+  var localSync: sync c_short;
+  var internalEvent = event_new(event_loop_base, this.socketFd, EV_READ | EV_TIMEOUT, c_ptrTo(syncRWTCallback), c_ptrTo(localSync):c_ptr(void));
   defer {
     event_free(internalEvent);
   }
@@ -1070,7 +1084,7 @@ proc udpSocket.recvfrom(bufferLen: int, in timeout = indefiniteTimeout,
       deallocate(buffer);
       throw new Error("recv failed");
     }
-    var retval = localSync$.readFE();
+    var retval = localSync.readFE();
     t.stop();
     if retval & EV_TIMEOUT != 0 {
       deallocate(buffer);
@@ -1171,8 +1185,8 @@ proc udpSocket.send(data: bytes, in address: ipAddr,
   if err_out != 0 && err_out != EAGAIN && err_out != EWOULDBLOCK {
     throw createSystemError(err_out, "send failed");
   }
-  var localSync$: sync c_short;
-  var internalEvent = event_new(event_loop_base, this.socketFd, EV_WRITE | EV_TIMEOUT, c_ptrTo(syncRWTCallback), c_ptrTo(localSync$):c_ptr(void));
+  var localSync: sync c_short;
+  var internalEvent = event_new(event_loop_base, this.socketFd, EV_WRITE | EV_TIMEOUT, c_ptrTo(syncRWTCallback), c_ptrTo(localSync):c_ptr(void));
   defer {
     event_free(internalEvent);
   }
@@ -1183,7 +1197,7 @@ proc udpSocket.send(data: bytes, in address: ipAddr,
     if err_out != 0 {
       throw createSystemError(err_out, "send failed");
     }
-    var retval = localSync$.readFE();
+    var retval = localSync.readFE();
     t.stop();
     if retval & EV_TIMEOUT != 0 {
       throw createSystemError(ETIMEDOUT, "send timed out");
@@ -1227,6 +1241,10 @@ inline operator ==(const ref lhs: udpSocket,const ref rhs: udpSocket) {
 proc udpSocket.writeThis(f) throws {
   f.write("(","addr:",this.addr,",fd:",this.socketFd);
 }
+@chpldoc.nodoc
+proc udpSocket.serialize(writer, ref serializer) throws {
+  writeThis(writer);
+}
 
 
 extern const SO_ACCEPTCONN:c_int;
@@ -1254,7 +1272,7 @@ proc setSockOpt(socketFd: c_int, level: c_int, optname: c_int, ref value: c_int)
 }
 
 /*
-  Set the value of the given socket option (see `setsockopt(2) </https://pubs.opengroup.org/onlinepubs/9699919799/functions/setsockopt.html#>`_)
+  Set the value of the given socket option (see `setsockopt(2) <https://pubs.opengroup.org/onlinepubs/9699919799/functions/setsockopt.html#>`_)
   on provided :type:`tcpConn`. The needed symbolic constants (SO_* etc.)
   are defined above.
 
@@ -1357,7 +1375,7 @@ proc getSockOpt(socketFd:c_int, level: c_int, optname: c_int) throws {
 }
 
 /*
-  Returns the value of the given socket option (see `getsockopt </https://pubs.opengroup.org/onlinepubs/9699919799/functions/getsockopt.html>`_)
+  Returns the value of the given socket option (see `getsockopt <https://pubs.opengroup.org/onlinepubs/9699919799/functions/getsockopt.html>`_)
   on provided :type:`tcpConn`. The needed symbolic constants (SO_* etc.)
   are defined above.
 

@@ -1,6 +1,6 @@
 use Time;
 use Types;
-use Random;
+use NPBRandom;
 
 use HPCCProblemSize;
 
@@ -15,7 +15,7 @@ config const numTrials = 10,
              epsilon = 0.0;
 
 config const useRandomSeed = true,
-             seed = if useRandomSeed then SeedGenerator.oddCurrentTime else 314159265;
+             seed = if useRandomSeed then oddTimeSeed() else 314159265;
 
 config const printParams = true,
              printArrays = false,
@@ -34,7 +34,7 @@ proc main() {
 
   for trial in 1..numTrials {
     const startTime = timeSinceEpoch().totalSeconds();
-    [i in ProblemSpace] A(i) = B(i) + alpha * C(i);
+    [i in ProblemSpace with (ref A)] A(i) = B(i) + alpha * C(i);
     execTime(trial) = timeSinceEpoch().totalSeconds() - startTime;
   }
 
@@ -51,7 +51,7 @@ proc printConfiguration() {
 }
 
 
-proc initVectors(B, C) {
+proc initVectors(ref B, ref C) {
   var randlist = new NPBRandomStream(eltType=real, seed=seed);
 
   randlist.fillRandom(B);

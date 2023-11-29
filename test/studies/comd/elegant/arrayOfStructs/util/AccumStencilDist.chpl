@@ -46,7 +46,7 @@ config param debugAccumStencilDistBulkTransfer = false;
 //
 config param disableAccumStencilLazyRAD = defaultDisableLazyRADOpt;
 
-class AccumStencil : BaseDist {
+class AccumStencil : BaseDist, writeSerializable {
   param rank: int;
   type idxType = int;
   param ignoreFluff: bool;
@@ -230,7 +230,7 @@ private proc makeZero(param rank : int, type idxType) {
 //
 // AccumStencil constructor for clients of the AccumStencil distribution
 //
-proc AccumStencil.init(boundingBox: domain,
+proc AccumStencil.init(boundingBox: domain(?),
                 targetLocales: [] locale = Locales,
                 dataParTasksPerLocale=getDataParTasksPerLocale(),
                 dataParIgnoreRunningTasks=getDataParIgnoreRunningTasks(),
@@ -281,7 +281,7 @@ proc AccumStencil.init(boundingBox: domain,
   this.dataParIgnoreRunningTasks = dataParIgnoreRunningTasks;
   this.dataParMinGranularity = dataParMinGranularity;
 
-  this.complete();
+  init this;
 
   if debugAccumStencilDist {
     writeln("Creating new AccumStencil distribution:");
@@ -380,15 +380,15 @@ override proc AccumStencil.dsiNewRectangularDom(param rank: int, type idxType,
 //
 // output distribution
 //
-proc AccumStencil.writeThis(x) throws {
-  x.writeln("AccumStencil");
-  x.writeln("-------");
-  x.writeln("distributes: ", boundingBox);
-  x.writeln("across locales: ", targetLocales);
-  x.writeln("indexed via: ", targetLocDom);
-  x.writeln("resulting in: ");
+proc AccumStencil.serialize(writer, ref serializer) throws {
+  writer.writeln("AccumStencil");
+  writer.writeln("-------");
+  writer.writeln("distributes: ", boundingBox);
+  writer.writeln("across locales: ", targetLocales);
+  writer.writeln("indexed via: ", targetLocDom);
+  writer.writeln("resulting in: ");
   for locid in targetLocDom do
-    x.writeln("  [", locid, "] locale ", locDist(locid).locale.id, " owns chunk: ", locDist(locid).myChunk);
+    writer.writeln("  [", locid, "] locale ", locDist(locid).locale.id, " owns chunk: ", locDist(locid).myChunk);
 }
 
 proc AccumStencil.dsiIndexToLocale(ind: idxType) where rank == 1 {
@@ -673,7 +673,7 @@ iter AccumStencilDom.these(param tag: iterKind, followThis) where tag == iterKin
     var low  = wholeDim.orderToIndex(followDim.low);
     var high = wholeDim.orderToIndex(followDim.high);
     if wholeDim.hasNegativeStride() then low <=> high;
-    t(i) = try! (low..high by (wholeDim.stride*followDim.stride)) : t(i).type;
+    t(i) = (low..high by (wholeDim.stride*followDim.stride)) : t(i).type;
   }
   for i in {(...t)} {
     yield i;
@@ -733,7 +733,7 @@ proc AccumStencilDom.dsiStride do return whole.stride;
 // INTERFACE NOTES: Could we make dsiSetIndices() for a rectangular
 // domain take a domain rather than something else?
 //
-proc AccumStencilDom.dsiSetIndices(x: domain) {
+proc AccumStencilDom.dsiSetIndices(x: domain(?)) {
   if x.rank != rank then
     compilerError("rank mismatch in domain assignment");
   if x._value.idxType != idxType then
@@ -776,7 +776,7 @@ proc AccumStencilDom.dsiSetIndices(x) {
   }
 }
 
-proc AccumStencilDom.dsiAssignDomain(rhs: domain, lhsPrivate:bool) {
+proc AccumStencilDom.dsiAssignDomain(rhs: domain(?), lhsPrivate:bool) {
   chpl_assignDomainWithGetSetIndices(this, rhs);
 }
 
@@ -1056,7 +1056,7 @@ override proc AccumStencilArr.dsiStaticFastFollowCheck(type leadType) param do
 proc AccumStencilArr.dsiDynamicFastFollowCheck(lead: []) do
   return this.dsiDynamicFastFollowCheck(lead.domain);
 
-proc AccumStencilArr.dsiDynamicFastFollowCheck(lead: domain) do
+proc AccumStencilArr.dsiDynamicFastFollowCheck(lead: domain(?)) do
   return lead.distribution.dsiEqualDMaps(this.dom.dist) && lead._value.whole == this.dom.whole;
 
 iter AccumStencilArr.these(param tag: iterKind, followThis, param fast: bool = false) ref where tag == iterKind.follower {
@@ -1071,7 +1071,7 @@ iter AccumStencilArr.these(param tag: iterKind, followThis, param fast: bool = f
     writeln((if fast then "fast" else "regular") + " follower invoked for AccumStencil array");
 
   var myFollowThis: rank*range(idxType=idxType, strides=chpl_strideProduct(
-                                      strides, chpl_strideUnion(followThis)));
+                                     strides, chpl_strideUnion(followThis)));
   var lowIdx: rank*idxType;
 
   for param i in 0..rank-1 {
@@ -1079,7 +1079,8 @@ iter AccumStencilArr.these(param tag: iterKind, followThis, param fast: bool = f
     // NOTE: Not bothering to check to see if these can fit into idxType
     var low = followThis(i).lowBound * abs(stride):idxType;
     var high = followThis(i).highBound * abs(stride):idxType;
-    myFollowThis(i) = try! ((low..high by stride) + dom.whole.dim(i).low by followThis(i).stride) : myFollowThis(i).type;
+    myFollowThis(i) = ((low..high by stride) + dom.whole.dim(i).low
+                       by followThis(i).stride) : myFollowThis(i).type;
     lowIdx(i) = myFollowThis(i).lowBound;
   }
 
@@ -1125,7 +1126,6 @@ iter AccumStencilArr.these(param tag: iterKind, followThis, param fast: bool = f
 //
 proc AccumStencilArr.dsiSerialWrite(f) {
   type strType = chpl__signedType(idxType);
-  var binary = f.binary();
   if dom.dsiNumIndices == 0 then return;
   var i : rank*idxType;
   for dim in 0..#rank do
@@ -1133,7 +1133,7 @@ proc AccumStencilArr.dsiSerialWrite(f) {
   label next while true {
     f.write(dsiAccess(i));
     if i(rank) <= (dom.dsiDim(rank).high - dom.dsiDim(rank).stride:strType) {
-      if ! binary then f.write(" ");
+      f.write(" ");
       i(rank) += dom.dsiDim(rank).stride:strType;
     } else {
       for dim in 0..rank-2 by -1 {
@@ -1408,7 +1408,7 @@ proc AccumStencilArr._getSendDom(sourceArr, dim, direction) {
   return {(...r)};
 }
 
-private proc chopDim(D:domain, dim) {
+private proc chopDim(D:domain(?), dim) {
   compilerAssert(D.rank > 1, "Cannot call 'chopDim' on one-dimensional domain");
   param newRank = D.rank - 1;
   var r : newRank * D.dim(0).type;
@@ -1564,7 +1564,7 @@ inline proc LocAccumStencilArr.this(i) ref {
 //
 // Privatization
 //
-proc AccumStencil.init(other: unmanaged AccumStencil, privateData,
+proc AccumStencil.init(other: unmanaged AccumStencil(?), privateData,
                 param rank = other.rank,
                 type idxType = other.idxType,
                 param ignoreFluff = other.ignoreFluff) {

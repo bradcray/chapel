@@ -154,7 +154,9 @@ def elapsed_sub_test_time():
         chpl_name = os.environ.get('CHPL_ONETEST')
         base_name = os.path.splitext(chpl_name)[0]
         test_name = os.path.join(test_name, base_name)
+    print_elapsed_sub_test_time(test_name, elapsed_sec)
 
+def print_elapsed_sub_test_time(test_name, elapsed_sec):
     print('[Finished subtest "{0}" - {1:.3f} seconds]\n'.format(test_name, elapsed_sec))
 
 def run_process(*args, **kwargs):
@@ -469,6 +471,14 @@ def printTestVariation(compoptsnum, compoptslist,
     sys.stdout.write(')')
     return
 
+def printStartOfTestMsg(startTime, preexecs=None, prediffs=None):
+    sys.stdout.write('[Starting subtest - %s]\n'%(time.strftime('%a %b %d %H:%M:%S %Z %Y', startTime)))
+    #sys.stdout.write('[compiler: \'%s\']\n'%(compiler))
+    if preexecs:
+        sys.stdout.write('[system-wide preexec(s): \'%s\']\n'%(', '.join(preexecs)))
+    if prediffs:
+        sys.stdout.write('[system-wide prediff(s): \'%s\']\n'%(', '.join(prediffs)))
+
 # print '[Elapsed time to compile and execute all versions of ...'
 #   in the format expected by convert_start_test_log_to_junit_xml.py.
 
@@ -477,6 +487,12 @@ def printEndOfTestMsg(test_name, elapsedTime):
     print('[Elapsed time to compile and execute all versions of "{0}" - '
         '{1:.3f} seconds]'.format(test_name, elapsedTime))
 
+
+def printTestName(name):
+    sys.stdout.write('[test: %s]\n' % name)
+
+def printSkipping(name, reason):
+    sys.stdout.write('Skipping test %s: %s\n' % (name, reason))
 
 # return true if string is an integer
 def IsInteger(str):
@@ -604,23 +620,15 @@ def runSkipIf(skipifName):
 # Translate some known failures into more easily understood forms
 def translateOutput(output_in):
     xlates = (('slurmstepd: Munge decode failed: Expired credential',
-               'Jira 18 -- Expired slurm credential for'),
+               'private issue #4552 -- Expired slurm credential for'),
               ('output file from job .* does not exist',
                'private issue #906 -- Missing output file for'),
-              ('aprun: Unexpected close of the apsys control connection',
-               'Jira 193 -- Unexpected close of apsys for'),
               ('qsub: cannot connect to server sdb',
                'private issue #4542 -- Sporadic: qstat failed to connect to server sdb'),
               ('qstat: cannot connect to server sdb',
                'private issue #4542 -- Sporadic: qstat failed to connect to server sdb'),
               ('Failed to recv data from background qsub',
-               'Jira 260 -- Failed to recv data from background qsub for'),
-              (r'\d+ Killed /var/spool/PBS/mom_priv/jobs',
-               'Jira 324 -- PBS job killed for'),
-              ('Fatal MPP reservation error on confirm',
-               'Jira 329 -- Fatal MPP reservation error for'),
-              ('Fatal MPP reservation error on create',
-               'Jira 329 -- Fatal MPP reservation error for'),
+               'private issue #4553 -- Failed to recv data from background qsub for'),
               ('Text file busy',
                'private issue #474 -- Text file busy for'),
               ('Socket timed out on send/recv operation',
@@ -668,9 +676,6 @@ def filter_errors(output_in, pre_exec_output, execgoodfile, execlog):
     """Identify common errors that occur in runtime or compiler warnings.
     Return message to emit when error found."""
 
-    # If the output contains messages consistent with JIRA 154, add a
-    # hint to the error summary and force a text base diff since
-    # sometimes the output contains a null character
     extra_msg = ''
     err_strings = ['got exn while reading exit code: connection closed',
                    'slave got an unknown command on coord socket:',
@@ -684,14 +689,8 @@ def filter_errors(output_in, pre_exec_output, execgoodfile, execlog):
 
     for s in err_strings:
         if re.search(s, output, re.IGNORECASE) != None:
-            extra_msg = '(possible JIRA 154) '
+            extra_msg = '(private issue #634) '
             DiffBinaryFiles(execgoodfile, execlog)
-            break
-
-    err_strings = ['Master got an xSocket: error in sendAll']
-    for s in err_strings:
-        if re.search(s, output, re.IGNORECASE) != None:
-            extra_msg = '(possible JIRA 274) '
             break
 
     err_strings = ['Clock skew detected']
@@ -1225,12 +1224,7 @@ def main():
     #
     # Start running tests
     #
-    sys.stdout.write('[Starting subtest - %s]\n'%(time.strftime('%a %b %d %H:%M:%S %Z %Y', time.localtime())))
-    #sys.stdout.write('[compiler: \'%s\']\n'%(compiler))
-    if systemPreexecs:
-        sys.stdout.write('[system-wide preexec(s): \'%s\']\n'%(', '.join(systemPreexecs)))
-    if systemPrediffs:
-        sys.stdout.write('[system-wide prediff(s): \'%s\']\n'%(', '.join(systemPrediffs)))
+    printStartOfTestMsg(time.localtime(), systemPreexecs, systemPrediffs)
 
     # consistently look only at the files in the current directory
     dirlist=os.listdir(".")
@@ -1251,7 +1245,7 @@ def main():
         compiler = original_compiler
 
         # print testname
-        sys.stdout.write('[test: %s/%s]\n'%(localdir,testname))
+        printTestName(os.path.join(localdir, testname))
         test_filename = re.match(r'^(.*)\.(?:chpl|test\.c|test\.cpp|ml-test\.c|ml-test\.cpp)$', testname).group(1)
         execname = test_filename
         if uniquifyTests:
@@ -1638,6 +1632,12 @@ def main():
             # Build the test program
             #
             args = []
+
+            # make sure to add this early so that actual compopts file can
+            # override
+            if os.getenv('CHPL_TEST_GPU'):
+                args += ['--no-checks']
+
             if test_is_chpldoc:
                 args += globalChpldocOpts + shlex.split(compopts)
             elif 'CHPL_TEST_NO_USE_O' not in os.environ or \
@@ -2180,7 +2180,7 @@ def main():
 
                     with create_exec_limiter():
                         exectimeout = False  # 'exectimeout' is specific to one trial of one execopt setting
-                        launcher_error = ''  # used to suppress output/timeout errors whose root cause is a launcher error
+                        launcher_error = '' # used to suppress output/timeout errors whose root cause is a launcher error
                         sys.stdout.write('[Executing program %s %s'%(cmd, ' '.join(args)))
                         if redirectin:
                             sys.stdout.write(' < %s'%(redirectin))
@@ -2459,7 +2459,8 @@ def main():
                                     printTestVariation(compoptsnum, compoptslist,
                                                     execoptsnum, execoptslist);
                                 sys.stdout.write(']\n')
-                        else:
+                        # only notify for a failed execution if launching the test was successful
+                        elif (not launcher_error):
                             sys.stdout.write('[Error execution failed for %s]\n'%(test_name))
 
                         if exectimeout or status != 0 or exec_status != 0:

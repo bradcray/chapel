@@ -17,12 +17,12 @@ config const parallel = true;
 config param reverse = false;
 config type eltType = int;
 
-config const seed = SeedGenerator.oddCurrentTime;
+config const seed = NPBRandom.oddTimeSeed();
 
 var methods = ["default", "msbRadixSort", "quickSort", "mergeSort",
                "twoArraySample", "twoArrayRadix", "timSort"];
 
-proc testsort(input, method, parallel, cmp) {
+proc testsort(ref input, method, parallel, cmp) {
 
   if method == "default" {
     if parallel == false {

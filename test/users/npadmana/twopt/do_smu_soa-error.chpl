@@ -52,12 +52,12 @@ class Particle3D {
   var _n1, _ndx : [Dpart] int;
 
   proc init(npart1 : int, random : bool = false) {
-    this.complete();
+    init this;
     npart = npart1;
     Darr = {ParticleAttrib, 0.. #npart};
     Dpart = {0.. #npart};
     if random {
-      var rng = new RandomStream(eltType=real);
+      var rng = new randomStream(eltType=real);
       var x, y, z : real;
       for ii in Dpart {
         x = rng.getNext()*1000.0; y = rng.getNext()*1000.0; z = rng.getNext()*1000.0;
@@ -98,7 +98,7 @@ class Particle3D {
     }
 
     // Set the random number generator
-    var rng = new RandomStream(eltType=real, seed=41);
+    var rng = new randomStream(eltType=real, seed=41);
     var jj : int;
     for ii in 0..(npart-2) {
       jj = (rng.getNext()*(npart-ii)):int + ii;
@@ -224,7 +224,7 @@ proc BuildTree(pp : Particle3D, lo : int, hi : int, id : int) : owned KDNode  {
   return me;
 }
 
-proc TreeAccumulate(hh : UniformBins, p1, p2 : Particle3D, node1, node2 :  KDNode) {
+proc TreeAccumulate(hh : UniformBins(?), p1, p2 : Particle3D, node1, node2 :  KDNode) {
   // Compute the distance between node1 and node2
   var rr = sqrt (+ reduce(node1.xcen - node2.xcen)**2);
   var rmin = rr - (node1.rcell+node2.rcell);
@@ -266,7 +266,7 @@ proc TreeAccumulate(hh : UniformBins, p1, p2 : Particle3D, node1, node2 :  KDNod
   
 
 // The basic pair counter
-proc smuAccumulate(hh : UniformBins, p1,p2 : Particle3D, d1,d2 : domain(1), scale : real) {
+proc smuAccumulate(hh : UniformBins(?), p1,p2 : Particle3D, d1,d2 : domain(1), scale : real) {
   for ii in d1 { // Loop over first set of particles
    
     var x1,y1,z1,w1,r2 : real;

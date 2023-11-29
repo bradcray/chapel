@@ -216,19 +216,19 @@ proc test_gbmv_helper(type t){
         Y : [{0.. #m}]t,
         R : [{0.. #m}]t; // Result
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var alpha = 1: t, //rng.getNext();
         beta = 2: t;//rng.getNext();
-    //var rngint = createRandomStream(eltType=int,algorithm=RNG.PCG);
+    //var rngint = new randomStream(eltType=int);
     //var kl = rng.getNext(0, min(m, n)) ,
     //    ku = rng.getNext(0, min(m, n)) ;
     var kl = 3,
         ku = 3;
 
-    //rng.fillRandom(A);
-    //rng.fillRandom(X);
-    //rng.fillRandom(Y);
+    //rng.fill(A);
+    //rng.fill(X);
+    //rng.fill(Y);
     X = 2: t;
     Y = 2: t;
     A = 2: t;
@@ -267,10 +267,10 @@ proc test_gemv_helper(type t){
         R : [{0.. #m}]t; // Result
 
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    var rng = new randomStream(t);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     const alpha = rng.getNext();
     const beta = rng.getNext();
@@ -296,10 +296,10 @@ proc test_gemv_helper(type t){
         R : [{0.. #m}]t; // Result
 
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    var rng = new randomStream(t);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     const alpha = rng.getNext();
     const beta = rng.getNext();
@@ -324,17 +324,17 @@ proc test_gemv_helper(type t){
         R : [{0.. #m}]t; // Result
 
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    var rng = new randomStream(t);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     const alpha = rng.getNext();
     const beta = rng.getNext();
 
     // Compute Result vector
     for i in R.domain do
-      R[i] = beta*Y[i] + alpha*(+ reduce (conjg(A[..,i])*X[..]));
+      R[i] = beta*Y[i] + alpha*(+ reduce (conj(A[..,i])*X[..]));
 
     gemv(A, X, Y, alpha, beta, opA=Op.H);
 
@@ -356,10 +356,10 @@ proc test_gemv_helper(type t){
         R : [{0.. #m}]t; // Result
 
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    var rng = new randomStream(t);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     const alpha = rng.getNext();
     const beta = rng.getNext();
@@ -399,10 +399,10 @@ proc test_ger_helper(type t){
 
 
     // Populate values
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    var rng = new randomStream(t);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
     const alpha = rng.getNext();
 
     // Precompute result
@@ -429,10 +429,10 @@ proc test_ger_helper(type t){
         R : [{0.. #m, 0..#n}] t; // Result
 
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    var rng = new randomStream(t);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     const alpha = rng.getNext();
 
@@ -469,14 +469,14 @@ proc test_gerc_helper(type t){
 
 
     // Populate values
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    var rng = new randomStream(t);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
     var alpha = rng.getNext();
 
     // Precompute result
-    for (i,j) in R.domain do R[i, j] = alpha*X[i]*conjg(Y[j]) + A[i, j];
+    for (i,j) in R.domain do R[i, j] = alpha*X[i]*conj(Y[j]) + A[i, j];
 
     gerc(A, X, Y, alpha);
 
@@ -500,15 +500,15 @@ proc test_gerc_helper(type t){
 
 
     // Populate values
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    var rng = new randomStream(t);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     var alpha = rng.getNext();
 
     // Precompute result
-    for (i,j) in R.domain do R[i, j] = alpha*X[i]*conjg(Y[j]) + A[i, j];
+    for (i,j) in R.domain do R[i, j] = alpha*X[i]*conj(Y[j]) + A[i, j];
 
     gerc(A[.., 0.. #n], X, Y, alpha);
 
@@ -539,10 +539,10 @@ proc test_geru_helper(type t){
 
 
     // Populate values
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    var rng = new randomStream(t);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
     var alpha = rng.getNext();
 
     // Precompute result
@@ -569,10 +569,10 @@ proc test_geru_helper(type t){
 
 
     // Populate values
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    var rng = new randomStream(t);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     var alpha = rng.getNext();
 
@@ -621,11 +621,11 @@ proc test_hemv_helper(type t){
 
 
     // Populate values
-    var rng = createRandomStream(eltType=t, algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     var alpha = rng.getNext(),
         beta = rng.getNext();
@@ -654,11 +654,11 @@ proc test_hemv_helper(type t){
 
 
     // Populate values
-    var rng = createRandomStream(eltType=t, algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     var alpha = rng.getNext(),
         beta = rng.getNext();
@@ -687,11 +687,11 @@ proc test_hemv_helper(type t){
 
 
     // Populate values
-    var rng = createRandomStream(eltType=t, algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     var alpha = rng.getNext(),
         beta = rng.getNext();
@@ -722,7 +722,7 @@ proc test_her_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}]t,
@@ -730,13 +730,13 @@ proc test_her_helper(type t){
 
     var alphacomplex = rng.getNext(),
         alpha = alphacomplex.re;
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     makeHerm(A);
 
     // Precompute result
-    for (i,j) in R.domain do R[i, j] = alpha*X[i]*conjg(X[j]) + A[i, j];
+    for (i,j) in R.domain do R[i, j] = alpha*X[i]*conj(X[j]) + A[i, j];
 
     // Resulting 'A' is only stored in upper triangular array
     zeroTri(A);
@@ -753,7 +753,7 @@ proc test_her_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}]t,
@@ -761,13 +761,13 @@ proc test_her_helper(type t){
 
     var alphacomplex = rng.getNext(),
         alpha = alphacomplex.re;
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     makeHerm(A);
 
     // Precompute result
-    for (i,j) in R.domain do R[i, j] = alpha*X[i]*conjg(X[j]) + A[i, j];
+    for (i,j) in R.domain do R[i, j] = alpha*X[i]*conj(X[j]) + A[i, j];
 
     // Resulting 'A' is only stored in upper triangular array
     zeroTri(A, uplo=Uplo.Lower);
@@ -785,7 +785,7 @@ proc test_her_helper(type t){
     const m = 10 : c_int;
     const ld = 20;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #ld}] t,
         X : [{0.. #m}]t,
@@ -793,13 +793,13 @@ proc test_her_helper(type t){
 
     var alphacomplex = rng.getNext(),
         alpha = alphacomplex.re;
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     makeHerm(A[.., 0..#m]);
 
     // Precompute result
-    for (i,j) in R.domain do R[i, j] = alpha*X[i]*conjg(X[j]) + A[i, j];
+    for (i,j) in R.domain do R[i, j] = alpha*X[i]*conj(X[j]) + A[i, j];
 
     // Resulting 'A' is only stored in upper triangular array
     zeroTri(A[.., 0..#m]);
@@ -825,7 +825,7 @@ proc test_her2_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -833,14 +833,14 @@ proc test_her2_helper(type t){
         R : [{0.. #m, 0..#m}] t; // Result
 
     var alpha = rng.getNext();
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     makeHerm(A);
 
     // Precompute result
     for (i, j) in R.domain do
-      R[i, j] = alpha*X[i]*conjg(Y[j]) + conjg(alpha)*Y[i]*conjg(Y[j]) + A[i, j];
+      R[i, j] = alpha*X[i]*conj(Y[j]) + conj(alpha)*Y[i]*conj(Y[j]) + A[i, j];
 
     // A result is only stored in upper triangular array
     zeroTri(A);
@@ -857,7 +857,7 @@ proc test_her2_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -865,14 +865,14 @@ proc test_her2_helper(type t){
         R : [{0.. #m, 0..#m}] t; // Result
 
     var alpha = rng.getNext();
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     makeHerm(A);
 
     // Precompute result
     for (i, j) in R.domain do
-      R[i, j] = alpha*X[i]*conjg(Y[j]) + conjg(alpha)*Y[i]*conjg(Y[j]) + A[i, j];
+      R[i, j] = alpha*X[i]*conj(Y[j]) + conj(alpha)*Y[i]*conj(Y[j]) + A[i, j];
 
     // A result is only stored in upper triangular array
     zeroTri(A, uplo=Uplo.Lower);
@@ -890,7 +890,7 @@ proc test_her2_helper(type t){
     const m = 10 : c_int;
     const ld = 20;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0..#m, 0..#ld}] t,
         X : [{0..#m}] t,
@@ -898,14 +898,14 @@ proc test_her2_helper(type t){
         R : [{0..#m, 0..#m}] t; // Result
 
     var alpha = rng.getNext();
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     makeHerm(A[.., 0..#m]);
 
     // Precompute result
     for (i, j) in R.domain do
-      R[i, j] = alpha*X[i]*conjg(Y[j]) + conjg(alpha)*Y[i]*conjg(Y[j]) + A[i, j];
+      R[i, j] = alpha*X[i]*conj(Y[j]) + conj(alpha)*Y[i]*conj(Y[j]) + A[i, j];
 
     // A result is only stored in upper triangular array
     zeroTri(A[.., 0..#m]);
@@ -1029,7 +1029,7 @@ proc test_symv_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -1039,9 +1039,9 @@ proc test_symv_helper(type t){
     var alpha = rng.getNext(),
         beta = rng.getNext();
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     makeSymm(A);
 
@@ -1064,7 +1064,7 @@ proc test_symv_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -1074,9 +1074,9 @@ proc test_symv_helper(type t){
     var alpha = rng.getNext(),
         beta = rng.getNext();
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     makeSymm(A);
 
@@ -1098,7 +1098,7 @@ proc test_symv_helper(type t){
     const m = 10 : c_int;
     const ld = 20: c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #ld}] t,
         X : [{0.. #m}] t,
@@ -1108,9 +1108,9 @@ proc test_symv_helper(type t){
     var alpha = rng.getNext(),
         beta = rng.getNext();
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     makeSymm(A[.., 0..#m]);
 
@@ -1140,7 +1140,7 @@ proc test_syr_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -1148,12 +1148,12 @@ proc test_syr_helper(type t){
 
     var alpha = rng.getNext();
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     makeSymm(A);
 
-    for (i, j) in R.domain do R[i, j] = alpha*X[i]*conjg(X[j]) + A[i, j];
+    for (i, j) in R.domain do R[i, j] = alpha*X[i]*conj(X[j]) + A[i, j];
 
     // A result is only stored in upper triangular array
     zeroTri(R);
@@ -1170,7 +1170,7 @@ proc test_syr_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -1178,12 +1178,12 @@ proc test_syr_helper(type t){
 
     var alpha = rng.getNext();
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     makeSymm(A);
 
-    for (i, j) in R.domain do R[i, j] = alpha*X[i]*conjg(X[j]) + A[i, j];
+    for (i, j) in R.domain do R[i, j] = alpha*X[i]*conj(X[j]) + A[i, j];
 
     // A result is only stored in upper triangular array
     zeroTri(R, Uplo.Lower);
@@ -1201,7 +1201,7 @@ proc test_syr_helper(type t){
     const m = 10 : c_int;
     const ld = 20;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0..#m, 0..#ld}] t,
         X : [{0.. #m}] t,
@@ -1209,12 +1209,12 @@ proc test_syr_helper(type t){
 
     var alpha = rng.getNext();
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     makeSymm(A[.., 0..#m]);
 
-    for (i, j) in R.domain do R[i, j] = alpha*X[i]*conjg(X[j]) + A[i, j];
+    for (i, j) in R.domain do R[i, j] = alpha*X[i]*conj(X[j]) + A[i, j];
 
     // A result is only stored in upper triangular array
     zeroTri(R);
@@ -1240,7 +1240,7 @@ proc test_syr2_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -1249,14 +1249,14 @@ proc test_syr2_helper(type t){
 
     var alpha = rng.getNext();
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     makeSymm(A);
 
     for (i, j) in R.domain do
-        R[i, j] = alpha*X[i]*conjg(Y[j]) + conjg(alpha)*Y[i]*conjg(X[j]) + A[i,j];
+        R[i, j] = alpha*X[i]*conj(Y[j]) + conj(alpha)*Y[i]*conj(X[j]) + A[i,j];
 
     // A result is only stored in upper triangular array
     zeroTri(R);
@@ -1273,7 +1273,7 @@ proc test_syr2_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -1282,14 +1282,14 @@ proc test_syr2_helper(type t){
 
     var alpha = rng.getNext();
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     makeSymm(A);
 
     for (i, j) in R.domain do
-        R[i, j] = alpha*X[i]*conjg(Y[j]) + conjg(alpha)*Y[i]*conjg(X[j]) + A[i,j];
+        R[i, j] = alpha*X[i]*conj(Y[j]) + conj(alpha)*Y[i]*conj(X[j]) + A[i,j];
 
     // A result is only stored in upper triangular array
     zeroTri(R, Uplo.Lower);
@@ -1307,7 +1307,7 @@ proc test_syr2_helper(type t){
     const m = 10 : c_int;
     const ld = 20;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #ld}] t,
         X : [{0.. #m}] t,
@@ -1316,14 +1316,14 @@ proc test_syr2_helper(type t){
 
     var alpha = rng.getNext();
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
-    rng.fillRandom(Y);
+    rng.fill(A);
+    rng.fill(X);
+    rng.fill(Y);
 
     makeSymm(A[.., 0..#m]);
 
     for (i, j) in R.domain do
-        R[i, j] = alpha*X[i]*conjg(Y[j]) + conjg(alpha)*Y[i]*conjg(X[j]) + A[i,j];
+        R[i, j] = alpha*X[i]*conj(Y[j]) + conj(alpha)*Y[i]*conj(X[j]) + A[i,j];
 
     // A result is only stored in upper triangular array
     zeroTri(R);
@@ -1350,14 +1350,14 @@ proc test_tbmv_helper(type t){
   {
     const m = 5 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
         R : [X.domain] t; // Result
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     const k = m-1: c_int;
 
@@ -1406,14 +1406,14 @@ proc test_trmv_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
         R : [X.domain] t; // Result
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     // A result is only stored in upper triangular array
     zeroTri(A);
@@ -1431,14 +1431,14 @@ proc test_trmv_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
         R : [X.domain] t; // Result
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     // A result is only stored in upper triangular array
     zeroTri(A);
@@ -1456,14 +1456,14 @@ proc test_trmv_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
         R : [X.domain] t; // Result
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     // A result is only stored in upper triangular array
     zeroTri(A, Uplo.Lower);
@@ -1481,14 +1481,14 @@ proc test_trmv_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
         R : [X.domain] t; // Result
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     // A result is only stored in upper triangular array
     zeroTri(A);
@@ -1511,14 +1511,14 @@ proc test_trmv_helper(type t){
     const m = 10 : c_int;
     const ld = 20;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #ld}] t,
         X : [{0.. #m}] t,
         R : [X.domain] t; // Result
 
-    rng.fillRandom(A);
-    rng.fillRandom(X);
+    rng.fill(A);
+    rng.fill(X);
 
     // A result is only stored in upper triangular array
     zeroTri(A[.., 0..#m]);
@@ -1546,7 +1546,7 @@ proc test_trsv_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -1554,7 +1554,7 @@ proc test_trsv_helper(type t){
 
 
     makeRandomInvertible(A);
-    rng.fillRandom(X);
+    rng.fill(X);
 
     // Make A a triangular matrix
     zeroTri(A);
@@ -1575,7 +1575,7 @@ proc test_trsv_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -1583,7 +1583,7 @@ proc test_trsv_helper(type t){
 
 
     makeRandomInvertible(A);
-    rng.fillRandom(X);
+    rng.fill(X);
 
     // Make A a triangular matrix
     zeroTri(A);
@@ -1604,7 +1604,7 @@ proc test_trsv_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -1612,7 +1612,7 @@ proc test_trsv_helper(type t){
 
 
     makeRandomInvertible(A);
-    rng.fillRandom(X);
+    rng.fill(X);
 
     // Make A a triangular matrix
     zeroTri(A, Uplo.Lower);
@@ -1633,7 +1633,7 @@ proc test_trsv_helper(type t){
   {
     const m = 10 : c_int;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #m}] t,
         X : [{0.. #m}] t,
@@ -1641,7 +1641,7 @@ proc test_trsv_helper(type t){
 
 
     makeRandomInvertible(A);
-    rng.fillRandom(X);
+    rng.fill(X);
 
     // Make A a triangular matrix
     zeroTri(A);
@@ -1667,7 +1667,7 @@ proc test_trsv_helper(type t){
     const m = 10 : c_int;
     const ld = 20;
 
-    var rng = createRandomStream(eltType=t,algorithm=RNG.PCG);
+    var rng = new randomStream(t);
 
     var A : [{0.. #m, 0.. #ld}] t,
         X : [{0.. #m}] t,
@@ -1675,7 +1675,7 @@ proc test_trsv_helper(type t){
 
 
     makeRandomInvertible(A[.., 0..#m]);
-    rng.fillRandom(X);
+    rng.fill(X);
 
     // Make A a triangular matrix
     zeroTri(A[.., 0..#m]);
@@ -1694,4 +1694,3 @@ proc test_trsv_helper(type t){
 
   printErrors(name, passed, failed, tests);
 }
-

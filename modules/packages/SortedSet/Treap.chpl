@@ -64,7 +64,7 @@ module Treap {
   }
 
   @chpldoc.nodoc
-  var _treapRandomStream = new RandomStream(int);
+  var _treapRandomStream = new randomStream(int);
 
   /*
     Helper procedure to get one random int
@@ -129,7 +129,7 @@ module Treap {
     }
   }
 
-  record treap {
+  record treap : writeSerializable {
     /* The type of the elements contained in this sortedSet.*/
     type eltType;
 
@@ -217,7 +217,7 @@ module Treap {
       this.eltType = eltType;
       this.parSafe = parSafe;
       this.comparator = comparator;
-      this.complete();
+      init this;
 
       for elem in iterable do _add(elem);
     }
@@ -365,7 +365,7 @@ module Treap {
        Used by sortedMap
      */
     @chpldoc.nodoc
-    proc _getReference(element: eltType) ref {
+    proc ref _getReference(element: eltType) ref {
       var node = _findRef(_root, element);
       if node == nil then
         boundsCheckHalt(try! "index %? out of bounds".format(element));
@@ -821,6 +821,11 @@ module Treap {
       _enter();
       _visit(ch);
       _leave();
+    }
+
+    @chpldoc.nodoc
+    proc const serialize(writer, ref serializer) throws {
+      writeThis(writer);
     }
 
     /*

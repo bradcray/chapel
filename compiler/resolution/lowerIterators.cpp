@@ -3027,6 +3027,7 @@ static void removeUncalledIterators()
 }
 
 void lowerIterators() {
+
   nonLeaderParCheck();
 
   markVectorizableForallLoops();

@@ -353,22 +353,6 @@ module ChapelIteratorSupport {
     return false;
   }
 
-  proc _iteratorRecord.writeThis(f) throws {
-    var first: bool = true;
-    for e in this {
-      if !first then
-        f.write(" ");
-      else
-        first = false;
-      f.write(e);
-    }
-  }
-
-  @chpldoc.nodoc
-  proc _iteratorRecord.serialize(writer, ref serializer) throws {
-    writeThis(writer);
-  }
-
   operator =(ref ic: _iteratorRecord, xs) {
     for (e, x) in zip(ic, xs) do
       e = x;
@@ -444,13 +428,13 @@ module ChapelIteratorSupport {
 
   pragma "fn returns iterator"
   pragma "no implicit copy"
-  inline proc _toLeader(ir: _iteratorRecord)
+  inline proc _toLeader(const ir: _iteratorRecord)
     where __primitive("has leader", ir) do
     return chpl__autoCopy(__primitive("to leader", ir), definedConst=false);
 
   pragma "suppress lvalue error"
   pragma "fn returns iterator"
-  inline proc _toLeader(x)
+  inline proc _toLeader(const x)
     where !isSubtype(x.type, _iteratorRecord) && __primitive("has leader", x.these()) do
     return _toLeader(x.these());
 

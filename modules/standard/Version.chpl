@@ -180,7 +180,7 @@ module Version {
     converted to a string, it is represented as ``major.minor.update (commit)``.
   */
 
-  record versionValue {
+  record versionValue : writeSerializable {
     /*
       The major version number. For version ``2.0.1``, this would be ``2``.
     */
@@ -202,6 +202,10 @@ module Version {
     @chpldoc.nodoc
     proc writeThis(s) throws {
       s.write(this:string);
+    }
+    @chpldoc.nodoc
+    proc serialize(writer, ref serializer) throws {
+      writeThis(writer);
     }
 
     @chpldoc.nodoc
@@ -337,7 +341,7 @@ module Version {
     converted to a string, it is represented as ``major.minor.update (commit)``.
     Unlike :type:`versionValue`, a ``version`` can be created and modified at runtime.
   */
-  record version {
+  record version : writeSerializable {
     /*
       The major version number. For version ``2.0.1``, this would be ``2``.
       Defaults to ``-1``
@@ -366,6 +370,10 @@ module Version {
     @chpldoc.nodoc
     proc writeThis(s) throws {
       s.write(this:string);
+    }
+    @chpldoc.nodoc
+    proc serialize(writer, ref serializer) throws {
+      writeThis(writer);
     }
 
     @chpldoc.nodoc
@@ -618,7 +626,7 @@ module Version {
     return v2 <= v1;
   }
 
-  private proc spaceship(v1: version(?),
+  private proc spaceship(v1: version,
                          v2: versionValue(?)) : int {
     const majComp = spaceship(v1.major, v2.major);
     if majComp != 0 {
@@ -666,14 +674,21 @@ module Version {
   }
 
 
+  /*
+    Error class thrown when two versions are compared that cannot be compared.
 
+    For example, two versions differing only in commit IDs cannot be compared.
+  */
   class VersionComparisonError : Error {
+    @chpldoc.nodoc
     var msg:string;
 
+    @chpldoc.nodoc
     proc init(msg:string) {
       this.msg = msg;
     }
 
+    @chpldoc.nodoc
     override proc message() {
       return msg;
     }

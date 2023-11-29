@@ -65,11 +65,7 @@ void gatherPrimitiveType(Context* context,
 void Type::gatherBuiltins(Context* context,
                           std::unordered_map<UniqueString,const Type*>& map) {
 
-  gatherPrimitiveType(context, map, BoolType::get(context, 0));
-  gatherPrimitiveType(context, map, BoolType::get(context, 8));
-  gatherPrimitiveType(context, map, BoolType::get(context, 16));
-  gatherPrimitiveType(context, map, BoolType::get(context, 32));
-  gatherPrimitiveType(context, map, BoolType::get(context, 64));
+  gatherPrimitiveType(context, map, BoolType::get(context));
 
   gatherPrimitiveType(context, map, IntType::get(context, 8));
   gatherPrimitiveType(context, map, IntType::get(context, 16));
@@ -103,11 +99,11 @@ void Type::gatherBuiltins(Context* context,
   gatherType(context, map, "_any", AnyType::get(context));
   gatherType(context, map, "_nilType", NilType::get(context));
   gatherType(context, map, "_unknown", UnknownType::get(context));
-  gatherType(context, map, "c_string", CStringType::get(context));
+  gatherType(context, map, "chpl_c_string", CStringType::get(context));
   gatherType(context, map, "nothing", NothingType::get(context));
   gatherType(context, map, "void", VoidType::get(context));
 
-  gatherType(context, map, "object", BasicClassType::getObjectType(context));
+  gatherType(context, map, "RootClass", BasicClassType::getRootClassType(context));
 
   gatherType(context, map, "_tuple", TupleType::getGenericTupleType(context));
 
@@ -120,6 +116,10 @@ void Type::gatherBuiltins(Context* context,
   auto localeType = CompositeType::getLocaleType(context);
   gatherType(context, map, "locale", localeType);
   gatherType(context, map, "_locale", localeType);
+
+  auto rangeType = CompositeType::getRangeType(context);
+  gatherType(context, map, "range", rangeType);
+  gatherType(context, map, "_range", rangeType);
 
   gatherType(context, map, "Error", CompositeType::getErrorType(context));
 
@@ -166,6 +166,14 @@ bool Type::isStringType() const {
 bool Type::isBytesType() const {
   if (auto rec = toRecordType()) {
     if (rec->name() == USTR("bytes"))
+      return true;
+  }
+  return false;
+}
+
+bool Type::isLocaleType() const {
+  if (auto rec = toRecordType()) {
+    if (rec->name() == USTR("locale"))
       return true;
   }
   return false;

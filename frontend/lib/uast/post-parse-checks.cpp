@@ -25,6 +25,7 @@
 #include "chpl/parsing/parser-error.h"
 #include "chpl/uast/all-uast.h"
 #include <vector>
+#include <string.h>
 
 namespace {
 
@@ -100,6 +101,8 @@ struct Visitor {
   bool isParentFalseBlock(int depth=0) const;
 
   bool isNamedThisAndNotReceiverOrFunction(const NamedDecl* node);
+  bool isNamedTheseAndNotIterMethod(const NamedDecl* node);
+  bool isSpecialMethodKeywordUsedIncorrectly(const NamedDecl *node);
   bool isNameReservedWord(const NamedDecl* node);
   inline bool shouldEmitUnstableWarning(const AstNode* node);
 
@@ -111,8 +114,10 @@ struct Visitor {
   bool handleNestedDecoratorsInTypeConstructors(const FnCall* node);
   void checkForNestedClassDecorators(const FnCall* node);
   void checkExplicitDeinitCalls(const FnCall* node);
+  void checkNewBorrowed(const FnCall* node);
   void checkBorrowFromNew(const FnCall* node);
   void checkSparseKeyword(const FnCall* node);
+  void checkPrimCallInUserCode(const PrimCall* node);
   void checkDmappedKeyword(const OpCall* node);
   void checkConstVarNoInit(const Variable* node);
   void checkConfigVar(const Variable* node);
@@ -134,12 +139,13 @@ struct Visitor {
                                   const VisibilityClause* clause);
   void checkAttributeNameRecognizedOrToolSpaced(const Attribute* node);
   void checkAttributeAppliedToCorrectNode(const Attribute* attr);
-  void checkAttributeUsedParens(const Attribute* node);
   void checkAttributeUnstable(const Attribute* node);
   void checkUserModuleHasPragma(const AttributeGroup* node);
+  void checkParenfulDeprecation(const AttributeGroup* node);
   void checkExternBlockAtModuleScope(const ExternBlock* node);
   void checkLambdaDeprecated(const Function* node);
   void checkCStringLiteral(const CStringLiteral* node);
+  void checkAllowedImplementsTypeIdent(const Implements* impl, const Identifier* node);
   /*
   TODO
   void checkProcedureFormalsAgainstRetType(const Function* node);
@@ -160,6 +166,7 @@ struct Visitor {
 
   // Warnings.
   void warnUnstableUnions(const Union* node);
+  void warnUnstableForeachLoops(const Foreach* node);
   void warnUnstableSymbolNames(const NamedDecl* node);
 
   // Visitors.
@@ -173,11 +180,14 @@ struct Visitor {
   void visit(const Continue* node);
   void visit(const CStringLiteral* node);
   void visit(const ExternBlock* node);
+  void visit(const Foreach* node);
   void visit(const FnCall* node);
   void visit(const Function* node);
   void visit(const FunctionSignature* node);
+  void visit(const Implements* node);
   void visit(const Import* node);
   void visit(const OpCall* node);
+  void visit(const PrimCall* node);
   void visit(const Return* node);
   void visit(const TypeQuery* node);
   void visit(const Union* node);
@@ -222,6 +232,19 @@ static ControlFlowModifier nodeAllowsReturn(const AstNode* node,
       // can't return a value from an iterator.
       return ControlFlowModifier::BLOCKS;
     }
+
+    // The 'init' method is handled separately by the initializerRules pass.
+    // If we handle it here it also erroneously picks up the use of 'return'
+    // in 'lifetime return' statements (which isn't a concern for deinit
+    // and postinit).
+    if(fn->name() == USTR("deinit") ||
+       fn->name() == USTR("postinit"))
+    {
+      if(ctrl->value() != nullptr) {
+        return ControlFlowModifier::BLOCKS;
+      }
+    }
+
     return ControlFlowModifier::ALLOWS;
   }
   if (node->isForall() || node->isForeach() || node->isCoforall() ||
@@ -610,6 +633,16 @@ void Visitor::checkExplicitDeinitCalls(const FnCall* node) {
   }
 }
 
+void Visitor::checkNewBorrowed(const FnCall* node) {
+  if(auto calledExpr = node->calledExpression()) {
+    if(auto newCalledExpr = calledExpr->toNew()) {
+      if (newCalledExpr->management() == New::Management::BORROWED) {
+        error(node, "cannot create a 'borrowed' object using 'new'");
+      }
+    }
+  }
+}
+
 void Visitor::checkBorrowFromNew(const FnCall* node) {
   // look for patterns along these lines:
   //   const x = (new C()).borrow()
@@ -647,6 +680,19 @@ void Visitor::checkSparseKeyword(const FnCall* node) {
         if (ident->name() == USTR("sparse"))
           warn(node, "sparse domains are unstable,"
                " their behavior is likely to change in the future.");
+}
+
+// TODO: remove this check and warning after 1.34?
+void Visitor::checkPrimCallInUserCode(const PrimCall* node) {
+  // suppress this warning from chpldoc
+  if (isUserCode())
+    if ((node->prim() == PrimitiveTag::PRIM_CHPL_COMM_GET ||
+         node->prim() == PrimitiveTag::PRIM_CHPL_COMM_PUT) &&
+        context_->configuration().toolName != "chpldoc")
+          warn(node, "the primitives 'chpl_comm_get' and 'chpl_comm_put',"
+               " have changed behavior in Chapel 1.32. Please use"
+               " the 'Communication' module's 'get' and 'put' procedures"
+               " as replacements for calling the primitives directly");
 }
 
 void Visitor::checkDmappedKeyword(const OpCall* node) {
@@ -1035,12 +1081,54 @@ bool Visitor::isNamedThisAndNotReceiverOrFunction(const NamedDecl* node) {
   return true;
 }
 
+bool Visitor::isNamedTheseAndNotIterMethod(const NamedDecl* node) {
+  if (node->name() != USTR("these")) return false;
+  if (auto asFn = node->toFunction()) {
+    if (asFn->isMethod()) {
+      if (asFn->kind() == Function::Kind::ITER) {
+        return false;
+      } else if (asFn->kind() == Function::Kind::PROC &&
+                 node->attributeGroup() &&
+                 node->attributeGroup()->hasPragma(
+                     pragmatags::PRAGMA_FN_RETURNS_ITERATOR)) {
+        // also allow proc methods that forward an iterator,
+        // via: pragma "fn returns iterator"
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+bool Visitor::isSpecialMethodKeywordUsedIncorrectly(
+  const NamedDecl *node)
+{
+  if ((node->name() != USTR("init")) &&
+      (node->name() != USTR("deinit")) &&
+      (node->name() != USTR("postinit")))
+  {
+    return false;
+  }
+
+  // deinit can be a free function used to deinitialize the current
+  // module
+  if(node->name() == USTR("deinit")) {
+    return !node->isFunction();
+  }
+
+  return !(node->isFunction() && node->toFunction()->isMethod());
+}
+
 bool Visitor::isNameReservedWord(const NamedDecl* node) {
   auto name = node->name();
   if (isNamedThisAndNotReceiverOrFunction(node)) return true;
+  if (isNamedTheseAndNotIterMethod(node)) return true;
+  if (isSpecialMethodKeywordUsedIncorrectly(node)) return true;
   if (name == "none") return true;
   if (name == "false") return true;
   if (name == "true") return true;
+  if (name == "super") return true;
   return false;
 }
 
@@ -1063,6 +1151,7 @@ static bool isNameReservedType(UniqueString name) {
       name == USTR("domain")    ||
       name == USTR("index")     ||
       name == USTR("locale")    ||
+      name == USTR("range")     ||
       name == USTR("nothing")   ||
       name == USTR("void"))
     return true;
@@ -1086,6 +1175,10 @@ void Visitor::checkReservedSymbolName(const NamedDecl* node) {
     error(node, "attempt to redefine reserved word '%s'.", name.c_str());
   } else if (isNameReservedType(name)) {
     error(node, "attempt to redefine reserved type '%s'.", name.c_str());
+  }
+
+  if(strchr(name.c_str(), '$') != nullptr) {
+    warn(node, "Using '$' in identifiers is deprecated; rename this to not use a '$'.");
   }
 }
 
@@ -1160,13 +1253,20 @@ void Visitor::warnUnstableUnions(const Union* node) {
              "in ways that will break their current uses.");
 }
 
+void Visitor::warnUnstableForeachLoops(const Foreach* node) {
+  if (!shouldEmitUnstableWarning(node)) return;
+  warn(node, "foreach loops are currently unstable and are expected to change "
+             "in ways that may break some of their current uses.");
+}
+
 void Visitor::warnUnstableSymbolNames(const NamedDecl* node) {
   if (!shouldEmitUnstableWarning(node)) return;
   if (!isUserCode()) return;
 
   auto name = node->name();
 
-  if (name.startsWith("_")) {
+  // warn on names with leading underscore, except for just underscore itself
+  if (name.startsWith("_") && name.length() > 1) {
     warn(node,
          "symbol names with leading underscores (%s) are unstable.",
          name.c_str());
@@ -1187,27 +1287,11 @@ void Visitor::visit(const BracketLoop* node) {
 }
 
 void Visitor::checkUserModuleHasPragma(const AttributeGroup* node) {
-  // determine if the module is user code
-  if (!isUserCode()) return;
+  // determine if the module is user code and warn_unstable was set
+  if (!isUserCode() || !shouldEmitUnstableWarning(node)) return;
 
-  bool pragmaNoDocFound = false;
-  int pragmaCount = 0;
-  for (auto pragma : node->pragmas()) {
-    pragmaCount++;
-    if (pragma == pragmatags::PRAGMA_NO_DOC) {
-      // issue a deprecation warning about pragma 'no doc' and continue
-      warn(node, "pragma 'no doc' is deprecated, use '@chpldoc.nodoc' instead");
-      pragmaNoDocFound = true;
-      continue;
-    }
-  }
-  // don't check if warn_unstable isn't set
-  if (!shouldEmitUnstableWarning(node)) return;
-
-  // don't warn if the only pragma is 'no doc', which is deprecated
-  bool noDocIsOnlyPragma = (pragmaNoDocFound && pragmaCount == 1);
   // issue a warning once for the symbol
-  if (node->pragmas().begin() != node->pragmas().end() && !noDocIsOnlyPragma) {
+  if (node->pragmas().begin() != node->pragmas().end()) {
     auto parentNode = parsing::parentAst(context_, node);
     UniqueString parentName;
     if (auto decl = parentNode->toNamedDecl()) {
@@ -1234,9 +1318,13 @@ void Visitor::checkUserModuleHasPragma(const AttributeGroup* node) {
   }
 }
 
-void Visitor::checkAttributeUsedParens(const Attribute* node) {
-  if (node->numActuals() > 0 && !node->usedParens()) {
-     CHPL_REPORT(context_, ParenlessAttributeArgDeprecated, node);
+void Visitor::checkParenfulDeprecation(const AttributeGroup* node) {
+  if (!node->isParenfulDeprecated()) return;
+  auto groupParent = parents_.back();
+  auto fn = groupParent->toFunction();
+
+  if (!fn || !fn->isParenless()) {
+    CHPL_REPORT(context_, InvalidParenfulDeprecation, node, groupParent);
   }
 }
 
@@ -1247,7 +1335,8 @@ void Visitor::checkAttributeNameRecognizedOrToolSpaced(const Attribute* node) {
       node->name() == USTR("unstable") ||
       node->name() == USTR("stable") ||
       node->name() == USTR("assertOnGpu") ||
-      node->name().startsWith(USTR("chpldoc."))) {
+      node->name().startsWith(USTR("chpldoc.")) ||
+      node->name().startsWith(USTR("llvm."))) {
       // TODO: should we match chpldoc.nodoc or anything toolspaced with chpldoc.?
       return;
   } else if (node->fullyQualifiedAttributeName().find('.') == std::string::npos) {
@@ -1296,20 +1385,26 @@ void Visitor::checkAttributeUnstable(const Attribute* node) {
 void Visitor::visit(const Attribute* node) {
   checkAttributeAppliedToCorrectNode(node);
   checkAttributeNameRecognizedOrToolSpaced(node);
-  checkAttributeUsedParens(node);
   checkAttributeUnstable(node);
 }
 
 void Visitor::visit(const AttributeGroup* node) {
   checkUserModuleHasPragma(node);
+  checkParenfulDeprecation(node);
 }
 
 void Visitor::visit(const FnCall* node) {
   checkNoDuplicateNamedArguments(node);
   checkForNestedClassDecorators(node);
   checkExplicitDeinitCalls(node);
+  checkNewBorrowed(node);
   checkBorrowFromNew(node);
   checkSparseKeyword(node);
+
+}
+
+void Visitor::visit(const PrimCall* node) {
+  checkPrimCallInUserCode(node);
 }
 
 void Visitor::visit(const OpCall* node) {
@@ -1349,9 +1444,31 @@ void Visitor::visit(const Union* node) {
   warnUnstableUnions(node);
 }
 
+void Visitor::visit(const Foreach* node) {
+  warnUnstableForeachLoops(node);
+}
+
 void Visitor::visit(const Use* node) {
   for (auto clause : node->visibilityClauses()) {
     checkVisibilityClauseValid(node, clause);
+  }
+}
+
+void Visitor::checkAllowedImplementsTypeIdent(const Implements* impl, const Identifier* node) {
+  auto typeName = node->name();
+  if (typeName == USTR("none") ||
+      typeName == USTR("this") ||
+      typeName == USTR("false") ||
+      typeName == USTR("true") ||
+      typeName == USTR("domain") ||
+      typeName == USTR("index")) {
+    CHPL_REPORT(context_, InvalidImplementsIdent, impl, node);
+  }
+}
+
+void Visitor::visit(const Implements* node) {
+  if (auto typeIdent = node->typeIdent()) {
+    checkAllowedImplementsTypeIdent(node, typeIdent);
   }
 }
 

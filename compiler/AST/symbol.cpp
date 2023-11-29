@@ -30,6 +30,7 @@
 #include "astutil.h"
 #include "driver.h"
 #include "ForallStmt.h"
+#include "ForLoop.h"
 #include "passes.h"
 #include "resolveIntents.h"
 #include "resolution.h"
@@ -466,27 +467,48 @@ const char* Symbol::getSanitizedMsg(std::string msg) const {
   return astr(chpl::removeSphinxMarkup(msg));
 }
 
+std::unordered_set<std::pair<Symbol*,Expr*>> dedupDeprecationWarnings;
+
 void Symbol::maybeGenerateDeprecationWarning(Expr* context) {
   if (!this->hasFlag(FLAG_DEPRECATED)) return;
 
   Symbol* contextParent = context->parentSymbol;
   bool parentDeprecated = contextParent->hasFlag(FLAG_DEPRECATED);
-  bool compilerGenerated = contextParent->hasFlag(FLAG_COMPILER_GENERATED);
+  bool compilerGenerated = contextParent->hasFlag(FLAG_COMPILER_GENERATED) &&
+                          !contextParent->hasFlag(FLAG_DEFAULT_ACTUAL_FUNCTION);
+  bool ignoreUsage = contextParent->hasFlag(FLAG_IGNORE_DEPRECATED_USE);
+
+  // Ignore initialization of deprecated fields in initializers.
+  if (FnSymbol* fn = toFnSymbol(contextParent)) {
+    bool isField = isTypeSymbol(this->defPoint->parentSymbol) ||
+                   this->hasFlag(FLAG_FIELD_ACCESSOR);
+    bool isInit = (fn->isInitializer() || fn->isCopyInit());
+    if (isField && isInit) {
+      return;
+    }
+  }
 
   // Traverse until we find a deprecated parent symbol, a compiler generated
   // parent symbol, or until we reach the highest outer scope
   while (contextParent != NULL && contextParent->defPoint != NULL &&
          contextParent->defPoint->parentSymbol != NULL &&
-         parentDeprecated != true && compilerGenerated != true) {
+         parentDeprecated != true && compilerGenerated != true &&
+         ignoreUsage != true) {
     contextParent = contextParent->defPoint->parentSymbol;
     parentDeprecated = contextParent->hasFlag(FLAG_DEPRECATED);
-    compilerGenerated = contextParent->hasFlag(FLAG_COMPILER_GENERATED);
+    compilerGenerated = contextParent->hasFlag(FLAG_COMPILER_GENERATED) &&
+                       !contextParent->hasFlag(FLAG_DEFAULT_ACTUAL_FUNCTION);
+    ignoreUsage = contextParent->hasFlag(FLAG_IGNORE_DEPRECATED_USE);
   }
 
   // Only generate the warning if the location with the reference is not
   // created by the compiler or also deprecated.
-  if (!compilerGenerated && !parentDeprecated) {
-    USR_WARN(context, "%s", getSanitizedMsg(getDeprecationMsg()));
+  if (!compilerGenerated && !parentDeprecated && !ignoreUsage) {
+    auto key = std::make_pair(this, context);
+    if (dedupDeprecationWarnings.find(key) == dedupDeprecationWarnings.end()) {
+      USR_WARN(context, "%s", getSanitizedMsg(getDeprecationMsg()));
+      dedupDeprecationWarnings.insert(key);
+    }
   }
 }
 
@@ -514,6 +536,8 @@ static bool isUnstableShouldWarn(Symbol* sym, Expr* initialContext) {
   return fWarnUnstable;
 }
 
+std::unordered_set<std::pair<Symbol*,Expr*>> dedupUnstableWarnings;
+
 //based on maybeGenerateDeprecationWarning
 void Symbol::maybeGenerateUnstableWarning(Expr* context) {
   if (!isUnstableShouldWarn(this, context)) return;
@@ -521,7 +545,8 @@ void Symbol::maybeGenerateUnstableWarning(Expr* context) {
   Symbol* contextParent = context->parentSymbol;
   bool parentUnstable = isUnstableContext(contextParent);
   bool parentDeprecated = contextParent->hasFlag(FLAG_DEPRECATED);
-  bool compilerGenerated = contextParent->hasFlag(FLAG_COMPILER_GENERATED);
+  bool compilerGenerated = contextParent->hasFlag(FLAG_COMPILER_GENERATED) &&
+                          !contextParent->hasFlag(FLAG_DEFAULT_ACTUAL_FUNCTION);
 
   // Traverse until we find an unstable parent symbol, a deprecated parent
   // symbol, a compiler generated parent symbol, or until we reach the highest
@@ -534,13 +559,18 @@ void Symbol::maybeGenerateUnstableWarning(Expr* context) {
     contextParent = contextParent->defPoint->parentSymbol;
     parentUnstable = isUnstableContext(contextParent);
     parentDeprecated = contextParent->hasFlag(FLAG_DEPRECATED);
-    compilerGenerated = contextParent->hasFlag(FLAG_COMPILER_GENERATED);
+    compilerGenerated = contextParent->hasFlag(FLAG_COMPILER_GENERATED) &&
+                       !contextParent->hasFlag(FLAG_DEFAULT_ACTUAL_FUNCTION);
   }
 
   // Only generate the warning if the location with the reference is not
   // created by the compiler, is not unstable, and is not deprecated.
   if (!compilerGenerated && !parentUnstable && !parentDeprecated) {
-    USR_WARN(context, "%s", getSanitizedMsg(getUnstableMsg()));
+    auto key = std::make_pair(this, context);
+    if (dedupUnstableWarnings.find(key) == dedupUnstableWarnings.end()) {
+      USR_WARN(context, "%s", getSanitizedMsg(getUnstableMsg()));
+      dedupUnstableWarnings.insert(key);
+    }
   }
 }
 
@@ -1018,9 +1048,15 @@ void ShadowVarSymbol::verify() {
   verifyNotOnList(specBlock);
   if (!resolved) {
     // Verify that this symbol is on a ForallStmt::shadowVariables() list.
-    ForallStmt* pfs = toForallStmt(defPoint->parentExpr);
-    INT_ASSERT(pfs);
-    INT_ASSERT(defPoint->list == &(pfs->shadowVariables()));
+    if(ForallStmt* pfs = toForallStmt(defPoint->parentExpr)) {
+      INT_ASSERT(defPoint->list == &(pfs->shadowVariables()));
+    } else if(ForLoop *pfl = toForLoop(defPoint->parentExpr)) {
+      INT_ASSERT(pfl);
+      INT_ASSERT(pfl->isOrderIndependent());
+      INT_ASSERT(defPoint->list == &(pfl->shadowVariables()));
+    } else {
+      INT_FATAL(defPoint, "Shadow variable on an unexpected expression");
+    }
   }
   if (specBlock != NULL)
     INT_ASSERT(intent == TFI_REDUCE || intent == TFI_REDUCE_OP);
@@ -1722,27 +1758,17 @@ VarSymbol *new_CStringSymbol(const char *str) {
   return s;
 }
 
-VarSymbol* new_BoolSymbol(bool b, IF1_bool_type size) {
-  Immediate imm;
-  switch (size) {
-  default:
-    INT_FATAL( "unknown BOOL_SIZE");
 
-  case BOOL_SIZE_SYS:
-  case BOOL_SIZE_8  :
-  case BOOL_SIZE_16 :
-  case BOOL_SIZE_32 :
-  case BOOL_SIZE_64 :
-    break;
-  }
+VarSymbol* new_BoolSymbol(bool b) {
+  Immediate imm;
   imm.v_bool = b;
   imm.const_kind = NUM_KIND_BOOL;
-  imm.num_index = size;
+  imm.num_index = BOOL_SIZE_SYS;
   VarSymbol *s;
   // doesn't use uniqueConstantsHash because new_BoolSymbol is only
   // called to initialize dtBools[i]->defaultValue.
   // gTrue and gFalse are set up directly in initPrimitiveTypes.
-  PrimitiveType* dtRetType = dtBools[size];
+  PrimitiveType* dtRetType = dtBool;
   s = new VarSymbol(astr("_literal_", istr(literal_id++)), dtRetType);
   rootModule->block->insertAtTail(new DefExpr(s));
   s->immediate = new Immediate;
@@ -1957,7 +1983,7 @@ immediate_type(Immediate *imm) {
       }
     }
     case NUM_KIND_BOOL:
-      return dtBools[imm->num_index];
+      return dtBool;
     case NUM_KIND_UINT:
       return dtUInt[imm->num_index];
     case NUM_KIND_INT:
@@ -2095,6 +2121,7 @@ const char* astrPostinit = NULL;
 const char* astrBuildTuple = NULL;
 const char* astrTag = NULL;
 const char* astrThis = NULL;
+const char* astrThese = NULL;
 const char* astrSuper = NULL;
 const char* astr_chpl_cname = NULL;
 const char* astr_chpl_forward_tgt = NULL;
@@ -2136,6 +2163,7 @@ void initAstrConsts() {
   astrBuildTuple = astr("_build_tuple");
   astrTag     = astr("tag");
   astrThis    = astr("this");
+  astrThese   = astr("these");
   astrSuper   = astr("super");
   astr_chpl_cname = astr("_chpl_cname");
   astr_chpl_forward_tgt = astr("_chpl_forward_tgt");

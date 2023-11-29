@@ -32,14 +32,15 @@ an expression. Both kinds are shown in the following sections.
 "Must-parallel" forall statement
 --------------------------------
 
-In the following example, the forall loop iterates over the array indices
-in parallel:
+In the following example, the forall loop iterates over the array indices in
+parallel. Since the loop iterates over ``1..n`` and not ``A``, an explicit
+``ref`` intent must be used to allow modification of ``A``.
 */
 
 config const n = 5;
 var A: [1..n] real;
 
-forall i in 1..n {
+forall i in 1..n with (ref A) {
   A[i] = i;
 }
 
@@ -81,11 +82,12 @@ provide a "leader" iterator and all iterables provide "follower" iterators.
 These are described in the :ref:`parallel iterators primer
 <primers-parIters-leader-follower>`.
 
-Here we illustrate zippering arrays and domains:
+Here we illustrate zippering arrays and domains. In this example, we must
+explicitly mark ``C`` as modified with a ``ref`` intent.
 */
 
 var C: [1..n] real;
-forall (a, b, i) in zip(A, B, C.domain) do
+forall (a, b, i) in zip(A, B, C.domain) with (ref C) do
   C[i] = a * 10 + b / 10 + i * 0.001;
 
 writeln("After a zippered loop, C is:");
@@ -150,14 +152,15 @@ Its parallel iterator will determine how this loop is parallelized.
 if A were a distributed array, its parallel iterator would also
 determine iteration locality.
 
-Domains declared without a ``dmapped`` clause, including
-default rectangular and default associative domains, as well as
-arrays over such domains, provide both serial and parallel
-iterators. So do domains distributed over standard distributions,
-such as Block and Cyclic (:ref:`primers-distributions`), and
-arrays over such domains. The parallel iterators provided
-by standard distributions place each loop iteration on the
-locale where the corresponding index or array element is placed.
+Domains declared without a distribution (see :ref:`primers-distributions`),
+including default rectangular and default associative domains,
+as well as arrays over such domains, provide both serial and parallel
+iterators. So do domains distributed over standard multi-locale distributions,
+such as blockDist and cyclicDist, and arrays over such domains. The
+parallel iterators provided by standard multi-locale distributions place each loop
+iteration on the locale where the corresponding index or array element
+is placed.
+
 
 Task Intents and Shadow Variables
 ---------------------------------
@@ -186,8 +189,9 @@ of shadow variables, one per outer variable.
 The default argument intent (:ref:`The_Default_Intent`) is used by default.
 For numeric types, this implies capturing the value of the outer
 variable by the time the task starts executing. Arrays are passed by
-reference, as are sync, single, and atomic variables
-(:ref:`primers-syncsingle`, :ref:`primers-atomics`).
+constant reference, so to modify them we must use an explicit intent.
+Sync and atomic variables are passed by reference
+(:ref:`primers-syncs`, :ref:`primers-atomics`).
 */
 
 var outerIntVariable = 0;
@@ -196,7 +200,7 @@ proc updateOuterVariable() {
 }
 var outerAtomicVariable: atomic int;
 
-forall i in 1..n {
+forall i in 1..n with (ref D) {
 
   D[i] += 0.5; // if multiple iterations of the loop update the same
                // array element, it could lead to a data race
@@ -324,11 +328,14 @@ Task Intents Inside Record Methods
 When the forall loop occurs inside a method on a record,
 the fields of the receiver record are represented in the loop body
 with shadow variables as if they were outer variables.
-This, for example, allows the forall loop body to update
-record fields of array types.
 
-At present, the record fields, as well as the method receiver ``this``,
-are always passed by default intent and cannot be listed in a with-clause.
+At present, record fields are always passed by the default intent
+(:ref:`The_Default_Intent`), so the fields of ``MyRecord`` cannot be modified
+inside of the first forall loop loop below.
+
+To modify the fields within the body of a forall loop,
+use the ``ref`` intent for ``this`` in the with-clause of the forall loop,
+as in the second forall loop below.
 */
 
 record MyRecord {
@@ -336,10 +343,14 @@ record MyRecord {
   var intField: int;
 }
 
-proc MyRecord.myMethod() {
+proc ref MyRecord.myMethod() {
   forall i in 1..n {
-    arrField[i] = i * 2;  // beware of potential for data races
     // intField += 1;     // would cause "illegal assignment" error
+  }
+  forall i in 1..n with (ref this) {
+    arrField[i] = i * 2;  
+    if i == 1 then
+      intField += 1;      // beware of potential for data races
   }
 }
 

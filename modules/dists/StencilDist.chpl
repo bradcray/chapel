@@ -1911,6 +1911,7 @@ proc StencilArr.noFluffView() {
   var tempDist = new unmanaged StencilImpl(dom.dist.boundingBox, dom.dist.targetLocales,
                              dom.dist.dataParTasksPerLocale, dom.dist.dataParIgnoreRunningTasks,
                              dom.dist.dataParMinGranularity, ignoreFluff=true);
+  pragma "no auto destroy" var newDist = new _distribution(tempDist);
   pragma "no auto destroy" var tempDom = new _domain(newDist, rank, idxType,
                                                 dom.strides, dom.whole.dims());
   newDist._value._free_when_no_doms = true;

@@ -12,7 +12,7 @@ proc main() {
     f.writer().write(new R(int, 5));
   }
   {
-    var val = f.reader().read(R);
+    var val = f.reader().read(R(?));
     writeln(val);
   }
 }

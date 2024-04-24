@@ -490,6 +490,78 @@ CanPassResult CanPassResult::canPassDecorators(Context* context,
                        conversion);
 }
 
+CanPassResult CanPassResult::canPassClassTypes(Context* context,
+                                               const ClassType* actualCt,
+                                               const ClassType* formalCt) {
+  // owned Child -> owned Parent
+  // owned Child -> owned Parent?
+  // ditto borrowed, etc
+
+  // check decorators allow passing
+  CanPassResult decResult = canPassDecorators(context,
+                                              actualCt->decorator(),
+                                              formalCt->decorator());
+
+  if (!decResult.passes())
+    return decResult;
+
+  // Only worry about subtype conversion here; we will address
+  // borrowing conversions later.
+  if (decResult.conversionKind_ == BORROWS)
+    decResult.conversionKind_ = NONE;
+  else if (decResult.conversionKind_ == BORROWS_SUBTYPE)
+    decResult.conversionKind_ = SUBTYPE;
+
+  if (actualCt->decorator().isManaged() &&
+      formalCt->decorator().isManaged() &&
+      actualCt->manager() != formalCt->manager()) {
+    // disallow e.g. owned C -> shared C
+    return fail(FAIL_INCOMPATIBLE_MGR);
+  }
+
+  auto actualBct = actualCt->basicClassType();
+  auto formalBct = formalCt->basicClassType();
+
+  // code below assumes this
+  CHPL_ASSERT(decResult.passes());
+  CHPL_ASSERT(decResult.conversionKind_ == NONE ||
+         decResult.conversionKind_ == SUBTYPE);
+  CHPL_ASSERT(!decResult.promotes_);
+
+  bool converts = decResult.conversionKind_ != NONE;
+  bool instantiates = decResult.instantiates_;
+
+  if (formalCt->manageableType()->isAnyClassType()) {
+    // Formal is the generic `class`. This is an instantiation since
+    // that's always generic, but it might also be a conversion if nilability
+    // is involved.
+
+    // all class conversions are subtype conversions
+    ConversionKind conversion = converts ? SUBTYPE : NONE;
+
+    return CanPassResult(/* no fail reason */ {},
+                         /* instantiates */ true,
+                         /*promotes*/ false,
+                         conversion);
+  } else if (actualCt->manageableType()->isAnyClassType()) {
+    CHPL_ASSERT(false && "probably shouldn't happen");
+  } else if (actualBct->isSubtypeOf(formalBct, converts, instantiates)) {
+    // the basic class types are the same
+    // or there was a subclass relationship
+    // or there was instantiation
+
+    // all class conversions are subtype conversions
+    ConversionKind conversion = converts ? SUBTYPE : NONE;
+
+    return CanPassResult(/* no fail reason */ {},
+                         instantiates,
+                         /*promotes*/ false,
+                         conversion);
+  }
+
+  return fail(FAIL_EXPECTED_SUBTYPE);
+}
+
 // The compiler considers many patterns of "subtyping" as things that require
 // implicit conversions (they often require implicit conversions in the
 // generated C).  However not all implicit conversions are created equal.
@@ -503,66 +575,24 @@ CanPassResult CanPassResult::canPassDecorators(Context* context,
 // kind of NONE or SUBTYPE.
 // It's returning CanPassResult in order to also reflect if instantiation
 // was necessary.
-CanPassResult CanPassResult::canPassSubtypeNonBorrowing(Context* context,
+CanPassResult CanPassResult::canPassSubtype(Context* context,
                                             const Type* actualT,
                                             const Type* formalT) {
-  // nil -> pointers
+  // nil -> pointers and class types
   if (actualT->isNilType() && formalT->isNilablePtrType() &&
       !formalT->isCStringType())
     return convert(SUBTYPE);
 
-  // class types
   if (auto actualCt = actualT->toClassType()) {
     if (auto formalCt = formalT->toClassType()) {
-      // owned Child -> owned Parent
-      // owned Child -> owned Parent?
-      // owned Child? -> owned Parent?
-
-      // check decorators allow passing
-      CanPassResult decResult = canPassDecorators(context,
-                                                  actualCt->decorator(),
-                                                  formalCt->decorator());
-      if (!decResult.passes()) return decResult;
-      CHPL_ASSERT(!decResult.promotes_);
-
-      if (actualCt->decorator().isManaged() &&
-          formalCt->decorator().isManaged() &&
-          actualCt->manager() != formalCt->manager()) {
-        // disallow e.g. owned C -> shared C
-        return fail(FAIL_INCOMPATIBLE_MGR);
+      CanPassResult result = canPassClassTypes(context, actualCt, formalCt);
+      if (result.passes() && !(result.conversionKind_ == NONE ||
+                               result.conversionKind_ == SUBTYPE)) {
+        // It could've been "passable", but not as a subtype -- if that's the
+        // case, cause failure.
+        return fail(FAIL_EXPECTED_SUBTYPE);
       }
-
-      auto actualBct = actualCt->basicClassType();
-      auto formalBct = formalCt->basicClassType();
-
-      // Only consider subtype conversions here.
-      bool converts = (decResult.conversionKind_ == SUBTYPE ||
-                       decResult.conversionKind_ == BORROWS_SUBTYPE);
-      bool instantiates = decResult.instantiates_;
-
-      bool pass = false;
-      if (formalCt->manageableType()->isAnyClassType()) {
-        // Formal is the generic `class`. This is an instantiation since
-        // that's always generic, but it might also be a conversion if
-        // nilability is involved.
-        instantiates = true;
-        pass = true;
-      } else if (actualCt->manageableType()->isAnyClassType()) {
-        CHPL_ASSERT(false && "probably shouldn't happen");
-      } else if (actualBct->isSubtypeOf(formalBct, converts, instantiates)) {
-        // the basic class types are the same
-        // or there was a subclass relationship
-        // or there was instantiation
-        pass = true;
-      }
-
-      if (pass) {
-        ConversionKind conversion = converts ? SUBTYPE : NONE;
-        return CanPassResult(/* no fail reason */ {},
-                             instantiates,
-                             /*promotes*/ false,
-                             conversion);
-      }
+      return result;
     }
   }
 
@@ -572,7 +602,7 @@ CanPassResult CanPassResult::canPassSubtypeNonBorrowing(Context* context,
   return fail(FAIL_EXPECTED_SUBTYPE);
 }
 
-// Like canPassSubtypeNonBorrowing, but considers subtyping conversions and/or implicit
+// Like canPassSubtype, but considers subtyping conversions and/or implicit
 // borrowing conversions.
 // This function returns CanPassResult which always has
 // conversion kind of NONE, SUBTYPE, BORROWS, or BORROWS_SUBTYPE.
@@ -581,7 +611,7 @@ CanPassResult CanPassResult::canPassSubtypeOrBorrowing(Context* context,
                                                        const Type* formalT) {
   // First check if we can pass directly or with subtype conversion, ignoring
   // any borrowing that may be necessary.
-  auto result = canPassSubtypeNonBorrowing(context, actualT, formalT);
+  auto result = canPassSubtype(context, actualT, formalT);
   if (result.passes()) {
     const ConversionKind subtypingConversion = result.conversionKind_;
     CHPL_ASSERT(subtypingConversion == NONE || subtypingConversion == SUBTYPE);
@@ -751,12 +781,12 @@ bool CanPassResult::canInstantiateBuiltin(Context* context,
     return true;
 
   if (formalT->isAnyIteratorClassType()) {
-    // TODO: represent iterators
+    CHPL_UNIMPL("iterator classes"); // TODO: represent iterators
     return false;
   }
 
   if (formalT->isAnyIteratorRecordType()) {
-    // TODO: represent iterators
+    CHPL_UNIMPL("iterator records"); // TODO: represent iterators
     return false;
   }
 
@@ -816,7 +846,7 @@ CanPassResult CanPassResult::canInstantiate(Context* context,
 
   // check for builtin generic types
   //
-  // note: 'class' generic handling is below, because it shares
+  // note: 'class' generic handling is down in canPassClassTypes, because it shares
   // some logic for owned -> shared and nilable -> nonnilable conversions (etc.).
   // It might need to be copied / moved up here, but for now, it's identical to
   // regular parent / child logic, so leave it there.
@@ -829,7 +859,7 @@ CanPassResult CanPassResult::canInstantiate(Context* context,
   if (auto actualCt = actualT->toClassType()) {
     // check for instantiating classes
     if (auto formalCt = formalT->toClassType()) {
-      CanPassResult got = canPassSubtypeOrBorrowing(context, actualCt, formalCt);
+      CanPassResult got = canPassClassTypes(context, actualCt, formalCt);
       if (got.passes() && got.instantiates()) {
         return got;
       }
@@ -977,12 +1007,6 @@ CanPassResult CanPassResult::canPass(Context* context,
       // Instantiation may not be necessary for generic type formals: we
       // could be passing a (subtype) generic type actual.
       // Fall through to the checks below.
-    } else if (!got.passes() && formalQT.isParam()) {
-      // 'isTypeGeneric' will return 'true' if there is not a param value
-      // for the given QualifiedType, which is usually the case for a param
-      // formal despite the presence of a type expression.
-      //
-      // Fall through to the checks below.
     } else {
       return got;
     }
@@ -1027,8 +1051,7 @@ CanPassResult CanPassResult::canPass(Context* context,
           }
         }
         // TODO: promotion
-
-        return canPassSubtypeNonBorrowing(context, actualT, formalT);
+        return canPassSubtype(context, actualT, formalT);
       }
 
     case QualifiedType::PARAM:

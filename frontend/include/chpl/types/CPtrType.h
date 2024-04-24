@@ -82,10 +82,6 @@ class CPtrType final : public Type {
   static const ID& getId(Context* context);
   static const ID& getConstId(Context* context);
 
-  const ID& id(Context* context) const {
-    return isConst() ? getConstId(context) : getId(context);
-  }
-
   const Type* eltType() const {
     return eltType_;
   }

@@ -1,1 +1,0 @@
-manageNonAggregate.chpl:2: error: cannot use a non-context manager in a 'manage' statement

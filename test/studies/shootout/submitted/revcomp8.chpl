@@ -7,25 +7,26 @@
 
 use IO, CTypes;
 
-param readSize = 65536,      // size to read at a time
-      linesPerChunk = 8192,  // number of lines to deal per task
-      eol = '\n'.toByte(),   // end-of-line, as an integer
-      cols = 61,             // # of characters per full row (including '\n')
+config param readSize = 65536,
+             linesPerChunk = 8192;
 
-      // a 'bytes' value that stores the complement of each base at its index
+param eol = '\n'.toByte(),  // end-of-line, as an integer
+      cols = 61,            // # of characters per full row (including '\n')
+
+      // A 'bytes' value that stores the complement of each base at its index
       cmpl = b"          \n                                                  "
            + b"    TVGH  CD  M KN   YSAABW R       TVGH  CD  M KN   YSAABW R",
              //    ↑↑↑↑  ↑↑  ↑ ↑↑   ↑↑↑↑↑↑ ↑       ↑↑↑↑  ↑↑  ↑ ↑↑   ↑↑↑↑↑↑ ↑
              //    ABCDEFGHIJKLMNOPQRSTUVWXYZ      abcdefghijklmnopqrstuvwxyz
 
-      maxChars = cmpl.size: uint(8); // upper bound on # of nucleotides used
+      maxChars = cmpl.size; // upper bound on number of nucleotides used
 
 // map from pairs of nucleotide characters to their reversed complements
 var pairCmpl: [0..<join(maxChars, maxChars)] uint(16);
 
-// define non-locking versions of stdin/stdout for efficiency
-var stdin  = (new file(0)).reader(locking=false),
-    stdout = (new file(1)).writer(locking=false);
+// channels for doing efficient console I/O
+var stdinBin  = openfd(0).reader(iokind.native, locking=false),
+    stdoutBin = openfd(1).writer(iokind.native, locking=false);
 
 proc main(args: [] string) {
   // set up the 'pairCmpl' map
@@ -41,7 +42,7 @@ proc main(args: [] string) {
 
   do {
     // read 'readSize' new characters
-    var newChars = stdin.readBinary(c_ptrTo(buff[readPos]), readSize),
+    var newChars = stdinBin.readBinary(c_ptrTo(buff[readPos]), readSize),
         nextSeqStart: int;
 
     // if the new characters contain the start of the next sequence,
@@ -74,7 +75,7 @@ proc main(args: [] string) {
   if readPos then revcomp(buff, readPos);
 }
 
-proc revcomp(ref seq, size) {
+proc revcomp(seq, size) {
   param chunkSize = linesPerChunk * cols; // the size of the chunks to deal out
 
   // compute how big the header is
@@ -84,7 +85,7 @@ proc revcomp(ref seq, size) {
   }
 
   // write out the header
-  stdout.writeBinary(c_ptrTo(seq[0]), headerSize);
+  stdoutBin.writeBinary(c_ptrTo(seq[0]), headerSize);
 
   // set up the atomic variables we'll use to coordinate between tasks
   var charsLeft, charsWritten: atomic int = size - (headerSize + 1);
@@ -131,7 +132,7 @@ proc revcomp(ref seq, size) {
 
       // take turns writing out our chunks
       charsWritten.waitFor(myStartChar);
-      stdout.writeBinary(c_ptrTo(myBuff[0]), myChunkSize);
+      stdoutBin.writeBinary(c_ptrTo(myBuff[0]), myChunkSize);
       charsWritten.write(myStartChar - myChunkSize);
 
       // grab the next chunk of work
@@ -140,8 +141,8 @@ proc revcomp(ref seq, size) {
   }
 }
 
-proc revcomp(in dstFront, in charAfter, spanLen, ref buff, ref seq) {
-  if spanLen % 2 {
+proc revcomp(in dstFront, in charAfter, spanLen, buff, seq) {
+  if spanLen%2 {
     charAfter -= 1;
     buff[dstFront] = cmpl[seq[charAfter]];
     dstFront += 1;
@@ -149,8 +150,8 @@ proc revcomp(in dstFront, in charAfter, spanLen, ref buff, ref seq) {
 
   for 2..spanLen by -2 {
     charAfter -= 2;
-    const src = c_ptrTo(seq[charAfter]): c_ptr(void): c_ptr(uint(16)),
-          dst = c_ptrTo(buff[dstFront]): c_ptr(void): c_ptr(uint(16));
+    const src = c_ptrTo(seq[charAfter]): c_ptr(uint(16)),
+          dst = c_ptrTo(buff[dstFront]): c_ptr(uint(16));
     dst.deref() = pairCmpl[src.deref()];
     dstFront += 2;
   }
@@ -171,3 +172,4 @@ proc findSeqStart(buff, inds, ref ltLoc) {
 inline proc join(i: uint(16), j) {
   return i << 8 | j;
 }
+use Compat, CompatIOKind;

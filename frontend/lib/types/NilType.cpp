@@ -36,10 +36,6 @@ const NilType* NilType::get(Context* context) {
   return getNilType(context).get();
 }
 
-void NilType::stringify(std::ostream& ss, StringifyKind stringKind) const {
-  ss << "_nilType";
-}
-
 
 } // end namespace types
 } // end namespace chpl

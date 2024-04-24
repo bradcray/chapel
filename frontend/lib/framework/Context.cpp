@@ -66,7 +66,6 @@ void Context::Configuration::swap(Context::Configuration& other) {
   std::swap(keepTmpDir, other.keepTmpDir);
   std::swap(toolName, other.toolName);
   std::swap(includeComments, other.includeComments);
-  std::swap(disableErrorBreakpoints, other.disableErrorBreakpoints);
 }
 
 void Context::setupGlobalStrings() {
@@ -876,9 +875,7 @@ void Context::collectGarbage() {
 }
 
 void Context::report(owned<ErrorBase> error) {
-  if (!config_.disableErrorBreakpoints) {
-    gdbShouldBreakHere();
-  }
+  gdbShouldBreakHere();
 
   // If errorCollectionStack is not empty, errors are being collected, and
   // thus not reported to the handler. Stash the error in the top (back) of the

@@ -1,9 +1,6 @@
 
 .. default-domain:: chpl
 
-.. index::
-   single: bytes
-   single: types; bytes
 .. _Chapter-Bytes:
 
 =====

@@ -1,7 +1,5 @@
 .. default-domain:: chpl
 
-.. index::
-   single: unions
 .. _Chapter-Unions:
 
 ======
@@ -14,9 +12,6 @@ execution. Unions are safe so that an access to a field that does not
 contain data is a runtime error. When a union is initialized, it is in
 an unset state so that no field contains data.
 
-.. index::
-   single: types; unions
-   single: union types
 .. _Union_Types:
 
 Union Types
@@ -33,9 +28,6 @@ The union type is specified by the name of the union type. This
 simplification from class and record types is possible because generic
 unions are not supported.
 
-.. index::
-   single: union
-   single: declarations; union
 .. _Union_Declarations:
 
 Union Declarations
@@ -65,8 +57,6 @@ for type and field resolution, but no corresponding backend definition
 is generated. It is presumed that the definition of an external union
 type is supplied by a library or the execution environment.
 
-.. index::
-   single: unions; fields
 .. _Union_Fields:
 
 Union Fields
@@ -78,8 +68,6 @@ set.
 
 Union fields should not be specified with initialization expressions.
 
-.. index::
-   single: unions; assignment
 .. _Union_Assignment:
 
 Union Assignment

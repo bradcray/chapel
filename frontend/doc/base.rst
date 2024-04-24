@@ -35,10 +35,6 @@ namespace. The entries may not be exhaustive.
    :members:
    :undoc-members:
 
-.. doxygenclass:: chpl::CompatibilityWriter
-   :members:
-   :undoc-members:
-
 .. doxygenclass:: chpl::ErrorBase
    :members:
    :undoc-members:

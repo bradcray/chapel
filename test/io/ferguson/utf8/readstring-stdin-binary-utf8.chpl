@@ -7,7 +7,7 @@ var style = stdin._styleInternal();
 style.binary = 1;
 stdin._set_styleInternal(style);
 
-// read 10 codepoints
+// read 10 bytes
 stdin.readString(str, 10);
 writeln("Read\n", str);
 

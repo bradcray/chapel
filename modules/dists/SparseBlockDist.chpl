@@ -98,7 +98,7 @@ class SparseBlockDom: BaseSparseDomImpl(?) {
     var thisid = this.locale.id;
     if locDoms(dist.targetLocDom.lowBound) == nil {
       coforall localeIdx in dist.targetLocDom {
-        on dist.targetLocales(localeIdx) {
+        on dist.targetLocales(localeIdx) do {
           //                    writeln("Setting up on ", here.id);
           //                    writeln("setting up on ", localeIdx, ", whole is: ", whole, ", chunk is: ", dist.getChunk(whole,localeIdx));
          locDoms(localeIdx) = new unmanaged LocSparseBlockDom(rank, idxType,

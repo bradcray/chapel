@@ -52,14 +52,10 @@ OPTIONS
 
 *Module Processing Options*
 
-.. _man-count-tokens:
-
 **\--[no-]count-tokens**
 
     Prints the total number of static lexical tokens in the Chapel code
     files named on the command line.
-
-.. _man-main-module:
 
 **\--main-module <module>**
 
@@ -67,8 +63,6 @@ OPTIONS
     functions or module initializers that can serve as an entry point), this
     option can be used to specify which module should serve as the starting
     point for program execution.
-
-.. _man-module-dir:
 
 **-M, \--module-dir <**\ *directory*\ **>**
 
@@ -88,8 +82,6 @@ OPTIONS
     variable (colon-separated directories), (4) the compiler's standard
     module search path.
 
-.. _man-print-code-size:
-
 **\--[no-]print-code-size**
 
     Prints out the size of the Chapel code files named on the command line
@@ -104,21 +96,15 @@ OPTIONS
     file, a grand total of the number of tokens across all the files is
     displayed.
 
-.. _man-print-module-files:
-
 **\--print-module-files**
 
     Prints the Chapel module source files parsed by the Chapel compiler.
-
-.. _man-print-search-dirs:
 
 **\--[no-]print-search-dirs**
 
     Print the module search path used to resolve module for further details.
 
 *Warning and Language Control Options*
-
-.. _man-permit-unhandled-module-errors:
 
 **\--[no-]permit-unhandled-module-errors**
 
@@ -128,21 +114,15 @@ OPTIONS
     will compile code in a module that does not handle its errors. If any
     error comes up during execution, it will cause the program to halt.
 
-.. _man-warn-unstable:
-
 **\--[no-]warn-unstable**
 
     Enable [disable] warnings for code that has recently or will recently
     change in meaning due to language changes.
 
-.. _man-warnings:
-
 **\--[no-]warnings**
 
     Enable [disable] the printing of compiler warnings. Defaults to printing
     warnings.
-
-.. _man-warn-unknown-attribute-toolname:
 
 **\--[no-]warn-unknown-attribute-toolname**
 
@@ -150,15 +130,11 @@ OPTIONS
     warning, attributes belonging to unknown tools will be silently ignored.
     The default is to warn about all unknown tool names.
 
-.. _man-using-attribute-toolname:
-
 **\--using-attribute-toolname <**\ *toolname*\ **>**
 
     Provide a tool name whose use in an attribute will not trigger an
     "unknown tool name" warning. To provide multiple tool names, use one
     **\--using-attribute-toolname** flag per name.
-
-.. _man-warn-potential-races:
 
 **\--[no-]warn-potential-races**
 
@@ -167,14 +143,10 @@ OPTIONS
     operation may be race condition and will warn with this flag. Defaults to
     not printing race condition warnings.
 
-.. _man-warn-int-to-uint:
-
 **\--[no-]warn-int-to-uint**
 
     Enable [disable] compilation warnings for when implicitly converting
     from a value of ``int`` type of any width to a ``uint`` value.
-
-.. _man-warn-small-integral-to-float:
 
 **\--[no-]warn-small-integral-to-float**
 
@@ -184,15 +156,11 @@ OPTIONS
     of type ``int(t)`` or ``uint(t)`` where ``t<64``, to something of
     type ``real(u)`` or ``complex(2*u)`` where ``u<64``.
 
-.. _man-warn-integral-to-float:
-
 **\--[no-]warn-integral-to-float**
 
     Enable [disable] compilation warnings for when implicitly converting
     from a value of ``int`` or ``uint`` type of any width to a ``real``
     or ``complex`` type of any width.
-
-.. _man-warn-float-to-float:
 
 **\--[no-]warn-float-to-float**
 
@@ -201,22 +169,16 @@ OPTIONS
     implicitly converting from ``real(32)`` to ``real(64)`` as well as
     similar cases with ``imag`` and ``complex`` types.
 
-.. _man-warn-integral-to-integral:
-
 **\--[no-]warn-integral-to-integral**
 
     Enable [disable] compilation warnings for when implicitly converting
     from a value of integral type to another integral type of different width.
     (An integral type is an ``int`` or ``uint`` type).
 
-.. _man-warn-implicit-numeric-conversions:
-
 **\--[no-]warn-implicit-numeric-conversions**
 
     Enable [disable] the above compilation warnings for implicitly
     converting between numeric types.
-
-.. _man-warn-param-implicit-numeric-conversions:
 
 **\--[no-]warn-param-implicit-numeric-conversions**
 
@@ -228,8 +190,6 @@ OPTIONS
 
 *Parallelism Control Options*
 
-.. _man-local:
-
 **\--[no-]local**
 
     Compile code for single/[multi-] *locale* execution, changing *on
@@ -240,14 +200,10 @@ OPTIONS
 
 *Optimization Control Options*
 
-.. _man-baseline:
-
 **\--baseline**
 
     Turns off all optimizations in the Chapel compiler and generates naive C
     code with many temporaries.
-
-.. _man-cache-remote:
 
 **\--[no-]cache-remote**
 
@@ -255,33 +211,23 @@ OPTIONS
     performance for some programs by adding aggregation, write behind, and
     read ahead.
 
-.. _man-copy-propagation:
-
 **\--[no-]copy-propagation**
 
     Enable [disable] copy propagation.
 
-.. _man-dead-code-elimination:
-
 **\--[no-]dead-code-elimination**
 
     Enable [disable] dead code elimination.
-
-.. _man-fast:
 
 **\--fast**
 
     Turns off all runtime checks using **\--no-checks**, turns on **-O** and
     **\--specialize**.
 
-.. _man-fast-followers:
-
 **\--[no-]fast-followers**
 
     Enable [disable] the fast follower optimization in which fast
     implementations of followers will be invoked for specific leaders.
-
-.. _man-ieee-float:
 
 **\--[no-]ieee-float**
 
@@ -290,8 +236,6 @@ OPTIONS
     point support your C compiler provides at the optimization level
     provided by '\ **chpl**\ '.
 
-.. _man-loop-invariant-code-motion:
-
 **\--[no-]loop-invariant-code-motion**
 
     Enable [disable] the optimization that moves loop invariant code from
@@ -299,27 +243,19 @@ OPTIONS
     moved. This is currently a rather conservative pass in the sense that it
     may not identify all code that is truly invariant.
 
-.. _man-optimize-forall-unordered-ops:
-
 **\--[no-]optimize-forall-unordered-ops**
 
     Enable [disable] optimization of the last statement in forall statements
     to use unordered communication. This optimization works with runtime
     support for unordered operations with CHPL_COMM=ugni.
 
-.. _man-ignore-local-classes:
-
 **\--[no-]ignore-local-classes**
 
     Disable [enable] local classes
 
-.. _man-inline:
-
 **\--[no-]inline**
 
     Enable [disable] function inlining.
-
-.. _man-inline-iterators:
 
 **\--[no-]inline-iterators**
 
@@ -327,21 +263,15 @@ OPTIONS
     optimizes the invocation of an iterator in a loop header by inlining the
     iterator's definition around the loop body.
 
-.. _man-inline-iterators-yield-limit:
-
 **\--inline-iterators-yield-limit**
 
     Limit on the number of yield statements permitted in an inlined iterator.
     The default value is 10.
 
-.. _man-live-analysis:
-
 **\--[no-]live-analysis**
 
     Enable [disable] live variable analysis, which is currently only used to
     optimize iterators that are not inlined.
-
-.. _man-optimize-range-iteration:
 
 **\--[no-]optimize-range-iteration**
 
@@ -349,14 +279,10 @@ OPTIONS
     compiler to avoid creating ranges when they are only used for iteration.
     By default this is enabled.
 
-.. _man-optimize-loop-iterators:
-
 **\--[no-]optimize-loop-iterators**
 
     Enable [disable] optimizations to aggressively optimize iterators that
     are defined in terms of a single loop. By default this is enabled.
-
-.. _man-vectorize:
 
 **\--[no-]vectorize**
 
@@ -364,29 +290,21 @@ OPTIONS
     If enabled, hints will always be generated, but the effects on performance
     (and in some cases correctness) will vary based on the target compiler.
 
-.. _man-optimize-on-clauses:
-
 **\--[no-]optimize-on-clauses**
 
     Enable [disable] optimization of on clauses in which qualifying on
     statements may be optimized in the runtime if supported by the
     $CHPL\_COMM layer.
 
-.. _man-optimize-on-clause-limit:
-
 **\--optimize-on-clause-limit**
 
     Limit on the function call depth to allow for on clause optimization.
     The default value is 20.
 
-.. _man-privatization:
-
 **\--[no-]privatization**
 
     Enable [disable] privatization of distributed arrays and domains if the
     distribution supports it.
-
-.. _man-remove-copy-calls:
 
 **\--[no-]remove-copy-calls**
 
@@ -394,20 +312,14 @@ OPTIONS
     to a copy constructor for records) that ensure Chapel semantics but
     which can often be optimized away.
 
-.. _man-remote-value-forwarding:
-
 **\--[no-]remote-value-forwarding**
 
     Enable [disable] remote value forwarding of read-only values to remote
     threads if reading them early does not violate program semantics.
 
-.. _man-remote-serialization:
-
 **\--[no-]remote-serialization**
 
     Enable [disable] serialization for globals and remote constants.
-
-.. _man-scalar-replacement:
 
 **\--[no-]scalar-replacement**
 
@@ -415,14 +327,10 @@ OPTIONS
     compiler-generated data structures that support language features such
     as tuples and iterators.
 
-.. _man-scalar-replace-limit:
-
 **\--scalar-replace-limit**
 
     Limit on the size of tuples being replaced during scalar replacement.
     The default value is 8.
-
-.. _man-tuple-copy-opt:
 
 **\--[no-]tuple-copy-opt**
 
@@ -430,21 +338,15 @@ OPTIONS
     of homogeneous tuples are replaced with explicit assignment of each
     tuple component.
 
-.. _man-tuple-copy-limit:
-
 **\--tuple-copy-limit**
 
     Limit on the size of tuples considered for the tuple copy optimization.
     The default value is 8.
 
-.. _man-infer-local-fields:
-
 **\--[no-]infer-local-fields**
 
     Enable [disable] analysis to infer local fields in classes and records
     (experimental)
-
-.. _man-auto-local-access:
 
 **\--[no-]auto-local-access**
 
@@ -455,16 +357,12 @@ OPTIONS
     and adds calls that can further analyze alignment dynamically during
     execution time.
 
-.. _man-dynamic-auto-local-access:
-
 **\--[no-]dynamic-auto-local-access**
 
     Enable [disable] the dynamic portion of the analysis described in
     `\--[no-]auto-local-access`.  This dynamic analysis can result in loop
     duplication that increases executable size and compilation time. There
     may also be execution time overheads independent of loop domain size.
-
-.. _man-auto-aggregation:
 
 **\--[no-]auto-aggregation**
 
@@ -473,8 +371,6 @@ OPTIONS
 
 *Run-time Semantic Check Options*
 
-.. _man-checks:
-
 **\--[no-]checks**
 
     Enable [disable] all of the run-time checks in this section of the man page.
@@ -482,21 +378,15 @@ OPTIONS
     which implies **\--no-checks**) to achieve performance competitive with
     hand-coded C or Fortran.
 
-.. _man-bounds-checks:
-
 **\--[no-]bounds-checks**
 
     Enable [disable] run-time bounds checking, e.g. during slicing and array
     indexing.
 
-.. _man-cast-checks:
-
 **\--[no-]cast-checks**
 
     Enable [disable] run-time checks in safeCast calls for casts that
     wouldn't preserve the logical value being cast.
-
-.. _man-const-arg-checks:
 
 **\--[no-]const-arg-checks**
 
@@ -507,14 +397,10 @@ OPTIONS
     intent (such as `const ref` or `const in`, depending on if the indirect
     modification behavior should be preserved or avoided).
 
-.. _man-div-by-zero-checks:
-
 **\--[no-]div-by-zero-checks**
 
     Enable [disable] run-time checks in integer division and modulus operations
     to guard against dividing by zero.
-
-.. _man-formal-domain-checks:
 
 **\--[no-]formal-domain-checks**
 
@@ -523,20 +409,14 @@ OPTIONS
     (a) describing the same index set and (b) having an equivalent domain
     map (if the formal domain explicitly specifies a domain map).
 
-.. _man-local-checks:
-
 **\--[no-]local-checks**
 
     Enable [disable] run-time checking of the locality of references within
     local blocks.
 
-.. _man-nil-checks:
-
 **\--[no-]nil-checks**
 
     Enable [disable] run-time checking for accessing nil object references.
-
-.. _man-stack-checks:
 
 **\--[no-]stack-checks**
 
@@ -544,15 +424,11 @@ OPTIONS
 
 *C Code Generation Options*
 
-.. _man-codegen:
-
 **\--[no-]codegen**
 
     Enable [disable] generating C code and the binary executable. Disabling
     code generation is useful to reduce compilation time, for example, when
     only Chapel compiler warnings/errors are of interest.
-
-.. _man-cpp-lines:
 
 **\--[no-]cpp-lines**
 
@@ -561,16 +437,12 @@ OPTIONS
     that it implements. The [no-] version of this flag turns this feature
     off.
 
-.. _man-max-c-ident-len:
-
 **\--max-c-ident-len**
 
     Limits the length of identifiers in the generated code, except when set
     to 0. The default is 0, except when $CHPL\_TARGET\_COMPILER indicates a
     PGI compiler (pgi or cray-prgenv-pgi), in which case the default is
     1020.
-
-.. _man-munge-user-idents:
 
 **\--[no-]munge-user-idents**
 
@@ -582,8 +454,6 @@ OPTIONS
     perform additional munging in order to implement Chapel semantics in C,
     or for other reasons.
 
-.. _man-savec:
-
 **\--savec <dir>**
 
     Saves the compiler-generated C code in the specified *directory*,
@@ -592,16 +462,12 @@ OPTIONS
 
 *C Code Compilation Options*
 
-.. _man-ccflags:
-
 **\--ccflags <flags>**
 
     Add the specified flags to the C compiler command line when compiling
     the generated code. Multiple **\--ccflags** *options* can be provided and
     in that case the combination of the flags will be forwarded to the C
     compiler.
-
-.. _man-debug:
 
 **-g, \--[no-]debug**
 
@@ -611,15 +477,11 @@ OPTIONS
     **\--cpp-lines** option unless compiling as a developer (for example, via
     **\--devel**).
 
-.. _man-dynamic:
-
 **\--dynamic**
 
     Use dynamic linking when generating the final binary. If neither
     **\--dynamic** or **\--static** are specified, use the backend compiler's
     default.
-
-.. _man-hdr-search-path:
 
 **-I, \--hdr-search-path <dir>**
 
@@ -629,8 +491,6 @@ OPTIONS
     variable and this flag accept a colon-separated list of
     directories.
 
-.. _man-ldflags:
-
 **\--ldflags <flags>**
 
     Add the specified flags to the back-end C compiler link line when
@@ -638,14 +498,10 @@ OPTIONS
     be provided and in that case the combination of the flags will be
     forwarded to the C compiler.
 
-.. _man-lib-linkage:
-
 **-l, \--lib-linkage <library>**
 
     Specify a C library to link to on the back-end C compiler command
     line.
-
-.. _man-lib-search-path:
 
 **-L, \--lib-search-path <dir>**
 
@@ -655,8 +511,6 @@ OPTIONS
     variable and this flag accept a colon-separated list of
     directories.
 
-.. _man-optimize:
-
 **-O, \--[no-]optimize**
 
     Causes the generated C code to be compiled with [without] optimizations
@@ -665,8 +519,6 @@ OPTIONS
     compiler command used. If you would like additional flags to be used
     with the C compiler command, use the **\--ccflags** option.
 
-.. _man-specialize:
-
 **\--[no-]specialize**
 
     Causes the generated C code to be compiled with flags that specialize
@@ -674,15 +526,11 @@ OPTIONS
     CHPL\_TARGET\_CPU. The effects of this flag will vary based on choice
     of back-end compiler and the value of CHPL\_TARGET\_CPU.
 
-.. _man-output:
-
 **-o, \--output <filename>**
 
     Specify the name of the compiler-generated executable. Defaults to
     the filename of the main module (minus its `.chpl` extension), if
     unspecified.
-
-.. _man-static:
 
 **\--static**
 
@@ -692,14 +540,10 @@ OPTIONS
 
 *LLVM Code Generation Options*
 
-.. _man-llvm:
-
 **\--[no-]llvm**
 
     Use LLVM as the code generation target rather than C. See
     $CHPL\_HOME/doc/rst/technotes/llvm.rst for details.
-
-.. _man-llvm-wide-opt:
 
 **\--[no-]llvm-wide-opt**
 
@@ -710,8 +554,6 @@ OPTIONS
     they might be able to hoist a 'get' out of a loop. See
     $CHPL\_HOME/doc/rst/technotes/llvm.rst for details.
 
-.. _man-mllvm:
-
 **\--mllvm <option>**
 
     Pass an option to the LLVM optimization and transformation passes.
@@ -720,14 +562,10 @@ OPTIONS
 
 *Compilation Trace Options*
 
-.. _man-print-commands:
-
 **\--[no-]print-commands**
 
     Prints the system commands that the compiler executes in order to
     compile the Chapel program.
-
-.. _man-print-passes:
 
 **\--[no-]print-passes**
 
@@ -739,8 +577,6 @@ OPTIONS
     table is sorted by pass and the second table is sorted by the time for
     the pass in descending order.
 
-.. _man-print-passes-file:
-
 **\--print-passes-file <filename>**
 
     Saves the compiler passes and the amount of wall clock time required for
@@ -749,16 +585,12 @@ OPTIONS
 
 *Miscellaneous Options*
 
-.. _man-detailed-errors:
-
 **\--[no-]detailed-errors**
 
     Enables [disables] the compiler's detailed error message mode. In this
     mode, the compiler will print additional information about errors when
     it is available. This could include printing and underlining relevant
     segments of code, or providing suggestions for how to fix the error.
-
-.. _man-devel:
 
 **\--[no-]devel**
 
@@ -767,16 +599,12 @@ OPTIONS
     undocumented command-line *options*. Use at your own risk and direct any
     questions to the Chapel team.
 
-.. _man-explain-call:
-
 **\--explain-call <call>[:<module>][:<line>]**
 
     Helps explain the function resolution process for the named function by
     printing out the visible and candidate functions. Specifying a module
     name and/or line number can focus the explanation to those calls within
     a specific module or at a particular line number.
-
-.. _man-explain-instantiation:
 
 **\--explain-instantiation <function\|type>[:<module>][:<line>]**
 
@@ -785,14 +613,10 @@ OPTIONS
     module name and/or line number can focus the explanation to those calls
     within a specific module or at a particular line number.
 
-.. _man-explain-verbose:
-
 **\--[no-]explain-verbose**
 
     In combination with explain-call or explain-instantiation, causes the
     compiler to output more debug information related to disambiguation.
-
-.. _man-instantiate-max:
 
 **\--instantiate-max <max>**
 
@@ -801,15 +625,11 @@ OPTIONS
     instantiated. This flag raises that maximum in the event that a legal
     instantiation is being pruned too aggressively.
 
-.. _man-print-all-candidates:
-
 **\--[no-]print-all-candidates**
 
     By default, function resolution errors show only a few candidates.
     Use this flag to see all of the candidates for a call that could
     not be resolved.
-
-.. _man-print-callgraph:
 
 **\--[no-]print-callgraph**
 
@@ -819,8 +639,6 @@ OPTIONS
     Only a single call to each function is displayed from within any given
     parent function.
 
-.. _man-print-callstack-on-error:
-
 **\--[no-]print-callstack-on-error**
 
     Accompany certain error and warning messages with the Chapel call stack
@@ -828,22 +646,16 @@ OPTIONS
     location. This is useful when the underlying cause of the issue is in
     one of the callers.
 
-.. _man-print-unused-functions:
-
 **\--[no-]print-unused-functions**
 
     Print the names and source locations of unused functions within the
     user program.
-
-.. _man-set:
 
 **-s, \--set <config>[=<value>]**
 
     Overrides the default value of a configuration param, type, var,
     or const in the code.  If the value is omitted, it will default
     to the value `true`.
-
-.. _man-task-tracking:
 
 **\--[no-]task-tracking**
 
@@ -856,14 +668,10 @@ OPTIONS
 
 *Compiler Configuration Options*
 
-.. _man-home:
-
 **\--home <path>**
 
     Specify the location of the Chapel installation *directory*. This flag
     corresponds with and overrides the $CHPL\_HOME environment variable.
-
-.. _man-atomics:
 
 **\--atomics <atomics-impl>**
 
@@ -872,15 +680,11 @@ OPTIONS
     variable. (defaults to a best guess based on $CHPL\_TARGET\_COMPILER,
     $CHPL\_TARGET\_PLATFORM, and $CHPL\_COMM)
 
-.. _man-network-atomics:
-
 **\--network-atomics <network>**
 
     Specify the network atomics implementation for all atomic variables.
     This flag corresponds with and overrides the $CHPL\_NETWORK\_ATOMICS
     environment variable (defaults to best guess based on $CHPL\_COMM).
-
-.. _man-aux-filesys:
 
 **\--aux-filesys <aio-system>**
 
@@ -888,15 +692,11 @@ OPTIONS
     corresponds with and overrides the $CHPL\_AUX\_FILESYS environment
     variable (defaults to 'none').
 
-.. _man-comm:
-
 **\--comm <comm-impl>**
 
     Specify the communication implementation to use for inter-\ *locale*
     data transfers. This flag corresponds with and overrides the $CHPL\_COMM
     environment variable (defaults to 'none').
-
-.. _man-comm-substrate:
 
 **\--comm-substrate <conduit>**
 
@@ -905,15 +705,11 @@ OPTIONS
     environment variable (defaults to best guess based on
     $CHPL\_TARGET\_PLATFORM).
 
-.. _man-gasnet-segment:
-
 **\--gasnet-segment <segment>**
 
     Specify memory segment to use with GASNet. This flag corresponds with
     and overrides the $CHPL\_GASNET\_SEGMENT environment variable. (defaults
     to best guess based on $CHPL\_COMM\_SUBSTRATE).
-
-.. _man-gmp:
 
 **\--gmp <gmp-version>**
 
@@ -923,16 +719,12 @@ OPTIONS
     whether you've built the included GMP library in the third-party
     *directory*).
 
-.. _man-hwloc:
-
 **\--hwloc <hwloc-impl>**
 
     Specify whether or not to use the hwloc library. This flag corresponds
     with and overrides the $CHPL\_HWLOC environment variable (defaults to a
     best guess based on whether you've built the included library in the
     third-party hwloc *directory*).
-
-.. _man-launcher:
 
 **\--launcher <launcher-system>**
 
@@ -941,15 +733,11 @@ OPTIONS
     (defaults to a best guess based on $CHPL\_COMM and
     $CHPL\_TARGET\_PLATFORM).
 
-.. _man-locale-model:
-
 **\--locale-model <locale-model>**
 
     Specify the *locale* model to use for describing your *locale*
     architecture. This flag corresponds with and overrides the
     $CHPL\_LOCALE\_MODEL environment variable (defaults to 'flat').
-
-.. _man-make:
 
 **\--make <make utility>**
 
@@ -957,15 +745,11 @@ OPTIONS
     overrides the $CHPL\_MAKE environment variable (defaults to a best guess
     based on $CHPL\_HOST\_PLATFORM).
 
-.. _man-mem:
-
 **\--mem <mem-impl>**
 
     Specify the memory allocator used for dynamic memory management. This
     flag corresponds with and overrides the $CHPL\_MEM environment variable
     (defaults to a best guess based on $CHPL\_COMM).
-
-.. _man-re2:
 
 **\--re2 <re2>**
 
@@ -973,15 +757,11 @@ OPTIONS
     the $CHPL\_RE2 environment variable (defaults to 'none' or 'bundled' if
     you've installed the re2 package in the third-party *directory*).
 
-.. _man-target-arch:
-
 **\--target-arch <architecture>**
 
     Specify the machine type or general architecture to use.
     This flag corresponds with and overrides the $CHPL\_TARGET\_ARCH
     environment variable (defaults to the result of `uname -m`).
-
-.. _man-target-compiler:
 
 **\--target-compiler <compiler>**
 
@@ -991,8 +771,6 @@ OPTIONS
     (defaults to a best guess based on $CHPL\_HOST\_PLATFORM,
     $CHPL\_TARGET\_PLATFORM, and $CHPL\_HOST\_COMPILER).
 
-.. _man-target-cpu:
-
 **\--target-cpu <cpu>**
 
     Specify the cpu model that the compiled executable will be
@@ -1001,8 +779,6 @@ OPTIONS
     (defaults to a best guess based on $CHPL\_COMM, $CHPL\_TARGET\_COMPILER,
     and $CHPL\_TARGET\_PLATFORM).
 
-.. _man-target-platform:
-
 **\--target-platform <platform>**
 
     Specify the platform on which the target executable is to be run for the
@@ -1010,15 +786,11 @@ OPTIONS
     the $CHPL\_TARGET\_PLATFORM environment variable (defaults to
     $CHPL\_HOST\_PLATFORM).
 
-.. _man-tasks:
-
 **\--tasks <task-impl>**
 
     Specify the tasking layer to use for implementing tasks. This flag
     corresponds with and overrides the $CHPL\_TASKS environment variable
     (defaults to a best guess based on $CHPL\_TARGET\_PLATFORM).
-
-.. _man-timers:
 
 **\--timers <timer-impl>**
 
@@ -1028,20 +800,14 @@ OPTIONS
 
 *Compiler Information Options*
 
-.. _man-copyright:
-
 **\--copyright**
 
     Print the compiler's copyright information.
-
-.. _man-help:
 
 **-h, \--help**
 
     Print a list of the command line *options*, indicating the arguments
     that they expect and a brief summary of their purpose.
-
-.. _man-help-env:
 
 **\--help-env**
 
@@ -1049,27 +815,19 @@ OPTIONS
     variable equivalent for each flag (see ENVIRONMENT) and its current
     value.
 
-.. _man-help-settings:
-
 **\--help-settings**
 
     Print the command line option help message, listing the current setting
     of each option as specified by environment variables and other flags on
     the command line.
 
-.. _man-license:
-
 **\--license**
 
     Print the compiler's license information.
 
-.. _man-print-chpl-home:
-
 **\--print-chpl-home**
 
     Prints the compiler's notion of $CHPL\_HOME.
-
-.. _man-version:
 
 **\--version**
 

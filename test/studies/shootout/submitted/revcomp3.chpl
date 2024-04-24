@@ -12,7 +12,8 @@ const table = createTable();    // create the table of code complements
 
 proc main(args: [] string) {
   use IO;
-  const stdin = (new file(0)).reader(locking=false);
+  const stdinBin = openfd(0).reader(iokind.native, locking=false),
+        stdoutBin = openfd(1).writer(iokind.native, locking=false);
 
   // read in the data using an incrementally growing buffer
   var bufLen = 8 * 1024,
@@ -21,14 +22,14 @@ proc main(args: [] string) {
       end = 0;
 
   do {
-    const more = stdin.readBinary(buf[end..]);
+    const more = stdinBin.read(buf[end..]);
     if more {
       end = bufLen;
       bufLen += min(1024**2, bufLen);
       bufDom = {0..<bufLen};
     }
   } while more;
-  end = stdin.offset()-1;
+  end = stdinBin.offset()-1;
 
   // process the buffer a sequence at a time, working from the end
   var hi = end;
@@ -45,11 +46,11 @@ proc main(args: [] string) {
   }
 
   // write out the transformed buffer
-  stdout.writeBinary(buf[..end]);
+  stdoutBin.write(buf[..end]);
 }
 
 
-proc revcomp(ref buf: [?inds]) {
+proc revcomp(buf: [?inds]) {
   param cols = 61;  // the number of characters per full row (including '\n')
   var lo = inds.low,
       hi = inds.high;
@@ -98,3 +99,4 @@ proc createTable() {
 
   return table;
 }
+use Compat, CompatIOKind;

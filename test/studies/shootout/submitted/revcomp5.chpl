@@ -19,19 +19,20 @@ param eol = '\n'.toByte(),  // end-of-line, as an integer
 
 
 proc main(args: [] string) {
-  var stdin = (new file(0)).reader(locking=false),
+  var stdinBin  = openfd(0).reader(iokind.native, locking=false),
+      stdoutBin = openfd(1).writer(iokind.native, locking=false),
       bufLen = 8 * 1024,
       bufDom = {0..<bufLen},
       buf: [bufDom] uint(8),
       end = 0;
 
   // read in the data using an incrementally growing buffer
-  while stdin.readBinary(buf[end..]) {
+  while stdinBin.read(buf[end..]) {
     end = bufLen;
     bufLen += min(1024**2, bufLen);
     bufDom = {0..<bufLen};
   }
-  end = stdin.offset() - 1;
+  end = stdinBin.offset()-1;
 
   // process the buffer a sequence at a time, working from the end
   var hi = end;
@@ -43,8 +44,9 @@ proc main(args: [] string) {
 
     // skip past header line
     var seqlo = lo;
-    while buf[seqlo] != eol do
+    while buf[seqlo] != eol {
       seqlo += 1;
+    }
 
     // reverse and complement the sequence
     revcomp(buf, seqlo+1, hi);
@@ -53,11 +55,11 @@ proc main(args: [] string) {
   }
 
   // write out the transformed buffer
-  stdout.writeBinary(buf[..end]);
+  stdoutBin.write(buf[..end]);
 }
 
 
-proc revcomp(ref buf, lo, hi) {
+proc revcomp(buf, lo, hi) {
   // shift all of the linefeeds into the right places
   const len = hi - lo + 1,
         off = (len - 1) % cols,
@@ -75,3 +77,4 @@ proc revcomp(ref buf, lo, hi) {
   forall (i,j) in zip(lo..#(len/2), ..<hi by -1) do
     (buf[i], buf[j]) = (cmpl[buf[j]], cmpl[buf[i]]);
 }
+use Compat, CompatIOKind;

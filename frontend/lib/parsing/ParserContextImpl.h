@@ -548,20 +548,6 @@ void ParserContext::exitScope(asttags::AstTag tag, UniqueString name) {
 }
 
 
-void ParserContext::noteCurlyBraces(YYLTYPE left, YYLTYPE right) {
-  this->curlyBraceLocation = makeSpannedLocation(left, right);
-}
-bool ParserContext::hasCurlyBracesLoc() {
-  return this->curlyBraceLocation.first_line > 0;
-}
-YYLTYPE ParserContext::curlyBracesLoc() {
-  return this->curlyBraceLocation;
-}
-void ParserContext::resetCurlyBracesLoc() {
-  this->curlyBraceLocation = {0};
-}
-
-
 ErroneousExpression* ParserContext::report(YYLTYPE loc, owned<ErrorBase> error) {
   context()->report(std::move(error));
   return ErroneousExpression::build(builder, convertLocation(loc)).release();
@@ -924,10 +910,6 @@ ParserContext::buildBeginStmt(YYLTYPE location, YYLTYPE locBegin,
                            blockStyle,
                            std::move(stmts));
   builder->noteBlockHeaderLocation(node.get(), convertLocation(locBegin));
-  if (hasCurlyBracesLoc()) {
-    builder->noteCurlyBracesLocation(node.get(), convertLocation(curlyBracesLoc()));
-    resetCurlyBracesLoc();
-  }
   CommentsAndStmt ret = { .comments=comments, .stmt=node.release() };
   return finishStmt(ret);
 }
@@ -1086,10 +1068,6 @@ CommentsAndStmt ParserContext::buildManageStmt(YYLTYPE location,
                             blockStyle,
                             std::move(stmts));
   builder->noteBlockHeaderLocation(node.get(), convertLocation(locHeader));
-  if (hasCurlyBracesLoc()) {
-    builder->noteCurlyBracesLocation(node.get(), convertLocation(curlyBracesLoc()));
-    resetCurlyBracesLoc();
-  }
 
   CommentsAndStmt ret = { .comments=comments, .stmt=node.release() };
 
@@ -1991,10 +1969,6 @@ ParserContext::buildBracketLoopStmt(YYLTYPE locLoop,
                                  /*isExpressionLevel*/ false,
                                  this->popLoopAttributeGroup());
   builder->noteLoopHeaderLocation(node.get(), convertLocation(locHeader));
-  if (hasCurlyBracesLoc()) {
-    builder->noteCurlyBracesLocation(node.get(), convertLocation(curlyBracesLoc()));
-    resetCurlyBracesLoc();
-  }
   return { .comments=comments, .stmt=node.release() };
 }
 
@@ -2039,10 +2013,6 @@ CommentsAndStmt ParserContext::buildBracketLoopStmt(YYLTYPE locLoop,
                                  /*isExpressionLevel*/ false,
                                  this->popLoopAttributeGroup());
   builder->noteLoopHeaderLocation(node.get(), convertLocation(locHeader));
-  if (hasCurlyBracesLoc()) {
-    builder->noteCurlyBracesLocation(node.get(), convertLocation(curlyBracesLoc()));
-    resetCurlyBracesLoc();
-  }
   return { .comments=comments, .stmt=node.release() };
 }
 
@@ -2112,10 +2082,6 @@ CommentsAndStmt ParserContext::buildGeneralLoopStmt(YYLTYPE locLoop,
   } else {
     CHPL_ASSERT(result);
     builder->noteLoopHeaderLocation(result, convertLocation(locHeader));
-    if (hasCurlyBracesLoc()) {
-      builder->noteCurlyBracesLocation(result, convertLocation(curlyBracesLoc()));
-      resetCurlyBracesLoc();
-    }
     return { .comments=comments, .stmt=result };
   }
 }
@@ -2195,18 +2161,13 @@ CommentsAndStmt ParserContext::buildCoforallLoopStmt(YYLTYPE locCoforall,
                               std::move(body),
                               this->popLoopAttributeGroup());
   builder->noteLoopHeaderLocation(node.get(), convertLocation(locHeader));
-  if (hasCurlyBracesLoc()) {
-    builder->noteCurlyBracesLocation(node.get(), convertLocation(curlyBracesLoc()));
-    resetCurlyBracesLoc();
-  }
 
   return { .comments=comments, .stmt=node.release() };
 }
 
 CommentsAndStmt
 ParserContext::buildConditionalStmt(bool usesThenKeyword, YYLTYPE locIf,
-                                    YYLTYPE locThenKw,
-                                    YYLTYPE locThenBody,
+                                    YYLTYPE locThenBodyAnchor,
                                     AstNode* condition,
                                     CommentsAndStmt thenCs) {
 
@@ -2216,10 +2177,10 @@ ParserContext::buildConditionalStmt(bool usesThenKeyword, YYLTYPE locIf,
 
   prepareStmtPieces(comments, thenExprLst, thenBlockStyle, locIf,
                     usesThenKeyword,
-                    locThenKw,
+                    locThenBodyAnchor,
                     thenCs);
 
-  auto thenBlock = consumeToBlock(locThenBody, thenExprLst);
+  auto thenBlock = consumeToBlock(locThenBodyAnchor, thenExprLst);
 
   auto node = Conditional::build(builder, convertLocation(locIf),
                                  toOwned(condition),
@@ -2234,10 +2195,8 @@ ParserContext::buildConditionalStmt(bool usesThenKeyword, YYLTYPE locIf,
 
 CommentsAndStmt
 ParserContext::buildConditionalStmt(bool usesThenKeyword, YYLTYPE locIf,
-                                    YYLTYPE locThenKw,
-                                    YYLTYPE locThenBody,
-                                    YYLTYPE locElseKw,
-                                    YYLTYPE locElseBody,
+                                    YYLTYPE locThenBodyAnchor,
+                                    YYLTYPE locElse,
                                     AstNode* condition,
                                     CommentsAndStmt thenCs,
                                     CommentsAndStmt elseCs) {
@@ -2249,7 +2208,7 @@ ParserContext::buildConditionalStmt(bool usesThenKeyword, YYLTYPE locIf,
   prepareStmtPieces(comments, thenExprLst, thenBlockStyle,
                     locIf,
                     usesThenKeyword,
-                    locThenKw,
+                    locThenBodyAnchor,
                     thenCs);
 
   const bool isElseBodyBlock = elseCs.stmt->isBlock();
@@ -2257,7 +2216,7 @@ ParserContext::buildConditionalStmt(bool usesThenKeyword, YYLTYPE locIf,
   auto elseBlockStyle = isElseBodyBlock ? BlockStyle::EXPLICIT
                                         : BlockStyle::IMPLICIT;
 
-  auto thenBlock = consumeToBlock(locThenBody, thenExprLst);
+  auto thenBlock = consumeToBlock(locThenBodyAnchor, thenExprLst);
 
   // If the else body is a block, discard all comments preceding it.
   if (isElseBodyBlock) {
@@ -2268,9 +2227,9 @@ ParserContext::buildConditionalStmt(bool usesThenKeyword, YYLTYPE locIf,
   auto elseExprLst = makeList(elseCs);
 
   // If else body is not a block, discard comments preceding the 'else'.
-  if (!isElseBodyBlock) discardCommentsFromList(elseExprLst, locElseKw);
+  if (!isElseBodyBlock) discardCommentsFromList(elseExprLst, locElse);
 
-  auto elseBlock = consumeToBlock(locElseBody, elseExprLst);
+  auto elseBlock = consumeToBlock(locElse, elseExprLst);
 
   auto node = Conditional::build(builder, convertLocation(locIf),
                                  toOwned(condition),
@@ -3012,9 +2971,7 @@ AstNode* ParserContext::buildCatch(YYLTYPE location, AstNode* error,
 }
 
 CommentsAndStmt
-ParserContext::buildWhenStmt(YYLTYPE location,
-                             YYLTYPE headerLocation,
-                             ParserExprList* caseExprs,
+ParserContext::buildWhenStmt(YYLTYPE location, ParserExprList* caseExprs,
                              BlockOrDo blockOrDo) {
 
   // No need to gather comments, they'll have been collected here...
@@ -3037,11 +2994,6 @@ ParserContext::buildWhenStmt(YYLTYPE location,
                           std::move(caseList),
                           blockStyle,
                           std::move(stmtList));
-  builder->noteBlockHeaderLocation(node.get(), convertLocation(headerLocation));
-  if (hasCurlyBracesLoc()) {
-    builder->noteCurlyBracesLocation(node.get(), convertLocation(curlyBracesLoc()));
-    resetCurlyBracesLoc();
-  }
 
   CommentsAndStmt cs = { .comments=comments, .stmt=node.release() };
 
@@ -3049,9 +3001,7 @@ ParserContext::buildWhenStmt(YYLTYPE location,
 }
 
 CommentsAndStmt
-ParserContext::buildSelectStmt(YYLTYPE location,
-                               YYLTYPE headerLocation,
-                               owned<AstNode> expr,
+ParserContext::buildSelectStmt(YYLTYPE location, owned<AstNode> expr,
                                ParserExprList* whenStmts) {
   auto comments = gatherCommentsFromList(whenStmts, location);
 
@@ -3079,7 +3029,6 @@ ParserContext::buildSelectStmt(YYLTYPE location,
   auto node = Select::build(builder, convertLocation(location),
                             std::move(expr),
                             std::move(stmts));
-  builder->noteBlockHeaderLocation(node.get(), convertLocation(headerLocation));
 
   CommentsAndStmt cs = { .comments=comments, .stmt=node.release() };
 

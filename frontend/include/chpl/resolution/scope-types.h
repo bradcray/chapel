@@ -640,8 +640,6 @@ class Scope {
 
   UniqueString name() const { return name_; }
 
-  const DeclMap& declared() const { return declared_; }
-
   /** Returns 'true' if this Scope directly contains use or import statements
       including the automatic 'use' for the standard library. */
   bool containsUseImport() const {

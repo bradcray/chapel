@@ -84,8 +84,7 @@ void ClassType::stringify(std::ostream& ss,
   // emit ? if nilable
   if (decorator_.isNilable()) {
     ss << "?";
-  } else if (decorator_.isUnknownNilability() &&
-             stringKind != StringifyKind::CHPL_SYNTAX) {
+  } else if (decorator_.isUnknownNilability()) {
     ss << " <unknown-nilability>";
   }
 }

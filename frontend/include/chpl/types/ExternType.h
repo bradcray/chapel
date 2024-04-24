@@ -29,20 +29,17 @@ namespace types {
 class ExternType final : public Type {
  private:
   UniqueString linkageName_;
-  ID id_;
 
-  ExternType(UniqueString linkageName, ID id)
-    : Type(typetags::ExternType), linkageName_(linkageName), id_(std::move(id)) {}
+  ExternType(UniqueString linkageName)
+    : Type(typetags::ExternType), linkageName_(linkageName) {}
 
   bool contentsMatchInner(const Type* other) const override {
     const ExternType* rhs = (const ExternType*) other;
-    return linkageName_ == rhs->linkageName_ &&
-           id_ == rhs->id_;
+    return linkageName_ == rhs->linkageName_;
   }
 
   void markUniqueStringsInner(Context* context) const override {
     linkageName_.mark(context);
-    id_.mark(context);
   }
 
   Genericity genericity() const override {
@@ -50,8 +47,7 @@ class ExternType final : public Type {
   }
 
   static const owned<ExternType>& getExternType(Context* context,
-                                                UniqueString linkageName,
-                                                ID id);
+                                                UniqueString linkageName);
 
  public:
   virtual void stringify(std::ostream& ss,
@@ -59,9 +55,7 @@ class ExternType final : public Type {
 
   inline UniqueString linkageName() const { return linkageName_; }
 
-  inline const ID& id() const { return id_; }
-
-  static const ExternType* get(Context* context, UniqueString linkageName, ID id);
+  static const ExternType* get(Context* context, UniqueString linkageName);
 };
 
 } // end namespace types

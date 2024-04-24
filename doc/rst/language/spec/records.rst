@@ -31,10 +31,6 @@ type.
 A record type is generic if it contains generic fields. Generic record
 types are discussed in detail in :ref:`Generic_Types`.
 
-.. index::
-   single: records; declarations
-   single: declarations; records
-   single: record
 .. _Record_Declarations:
 
 Record Declarations
@@ -87,9 +83,6 @@ external records.
     as discussion is needed regarding its impact on inheritance, for
     instance.
 
-.. index::
-   single: records; record types
-   pair: records; types
 .. _Record_Types:
 
 Record Types
@@ -112,8 +105,6 @@ specify the type. Generic records must be instantiated to serve as a
 fully-specified type, for example to declare a variable. This is done
 with type constructors, which are defined in Section :ref:`Type_Constructors`.
 
-.. index::
-   pair: records; fields
 .. _Record_Fields:
 
 Record Fields
@@ -141,8 +132,6 @@ storage associated with a record.
    contained by an instance of the ``Actor`` class defined in the
    preceding chapter :ref:`Class_Fields`.
 
-.. index::
-   pair: records; methods
 .. _Record_Methods:
 
 Record Methods
@@ -156,9 +145,6 @@ The receiver of a record method is passed by ``const`` intent by default.
 A method that modifies ``this`` must declare an explicit ``this-intent`` of
 ``ref``, see :ref:`Method_receiver_and_this`.
 
-.. index::
-   single: nested records
-   single: records; nested
 .. _Nested_Record_Types:
 
 Nested Record Types
@@ -168,9 +154,6 @@ A record defined within another class or record is a nested record. A
 nested record can be referenced only within its immediately enclosing
 class or record.
 
-.. index::
-   single: records; variable declarations
-   single: variables; records
 .. _Record_Variable_Declarations:
 
 Record Variable Declarations
@@ -191,8 +174,6 @@ record type. The record variable is initialized with a call to an
 initializer (:ref:`Class_Initializers`) that accepts zero actual
 arguments.
 
-.. index::
-   single: records; allocation
 .. _Record_Storage:
 
 Storage Allocation
@@ -213,9 +194,6 @@ elements elsewhere (see
 Record storage is reclaimed automatically. See :ref:`Variable_Lifetimes`
 for details on when a record becomes dead.
 
-.. index::
-   single: records; initialization
-   single: initialization; record
 .. _Record_Initialization:
 
 Record Initialization
@@ -294,9 +272,6 @@ As with classes, the user can provide their own initializers
 initializers are supplied, the default initializer cannot be called
 directly.
 
-.. index::
-   single: records; deinitializer
-   single: deinitializer; records
 .. _Record_Deinitializer:
 
 Record Deinitializer
@@ -348,9 +323,6 @@ out of scope and before its memory is reclaimed.
 
       --memLeaksByType
 
-.. index::
-   single: records; arguments
-   single: arguments; records
 .. _Record_Arguments:
 
 Record Arguments
@@ -402,9 +374,6 @@ by the record assignment function (:ref:`Record_Assignment`).
    by the assignment in ``modifyMyColor`` because the intent ``inout``
    is used.
 
-.. index::
-   single: records; field access
-   single: field access
 .. _Record_Field_Access:
 
 Record Field Access
@@ -419,8 +388,6 @@ Accessing a parameter or type field returns a parameter or type,
 respectively. Also, parameter and type fields can be accessed from an
 instantiated record type in addition to from a record value.
 
-.. index::
-   single: records; getters
 .. _Field_Getter_Methods:
 
 Field Getter Methods
@@ -431,9 +398,6 @@ As in classes, field accesses are performed via getter methods
 a reference to the specified field (so they can be written as well as
 read). The user may redefine these as needed.
 
-.. index::
-   single: records; method calls
-   single: method calls
 .. _Record_Method_Access:
 
 Record Method Calls
@@ -448,8 +412,6 @@ always resolved at compile time.
 Common Operations
 -----------------
 
-.. index::
-   pair: records; copy initialization
 .. _Copy_Initialization_of_Records:
 
 Copy Initialization of Records
@@ -596,8 +558,6 @@ declaration:
   var A : Wrapper(int) = 4;
   var B : Wrapper(string) = "hello";
 
-.. index::
-   pair: records; assignment
 .. _Record_Assignment:
 
 Record Assignment
@@ -661,13 +621,6 @@ The following example demonstrates record assignment.
    entities, rather than two references to the same object. Assigning
    ``3.14`` to ``C.x`` does not affect the ``x`` field in ``A``.
 
-.. index::
-   single: records; equality
-   single: records; inequality
-   single: records; ==
-   single: records; !=
-   single: == (record)
-   single: != (record)
 .. _Record_Comparison_Operators:
 
 Default Comparison Operators
@@ -743,9 +696,6 @@ like ``int``.
 
 
 
-.. index::
-   single: records; differences from classes
-   single: classes; differences from records
 .. _Class_and_Record_Differences:
 
 Differences between Classes and Records

@@ -135,6 +135,10 @@ void Type::gatherBuiltins(Context* context,
   auto genericUnmanaged = ClassType::get(context, AnyClassType::get(context), nullptr, ClassTypeDecorator(ClassTypeDecorator::UNMANAGED));
   gatherType(context, map, "unmanaged", genericUnmanaged);
 
+  gatherType(context, map, "c_ptr", CPtrType::get(context));
+
+  gatherType(context, map, "c_ptrConst", CPtrType::getConst(context));
+
   BuiltinType::gatherBuiltins(context, map);
 }
 
@@ -155,9 +159,7 @@ void Type::stringify(std::ostream& ss, chpl::StringifyKind stringKind) const {
   for (int i = 0; i < leadingSpaces; i++) {
     ss << "  ";
   }
-  if (stringKind != chpl::StringifyKind::CHPL_SYNTAX) {
-    ss << "type ";
-  }
+  ss << "type ";
   ss << typetags::tagToString(this->tag());
 }
 

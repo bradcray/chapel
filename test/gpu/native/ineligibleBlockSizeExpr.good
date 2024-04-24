@@ -1,3 +1,0 @@
-0 (gpu 0): ineligibleBlockSizeExpr.chpl:16: kernel launch (block size: 128x1x1)
-0 (gpu 0): ineligibleBlockSizeExpr.chpl:20: kernel launch (block size: 256x1x1)
-0 (gpu 0): ineligibleBlockSizeExpr.chpl:24: kernel launch (block size: 512x1x1)

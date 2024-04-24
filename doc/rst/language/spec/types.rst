@@ -1,7 +1,5 @@
 .. default-domain:: chpl
 
-.. index::
-   single: types
 .. _Chapter-Types:
 
 =====
@@ -56,8 +54,6 @@ These statements are defined in Sections :ref:`Enumerated_Types`,
 :ref:`Union_Declarations`, and :ref:`Type_Aliases`,
 respectively.
 
-.. index::
-   single: types; primitive
 .. _Primitive_Types:
 
 Primitive Types
@@ -109,9 +105,6 @@ See :ref:`Compile-Time_Constants`
    primitive types depending on a platform’s native support for those
    types.
 
-.. index::
-   single: void
-   single: types; void
 .. _The_Void_Type:
 
 The Void Type
@@ -143,9 +136,6 @@ primarily used to indicate that a function does not return anything.
 It is an error to assign the result of a function that returns ``void``
 to a variable.
 
-.. index::
-   single: nothing
-   single: types; nothing
 .. _The_Nothing_type:
 
 The Nothing Type
@@ -186,9 +176,6 @@ representation at run-time.
 
        1
 
-.. index::
-   single: bool
-   single: types; bool
 .. _The_Bool_Type:
 
 The Bool Type
@@ -237,11 +224,6 @@ not initialized to something else (see also :ref:`Chapter-Variables`).
       false
 
 
-.. index::
-   single: uint
-   single: int
-   single: types; uint
-   single: types; int
 .. _Signed_and_Unsigned_Integral_Types:
 
 Signed and Unsigned Integral Types
@@ -324,10 +306,6 @@ will be discarded.
 
 
 
-.. index::
-   single: real
-   single: types; real
-   single: types; floating point
 .. _Real_Types:
 
 Real Types
@@ -401,10 +379,6 @@ without an exponent (see :ref:`Literals` for details):
       5.18738
 
 
-.. index::
-   single: imaginary
-   single: types; imaginary
-   single: types; imag
 .. _Imaginary_Types:
 
 Imaginary Types
@@ -472,9 +446,6 @@ floating-point value while changing whether or not it is imaginary.
       b = 10.25i : imag(64)
 
 
-.. index::
-   single: complex
-   single: types; complex
 .. _Complex_Types:
 
 Complex Types
@@ -527,9 +498,6 @@ The standard :mod:`Math` module provides more functions on complex types.
 See the :mod:`Math` module documentation.
 
 
-.. index::
-   single: string
-   single: types; string
 .. _The_String_Type:
 
 The String Type
@@ -539,9 +507,6 @@ Strings are a primitive type designated by the symbol ``string``
 comprised of Unicode characters in UTF-8 encoding. Their length is
 unbounded. Strings are defined in :ref:`Chapter-Strings`.
 
-.. index::
-   single: bytes
-   single: types; bytes
 .. _The_Bytes_Type:
 
 The Bytes Type
@@ -551,15 +516,6 @@ Bytes is a primitive type designated by the symbol ``bytes`` comprised
 of arbitrary bytes. Bytes are immutable in-place and their length is
 unbounded. Bytes are defined in :ref:`Chapter-Bytes`.
 
-.. index::
-   single: enumerated types
-   single: types; enumerated
-   single: enumerated types; abstract
-   single: enumerated types; concrete
-   single: enumerated types; semi-concrete
-   single: enumerated types; iterating
-   single: enumerated types; size
-   single: predefined functions; size (enum)
 .. _Enumerated_Types:
 
 Enumerated Types
@@ -679,8 +635,6 @@ available:
 
    Returns the last constant in the enumerated type.
 
-.. index::
-   single: types; structured
 .. _Structured_Types:
 
 Structured Types
@@ -761,8 +715,6 @@ A tuple is a light-weight record that consists of one or more anonymous
 fields. If all the fields are of the same type, the tuple is
 homogeneous. Tuples are defined in :ref:`Chapter-Tuples`.
 
-.. index::
-   single: types; data parallel
 .. _Data_Parallel_Types:
 
 Data Parallel Types
@@ -804,8 +756,6 @@ that correspond to the indices in its domain. A domain’s indices can be
 of any type. Domains, arrays, and their index types are defined in
 :ref:`Chapter-Domains` and :ref:`Chapter-Arrays`.
 
-.. index::
-   single: types; synchronization
 .. _Synchronization_Types:
 
 Synchronization Types
@@ -825,8 +775,6 @@ The sync type is discussed in
 :ref:`Synchronization_Variables`. The atomic type is discussed
 in :ref:`Atomic_Variables`.
 
-.. index::
-   single: types; aliases
 .. _Type_Aliases:
 
 Type Aliases

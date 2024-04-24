@@ -1,8 +1,5 @@
 .. default-domain:: chpl
 
-.. index::
-   single: string
-   single: types; string
 .. _Chapter-Strings:
 
 =======

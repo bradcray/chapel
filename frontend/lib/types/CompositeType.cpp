@@ -96,14 +96,11 @@ void CompositeType::stringify(std::ostream& ss,
 
   auto sorted = sortedSubstitutions();
 
-  bool printSupertype =
-    superType != nullptr && stringKind != StringifyKind::CHPL_SYNTAX;
-
-  if (printSupertype || !sorted.empty()) {
+  if (superType || !sorted.empty()) {
     bool emittedField = false;
     ss << "(";
 
-    if (printSupertype) {
+    if (superType != nullptr && stringKind != StringifyKind::CHPL_SYNTAX) {
       ss << "super:";
       superType->stringify(ss, stringKind);
       emittedField = true;
@@ -111,23 +108,9 @@ void CompositeType::stringify(std::ostream& ss,
 
     for (const auto& sub : sorted) {
       if (emittedField) ss << ", ";
-
-      if (stringKind != StringifyKind::CHPL_SYNTAX) {
-        sub.first.stringify(ss, stringKind);
-        ss << ":";
-        sub.second.stringify(ss, stringKind);
-      } else {
-        if (sub.second.isType() || (sub.second.isParam() && sub.second.param() == nullptr)) {
-          sub.second.type()->stringify(ss, stringKind);
-        } else if (sub.second.isParam()) {
-          sub.second.param()->stringify(ss, stringKind);
-        } else {
-          // Some odd configuration; fall back to printing the qualified type.
-          CHPL_UNIMPL("attempting to stringify odd type representation as Chapel syntax");
-          sub.second.stringify(ss, stringKind);
-        }
-      }
-
+      sub.first.stringify(ss, stringKind);
+      ss << ":";
+      sub.second.stringify(ss, stringKind);
       emittedField = true;
     }
     ss << ")";
@@ -145,7 +128,7 @@ const RecordType* CompositeType::getStringType(Context* context) {
 
 const RecordType* CompositeType::getRangeType(Context* context) {
   auto symbolPath = UniqueString::get(context, "ChapelRange._range");
-  auto name = UniqueString::get(context, "_range");
+  auto name = UniqueString::get(context, "range");
   auto id = ID(symbolPath, -1, 0);
   return RecordType::get(context, id, name,
                          /* instantiatedFrom */ nullptr,
@@ -188,7 +171,7 @@ bool CompositeType::isMissingBundledRecordType(Context* context, ID id) {
   if (noLibrary) {
     auto path = id.symbolPath();
     return path == "String._string" ||
-           path == "ChapelRange._range" ||
+           path == "ChapelRange.range" ||
            path == "Bytes._bytes";
   }
 
@@ -201,8 +184,7 @@ bool CompositeType::isMissingBundledClassType(Context* context, ID id) {
     auto path = id.symbolPath();
     return path == "ChapelReduce.ReduceScanOp" ||
            path == "Errors.Error" || 
-           path == "CTypes.c_ptr" ||
-           path == "CTypes.c_ptrConst";
+           path == "CTypes.c_ptr";
   }
 
   return false;

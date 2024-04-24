@@ -1,7 +1,5 @@
 .. default-domain:: chpl
 
-.. index::
-   single: tuples
 .. _Chapter-Tuples:
 
 ======
@@ -15,10 +13,6 @@ addition to making it easy to return multiple values from a function,
 tuples help to support multidimensional indices, to group arguments to
 functions, and to specify mathematical concepts.
 
-.. index::
-   pair: tuples; types
-   single: tuples; homogeneous
-   single: types; * (tuples)
 .. _Tuple_Types:
 
 Tuple Types
@@ -99,8 +93,6 @@ operator since every 1-tuple is trivially a homogeneous tuple.
    integers. The type ``3*3*int``, on the other hand, specifies a
    9-tuple of integers.
 
-.. index::
-   pair: tuples;values
 .. _Tuple_Values:
 
 Tuple Values
@@ -187,8 +179,6 @@ When a tuple is passed as an argument to a function, it is passed as if
 it is a record type containing fields of the same type and in the same
 order as in the tuple.
 
-.. index::
-   pair: tuples; indexing
 .. _Tuple_Indexing:
 
 Tuple Indexing
@@ -247,8 +237,6 @@ necessarily compile-time constants.
    Non-homogeneous tuples can only be accessed by compile-time constants
    since the type of an expression must be statically known.
 
-.. index::
-   pair: tuples; iteration
 .. _Iteration_over_Tuples:
 
 Iteration over Tuples
@@ -313,8 +301,6 @@ equivalent to:
 Similarly, a `coforall` loop is equivalent to the `cobegin` statement
 whose body is the series of compound statements from the serial case.
 
-.. index::
-   pair: assignment; tuples
 .. _Tuple_Assignment:
 
 Tuple Assignment
@@ -325,8 +311,6 @@ of the assignment operator are each assigned the components of the tuple
 on the right-hand side of the assignment. These assignments occur in
 component order (component zero followed by component one, etc.).
 
-.. index::
-   single: tuples; destructuring
 .. _Tuple_Destructuring:
 
 Tuple Destructuring
@@ -350,9 +334,6 @@ Tuples can be split into their components in the following ways:
    expressions where a tuple expression is expanded in place using the
    tuple expansion expression.
 
-.. index::
-   single: tuples; assignments grouped as
-   single: tuples; omitting components
 .. _Assignments_in_a_Tuple:
 
 Splitting a Tuple with Assignment
@@ -442,9 +423,6 @@ evaluated, but the omitted values will not be assigned to anything.
 
       1
 
-.. index::
-   single: tuples; variable declarations grouped as
-   single: tuples; omitting components
 .. _Variable_Declarations_in_a_Tuple:
 
 Splitting a Tuple in a Declaration
@@ -530,9 +508,6 @@ defined for the omitted components.
 
       1
 
-.. index::
-   single: tuples; indices grouped as
-   single: tuples; omitting components
 .. _Indices_in_a_Tuple:
 
 Splitting a Tuple into Multiple Indices of a Loop
@@ -576,9 +551,6 @@ present but invisible. This means that the loop body controlled by the
 iterator may be executed multiple times with the same set of (visible)
 indices.
 
-.. index::
-   single: tuples; formal arguments grouped as
-   single: tuples; omitting components
 .. _Formal_Argument_Declarations_in_a_Tuple:
 
 Splitting a Tuple into Multiple Formal Arguments in a Function Call
@@ -678,9 +650,6 @@ that are grouped using the tuple notation may be omitted. In this case,
 no names are associated with the omitted components. The call is
 evaluated as if an argument were defined.
 
-.. index::
-   single: ... (tuple expansion)
-   single: tuples; expanding in place
 .. _Tuple_Expansion:
 
 Splitting a Tuple via Tuple Expansion
@@ -1071,15 +1040,11 @@ An iterator with the default or ``const`` yield intent may yield
 using the semantics of either the ``out`` or ``const ref`` yield intent,
 in an implementation-defined manner.
 
-.. index::
-   single: tuples; operators
 .. _Tuple_Operators:
 
 Tuple Operators
 ---------------
 
-.. index::
-   single: operators; unary tuple operators
 .. _Tuple_Unary_Operators:
 
 Unary Operators
@@ -1118,19 +1083,6 @@ element type is a user-defined type, it must supply an overloaded
 definition for the unary operator being used. Otherwise, a compile-time
 error will be issued.
 
-.. index::
-   single: operators; binary tuple operators
-   single: + (on tuples)
-   single: - (on tuples)
-   single: * (on tuples)
-   single: / (on tuples)
-   single: % (on tuples)
-   single: ** (on tuples)
-   single: & (on tuples)
-   single: | (on tuples)
-   single: ^ (on tuples)
-   single: << (on tuples)
-   single: >> (on tuples)
 .. _Tuple_Binary_Operators:
 
 Binary Operators
@@ -1172,14 +1124,6 @@ result.
 
       (3, 3.0, 12)
 
-.. index::
-   single: operators; relational operators on tuples
-   single: > (on tuples)
-   single: >= (on tuples)
-   single: < (on tuples)
-   single: <= (on tuples)
-   single: == (on tuples)
-   single: != (on tuples)
 .. _Tuple_Relational_Operators:
 
 Relational Operators
@@ -1223,18 +1167,6 @@ in the two operand tuples. Otherwise, a compile-time error will result.
 
       true
 
-.. index::
-   pair: tuples; predefined functions
-   single: tuples; isTuple
-   single: predefined functions; isTuple
-   single: tuples; isTupleType
-   single: predefined functions; isTupleType
-   single: tuples; max
-   single: predefined functions; max
-   single: tuples; min
-   single: predefined functions; min
-   single: tuples; size
-   single: predefined functions; size
 .. _Predefined_Functions_and_Methods_on_Tuples:
 
 Predefined Routines on Tuples

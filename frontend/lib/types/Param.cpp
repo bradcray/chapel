@@ -123,7 +123,7 @@ static ImmString getImmediateValueOrEmpty(const StringParam* p) {
   return UniqueString().podUniqueString();
 }
 
-optional<ParamTag> Param::tryGuessParamTagFromType(const Type* t) {
+static paramtags::ParamTag guessParamTagFromType(const Type* t) {
   if (t->isBoolType()) {
     return paramtags::BoolParam;
   } else if (t->isComplexType()) {
@@ -146,15 +146,9 @@ optional<ParamTag> Param::tryGuessParamTagFromType(const Type* t) {
     return paramtags::StringParam;
   } else if (t->isNothingType()) {
     return paramtags::NoneParam;
+  } else {
+    CHPL_ASSERT(false && "case not handled");
   }
-  return {};
-}
-
-static paramtags::ParamTag guessParamTagFromType(const Type* t) {
-  if (auto guess = Param::tryGuessParamTagFromType(t)) {
-    return *guess;
-  }
-  CHPL_ASSERT(false && "case not handled");
   return paramtags::NoneParam;
 }
 

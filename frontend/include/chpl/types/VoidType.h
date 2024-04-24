@@ -50,8 +50,6 @@ class VoidType final : public Type {
   ~VoidType() = default;
 
   static const VoidType* get(Context* context);
-
-  void stringify(std::ostream& ss, StringifyKind stringKind) const override;
 };
 
 

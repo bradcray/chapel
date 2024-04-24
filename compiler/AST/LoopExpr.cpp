@@ -38,7 +38,6 @@
 #include "symbol.h"
 #include "TransformLogicalShortCircuit.h"
 #include "wellknown.h"
-#include "TryStmt.h"
 
 #include "global-ast-vecs.h"
 
@@ -344,7 +343,7 @@ handleArrayTypeCase(LoopExpr* loopExpr, FnSymbol* fn, Expr* indices,
   BlockStmt* exprCopy = expr->copy(&indicesMap);
   Expr* lastExpr = exprCopy->body.tail->remove();
   exprCopy->insertAtTail(new CallExpr(PRIM_MOVE, isTypeResult, new CallExpr("isType", lastExpr)));
-  isArrayTypeFn->insertAtTail(TryStmt::build(/* isTryBang */ true, exprCopy));
+  isArrayTypeFn->insertAtTail(exprCopy);
   isArrayTypeFn->insertAtTail(new CondStmt(
                                 new SymExpr(isTypeResult),
                                 new CallExpr(PRIM_MOVE, isArrayType, gTrue),

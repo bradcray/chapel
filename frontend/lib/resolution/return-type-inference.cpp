@@ -1032,9 +1032,8 @@ const QualifiedType& returnType(Context* context,
     // resolve the function body
     // resolveFunction will arrange to call computeReturnType
     // and store the return type in the result.
-    if (auto rFn = resolveFunction(context, sig, poiScope)) {
-      result = rFn->returnType();
-    }
+    const ResolvedFunction* rFn = resolveFunction(context, sig, poiScope);
+    result = rFn->returnType();
   }
 
   return QUERY_END(result);
@@ -1051,17 +1050,17 @@ inferOutFormalsQuery(Context* context,
   std::vector<types::QualifiedType> formalTypes;
 
   // resolve the function body
-  if (auto rFn = resolveFunction(context, sig, instantiationPoiScope)) {
-    const ResolutionResultByPostorderID& rr = rFn->resolutionById();
+  const ResolvedFunction* rFn = resolveFunction(context, sig,
+                                                instantiationPoiScope);
+  const ResolutionResultByPostorderID& rr = rFn->resolutionById();
 
-    int numFormals = sig->numFormals();
-    for (int i = 0; i < numFormals; i++) {
-      const types::QualifiedType& ft = sig->formalType(i);
-      if (ft.kind() == QualifiedType::OUT && ft.isGenericOrUnknown()) {
-        formalTypes.push_back(rr.byAst(untyped->formalDecl(i)).type());
-      } else {
-        formalTypes.push_back(ft);
-      }
+  int numFormals = sig->numFormals();
+  for (int i = 0; i < numFormals; i++) {
+    const types::QualifiedType& ft = sig->formalType(i);
+    if (ft.kind() == QualifiedType::OUT && ft.isGenericOrUnknown()) {
+      formalTypes.push_back(rr.byAst(untyped->formalDecl(i)).type());
+    } else {
+      formalTypes.push_back(ft);
     }
   }
 

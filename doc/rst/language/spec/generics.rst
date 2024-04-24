@@ -1,7 +1,5 @@
 .. default-domain:: chpl
 
-.. index::
-   single: generics
 .. _Chapter-Generics:
 
 ========
@@ -12,9 +10,6 @@ Chapel supports generic functions and types that are parameterizable
 over both types and parameters. The generic functions and types look
 similar to non-generic functions and types already discussed.
 
-.. index::
-   single: functions; generic
-   single: generics; functions
 .. _Generic_Functions:
 
 Generic Functions
@@ -38,8 +33,6 @@ A function is generic if any of the following conditions hold:
 
 These conditions are discussed in the next sections.
 
-.. index::
-   single: intents; type
 .. _Formal_Type_Arguments:
 
 Formal Type Arguments
@@ -122,8 +115,6 @@ accepting type arguments that only apply to a specific group of types.
       int(8) 1
       real(64) 1.0
 
-.. index::
-   single: intents; param
 .. _Formal_Parameter_Arguments:
 
 Formal Parameter Arguments
@@ -166,8 +157,6 @@ this function at a call site. The formal argument is a parameter.
    The function call ``fillTuple(3, 3)`` returns a 3-tuple where each
    component contains the value ``3``.
 
-.. index::
-   single: formal arguments; without types
 .. _Formal_Arguments_without_Types:
 
 Formal Arguments without Types
@@ -218,8 +207,6 @@ each unique actual type.
    3-tuple of real values ``(3.14, 3.14, 3.14)``. The return type is
    ``(real, real, real)``.
 
-.. index::
-   single: formal arguments; with queried types
 .. _Formal_Arguments_with_Queried_Types:
 
 Formal Arguments with Queried Types
@@ -290,8 +277,6 @@ semantics of a type alias.
       6
       12.0
 
-.. index::
-   single: formal arguments; with generic type
 .. _Formal_Arguments_of_Generic_Type:
 
 Formal Arguments of Generic Type
@@ -348,10 +333,6 @@ require a query to mark the argument as generic. See also
         // c.type may not be int
       }
 
-.. index::
-   single: formal arguments; partially concrete
-   single: formal arguments; partially generic
-   single: where; implicit
 .. _Formal_Arguments_of_Partially_Generic_Type:
 
 Formal Arguments of Partially Generic Type
@@ -478,8 +459,6 @@ constrained.
 
       partially-concrete-tuple-ambiguity.chpl:5: error: ambiguous call 'f(2*real(64))'
 
-.. index::
-   single: formal arguments; array
 .. _Formal_Arguments_of_Generic_Array_Types:
 
 Formal Arguments of Generic Array Types
@@ -495,8 +474,6 @@ formal argument is taken to be the domain of the actual argument.
 A queried domain may not be modified via the name to which it is bound
 (see :ref:`Association_of_Arrays_to_Domains` for rationale).
 
-.. index::
-   single: generics; function visibility
 .. _Function_Visibility_in_Generic_Functions:
 
 Function Visibility in Generic Functions
@@ -505,14 +482,11 @@ Function Visibility in Generic Functions
 When resolving a function call, as defined in :ref:`Function_Resolution`,
 there is an additional source of visible functions when the call is
 nested within a generic function. The additional source is the functions
-visible from the call site that the enclosing generic function is invoked
-from.  This call site is referred to as the *point of instantiation*.  If
-there are multiple enclosing generic functions or the call is nested
-within a concrete function that is, in turn, nested in generic
-function(s), the point of instantiation is the call site of the innermost
-generic function. This rule does not apply to non-method functions declared
-without parentheses (:ref:`Functions_without_Parentheses`): such
-functions cannot be discovered through the point of instantiation.
+visible from the call site that the enclosing generic function is invoked from.
+This call site is referred to as the *point of instantiation*.
+If there are multiple enclosing generic functions or the call is nested
+within a concrete function that is, in turn, nested in generic function(s),
+the point of instantiation is the call site of the innermost generic function.
 
 If no candidate functions are found during the initial steps of
 identifying visible and candidate functions, function resolution
@@ -604,9 +578,6 @@ or instantiated (if the derived type is generic).
    Note that the Chapel lookup mechanism is still under development and
    discussion. Comments or questions are appreciated.
 
-.. index::
-   single: generics; types
-   single: types; generic
 .. _Generic_Types:
 
 Generic Types
@@ -615,17 +586,6 @@ Generic Types
 Generic types comprise built-in generic types, generic classes, and
 generic records.
 
-.. index::
-   single: integral (generic type)
-   single: numeric (generic type)
-   single: enumerated (generic type)
-   single: enum (generic type)
-   single: class (generic type)
-   single: unmanaged (generic type)
-   single: owned (generic type)
-   single: shared (generic type)
-   single: borrowed (generic type)
-   single: record (generic type)
 .. _Built_in_Generic_Types:
 
 Built-in Generic Types
@@ -675,14 +635,6 @@ instantiated as follows:
 -  ``unmanaged``, ``unmanaged class``, ``unmanaged class?`` behave
    similarly to the above but with ``unmanaged`` management strategy.
 
- .. index::
-   single: generics; classes
-   single: classes; generic
-   single: generics; records
-   single: records; generic
-   single: generics; fields
-   single: fields; generic
-
 Generic Classes and Records
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -715,9 +667,6 @@ For each generic field, the class or record is parameterized over:
 Correspondingly, the class or record is instantiated with a set of types
 and parameter values, one type or value per generic field.
 
-.. index::
-   single: type aliases; in classes or records
-   single: fields; type alias
 .. _Type_Aliases_in_Generic_Types:
 
 Type Aliases in Generic Types
@@ -786,10 +735,6 @@ instead.
    ``next`` is the same type as the type of the object that it is a
    field of.
 
-.. index::
-   single: parameters; in classes or records
-   single: fields; parameter
-   pair: fields; param
 .. _Parameters_in_Generic_Types:
 
 Parameters in Generic Types
@@ -888,10 +833,6 @@ instead.
    Running this example with ``-sbig=true`` will print out ``R(64)``, and with
    ``-sbig=false`` or no argument it will print out ``R(32)``.
 
-.. index::
-   single: fields; variable and constant, without types
-   single: variables; in classes or records
-   single: constants; in classes or records
 .. _Fields_without_Types:
 
 Fields without Types
@@ -1000,10 +941,6 @@ The types for such fields must either be a built-in generic type (see
 
 
 
-.. index::
-   single: generics; type constructor
-   single: initializers; type constructors
-   single: generics; instantiated type
 .. _Type_Constructors:
 
 The Type Constructor
@@ -1119,9 +1056,6 @@ marked with ``(?)``:
  * generic types passed to a `type` formal argument (see
    :ref:`Formal_Type_Arguments`)
 
-.. index::
-   single: generics; methods
-   single: methods; generic
 .. _Generic_Methods:
 
 Generic Methods
@@ -1131,9 +1065,6 @@ All methods bound to generic classes or records, including initializers,
 are generic over the implicit ``this`` argument. This is in addition to
 being generic over any other argument that is generic.
 
-.. index::
-   single: generics; compiler-generated initializers
-   single: compiler-generated initializers;for generic classes or records
 .. _Generic_Compiler_Generated_Initializers:
 
 The Compiler-Generated Generic Initializer
@@ -1163,9 +1094,6 @@ corresponding to the generic ``var`` and ``const`` fields, if any, never
 have defaults, so the corresponding actual values must always be
 provided.
 
-.. index::
-   single: generics; user-defined initializers
-   single: user-defined initializers; for generic classes or records
 .. _Generic_User_Initializers:
 
 User-Defined Initializers
@@ -1255,12 +1183,6 @@ type.
    ``c1``, and ``v1``. Otherwise, field initializations may be omitted
    according to previously-described initializer semantics.
 
-.. index::
-   single: user-defined compiler diagnostics
-   single: user-defined compiler errors
-   single: user-defined compiler warnings
-   single: compilerError
-   single: compilerWarning
 .. _User_Defined_Compiler_Errors:
 
 User-Defined Compiler Diagnostics
@@ -1337,10 +1259,6 @@ continue after encountering a ``compilerWarning``.
       compilerDiagnostics.chpl:16: warning: 1-argument version of foo called with type: string
       compilerDiagnostics.chpl:20: error: foo() called with non-matching types: int(64) != real(64)
 
-.. index::
-   single: specific instantiations
-   single: generic specialization
-   single: generic functions and special versions
 .. _Creating_General_and_Specialized_Versions_of_a_Function:
 
 Creating General and Specialized Versions of a Function
@@ -1432,8 +1350,6 @@ that works with some set of types - in other words, the special
 implementation can still be a generic function. See also
 :ref:`Where_Clauses`.
 
-.. index::
-   single: generics; stack example
 .. _Example_Generic_Stack:
 
 Example: A Generic Stack

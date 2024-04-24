@@ -28,7 +28,6 @@ include $(CHPL_MAKE_HOME)/third-party/chpl-venv/Makefile.include
 
 bdir=$(CHPL_BIN_DIR)
 link=$(bdir)/chpl-language-server
-link-shim=$(bdir)/chpl-shim
 
 all: chpl-language-server install
 
@@ -37,34 +36,20 @@ chpl-language-server-venv:
 
 chpl-language-server: chpl-language-server-venv
 
-clean: clean-link clean-link-shim
-
-cleanall: clean
-
-clobber: clean
-
-clean-link:
+clean:
 ifneq ($(wildcard $(link)),)
 	@echo "Removing old symbolic link..."
 	rm -f $(link)
 	@echo
 endif
 
-clean-link-shim:
-ifneq ($(wildcard $(link-shim)),)
-	@echo "Removing old symbolic link..."
-	rm -f $(link-shim)
-	@echo
-endif
+cleanall: clean
 
-$(link): clean-link
+clobber: clean
+
+$(link): clean
 	@echo "Installing chpl-language-server symbolic link..."
 	mkdir -p $(bdir)
 	ln -s $(shell pwd)/chpl-language-server $(link)
 
-$(link-shim): clean-link-shim
-	@echo "Installing chpl-shim symbolic link..."
-	mkdir -p $(bdir)
-	ln -s $(shell pwd)/chpl-shim $(link-shim)
-
-install: chpl-language-server $(link) $(link-shim)
+install: chpl-language-server $(link)

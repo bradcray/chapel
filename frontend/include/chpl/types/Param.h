@@ -106,7 +106,7 @@ class Param {
 
   // helper function to convert a value to a string
   static std::string valueToString(UniqueString v) {
-    return std::string("\"") + v.str() + std::string("\"");
+    return v.str();
   }
   static std::string valueToString(ComplexDouble v) {
     return std::to_string(v.re) + "+" + std::to_string(v.im) + "i";
@@ -127,8 +127,6 @@ class Param {
 
  public:
   virtual ~Param() = 0; // this is an abstract base class
-
-  static optional<ParamTag> tryGuessParamTagFromType(const Type* type);
 
   /**
     Returns the tag indicating which Param subclass this is.

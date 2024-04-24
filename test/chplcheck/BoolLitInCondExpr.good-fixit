@@ -1,5 +1,0 @@
-module BoolLitInCondExpr {
-  var a = for i in 1..10 do i;
-
-  var b = 3;
-}

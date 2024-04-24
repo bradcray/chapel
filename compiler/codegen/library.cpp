@@ -505,13 +505,12 @@ std::string getPythonTypeName(Type* type, PythonFileType pxd) {
         return base + " *";
       }
     } else if (type->symbol->hasFlag(FLAG_C_PTR_CLASS)) {
-      bool isConst = type->symbol->hasFlag(FLAG_C_PTRCONST_CLASS);
       Type* pointedTo = getDataClassType(type->symbol)->typeInfo();
       std::string base = getPythonTypeName(pointedTo, pxd);
       if (pxd == C_PYX) {
         return "";
       } else {
-        return isConst ? "const " + base + " *" : base + " *";
+        return base + " *";
       }
     } else {
       return type->codegen().c;
@@ -850,11 +849,11 @@ static void makePYFile() {
       libraries += getCompilelineOption("multilocale-lib-deps");
     }
 
-    auto copyOfLib = std::make_unique<char[]>(libraries.length() + 1);
-    libraries.copy(copyOfLib.get(), libraries.length(), 0);
+    char copyOfLib[libraries.length() + 1];
+    libraries.copy(copyOfLib, libraries.length(), 0);
     copyOfLib[libraries.length()] = '\0';
     int prefixLen = strlen("-l");
-    char* curSection = strtok(copyOfLib.get(), " \n");
+    char* curSection = strtok(copyOfLib, " \n");
     // Get the libraries from compileline --libraries, taking the `name`
     // portion from all `-lname` parts of that command's output
     while (curSection != NULL) {

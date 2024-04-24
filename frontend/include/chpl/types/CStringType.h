@@ -50,8 +50,6 @@ class CStringType final : public Type {
   ~CStringType() = default;
 
   static const CStringType* get(Context* context);
-
-  void stringify(std::ostream& ss, StringifyKind stringKind) const override;
 };
 
 

@@ -2,7 +2,7 @@ use IO;
 
 var str:string;
 
-// read 10 codepoints
+// read 10 characters
 stdin.readString(str, 10);
 
 writeln("Read\n", str);

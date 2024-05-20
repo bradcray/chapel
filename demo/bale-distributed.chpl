@@ -12,7 +12,7 @@ var Src: [SrcInds] int,
 Src = [i in 0..<n] i*11;
 fillRandom(Inds, min=0, max=n-1); 
 
-forall (d, i) in zip(Dst, Inds) do {
+forall (d, i) in zip(Dst, Inds) do
   d = Src[i];
 
 

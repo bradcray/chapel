@@ -1195,9 +1195,19 @@ module DefaultRectangular {
       if debugDefaultDist {
         chpl_debug_writeln("*** In defRectArr simple-dd standalone iterator");
       }
-      foreach i in dom.these(tag, tasksPerLocale,
-                         ignoreRunning, minIndicesPerTask) with (ref this) {
-        yield dsiAccess(i);
+      if eltType == locale {
+        writeln("In special locale forall case");
+        coforall i in dom {
+          on dsiAccess(i) {
+            yield dsiAccess(i);
+          }
+        }
+      } else {
+        foreach i in dom.these(tag, tasksPerLocale,
+                               ignoreRunning, minIndicesPerTask)
+         with (ref this) {
+          yield dsiAccess(i);
+        }
       }
     }
 

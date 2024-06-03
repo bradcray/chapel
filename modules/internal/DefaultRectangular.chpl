@@ -2041,11 +2041,14 @@ module DefaultRectangular {
         chpl_debug_writeln("Performing simple DefaultRectangular transfer");
 
       _simpleTransfer(A, aView, B, bView);
+      if debugDefaultDistBulkTransfer then
+        chpl_debug_writeln("Done with simple DefaultRectangular transfer");
     } else if _canDoComplexTransfer(A, aView, B, bView) {
       if debugDefaultDistBulkTransfer then
         chpl_debug_writeln("Performing complex DefaultRectangular transfer");
 
       complexTransfer(A, aView, B, bView);
+        chpl_debug_writeln("Done with complex DefaultRectangular transfer");
     } else {
       return false;
     }
@@ -2117,10 +2120,12 @@ module DefaultRectangular {
     }
 
     if doParallelAssign {
+      writeln("Doing simple parallel transfer");
       _simpleParallelTransferHelper(A, B, Adata, Bdata, Alocid, Asublocid,
                                     Blocid, Bsublocid, len);
     }
     else{
+      writeln("Doing simple transfer");
       _simpleTransferHelper(A, B, Adata, Bdata, Alocid, Asublocid, Blocid,
                             Bsublocid, len);
     }
@@ -2163,18 +2168,21 @@ module DefaultRectangular {
 
       __primitive("chpl_comm_array_get", dstRef, Blocid, Bsublocid,
                   srcRef, len);
+      writeln("After primitive");
     } else if Blocid==here.id {
       if debugDefaultDistBulkTransfer then
         chpl_debug_writeln("\tlocal put() to ", Alocid);
 
       __primitive("chpl_comm_array_put", srcRef, Alocid, Asublocid,
                   dstRef, len);
+      writeln("After primitive");
     } else on Adata.locale {
       if debugDefaultDistBulkTransfer then
         chpl_debug_writeln("\tremote get() on ", here.id, " from ", Blocid);
 
       __primitive("chpl_comm_array_get", dstRef, Blocid, Bsublocid,
                   srcRef, len);
+      writeln("After primitive");
     }
   }
 

@@ -126,14 +126,17 @@ record hashedDist : writeSerializable {
   proc init(type idxType,
             mapper:?t = new DefaultMapper(),
             targetLocales: [] locale = Locales) {
+    writeln("Before value decl");
     const value = new unmanaged HashedImpl(idxType, mapper, targetLocales);
     this.idxType = idxType;
     this.mapperT = _to_unmanaged(t);
+    writeln("Before dist helper");
     this.chpl_distHelp = new chpl_PrivatizedDistHelper(
                           if _isPrivatized(value)
                             then _newPrivatizedClass(value)
                             else nullPid,
                           value);
+    writeln("After dist helper");
   }
 
     proc init(_pid : int, _instance, _unowned : bool) {
@@ -252,7 +255,9 @@ class HashedImpl : BaseDist, writeSerializable {
     // arbitrary dimensions (since the k-D case is a bit harder?)
     //
     targetLocDom = {0..#targetLocales.size};
+    writeln("Before targetLocales copy");
     this.targetLocales = targetLocales;
+    writeln("After targetLocales copy");
 
     // setting locDist commented out b/c not currently used
     //for locid in targetLocDom do

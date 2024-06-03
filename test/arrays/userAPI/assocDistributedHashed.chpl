@@ -23,8 +23,11 @@ proc main() {
   output.writeln([1,2,3]);
 
   var myMapper = new MyMapper();
+  writeln("Before D creation");
   var D: domain(string) dmapped new hashedDist(idxType=string, mapper=myMapper);
+  writeln("Before A creation");
   var A:[D] real;
+  writeln("After A creation");
 
   D += "zero";
   D += "pointone";
@@ -40,6 +43,7 @@ proc main() {
   D += "nine";
   D += "ten";
 
+  writeln("Before conditional");
   if !testSlice {
     testAssocArrayAPI(A, output);
   } else {

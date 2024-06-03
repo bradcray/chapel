@@ -2168,6 +2168,7 @@ module ChapelArray {
   pragma "find user line"
   @chpldoc.nodoc
   inline operator =(ref a: [], b:[]) {
+    writeln("In array =");
     if a.rank != b.rank then
       compilerError("rank mismatch in array assignment");
 
@@ -2190,6 +2191,7 @@ module ChapelArray {
     if boundsChecking then
       checkArrayShapesUponAssignment(a, b);
 
+    writeln("Going into unchecked transfer case");
     chpl__uncheckedArrayTransfer(a, b, kind=_tElt.assign);
   }
 
@@ -2302,6 +2304,7 @@ module ChapelArray {
   pragma "find user line"
   inline proc chpl__uncheckedArrayTransfer(ref a: [], b:[], param kind) {
 
+    writeln("In uncheckedArrayTransfer");
     var done = false;
     if !chpl__serializeAssignment(a, b) {
       if chpl__compatibleForBulkTransfer(a, b, kind) {
@@ -2314,16 +2317,21 @@ module ChapelArray {
       // run copy initializer still
       if done {
         if kind==_tElt.initCopy && !isPODType(a.eltType) {
+          writeln("About to init copy after transfer");
           initCopyAfterTransfer(a);
+          writeln("Done init copying after transfer");
         } else if kind==_tElt.move && (isSubtype(a.eltType, _array) ||
                                        isSubtype(a.eltType, _domain)) {
+          writeln("About to fix elt runtime types");
           fixEltRuntimeTypesAfterTransfer(a);
+          writeln("Done fixing elt runtime types");
         }
       }
     }
     if !done {
       chpl__transferArray(a, b, kind);
     }
+    writeln("Done with uncheckedArrayTransfer");
   }
 
   proc chpl__compatibleForWidePtrBulkTransfer(a, b,
@@ -2416,6 +2424,7 @@ module ChapelArray {
   pragma "ignore transfer errors"
   inline proc chpl__transferArray(ref a: [], const ref b,
                            param kind=_tElt.assign) lifetime a <= b {
+    writeln("In transferarray");
     if (a.eltType == b.type ||
         _isPrimitiveType(a.eltType) && _isPrimitiveType(b.type)) {
 
@@ -2486,20 +2495,25 @@ module ChapelArray {
     } else {
       if kind==_tElt.move {
         if needsInitWorkaround(a.eltType) {
+          writeln("*** In case A");
           [ (ai, bb) in zip(a.domain, b) with (ref a) ] {
             ref aa = a[ai];
             __primitive("=", aa, __primitive("steal", bb));
             fixRuntimeType(a.eltType, aa);
           }
+          writeln("*** In case A");
 
         } else {
+          writeln("*** In case B");
           [ (aa,bb) in zip(a,b) ] {
             __primitive("=", aa, __primitive("steal", bb));
             fixRuntimeType(a.eltType, aa);
           }
+          writeln("*** In case B");
         }
       } else if kind==_tElt.initCopy {
         if needsInitWorkaround(a.eltType) {
+          writeln("*** In case C");
           [ (ai, bb) in zip(a.domain, b) with (ref a) ] {
             ref aa = a[ai];
             pragma "no auto destroy"
@@ -2507,7 +2521,9 @@ module ChapelArray {
             // move it into the array
             __primitive("=", aa, copy);
           }
+          writeln("*** In case C");
         } else {
+          writeln("*** In case D");
           [ (aa,bb) in zip(a,b) ] {
             if isSyncType(bb.type) {
               pragma "no auto destroy"
@@ -2526,11 +2542,14 @@ module ChapelArray {
               __primitive("=", aa, copy);
             }
           }
+          writeln("*** In case D");
         }
       } else if kind==_tElt.assign {
+        writeln("*** In case E");
         [ (aa,bb) in zip(a,b) ] {
           aa = bb;
         }
+        writeln("*** In case E");
       }
     }
   }
@@ -3012,6 +3031,7 @@ module ChapelArray {
 
   pragma "init copy fn"
   proc chpl__initCopy(const ref rhs: [], definedConst: bool) {
+    writeln("In array chpl__initCopy");
     pragma "no copy"
     var lhs = chpl__coerceCopy(rhs.type, rhs, definedConst);
     return lhs;
@@ -3055,10 +3075,12 @@ module ChapelArray {
     }
   }
 
+  config param bradDebug = false;
+  
   pragma "find user line"
   pragma "coerce fn"
   proc chpl__coerceCopy(type dstType:_array, rhs:_array, definedConst: bool) {
-
+    if bradDebug then writeln("In coerceCopy A");
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
 
@@ -3083,12 +3105,15 @@ module ChapelArray {
       if boundsChecking then
         checkArrayShapesUponAssignment(lhs, rhs);
 
+      if bradDebug then writeln("About to call unchecked transfer");
       chpl__uncheckedArrayTransfer(lhs, rhs, kind=_tElt.initCopy);
     }
 
+    if bradDebug then writeln("About to mark init complete");
     // provide distributions a hook to call _ddata_allocate_postalloc etc.
     lhs._value.dsiElementInitializationComplete();
 
+    if bradDebug then writeln("Leaving coerceCopy A");
     return lhs;
   }
   pragma "find user line"
@@ -3097,6 +3122,7 @@ module ChapelArray {
                         pragma "no auto destroy" in rhs:_array,
                         definedConst: bool) {
 
+    if bradDebug then writeln("In coerce move A");
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
 
@@ -3148,6 +3174,7 @@ module ChapelArray {
   pragma "find user line"
   pragma "coerce fn"
   proc chpl__coerceCopy(type dstType:_array, rhs:_domain, definedConst: bool) {
+    if bradDebug then writeln("In coerceCopy B");
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
 
@@ -3170,6 +3197,7 @@ module ChapelArray {
   pragma "find user line"
   pragma "coerce fn"
   proc chpl__coerceMove(type dstType:_array, in rhs:_domain, definedConst: bool) {
+    if bradDebug then writeln("In coerce move B");
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
 
@@ -3193,6 +3221,7 @@ module ChapelArray {
   pragma "find user line"
   pragma "coerce fn"
   proc chpl__coerceCopy(type dstType:_array, rhs:range(?), definedConst: bool) {
+    if bradDebug then writeln("In coerceCopy C");
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
 
@@ -3211,6 +3240,7 @@ module ChapelArray {
   pragma "find user line"
   pragma "coerce fn"
   proc chpl__coerceMove(type dstType:_array, in rhs:range(?), definedConst: bool) {
+    if bradDebug then writeln("In coerceMove C");
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
 
@@ -3231,6 +3261,7 @@ module ChapelArray {
   pragma "coerce fn"
   proc chpl__coerceCopy(type dstType:_array, rhs:_tuple, definedConst: bool) {
 
+    if bradDebug then writeln("In coerceCopy D");
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
 
@@ -3253,6 +3284,7 @@ module ChapelArray {
                         pragma "no auto destroy" in rhs:_tuple,
                         definedConst: bool) {
 
+    if bradDebug then writeln("In coerceMove D");
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
 
@@ -3274,6 +3306,7 @@ module ChapelArray {
   pragma "coerce fn"
   proc chpl__coerceCopy(type dstType:_array, rhs:desyncEltType(dstType),
                         definedConst: bool) {
+    if bradDebug then writeln("In coerceCopy E");
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
 
@@ -3295,6 +3328,7 @@ module ChapelArray {
   pragma "find user line"
   pragma "coerce fn"
   proc chpl__coerceMove(type dstType:_array, in rhs:desyncEltType(dstType), definedConst: bool) {
+    if bradDebug then writeln("In coerceMove E");
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
 
@@ -3319,6 +3353,7 @@ module ChapelArray {
   pragma "coerce fn"
   proc chpl__coerceCopy(type dstType:_array, rhs: _iteratorRecord, definedConst: bool) {
     // assumes rhs is iterable
+    if bradDebug then writeln("In coerceCopy F");
 
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
@@ -3337,6 +3372,7 @@ module ChapelArray {
   pragma "coerce fn"
   proc chpl__coerceMove(type dstType:_array, rhs: _iteratorRecord, definedConst: bool) {
     // assumes rhs is iterable
+    if bradDebug then writeln("In coerceCopy F");
 
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
@@ -3357,6 +3393,7 @@ module ChapelArray {
   pragma "last resort"
   proc chpl__coerceCopy(type dstType:_array, rhs, definedConst: bool) {
     // assumes rhs is iterable (e.g. list)
+    if bradDebug then writeln("In coerceCopy G");
 
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);
@@ -3376,6 +3413,7 @@ module ChapelArray {
   pragma "last resort"
   proc chpl__coerceMove(type dstType:_array, in rhs, definedConst: bool) {
     // assumes rhs is iterable (e.g. list)
+    if bradDebug then writeln("In coerceMove G");
 
     type eltType = chpl__eltTypeFromArrayRuntimeType(dstType);
     const ref dom = chpl__domainFromArrayRuntimeType(dstType);

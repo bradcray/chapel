@@ -94,7 +94,7 @@ module ChapelDistribution {
                            param strides: strideKind,
                            ranges: rank*range(idxType, boundKind.both, strides),
                            definedConst: bool = false) {
-      var x = _value.dsiNewRectangularDom(rank, idxType, strides, ranges);
+      var x = _value.dsiNewRectangularDom(rank, idxType, strides, ranges, definedConst);
 
       x.definedConst = definedConst;
 
@@ -300,7 +300,8 @@ module ChapelDistribution {
 
     var definedConst: bool;
 
-    proc init() {
+    proc init(definedConst: bool) {
+      this.definedConst = definedConst;
     }
 
     proc deinit() {
@@ -544,6 +545,16 @@ module ChapelDistribution {
     type idxType;
     param strides: strideKind;
 
+    proc init(definedConst: bool,
+              param rank: int,
+              type idxType,
+              param strides: strideKind) {
+      super.init(definedConst=definedConst);
+      this.rank = rank;
+      this.idxType = idxType;
+      this.strides = strides;
+    }
+    
     @chpldoc.nodoc proc hasUnitStride() param do return strides.isOne();
     @chpldoc.nodoc proc hasPosNegUnitStride() param do return strides.isPosNegOne();
 

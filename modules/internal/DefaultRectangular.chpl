@@ -99,8 +99,10 @@ module DefaultRectangular {
   @unstable("DefaultDist is unstable and may change in the future")
   class DefaultDist: BaseDist {
     override proc dsiNewRectangularDom(param rank: int, type idxType,
-                                       param strides: strideKind, inds) {
-      const dom = new unmanaged DefaultRectangularDom(rank, idxType, strides,
+                                       param strides: strideKind, inds,
+                                       definedConst: bool) {
+      const dom = new unmanaged DefaultRectangularDom(definedConst,
+                                                      rank, idxType, strides,
                                                       _to_unmanaged(this));
       dom.dsiSetIndices(inds);
       return dom;
@@ -165,8 +167,8 @@ module DefaultRectangular {
     override proc type isDefaultRectangular() param do return true;
     override proc isDefaultRectangular() param do return true;
 
-    proc init(param rank, type idxType, param strides, dist) {
-      super.init(rank, idxType, strides);
+    proc init(definedConst: bool, param rank, type idxType, param strides, dist) {
+      super.init(definedConst, rank, idxType, strides);
       this.dist = dist;
     }
 

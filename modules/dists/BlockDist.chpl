@@ -541,6 +541,14 @@ class BlockDom: BaseRectangularDom(?) {
   const dist: unmanaged BlockImpl(rank, idxType, sparseLayoutType);
   var locDoms: [dist.targetLocDom] unmanaged LocBlockDom(rank, idxType, strides);
   var whole: domain(rank, idxType, strides);
+
+  proc init(definedConst: bool, param rank, type idxType, strides: strideKind,
+            type sparseLayoutType, dist: unmanaged BlockImpl(?), locDoms) {
+    super.init(definedConst, rank, idxType, strides);
+    this.sparseLayoutType = sparseLayoutType;
+    this.dist = dist;
+    this.locDoms = locDoms;
+  }
 }
 
 //
@@ -807,7 +815,8 @@ override proc BlockImpl.dsiDisplayRepresentation() {
 }
 
 override proc BlockImpl.dsiNewRectangularDom(param rank: int, type idxType,
-                                         param strides: strideKind, inds) {
+                                             param strides: strideKind, inds,
+                                             definedConst: bool) {
   if idxType != this.idxType then
     compilerError("domain index type does not match distribution's");
   if rank != this.rank then
@@ -828,7 +837,7 @@ override proc BlockImpl.dsiNewRectangularDom(param rank: int, type idxType,
   }
   delete dummyLBD;
 
-  var dom = new unmanaged BlockDom(rank, idxType, strides, sparseLayoutType,
+  var dom = new unmanaged BlockDom(definedConst, rank, idxType, strides, sparseLayoutType,
                                    this:unmanaged, locDomsTemp, whole);
 
   if debugBlockDist {
@@ -1780,10 +1789,12 @@ record blockDomPrvData {
   var distpid;
   var dims;
   var locdoms;  //todo rvf its elements along with the rest of the record
+  var definedConst: bool;
 }
 
 proc BlockDom.dsiGetPrivatizeData() {
-  return new blockDomPrvData(dist.pid, whole.dims(), locDoms);
+  writeln("In dsiGetPrivatizeData, definedConst = ", definedConst);
+  return new blockDomPrvData(dist.pid, whole.dims(), locDoms, definedConst);
 }
 
 proc BlockDom.dsiPrivatize(privatizeData) {
@@ -1794,7 +1805,7 @@ proc BlockDom.dsiPrivatize(privatizeData) {
     = privatizeData.locdoms;
 
   // in initializer we have to pass sparseLayoutType as it has no default value
-  const c = new unmanaged BlockDom(rank, idxType, strides,
+  const c = new unmanaged BlockDom(definedConst=definedConst, rank, idxType, strides,
                                    privdist.sparseLayoutType, privdist,
                                    locDomsTemp, {(...privatizeData.dims)});
   return c;

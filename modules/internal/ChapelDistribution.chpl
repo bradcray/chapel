@@ -365,9 +365,12 @@ module ChapelDistribution {
     // dist is nil or a distribution that should be removed.
     pragma "dont disable remote value forwarding"
     proc remove() : (unmanaged BaseDom?, unmanaged BaseDist?) {
-
+      //      writeln("Calling remove() on ", this);
       if boundsChecking {
         // TODO -- remove dsiLinksDistribution
+	//	writeln("dsiMyDist: ", dsiMyDist());
+	//	writeln("tracks domains: ", dsiMyDist().dsiTrackDomains());
+	//	writeln("links dist: ", dsiLinksDistribution());
         assert( dsiMyDist().dsiTrackDomains() == dsiLinksDistribution() );
       }
 
@@ -394,6 +397,7 @@ module ChapelDistribution {
             // Remove the domain from the distribution
             // and find out if the distribution should be removed.
             remove_dist = dist.remove_dom(_to_unmanaged(this));
+	    //	    writeln("remove_dist = ", remove_dist);
           }
         }
       }
@@ -409,6 +413,8 @@ module ChapelDistribution {
     // storing in the _arrs linked list or not (just counting it).
     // Currently, only slices using existing domains avoid the list.
     inline proc remove_arr(x:unmanaged BaseArr, param rmFromList=true): bool {
+      if debugDomDist then
+	writeln(this, " dom is being asked to remove ", x);
       var count = -1;
       on this {
         var cnt = -1;
@@ -1276,7 +1282,8 @@ module ChapelDistribution {
   }
 
   proc _delete_dom(dom, privatized:bool) {
-
+    if debugDomDist then
+      writeln(dom, " is being passed to delete_dom");
     dom.dsiDestroyDom();
 
     if _privatization && privatized {

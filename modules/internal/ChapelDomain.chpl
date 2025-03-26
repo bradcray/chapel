@@ -22,6 +22,8 @@
 //
 module ChapelDomain {
 
+  config var debugDomDist = false;
+  
   public use ChapelBase;
   use ArrayViewRankChange, ChapelTuple;
 
@@ -1174,7 +1176,11 @@ module ChapelDomain {
 
     @chpldoc.nodoc
     proc _do_destroy () {
+      if debugDomDist then
+	writeln(this, " _domain is being asked to destroy itself");
       if ! _unowned {
+	if debugDomDist then
+	  writeln("  it's owned");
         on _instance {
           // Count the number of arrays that refer to this domain,
           // and mark the domain to be freed when that number reaches 0.
@@ -1184,15 +1190,25 @@ module ChapelDomain {
           var (domToFree, distToRemove) = inst.remove();
           var distToFree:unmanaged BaseDist? = nil;
           if distToRemove != nil {
+	    if debugDomDist then
+	      writeln("  we found a dist to remove");
             distToFree = distToRemove!.remove();
           }
-          if domToFree != nil then
+          if domToFree != nil then {
+	    if debugDomDist then
+	      writeln("  we got a dom to free");
             _delete_dom(inst, _isPrivatized(inst));
-          if distToFree != nil then
+	  }
+          if distToFree != nil then {
+	    if debugDomDist then
+	      writeln("  we got a dist to free");
             _delete_dist(distToFree!, _isPrivatized(inst.dist));
+	  }
         }
       }
       else {
+	if debugDomDist then
+	  writeln("  it's unowned");
         // Engin 4/14/20: We don't have any arrayview domain instances that we
         // RVF today. If/when we do have them, we need to clean them up here.
         // See _do_destroy_arr for a similar cleanup we do today for arrayview
@@ -1201,6 +1217,8 @@ module ChapelDomain {
     }
     @chpldoc.nodoc
     proc deinit () {
+      if debugDomDist then
+	writeln(this, " _domain is being asked to deinit itself");
       _do_destroy();
     }
 

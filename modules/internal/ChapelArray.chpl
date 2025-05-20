@@ -1954,6 +1954,7 @@ module ChapelArray {
     }
   }
 
+  pragma "no promotion when by ref"
   pragma "reference to const when const this"
   pragma "fn returns aliasing array"
   proc _array.reshape(ranges: range(?)...) {
@@ -1966,13 +1967,14 @@ module ChapelArray {
 
   config param checkReshapeDimensions = boundsChecking;
 
+  pragma "no promotion when by ref"
   pragma "reference to const when const this"
   pragma "fn returns aliasing array"
   proc _array.reshape(dom: domain(?)) {
     if Reflection.canResolveMethod(_value, "doiReshape", dom) {
       if boundsChecking then
         validateReshape();
-      return _value.doiReshape(dom);
+      return _newArray(_value.doiReshape(dom));
     } else {
       compilerError("This array type does not support the '.reshape()'  method");
     }

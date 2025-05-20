@@ -2586,7 +2586,7 @@ module DefaultRectangular {
                                                   externArr=true,
                                                   _borrowed=true);
      dom._value.add_arr(ret, locking = false);
-     return _newArray(ret);
+     return ret;
   }
 
   // A helper routine to take the first parallel scan over a vector

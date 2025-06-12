@@ -1451,7 +1451,7 @@ module ChapelArray {
         compilerError("rank mismatch: cannot reindex() from " + this.rank:string +
                       " dimension(s) to " + newDomain.rank:string);
 
-       writeln("newDomain = ", newDomain);
+//       writeln("newDomain = ", newDomain);
        
        for param i in 0..rank-1 {
         if newDomain.dim(i).sizeAs(uint) != this.domain.dim(i).sizeAs(uint) then
@@ -1518,16 +1518,12 @@ module ChapelArray {
     proc reindex(newDims: range(bounds=boundKind.both, ?)...)
       where this.domain.isRectangular()
     {
-      for param i in 0..newDims.size-1 do
-        if !isRange(newDims(i)) then
-          compilerError("cannot reindex() a rectangular array to a tuple containing non-ranges");
-
       pragma "no auto destroy"
       const updom = {(...newDims)};
 
       return this.reindex(updom);
     }    
-
+/* creates ambiguiuty without saying newDims.bounds != boundKind.both
     pragma "fn returns aliasing array"
     @chpldoc.nodoc
     proc reindex(newDims: range(?)...)
@@ -1536,13 +1532,13 @@ module ChapelArray {
       compilerError("reindexing using ranges currently only supports bounded ranges");
       // TODO: But in the future, we could infer the missing bounds of unbounded ranges
     }    
-
+*/
     pragma "fn returns aliasing array"
     @chpldoc.nodoc
     proc reindex(newDims...)
       where this.domain.isRectangular()
     {
-      compilerError("the arguments to reindex() must be a domain or a list of ranges");
+      compilerError("the arguments to reindex() must be a single domain or a list of bounded ranges");
     }    
     
     // reindex for all non-rectangular domain types.

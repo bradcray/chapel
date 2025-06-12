@@ -522,7 +522,7 @@ module ArrayViewRankChange {
     forwarding arr except these,
                       doiBulkTransferFromKnown, doiBulkTransferToKnown,
                       doiBulkTransferFromAny,  doiBulkTransferToAny, doiScan,
-                      chpl__serialize, chpl__deserialize;
+                      chpl__serialize, chpl__deserialize, doiReindex;
 
 
 

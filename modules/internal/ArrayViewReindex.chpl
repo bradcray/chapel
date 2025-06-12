@@ -410,7 +410,7 @@ module ArrayViewReindex {
     forwarding arr except these,
                       doiBulkTransferFromKnown, doiBulkTransferToKnown,
                       doiBulkTransferFromAny,  doiBulkTransferToAny, doiScan,
-                      chpl__serialize, chpl__deserialize;
+                      chpl__serialize, chpl__deserialize, doiReindex;
 
     proc downdom: arr.dom.type {
       // TODO: This routine may get a remote domain if this is a view

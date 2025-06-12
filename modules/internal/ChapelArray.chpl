@@ -1443,7 +1443,7 @@ module ChapelArray {
           reA[6] = 1; // updates A[1]
     */
     pragma "fn returns aliasing array"
-    inline proc reindex(newDomain: domain)
+    inline proc reindex(newDomain: domain(?))
      where this.domain.isRectangular() && newDomain.isRectangular() {
       use Reflection;
 
@@ -1451,13 +1451,15 @@ module ChapelArray {
         compilerError("rank mismatch: cannot reindex() from " + this.rank:string +
                       " dimension(s) to " + newDomain.rank:string);
 
+       writeln("newDomain = ", newDomain);
+       
        for param i in 0..rank-1 {
         if newDomain.dim(i).sizeAs(uint) != this.domain.dim(i).sizeAs(uint) then
           halt("extent mismatch in dimension ", i+1, ": cannot reindex() from ",
                this.domain.dim(i), " to ", newDomain.dim(i));
         if ! noNegativeStrideWarnings && this.domain.dim(i).hasPositiveStride()
            && ! newDomain.dim(i).hasPositiveStride() then
-          warning("arrays and array slices with negatively-strided dimensions are currently unsupported and may lead to unexpected behavior; compile with -snoNegativeStrideWarnings to suppress this warning; in reindex() from ", this.domain.dim, " to ", newDomain);
+          warning("arrays and array slices with negatively-strided dimensions are currently unsupported and may lead to unexpected behavior; compile with -snoNegativeStrideWarnings to suppress this warning; in reindex() from ", this.domain, " to ", newDomain);
       }
 
       if canResolveMethod(this, "doiReindex", newDomain) {
@@ -1513,7 +1515,7 @@ module ChapelArray {
           reA[13,15] = 1; // updates A[3,5]
     */
     pragma "fn returns aliasing array"
-    proc reindex(newDims...)
+    proc reindex(newDims: range(bounds=boundKind.both, ?)...)
       where this.domain.isRectangular()
     {
       for param i in 0..newDims.size-1 do
@@ -1524,13 +1526,30 @@ module ChapelArray {
       const updom = {(...newDims)};
 
       return this.reindex(updom);
-    }
+    }    
 
+    pragma "fn returns aliasing array"
+    @chpldoc.nodoc
+    proc reindex(newDims: range(?)...)
+      where this.domain.isRectangular()
+    {
+      compilerError("reindexing using ranges currently only supports bounded ranges");
+      // TODO: But in the future, we could infer the missing bounds of unbounded ranges
+    }    
+
+    pragma "fn returns aliasing array"
+    @chpldoc.nodoc
+    proc reindex(newDims...)
+      where this.domain.isRectangular()
+    {
+      compilerError("the arguments to reindex() must be a domain or a list of ranges");
+    }    
+    
     // reindex for all non-rectangular domain types.
     // See above for the rectangular version.
     pragma "fn returns aliasing array"
     @chpldoc.nodoc
-    proc reindex(d:domain) {
+    proc reindex(d:domain(?)) {
       compilerError("Reindexing non-rectangular arrays is not permitted.");
     }
 

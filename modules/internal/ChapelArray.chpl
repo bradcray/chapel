@@ -1444,8 +1444,56 @@ module ChapelArray {
     */
     pragma "fn returns aliasing array"
     inline proc reindex(newDomain: domain)
-      where this.domain.isRectangular() && newDomain.isRectangular() do
-    return reindex((...newDomain.dims()));
+     where this.domain.isRectangular() && newDomain.isRectangular() {
+      use Reflection;
+
+      if this.rank != newDomain.rank then
+        compilerError("rank mismatch: cannot reindex() from " + this.rank:string +
+                      " dimension(s) to " + newDomain.rank:string);
+
+       for param i in 0..rank-1 {
+        if newDomain.dim(i).sizeAs(uint) != this.domain.dim(i).sizeAs(uint) then
+          halt("extent mismatch in dimension ", i+1, ": cannot reindex() from ",
+               this.domain.dim(i), " to ", newDomain.dim(i));
+        if ! noNegativeStrideWarnings && this.domain.dim(i).hasPositiveStride()
+           && ! newDomain.dim(i).hasPositiveStride() then
+          warning("arrays and array slices with negatively-strided dimensions are currently unsupported and may lead to unexpected behavior; compile with -snoNegativeStrideWarnings to suppress this warning; in reindex() from ", this.domain.dim, " to ", newDomain);
+      }
+
+      if canResolveMethod(this, "doiReindex", newDomain) {
+        return this.doiReindex(newDomain);
+      } else {
+      const redist = new unmanaged ArrayViewReindexDist(downDistPid = this.domain.distribution._pid,
+                                              downDistInst=this.domain.distribution._instance,
+                                              updom = newDomain._value,
+                                              downdomPid = this._value.dom.pid,
+                                              downdomInst = this._value.dom);
+      const redistRec = new _distribution(redist);
+      // redist._free_when_no_doms = true;
+
+      pragma "no copy"
+      pragma "no auto destroy"
+      const newDom = new _domain(redistRec, rank, newDomain.idxType,
+                                 newDomain.strides, newDomain.dims(),
+                                 definedConst=true);
+      newDom._value._free_when_no_arrs = true;
+
+      // TODO: With additional effort, we could collapse reindexings of
+      // reindexed array views to a single array view, similar to what
+      // we do for slices.
+      const (arr, arrpid) = (this._value, this._pid);
+
+      var x = new unmanaged ArrayViewReindexArr(eltType=this.eltType,
+                                      _DomPid = newDom._pid,
+                                      dom = newDom._instance,
+                                      _ArrPid=arrpid,
+                                      _ArrInstance=arr,
+                                      ownsArrInstance=false);
+      // this doesn't need to lock since we just created the domain d
+      newDom._value.add_arr(x, locking=false);
+      return _newArray(x);
+      }
+    }
 
     // The reason `newDims` arg is untyped is that it needs to allow
     // ranges of various types, ex. a mix of stridable and not.
@@ -1472,54 +1520,10 @@ module ChapelArray {
         if !isRange(newDims(i)) then
           compilerError("cannot reindex() a rectangular array to a tuple containing non-ranges");
 
-      if this.rank != newDims.size then
-        compilerError("rank mismatch: cannot reindex() from " + this.rank:string +
-                      " dimension(s) to " + newDims.size:string);
-
-      const dom = this._value.dom;
-      const origDims = dom.dsiDims();
-
-      for param i in 0..rank-1 {
-        if newDims(i).sizeAs(uint) != origDims(i).sizeAs(uint) then
-          halt("extent mismatch in dimension ", i+1, ": cannot reindex() from ",
-               origDims(i), " to ", newDims(i));
-        if ! noNegativeStrideWarnings && origDims(i).hasPositiveStride()
-           && ! newDims(i).hasPositiveStride() then
-          warning("arrays and array slices with negatively-strided dimensions are currently unsupported and may lead to unexpected behavior; compile with -snoNegativeStrideWarnings to suppress this warning; in reindex() from ", origDims, " to ", newDims);
-      }
-
       pragma "no auto destroy"
       const updom = {(...newDims)};
 
-      const redist = new unmanaged ArrayViewReindexDist(downDistPid = this.domain.distribution._pid,
-                                              downDistInst=this.domain.distribution._instance,
-                                              updom = updom._value,
-                                              downdomPid = dom.pid,
-                                              downdomInst = dom);
-      const redistRec = new _distribution(redist);
-      // redist._free_when_no_doms = true;
-
-      pragma "no copy"
-      pragma "no auto destroy"
-      const newDom = new _domain(redistRec, rank, updom.idxType,
-                                 updom.strides, updom.dims(),
-                                 definedConst=true);
-      newDom._value._free_when_no_arrs = true;
-
-      // TODO: With additional effort, we could collapse reindexings of
-      // reindexed array views to a single array view, similar to what
-      // we do for slices.
-      const (arr, arrpid) = (this._value, this._pid);
-
-      var x = new unmanaged ArrayViewReindexArr(eltType=this.eltType,
-                                      _DomPid = newDom._pid,
-                                      dom = newDom._instance,
-                                      _ArrPid=arrpid,
-                                      _ArrInstance=arr,
-                                      ownsArrInstance=false);
-      // this doesn't need to lock since we just created the domain d
-      newDom._value.add_arr(x, locking=false);
-      return _newArray(x);
+      return this.reindex(updom);
     }
 
     // reindex for all non-rectangular domain types.

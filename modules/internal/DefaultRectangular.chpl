@@ -2577,6 +2577,22 @@ module DefaultRectangular {
     return false;
   }
 
+  proc DefaultRectangularArr.doiReindex(dom: domain(?))
+  where dom._value.isDefaultRectangular() {
+//    writeln("In fast path");
+    var ret = new unmanaged DefaultRectangularArr(eltType=this.eltType,
+                                                  rank=dom.rank,
+                                                  idxType=dom.idxType,
+                                                  strides=dom.strides,
+                                                  dom=dom._value,
+                                                  data=this.data,
+                                                  externFreeFunc=nil,
+                                                  externArr=true,
+                                                  _borrowed=true);
+    dom._value.add_arr(ret, locking=false);
+    return _newArray(ret);
+  }
+  
   proc DefaultRectangularArr.doiSupportsReshape() param {
     return true;
   }

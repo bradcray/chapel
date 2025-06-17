@@ -1515,32 +1515,19 @@ module ChapelArray {
           reA[13,15] = 1; // updates A[3,5]
     */
     pragma "fn returns aliasing array"
-    proc reindex(newDims: range(bounds=boundKind.both, ?)...)
+    proc reindex(newDims...)
       where this.domain.isRectangular()
     {
+      for param i in 0..<newDims.size do
+        if !isRange(newDims(i)) || newDims(i).bounds != boundKind.both then
+          compilerError("the arguments to reindex() must be a single domain or a list of bounded ranges");
+
       pragma "no auto destroy"
       const updom = {(...newDims)};
 
       return this.reindex(updom);
     }    
-/* creates ambiguiuty without saying newDims.bounds != boundKind.both
-    pragma "fn returns aliasing array"
-    @chpldoc.nodoc
-    proc reindex(newDims: range(?)...)
-      where this.domain.isRectangular()
-    {
-      compilerError("reindexing using ranges currently only supports bounded ranges");
-      // TODO: But in the future, we could infer the missing bounds of unbounded ranges
-    }    
-*/
-    pragma "fn returns aliasing array"
-    @chpldoc.nodoc
-    proc reindex(newDims...)
-      where this.domain.isRectangular()
-    {
-      compilerError("the arguments to reindex() must be a single domain or a list of bounded ranges");
-    }    
-    
+
     // reindex for all non-rectangular domain types.
     // See above for the rectangular version.
     pragma "fn returns aliasing array"

@@ -24,7 +24,7 @@
 // sorted order (first by row and then by column).  The indices/coordinates are 0-based.
 //
 module DefaultSparse {
-  use ChapelStandard;
+  use ChapelStandard, ChapelLocks;
   import RangeChunk;
   use DSIUtil;
 
@@ -33,19 +33,33 @@ module DefaultSparse {
   config param defaultSparseSupportsAutoLocalAccess = true;
 
   class DefaultSparseDom: BaseSparseDomImpl(?) {
+    param parSafe: bool;
     var dist: unmanaged DefaultDist;
     var _nnz = 0;
 
     pragma "local field"
     var _indices: [nnzDom] index(rank, idxType);
 
+    // Since this is just the `DefaultSparseDom` we can use processor atomics
+    // since by design it is not a distributed data structure.
+    var _nnzAtomic: chpl__processorAtomicType(int);
+    var _indicesLock: if parSafe then chpl_LocalSpinlock else nothing;
+
+    inline proc lockIndices() {
+      if parSafe then _indicesLock.lock();
+    }
+
+    inline proc unlockIndices() {
+      if parSafe then _indicesLock.unlock();
+    }
+
     override proc linksDistribution() param do return false;
     override proc dsiLinksDistribution() do return false;
 
     proc init(param rank, type idxType, dist: unmanaged DefaultDist,
-        parentDom: domain) {
+        parentDom: domain, param parSafe: bool) {
       super.init(rank, idxType, parentDom);
-
+      this.parSafe = parSafe;
       this.dist = dist;
     }
 
@@ -145,7 +159,7 @@ module DefaultSparse {
       return found;
     }
 
-    proc parSafe param { dnsError("parSafe"); }
+    // proc parSafe param { dnsError("parSafe"); }
 
     override proc dsiFirst {
       if boundsChecking && _indices.isEmpty() then
@@ -238,27 +252,59 @@ module DefaultSparse {
     }
 
     proc dsiAdd(ind: idxType) where rank == 1 {
-      return add_help(ind);
+      var retVal = 0;
+      on this {
+        lockIndices();
+        defer {
+          unlockIndices();
+        }
+        retVal = add_help(ind);
+      }
+      return retVal;
     }
 
     proc dsiRemove(ind: idxType) where rank == 1 {
-      return rem_help(ind);
+      var retVal = 0;
+      on this {
+        lockIndices();
+        defer {
+          unlockIndices();
+        }
+        retVal = rem_help(ind);
+      }
+      return retVal;
     }
 
     proc dsiAdd(ind: rank*idxType) {
-      if (rank == 1) {
-        return add_help(ind(0));
-      } else {
-        return add_help(ind);
+      var retVal = 0;
+      on this {
+        lockIndices();
+        defer {
+          unlockIndices();
+        }
+        if (rank == 1) {
+          retVal = add_help(ind(0));
+        } else {
+          retVal = add_help(ind);
+        }
       }
+      return retVal;
     }
 
     proc dsiRemove(ind: rank*idxType) {
-      if (rank == 1) {
-        return rem_help(ind(0));
-      } else {
-        return rem_help(ind);
+      var retVal = 0;
+      on this {
+        lockIndices();
+        defer {
+          unlockIndices();
+        }
+        if (rank == 1) {
+          retVal = rem_help(ind(0));
+        } else {
+          retVal = rem_help(ind);
+        }
       }
+      return retVal;
     }
 
     // this returns the position for the last sparse index added

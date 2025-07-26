@@ -109,9 +109,9 @@ module CompressedSparseLayout {
     }
 
     override proc dsiNewSparseDom(param rank: int, type idxType,
-                                  dom: domain(?)) {
+                                  dom: domain(?), param parSafe: bool) {
       return new unmanaged CSDom(rank, idxType, this.compressRows,
-                                 this.sortedIndices, dom.strides,
+                                 this.sortedIndices, dom.strides, parSafe,
                                  _to_unmanaged(this), dom);
     }
 
@@ -137,8 +137,8 @@ module CompressedSparseLayout {
   record chpl_layoutHelper {
     forwarding var _value;
 
-    proc newSparseDom(param rank: int, type idxType, dom: domain(?)) {
-      var x = _value.dsiNewSparseDom(rank, idxType, dom);
+    proc newSparseDom(param rank: int, type idxType, dom: domain(?), param parSafe: bool) {
+      var x = _value.dsiNewSparseDom(rank, idxType, dom, parSafe);
       if x.linksDistribution() {
         _value.add_dom(x);
       }
@@ -268,6 +268,7 @@ module CompressedSparseLayout {
     param compressRows;
     param sortedIndices;
     param strides;
+    param parSafe: bool;
     var dist: unmanaged CSImpl(compressRows,sortedIndices);
 
     var rowRange: range(idxType, strides=strides);
@@ -287,7 +288,7 @@ module CompressedSparseLayout {
 
     /* Initializer */
     proc init(param rank, type idxType, param compressRows,
-              param sortedIndices, param strides,
+              param sortedIndices, param strides, param parSafe: bool,
               dist: unmanaged CSImpl(compressRows,sortedIndices),
               parentDom: domain(?)) {
       if (rank != 2 || parentDom.rank != 2) then
@@ -300,6 +301,7 @@ module CompressedSparseLayout {
       this.compressRows = compressRows;
       this.sortedIndices = sortedIndices;
       this.strides      = strides;
+      this.parSafe = parSafe;
 
       this.dist = dist;
       rowRange = parentDom.dim(0);

@@ -109,8 +109,8 @@ module DefaultRectangular {
     override proc dsiNewAssociativeDom(type idxType, param parSafe: bool) do
       return new unmanaged DefaultAssociativeDom(idxType, parSafe, _to_unmanaged(this));
 
-    override proc dsiNewSparseDom(param rank: int, type idxType, dom: domain) do
-      return new unmanaged DefaultSparseDom(rank, idxType, _to_unmanaged(this), dom);
+    override proc dsiNewSparseDom(param rank: int, type idxType, dom: domain, param parSafe: bool) do
+      return new unmanaged DefaultSparseDom(rank, idxType, _to_unmanaged(this), dom, parSafe);
 
     proc dsiTargetLocales() const ref do
       return chpl_getSingletonLocaleArray(this.locale);

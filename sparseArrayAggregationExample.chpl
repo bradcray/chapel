@@ -21,7 +21,8 @@ var timer:stopwatch;
 
 // The dense space
 const Space = {1..N, 1..N};
-const DenseDom = Space dmapped new blockDist(Space);
+const LocalDomain: domain(2) = Space;
+const DenseDom = blockDist.createDomain(LocalDomain);
 
 // Creating sparse domains and arrays for two use cases
 var SparseDomNoAgg: sparse subdomain(DenseDom);

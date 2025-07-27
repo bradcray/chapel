@@ -61,6 +61,7 @@ module DefaultSparse {
       super.init(rank, idxType, parentDom);
       this.parSafe = parSafe;
       this.dist = dist;
+      writeln("parSafe = ", parSafe);
     }
 
     override proc getNNZ(): int{

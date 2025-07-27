@@ -1,4 +1,5 @@
 use BlockDist;
+use CompressedSparseLayout;
 use CTypes;
 use IO.FormattedIO;
 use Time;
@@ -21,12 +22,11 @@ var timer:stopwatch;
 
 // The dense space
 const Space = {1..N, 1..N};
-const LocalDomain: domain(2) = Space;
-const DenseDom = blockDist.createDomain(LocalDomain);
+const DenseDom = blockDist.createDomain(Space);
 
 // Creating sparse domains and arrays for two use cases
-var SparseDomNoAgg: sparse subdomain(DenseDom);
-var SparseDomAgg: sparse subdomain(DenseDom);
+var SparseDomNoAgg: sparse subdomain(DenseDom) dmapped new csrLayout(parSafe=true);
+var SparseDomAgg: sparse subdomain(DenseDom) dmapped new csrLayout(parSafe=true);
 
 var SparseArrNoAgg: [SparseDomNoAgg] int;
 var SparseArrAgg: [SparseDomAgg] int;
@@ -58,7 +58,7 @@ forall (i,v) in zip(vals.domain, vals) do v = i + 1;
 timer.start();
 
 // Note: Will currently only work with CHPL_RT_NUM_THREADS_PER_LOCALE=1
-forall (i,j) in zip(rowIdx,colIdx) with (var idxBuf = SparseDomNoAgg.createIndexBuffer(idxBufSize)) do
+forall (i,j) in zip(rowIdx,colIdx) with (var idxBuf = SparseDomNoAgg.createIndexBuffer(idxBufSize,true,true)) do
 	idxBuf.add((i,j));
 forall (i,j,v) in zip(rowIdx,colIdx,vals) with (ref SparseArrNoAgg) do
 	SparseArrNoAgg[i,j] = v;
@@ -78,8 +78,8 @@ class DestinationHandler {
   }
 
   inline proc flush(ref rBuffer, const ref remBufferPtr, const ref myBufferIdx) {
-    const (found, locid) = domVal.dist.chpl__locToLocIdx(here);
-    var locIdxBuf = domVal.locDoms[locid]!.mySparseBlock.createIndexBuffer(idxBufSize,true,true);
+    const (found, locid) = domVal.parentDom.distribution.chpl__locToLocIdx(here);
+    var locIdxBuf = domVal.createIndexBuffer(idxBufSize,true,true);
     for (dstAddr, srcVal) in rBuffer.localIter(remBufferPtr, myBufferIdx) {
       assert(dstAddr == nil);
       var (i,j,_) = srcVal;
@@ -89,7 +89,8 @@ class DestinationHandler {
     for (dstAddr, srcVal) in rBuffer.localIter(remBufferPtr, myBufferIdx) {
       assert(dstAddr == nil);
       var (i,j,v) = srcVal;
-      this.arrVal.locArr[locid]!.myElems[i,j] = v;
+      var (_,loc) = this.domVal.find((i,j));
+      this.arrVal.data[loc] = v;
     }
   }
 }
@@ -109,9 +110,8 @@ class SourceHandler {
   }
 
   proc getDestinationLocale(val: elemType) {
-    // Since elemType is a tuple of (i,j,v) then we only need (i,j)
     var (i,j,_) = val;
-    return domVal.dist.dsiIndexToLocale((i,j));
+    return domVal.parentDom.distribution.dsiIndexToLocale((i,j));
   }
 }
 timer.restart();

@@ -119,8 +119,8 @@ module ChapelDistribution {
       return x;
     }
 
-    proc newSparseDom(param rank: int, type idxType, dom: domain, param parSafe: bool) {
-      var x = _value.dsiNewSparseDom(rank, idxType, dom, parSafe);
+    proc newSparseDom(param rank: int, type idxType, dom: domain) {
+      var x = _value.dsiNewSparseDom(rank, idxType, dom);
       if x.linksDistribution() {
         _value.add_dom(x);
       }
@@ -256,7 +256,7 @@ module ChapelDistribution {
     }
 
     pragma "last resort" @chpldoc.nodoc
-    proc dsiNewSparseDom(param rank: int, type idxType, dom: domain, param parSafe: bool) {
+    proc dsiNewSparseDom(param rank: int, type idxType, dom: domain) {
       compilerError("sparse domains not supported by this distribution");
     }
 

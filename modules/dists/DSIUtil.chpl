@@ -779,8 +779,8 @@ record chpl_PrivatizedDistHelper : writeSerializable {
     return x;
   }
 
-  proc newSparseDom(param rank: int, type idxType, dom: domain, param parSafe: bool) {
-    var x = _value.dsiNewSparseDom(rank, idxType, dom, parSafe);
+  proc newSparseDom(param rank: int, type idxType, dom: domain) {
+    var x = _value.dsiNewSparseDom(rank, idxType, dom);
     if x.linksDistribution() {
       _value.add_dom(x);
     }

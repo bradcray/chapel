@@ -122,23 +122,21 @@ module ChapelDomain {
 
   pragma "runtime type init fn"
   proc chpl__buildSparseDomainRuntimeType(dist,
-                                          parentDom: domain,
-                                          param parSafe: bool = false) type {
+                                          parentDom: domain) type {
     if ! isUltimatelyRectangularParent(parentDom) then
       compilerError("sparse subdomains are currently supported only for " +
                     "rectangular domains");
 
-    return new _domain(dist, parentDom, parSafe);
+    return new _domain(dist, parentDom);
   }
 
-  proc chpl__buildSparseDomainRuntimeTypeForParentDomain(parentDom, param parSafe:bool = false) type {
+  proc chpl__buildSparseDomainRuntimeTypeForParentDomain(parentDom) type {
     if ! isDomain(parentDom) then
       compilerError("building a sparse subdomain of a non-domain value",
                     " of type ", parentDom.type: string);
 
     return chpl__buildSparseDomainRuntimeType(parentDom.defaultSparseDist,
-                                              parentDom,
-                                              parSafe);
+                                              parentDom);
   }
 
   proc chpl__buildSparseDomainRuntimeTypeForParentDomain(type parentDom) {
@@ -164,10 +162,9 @@ module ChapelDomain {
 
   proc chpl__convertRuntimeTypeToValue(dist,
                                        parentDom: domain,
-                                       param parSafe: bool,
                                        param isNoInit: bool,
                                        definedConst: bool) {
-    return new _domain(dist, parentDom, parSafe);
+    return new _domain(dist, parentDom);
   }
 
   proc chpl__convertValueToRuntimeType(dom: domain) type
@@ -183,7 +180,7 @@ module ChapelDomain {
 
   proc chpl__convertValueToRuntimeType(dom: domain) type
    where isSubtype(dom._value.type, BaseSparseDom) {
-    return chpl__buildSparseDomainRuntimeType(dom.distribution, dom._value.parentDom, dom._value.parSafe);
+    return chpl__buildSparseDomainRuntimeType(dom.distribution, dom._value.parentDom);
   }
 
   proc chpl__convertValueToRuntimeType(dom: domain) type {
@@ -1124,9 +1121,8 @@ module ChapelDomain {
     @chpldoc.nodoc
     proc init(d,
               dom: domain,
-              param parSafe: bool = false,
               definedConst: bool = false) {
-      this.init(d.newSparseDom(dom.rank, dom._value.idxType, dom, parSafe));
+      this.init(d.newSparseDom(dom.rank, dom._value.idxType, dom));
     }
 
     // Note: init= does not handle the case where the type of 'this' does not

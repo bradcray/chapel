@@ -196,6 +196,10 @@ static void removeRandomPrimitive(CallExpr* call) {
       const char* memberName = NULL;
       Symbol* sym = NULL;  // the member symbol
 
+      if (call->id == 8261002) {
+        printf("Found my call!\n");
+      }
+      
       if (get_string(memberSE, &memberName)) {
         sym = baseType->getField(memberName);
         SET_LINENO(memberSE);

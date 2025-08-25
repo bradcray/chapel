@@ -5,7 +5,13 @@
 
 int main(int argc, char* argv[]) {
   MPI_Init(&argc, &argv);
-  chpl_library_init(argc, argv);
+
+  char* chpl_argv[3];
+  chpl_argv[0] = argv[0];
+  chpl_argv[1] = "-nl4";
+  chpl_argv[2] = "";
+
+  chpl_library_init(2, chpl_argv);
   chpl__init_ChapelHello(0, 0);
 
   int rank, size;

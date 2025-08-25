@@ -167,7 +167,7 @@ CHPL_MLI_CPPLIB="-lstdc++"
 endif
 
 printmultilocalelibdeps:
-	@echo "-L$(CHPL_MLI_LN_LIB_DIR) -lchpllaunch $(CHPL_MLI_CPPLIB) -lzmq"
+	@echo "-L$(CHPL_MLI_LN_LIB_DIR) $(CHPL_MLI_CPPLIB) -lzmq"
 
 checkRtLibDir:
 ifeq ($(wildcard $(CHPL_RT_LIB_DIR)),)

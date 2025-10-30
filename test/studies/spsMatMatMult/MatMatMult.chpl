@@ -64,7 +64,7 @@ module MatMatMult {
     time.start();
 
     class Box {
-      forwarding var val;
+      var val;
     }
 
     coforall (locRow, locCol) in targLocs.domain {

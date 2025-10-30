@@ -45,27 +45,51 @@ module MatMatMult {
 
   proc sparseMatMatMult(A, B) where (!A.chpl_isNonDistributedArray() &&
                                      !B.chpl_isNonDistributedArray()) {
+    use Math;
+
     var CD = emptySparseDomLike(B);  // For now, hard-code C to use CSR, like B
     var C: [CD] int;
 
     ref targLocs = A.targetLocales();
-  
-    if (targLocs.dim(0) != targLocs.dim(1)) {
-      halt("sparseMatMatMult() currently assumes a square target locale array");
-    }
-    
-    const numBlocks = targLocs.dim(0).size;
+
+    const locRows = targLocs.dim(0).size,
+          locCols = targLocs.dim(1).size,
+          numBlocks = if locRows == locCols then locRows
+                                            else lcm(locRows, locCols),
+          blocksPerLocRow = numBlocks / locRows,
+          blocksPerLocCol = numBlocks / locCols;
 
     if countComms then startCommDiagnostics();
     var time: stopwatch;
     time.start();
+
+    class Box {
+      forwarding var val;
+    }
 
     coforall (locRow, locCol) in targLocs.domain {
       on targLocs[locRow, locCol] {
 
         var spsData: sparseMatDat;
 
-        for loc in targLocs.dim(0) {
+        // pre-populate the A and B boxes for iter 0 to get the types right
+        var aBlkBox = new Box(A.getLocalSubarray(locRow, 0)),
+            bBlkBox = new Box(B.getLocalSubarray(0, locCol));
+
+        for blk in 0..<numBlocks {
+          if blk {  // skip blk == 0 because we've done that above
+            if blk % blocksPerLocRow == 0 {
+              const srcLocCol = ((blk/blocksPerLocCol) + locCol)%locCols;
+              writef("[%i,%i] In iteration %i, time to get a new A block from (%i.%i)\n", locRow, locCol, blk, locRow, srcLocCol);
+              aBlkBox = new Box(A.getLocalSubarray(locRow, srcLocCol));
+            }
+            if blk % blocksPerLocCol == 0 {
+              const srcLocRow = ((blk/blocksPerLocRow) + locRow)%locRows;
+              writef("[%i,%i] In iteration %i, time to get a new A block from (%i.%i)\n", locRow, locCol, blk, srcLocRow, locCol);
+              bBlkBox = new Box(B.getLocalSubarray(srcLocRow, locCol));
+            }
+          }
+          /*
           // Skew the row/col we access to avoid communication bottlenecks
           const srcloc = (loc + locRow)%numBlocks;
 
@@ -81,6 +105,7 @@ module MatMatMult {
           local {
             sparseMatMatMult(aBlk, bBlk, spsData);
           }
+*/
         }
 
         // Get my locale's local indices and create a sparse matrix

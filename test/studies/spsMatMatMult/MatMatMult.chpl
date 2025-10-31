@@ -37,10 +37,25 @@ module MatMatMult {
   // the multiplication is the first/only step.
   //
   proc sparseMatMatMult(A, B, ref spsData) {
-    forall ac_br in A.cols() with (merge reduce spsData) do
+    sparseMatMatMult(A, B, A.cols(), spsData);
+  }
+
+  proc sparseMatMatMult(A, B, inds, ref spsData) {
+    //    forall ac_br in inds with (merge reduce spsData) do {
+    for ac_br in inds {
+      writeln((A.domain.rowRange, A.domain.colRange));
       for (ar, a) in A.rowsAndVals(ac_br) do
         for (bc, b) in B.colsAndVals(ac_br) do
           spsData.add((ar, bc), a * b);
+    }
+  }
+  
+  class Box {
+    const val;
+
+    proc init(in x) {
+      this.val = x;
+    }
   }
 
   proc sparseMatMatMult(A, B) where (!A.chpl_isNonDistributedArray() &&
@@ -63,32 +78,36 @@ module MatMatMult {
     var time: stopwatch;
     time.start();
 
-    class Box {
-      var val;
-    }
-
-    coforall (locRow, locCol) in targLocs.domain {
+    // TODO: re-enable coforall
+    //    coforall (locRow, locCol) in targLocs.domain {
+    for (locRow, locCol) in targLocs.domain {
       on targLocs[locRow, locCol] {
 
         var spsData: sparseMatDat;
 
+        writef("[%i,%i] Starting with A block (%i.%i)\n", locRow, locCol, locRow, 0);
+        writef("[%i,%i] Starting with B block (%i.%i)\n", locRow, locCol, 0, locCol);
         // pre-populate the A and B boxes for iter 0 to get the types right
-        var aBlkBox = new Box(A.getLocalSubarray(locRow, 0)),
-            bBlkBox = new Box(B.getLocalSubarray(0, locCol));
+        var aBlkBox = new Box(A.getLocalSubarray(locRow, locCol)),
+            bBlkBox = new Box(B.getLocalSubarray(locRow, locCol));
 
         for blk in 0..<numBlocks {
           if blk {  // skip blk == 0 because we've done that above
-            if blk % blocksPerLocRow == 0 {
-              const srcLocCol = ((blk/blocksPerLocCol) + locCol)%locCols;
+            if blk % blocksPerLocCol == 0 {
+              const srcLocCol = (blk/blocksPerLocCol)%locCols;
               writef("[%i,%i] In iteration %i, time to get a new A block from (%i.%i)\n", locRow, locCol, blk, locRow, srcLocCol);
               aBlkBox = new Box(A.getLocalSubarray(locRow, srcLocCol));
             }
-            if blk % blocksPerLocCol == 0 {
-              const srcLocRow = ((blk/blocksPerLocRow) + locRow)%locRows;
-              writef("[%i,%i] In iteration %i, time to get a new A block from (%i.%i)\n", locRow, locCol, blk, srcLocRow, locCol);
+            if blk % blocksPerLocRow == 0 {
+              const srcLocRow = (blk/blocksPerLocRow)%locRows;
+              writef("[%i,%i] In iteration %i, time to get a new B block from (%i.%i)\n", locRow, locCol, blk, srcLocRow, locCol);
               bBlkBox = new Box(B.getLocalSubarray(srcLocRow, locCol));
             }
           }
+          use DSIUtil;
+          const inds = _computeBlock(A.dim(0).size, numBlocks, blk, A.dim(0).high, A.dim(0).low, A.dim(0).low);
+          writef("[%i,%i] In iteration %i, computing on inds %i..%i\n", locRow, locCol, blk, inds(0), inds(1));
+                                     
           /*
           // Skew the row/col we access to avoid communication bottlenecks
           const srcloc = (loc + locRow)%numBlocks;
@@ -102,10 +121,12 @@ module MatMatMult {
 
           // This local block is not strictly necessary but ensures that the
           // computation on the blocks will not require communication
-          local {
-            sparseMatMatMult(aBlk, bBlk, spsData);
-          }
 */
+          writeln((aBlkBox.locale.id, aBlkBox.val.locale.id));
+          // TODO: re-enble local block
+//          local {
+            sparseMatMatMult(aBlkBox.val, bBlkBox.val, inds(0)..inds(1), spsData);
+//          }
         }
 
         // Get my locale's local indices and create a sparse matrix

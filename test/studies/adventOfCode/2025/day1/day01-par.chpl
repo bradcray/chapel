@@ -2,6 +2,8 @@ use ParallelIO;
 
 config const filename = "day01.in";
 
+enum dir {L=-1, R=1};
+
 const numSettings = 100;
 
 const strs = readLines(filename),
@@ -13,6 +15,5 @@ const strs = readLines(filename),
 writeln(zeroes);
 
 proc strToStep(str: string) {
-  const val = str[1..]: int;
-  return if str[0] == 'L' then -val else val;
+  return str[0]:dir:int * str[1..]:int;
 }

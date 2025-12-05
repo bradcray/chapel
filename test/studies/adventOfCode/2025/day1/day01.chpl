@@ -1,5 +1,7 @@
 use IO;
 
+enum dir {L=-1, R=1};
+
 const numSettings = 100;
 
 var setting = 50,
@@ -10,12 +12,7 @@ while readln(str) {
   // get step size
   const step = str[1..]: int;
 
-  // see if we're turning right or left
-  if str[0] == 'R' {
-    setting += step;
-  } else {
-    setting -= step;
-  }
+  setting += str[0]:dir:int * step;
 
   // Though it's tempting to use 'setting %= numSettings;' here, that
   // doesn't treat negative numbers in a mathematically correct

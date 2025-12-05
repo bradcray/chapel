@@ -14,6 +14,6 @@ const strs = readLines(filename),
 
 writeln(zeroes);
 
-proc strToStep(str: string) {
-  return str[0]:dir:int * str[1..]:int;
-}
+// convert the first character to dir.L or .R and then to its 'int' value
+// convert the rest of the characters to an 'int'
+proc strToStep(str: string) do return str[0]:dir:int * str[1..]:int;

@@ -963,6 +963,7 @@ module CompressedSparseLayout {
   @chpldoc.nodoc
   iter CSArr.indsAndVals(rc) {
     ref dom = this.dom;
+    writeln((here.id,this.dom.locale.id,dom.idx.locale.id,this.data.locale.id, dom.startIdx.locale.id));
     for uid in dom.uidsInRowCol(rc) do
       yield (dom.idx[uid], this.data[uid]);
   }
@@ -977,8 +978,10 @@ module CompressedSparseLayout {
 
   @chpldoc.nodoc
   iter CSArr.rowsAndVals(c) {
+    writeln("In rowsAndVals");
     if this.dom.compressRows == true then
       compilerError("Can't (efficiently) iterate over columns using a CSR layout");
+    writeln("About to loop");
     for rowVal in indsAndVals(c) do
       yield rowVal;
   }

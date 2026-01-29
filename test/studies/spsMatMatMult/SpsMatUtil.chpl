@@ -56,14 +56,18 @@ module SpsMatUtil {
 
   proc randSparseDomain(parentDom, density, param layout, param distributed)
    where distributed == true {
-    const locsPerDim = sqrt(numLocales:real): int,
+/*
+     const locsPerDim = sqrt(numLocales:real): int,
           grid = {0..<locsPerDim, 0..<locsPerDim},
           localeGrid = reshape(Locales[0..<grid.size], grid);
+*/
 
 
+     /*
     if grid.size != numLocales then
       writeln("Warning: Only using ", grid.size, " of ", numLocales,
               " locales");
+*/
 
     // writeln(grid);
 
@@ -71,7 +75,7 @@ module SpsMatUtil {
     //   test/type/records/generic/typeAliasFullyDefaultedGeneric.chpl
     type layoutType = if layout==CSR then csrLayout() else cscLayout();
     const DenseBlkDom = parentDom dmapped new blockDist(boundingBox=parentDom,
-                                                  targetLocales=localeGrid,
+//                                                  targetLocales=localeGrid,
                                                   sparseLayoutType=layoutType);
 
     var SD: sparse subdomain(DenseBlkDom);

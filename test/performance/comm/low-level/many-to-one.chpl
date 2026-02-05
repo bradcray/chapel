@@ -19,6 +19,11 @@ use op_t;
 
 config param op = opNone;
 config param opNeedsTask = (op == opOn);
+config param enableSplits = true;
+
+config const splitStep = 250;
+config const maxOps = 2000;
+const numSplits = maxOps/splitStep;
 
 const numWorkerNodes = numLocales - 2;
 config const numTasksPerNode = min reduce ([i in 0..#numLocales]
@@ -109,11 +114,13 @@ proc main() {
 
         coforall taskIdx in 1..numTasksPerNode with (ref x, ref xAtomic, ref numOpsOnTasks, ref timeOnTasks, ref numOpsOnNodes, ref timeOnNodes) {
 
-          var nopsAtCheck = minOpsPerTimerCheck;
+          var nopsAtCheck = splitStep;
           var nops: int;
 
           var t: stopwatch;
-          var tElapsed, split1, split2: real;
+          var tElapsed: real;
+          var split: [1..numSplits] real;
+          var splitNum = 0;
 
           allLocalesBarrier.barrier();
 
@@ -128,28 +135,33 @@ proc main() {
             if nops == nopsAtCheck {
               tElapsed = t.elapsed();
 
-              if nops == minOpsPerTimerCheck {
-                split1 = tElapsed;
-              } else if nops == 2*minOpsPerTimerCheck {
-                split2 = tElapsed;
+              if enableSplits {
+                splitNum += 1;
+                
+                split[splitNum] = tElapsed;
+                if locIdx==2 && taskIdx==1 then
+                  writeln((nops, nopsAtCheck, splitNum));
               }
 
-              if tElapsed >= runSecs then break;
-              if tElapsed * 2 < runSecs then
-                // if we've used less than half the time, run as many ops again
-                nopsAtCheck *= 2;
-              else
-                // otherwise, scale what we've done by the fraction of time
-                // remaining
-                nopsAtCheck += max(1, (nops * ((runSecs/tElapsed) - 1.0)): int);
+              if tElapsed >= runSecs || nops >= maxOps then break;
 
+              nopsAtCheck += splitStep;
             }
             doOneOp(nops, x, xAtomic);
             nops += 1;
           }
-          if printSplits {
+          if enableSplits && printSplits {
+
+            for i in split.domain by -1 do
+              if i != 1 then
+                split[i] -= split[i-1];
+
+            
             extern proc printf(x...);
-            printf("[%ld,%ld] splits=(%lf, %lf)\n", locIdx, taskIdx, split1, split2);
+            printf("[%ld,%ld] splits=[", locIdx, taskIdx);
+            for s in split do
+              printf("%lf, ", s);
+            printf("]\n");
           }
 
           numOpsOnTasks(taskIdx) = nops;

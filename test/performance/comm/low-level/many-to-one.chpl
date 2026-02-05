@@ -159,7 +159,7 @@ proc main() {
             extern proc printf(fmt, x...);
             extern proc sprintf(str, fmt, x...);
             var str: [0..1023] c_char;
-            sprintf(c_ptrTo(str), "[%ld,%ld] splits=[", locIdx, taskIdx);
+            sprintf(c_ptrTo(str), "[%2ld,%3ld] splits=[", locIdx, taskIdx);
             for s in split do
               sprintf(c_ptrTo(str), "%s %lf,", c_ptrTo(str), s);
             printf("%s]\n", c_ptrTo(str));

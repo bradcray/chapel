@@ -139,8 +139,6 @@ proc main() {
                 splitNum += 1;
                 
                 split[splitNum] = tElapsed;
-                if locIdx==2 && taskIdx==1 then
-                  writeln((nops, nopsAtCheck, splitNum));
               }
 
               if tElapsed >= runSecs || nops >= maxOps then break;
@@ -156,12 +154,15 @@ proc main() {
               if i != 1 then
                 split[i] -= split[i-1];
 
+            use CTypes;
             
-            extern proc printf(x...);
-            printf("[%ld,%ld] splits=[", locIdx, taskIdx);
+            extern proc printf(fmt, x...);
+            extern proc sprintf(str, fmt, x...);
+            var str: [0..1023] c_char;
+            sprintf(c_ptrTo(str), "[%ld,%ld] splits=[", locIdx, taskIdx);
             for s in split do
-              printf("%lf, ", s);
-            printf("]\n");
+              sprintf(c_ptrTo(str), "%s %lf,", c_ptrTo(str), s);
+            printf("%s]\n", c_ptrTo(str));
           }
 
           numOpsOnTasks(taskIdx) = nops;

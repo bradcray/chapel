@@ -1515,12 +1515,35 @@ module ChapelArray {
           reA[13,15] = 1; // updates A[3,5]
     */
     pragma "fn returns aliasing array"
-    proc reindex(newDims...)
+    proc reindex(argDims...)
       where this.domain.isRectangular()
     {
-      for param i in 0..<newDims.size do
-        if !isRange(newDims(i)) || newDims(i).bounds != boundKind.both then
-          compilerError("the arguments to reindex() must be a single domain or a list of bounded ranges");
+      for param i in 0..<argDims.size do
+        if !isRange(argDims(i)) then
+          compilerError("cannot reindex() an array using non-range/-domain arguments");
+
+      type idxType = argDims(0).idxType;
+      param strides = argDims(0).strides;
+
+      for param i in 0..<argDims.size {
+        if argDims(i).idxType != idxType then
+          compilerError("ranges passed to 'reindex()' must currently have matching idxType\n(", idxType:string, " in dimension 0 doesn't match ", argDims(i).idxType:string, " in dimension ", i);
+        if argDims(i).strides != strides then
+          compilerError("ranges passed to 'reindex()' must currently have matching strideKinds\n(", strides:string, " in dimension 0 doesn't match ", argDims(i).strides:string, " in dimension ", i);
+      }
+
+      var newDims: argDims.size*range(idxType,
+                                      bounds=boundKind.both,
+                                      strides = strides);
+
+      for i in 0..<argDims.size {
+        select argDims(i).bounds {
+          when boundKind.both do newDims(i) = argDims(i);
+          when boundKind.low do newDims(i) = argDims(i)#this.domain.dim(i).size;
+          when boundKind.high do newDims(i) = argDims(i)#this.domain.dim(i).size;
+          when boundKind.neither do newDims(i) = this.domain.dim(i);
+        }
+      }
 
       pragma "no auto destroy"
       const updom = {(...newDims)};

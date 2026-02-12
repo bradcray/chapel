@@ -539,6 +539,7 @@ static DefaultExprFnEntry buildDefaultedActualFn(FnSymbol*  fn,
   ret.defaultExprFn = wrapper;
 
   wrapper->addFlag(FLAG_INVISIBLE_FN);
+  wrapper->addFlag(FLAG_INLINE);
   wrapper->addFlag(FLAG_LINE_NUMBER_OK);
   wrapper->retTag = RET_VALUE;
 

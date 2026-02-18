@@ -2596,6 +2596,21 @@ module DefaultRectangular {
     return _newArray(ret);
   }
 
+  proc DefaultRectangularArr.doiReindex(dom: domain(?))
+   where dom._value.isDefaultRectangular() {
+    var ret = new unmanaged DefaultRectangularArr(eltType=this.eltType,
+                                                  rank = dom.rank,
+                                                  idxType=dom.idxType,
+                                                  strides=dom.strides,
+                                                  dom=dom._value,
+                                                  data=this.data,
+                                                  externFreeFunc=nil,
+                                                  externArr=true,
+                                                  _borrowed=true);
+    dom._value.add_arr(ret, locking = false);
+    return _newArray(ret);
+  }
+
   // A helper routine to take the first parallel scan over a vector
   // yielding the number of tasks used, the ranges computed by each
   // task, and the scanned results of each task's scan.  This is

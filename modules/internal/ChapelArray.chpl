@@ -1435,10 +1435,11 @@ module ChapelArray {
          :start-after: START_EXAMPLE_0
          :end-before: STOP_EXAMPLE_0
     */
+    pragma "no promotion when by ref"
     pragma "fn returns aliasing array"
     inline proc reindex(newDomain: domain)
       where this.domain.isRectangular() && newDomain.isRectangular() do
-    return reindex((...newDomain.dims()));
+    return this.chpl_reindex(newDomain);
 
     // The reason `newDims` arg is untyped is that it needs to allow
     // ranges of various types, ex. a mix of stridable and not.
@@ -1456,10 +1457,27 @@ module ChapelArray {
          :start-after: START_EXAMPLE_1
          :end-before: STOP_EXAMPLE_1
     */
+    pragma "no promotion when by ref"
     pragma "fn returns aliasing array"
     proc reindex(newDims...)
-      where this.domain.isRectangular()
-    {
+      where this.domain.isRectangular() do
+        return this.chpl_reindex(if newDims.size == 1 then {newDims(0), }
+                                                      else {(...newDims)});
+
+    pragma "no promotion when by ref"
+    pragma "reference to const when const this"
+    pragma "fn returns aliasing array"
+    @chpldoc.nodoc
+    proc chpl_reindex(dom)
+      where Reflection.canResolveMethod(this._value, "doiReindex", dom) {
+        writeln("Using doiReindex");
+      return this._value.doiReindex(dom);
+    }
+
+    /*
+    pragma "no promotion when by ref"
+    pragma "fn returns aliasing array"
+    proc chpl_reindex(newDims...) {
       for param i in 0..newDims.size-1 do
         if !isRange(newDims(i)) then
           compilerError("cannot reindex() a rectangular array to a tuple containing non-ranges");
@@ -1513,6 +1531,7 @@ module ChapelArray {
       newDom._value.add_arr(x, locking=false);
       return _newArray(x);
     }
+*/
 
     // reindex for all non-rectangular domain types.
     // See above for the rectangular version.

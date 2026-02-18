@@ -756,6 +756,12 @@ module ChapelArray {
     return false;
   }
 
+  // TODO: remove me
+  proc chpl__tupToDomain(newDims) {
+    const dom = if newDims.size == 1 then {newDims(0), } else {(...newDims)};
+    return dom;
+  }
+
   // Array wrapper record
   pragma "array"
   pragma "has runtime type"
@@ -1438,8 +1444,8 @@ module ChapelArray {
     pragma "no promotion when by ref"
     pragma "fn returns aliasing array"
     inline proc reindex(newDomain: domain)
-      where this.domain.isRectangular() && newDomain.isRectangular() do
-    return this.chpl_reindex(newDomain);
+     where this.domain.isRectangular() && newDomain.isRectangular() do
+      return this.chpl_reindex(newDomain.dims());
 
     // The reason `newDims` arg is untyped is that it needs to allow
     // ranges of various types, ex. a mix of stridable and not.
@@ -1461,20 +1467,21 @@ module ChapelArray {
     pragma "fn returns aliasing array"
     proc reindex(newDims...)
       where this.domain.isRectangular() do
-        return this.chpl_reindex(if newDims.size == 1 then {newDims(0), }
-                                                      else {(...newDims)});
+        return this.chpl_reindex(newDims);
 
     pragma "no promotion when by ref"
     pragma "reference to const when const this"
     pragma "fn returns aliasing array"
     @chpldoc.nodoc
-    proc chpl_reindex(dom)
-      where Reflection.canResolveMethod(this._value, "doiReindex", dom) {
-        writeln("Using doiReindex");
+    proc chpl_reindex(newDims)
+     where Reflection.canResolveMethod(this._value, "doiReindex", chpl__tupToDomain(newDims)) {
+      writeln("Using doiReindex");
+
+      const dom = chpl__tupToDomain(newDims);
+
       return this._value.doiReindex(dom);
     }
 
-    /*
     pragma "no promotion when by ref"
     pragma "fn returns aliasing array"
     proc chpl_reindex(newDims...) {
@@ -1531,7 +1538,6 @@ module ChapelArray {
       newDom._value.add_arr(x, locking=false);
       return _newArray(x);
     }
-*/
 
     // reindex for all non-rectangular domain types.
     // See above for the rectangular version.

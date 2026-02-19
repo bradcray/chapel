@@ -1441,18 +1441,8 @@ module ChapelArray {
     pragma "no promotion when by ref"
     pragma "fn returns aliasing array"
     inline proc reindex(newDomain: domain)
-     where this.domain.isRectangular() && newDomain.isRectangular() do
-      if chpl__isArrayView(this) {
-        // If I don't do this, I get a valgrind error...  but is there
-        // a better way to deal with it?  Historically, it sehems we
-        // always created a new domain for reindexing (like this)
-        // rather than sharing the existing one.  That seems...  $$?
-        pragma "no auto destroy"
-        const newDomainCopy = newDomain;
-        return this.chpl_reindex(newDomainCopy);
-      } else {
-        return this.chpl_reindex(newDomain);
-      }
+    where this.domain.isRectangular() && newDomain.isRectangular() do
+      return reindex((...newDomain.dims()));
 
     // The reason `newDims` arg is untyped is that it needs to allow
     // ranges of various types, ex. a mix of stridable and not.
@@ -1473,7 +1463,7 @@ module ChapelArray {
     pragma "no promotion when by ref"
     pragma "fn returns aliasing array"
     proc reindex(newDims...)
-    where this.domain.isRectangular() {
+     where this.domain.isRectangular() {
       for param i in 0..newDims.size-1 {
         if !isRange(newDims(i)) then
           compilerError("cannot reindex() a rectangular array to a tuple containing non-ranges");
@@ -1481,20 +1471,11 @@ module ChapelArray {
           compilerError("cannot currently reindex() using unbounded ranges");
       }
 
-      if chpl__isArrayView(this) {
-        // Using this pragma causes leaks for closed-form reindexing;
-        // But not using it causes premature frees for open-form...  :thinking:
-        pragma "no auto destroy"
-        const updom = if newDims.size == 1 then {newDims(0), }
-        else {(...newDims)};
+      pragma "no auto destroy"
+      const updom = if newDims.size == 1 then {newDims(0), }
+                                         else {(...newDims)};
 
-        return this.chpl_reindex(updom);
-      } else {
-        const updom = if newDims.size == 1 then {newDims(0), }
-        else {(...newDims)};
-
-        return this.chpl_reindex(updom);
-      }
+      return this.chpl_reindex(updom);
     }
 
     pragma "no promotion when by ref"

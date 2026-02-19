@@ -253,7 +253,7 @@ static bool fNoWarnDomainLiteral = true;
 static bool fNoWarnTupleIteration = true;
 
 bool fNoLoopInvariantCodeMotion = false;
-bool fNoInterproceduralAliasAnalysis = true;
+bool fNoInterproceduralAliasAnalysis = false;
 bool fNoChecks = false;
 bool fNoInline = false;
 bool fNoPrivatization = false;
@@ -1616,7 +1616,7 @@ static ArgumentDescription arg_desc[] = {
  {"exit-leaks", ' ', NULL, "[Don't] leak memory on exit", "N", &fExitLeaks, NULL, NULL},
  {"gdb", ' ', NULL, "Run compiler in gdb", "F", &fRungdb, NULL, NULL},
  {"lldb", ' ', NULL, "Run compiler in lldb", "F", &fRunlldb, NULL, NULL},
- {"interprocedural-alias-analysis", ' ', NULL, "Enable [disable] interprocedural alias analysis", "n", &fNoInterproceduralAliasAnalysis, NULL, NULL},
+ {"interprocedural-alias-analysis", ' ', NULL, "Enable [disable] interprocedural alias analysis", "N", &fNoInterproceduralAliasAnalysis, NULL, NULL},
  {"lifetime-checking", ' ', NULL, "Enable [disable] lifetime checking pass", "n", &fNoLifetimeChecking, NULL, NULL},
  {"split-initialization", ' ', NULL, "Enable [disable] support for split initialization", "n", &fNoSplitInit, NULL, NULL},
  {"early-deinit", ' ', NULL, "Enable [disable] support for early deinit based upon expiring value analysis", "n", &fNoEarlyDeinit, NULL, NULL},

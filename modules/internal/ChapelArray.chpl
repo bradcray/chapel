@@ -1471,29 +1471,28 @@ module ChapelArray {
           compilerError("cannot currently reindex() using unbounded ranges");
       }
 
-      pragma "no auto destroy"
-      const updom = if newDims.size == 1 then {newDims(0), }
-                                         else {(...newDims)};
-
-      return this.chpl_reindex(updom);
+      return this.chpl_reindex(newDims);
     }
 
     pragma "no promotion when by ref"
     pragma "reference to const when const this"
     pragma "fn returns aliasing array"
     @chpldoc.nodoc
-    proc chpl_reindex(dom)
+    proc chpl_reindex(dims)
     where (!chpl__isArrayView(this) &&
-           Reflection.canResolveMethod(this._value, "doiReindex", dom)) {
-      // TODO: And "arr is not an array view"
+           Reflection.canResolveMethod(this._value, "doiReindex", {(...dims)})) {
       if printDoiReindex then writeln("Using doiReindex");
+      const dom = if dims.size == 1 then {dims(0), } else {(...dims)};
       chpl__validateReindex(this, dom);
       return this._value.doiReindex(dom);
     }
 
     pragma "no promotion when by ref"
     pragma "fn returns aliasing array"
-    proc chpl_reindex(updom) {
+    proc chpl_reindex(dims) {
+      pragma "no auto destroy"
+      const updom = if dims.size == 1 then {dims(0), } else {(...dims)};
+
       chpl__validateReindex(this, updom);
 
       const downDom = this._value.dom;

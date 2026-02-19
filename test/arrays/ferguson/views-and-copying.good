@@ -10,11 +10,11 @@ returned is view:             false
 .domain to var is view:       false
 
 reindex
-to const ref is view:         true
+to const ref is view:         false
 to var is view:               false
 returned is view:             false
-.domain to const ref is view: true
-.domain to var is view:       true
+.domain to const ref is view: false
+.domain to var is view:       false
 
 rank change
 to const ref is view:         true
@@ -28,7 +28,7 @@ returned is view:             false
 
 reindex
 to var is view:               false
-var.domain is view:           true
+var.domain is view:           false
 
 rank change
 to var is view:               false

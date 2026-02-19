@@ -258,6 +258,9 @@ module ChapelArray {
   @chpldoc.nodoc
   config param capturedIteratorLowBound = defaultLowBound;
 
+  @chpldoc.nodoc
+  config param printDoiReindex = false;
+  
   pragma "ignore transfer errors"
   proc chpl__buildArrayExpr( in elems ...?k ) {
     return chpl__buildNDArrayExpr((k,), (...elems));
@@ -1460,16 +1463,25 @@ module ChapelArray {
     pragma "no promotion when by ref"
     pragma "fn returns aliasing array"
     proc reindex(newDims...)
-     where this.domain.isRectangular() {
+    where this.domain.isRectangular() {
       for param i in 0..newDims.size-1 do
         if !isRange(newDims(i)) then
           compilerError("cannot reindex() a rectangular array to a tuple containing non-ranges");
 
-//      pragma "no auto destroy"
-      const updom = if newDims.size == 1 then {newDims(0), }
-                                         else {(...newDims)};
+      if chpl__isArrayView(this) {
+        // Using this pragma causes leaks for closed-form reindexing;
+        // But not using it causes premature frees for open-form...  :thinking:
+        pragma "no auto destroy"
+        const updom = if newDims.size == 1 then {newDims(0), }
+        else {(...newDims)};
 
-      return this.chpl_reindex(updom);
+        return this.chpl_reindex(updom);
+      } else {
+        const updom = if newDims.size == 1 then {newDims(0), }
+        else {(...newDims)};
+
+        return this.chpl_reindex(updom);
+      }
     }
 
     pragma "no promotion when by ref"
@@ -1477,8 +1489,10 @@ module ChapelArray {
     pragma "fn returns aliasing array"
     @chpldoc.nodoc
     proc chpl_reindex(dom)
-     where Reflection.canResolveMethod(this._value, "doiReindex", dom) {
-//      writeln("Using doiReindex");
+    where (!chpl__isArrayView(this) &&
+           Reflection.canResolveMethod(this._value, "doiReindex", dom)) {
+      // TODO: And "arr is not an array view"
+      if printDoiReindex then writeln("Using doiReindex");
       chpl__validateReindex(this, dom);
       return this._value.doiReindex(dom);
     }

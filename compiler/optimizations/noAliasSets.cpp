@@ -620,8 +620,6 @@ bool addAliases(std::map<Symbol*, BitVec> &map,
 
 
 void computeNoAliasSets() {
-
-  if (fNoInterproceduralAliasAnalysis)
     return;
 
   // TODO: retArg and in --

@@ -26,8 +26,10 @@ writeln(A);
 reset(A);
 }
 
+writeln(aliasDom);
 writeln("------");
 {
+writeln(aliasDom);
 ref B = A[5..9, 5..9].reindex(aliasDom);
 B = 1;
 writeln(A);

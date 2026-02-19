@@ -1451,7 +1451,7 @@ module ChapelArray {
         compilerError("rank mismatch: cannot reindex() from " + this.rank:string +
                       " dimension(s) to " + newDomain.rank:string);
 
-//       writeln("newDomain = ", newDomain);
+       writeln("newDomain = ", newDomain);
        
        for param i in 0..rank-1 {
         if newDomain.dim(i).sizeAs(uint) != this.domain.dim(i).sizeAs(uint) then
@@ -1522,33 +1522,49 @@ module ChapelArray {
         if !isRange(argDims(i)) then
           compilerError("cannot reindex() an array using non-range/-domain arguments");
 
-      type idxType = argDims(0).idxType;
-      param strides = argDims(0).strides;
-
-      for param i in 0..<argDims.size {
-        if argDims(i).idxType != idxType then
-          compilerError("ranges passed to 'reindex()' must currently have matching idxType\n(", idxType:string, " in dimension 0 doesn't match ", argDims(i).idxType:string, " in dimension ", i);
-        if argDims(i).strides != strides then
-          compilerError("ranges passed to 'reindex()' must currently have matching strideKinds\n(", strides:string, " in dimension 0 doesn't match ", argDims(i).strides:string, " in dimension ", i);
-      }
-
-      var newDims: argDims.size*range(idxType,
-                                      bounds=boundKind.both,
-                                      strides = strides);
-
-      for i in 0..<argDims.size {
-        select argDims(i).bounds {
-          when boundKind.both do newDims(i) = argDims(i);
-          when boundKind.low do newDims(i) = argDims(i)#this.domain.dim(i).size;
-          when boundKind.high do newDims(i) = argDims(i)#this.domain.dim(i).size;
-          when boundKind.neither do newDims(i) = this.domain.dim(i);
+      proc allBounded() param {
+        for param i in 0..<argDims.size {
+          if argDims(i).bounds != boundKind.both then return false;
         }
+        return true;
       }
+      
+      if allBounded() {
+        pragma "no auto destroy"
+        const updom = {(...argDims)};
 
-      pragma "no auto destroy"
-      const updom = {(...newDims)};
+        return this.reindex(updom);
+      } else {
+        // TODO: add unstable warning here since this is new behavior
 
-      return this.reindex(updom);
+        type idxType = argDims(0).idxType;
+        param strides = argDims(0).strides;
+
+        for param i in 0..<argDims.size {
+          if argDims(i).idxType != idxType then
+            compilerError("ranges passed to 'reindex()' must currently have matching idxType\n(", idxType:string, " in dimension 0 doesn't match ", argDims(i).idxType:string, " in dimension ", i);
+          if argDims(i).strides != strides then
+            compilerError("ranges passed to 'reindex()' must currently have matching strideKinds\n(", strides:string, " in dimension 0 doesn't match ", argDims(i).strides:string, " in dimension ", i);
+        }
+
+        var newDims: argDims.size*range(idxType,
+                                        bounds=boundKind.both,
+                                        strides = strides);
+
+        for i in 0..<argDims.size {
+          select argDims(i).bounds {
+            when boundKind.both do newDims(i) = argDims(i);
+            when boundKind.low do newDims(i) = argDims(i)#this.domain.dim(i).size;
+            when boundKind.high do newDims(i) = argDims(i)#this.domain.dim(i).size;
+            when boundKind.neither do newDims(i) = this.domain.dim(i);
+          }
+        }
+
+        pragma "no auto destroy"
+        const updom = {(...newDims)};
+
+        return this.reindex(updom);
+      }
     }    
 
     // reindex for all non-rectangular domain types.

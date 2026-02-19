@@ -1478,7 +1478,7 @@ module ChapelArray {
     @chpldoc.nodoc
     proc chpl_reindex(dom)
      where Reflection.canResolveMethod(this._value, "doiReindex", dom) {
-      writeln("Using doiReindex");
+//      writeln("Using doiReindex");
       chpl__validateReindex(this, dom);
       return this._value.doiReindex(dom);
     }

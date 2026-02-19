@@ -756,12 +756,6 @@ module ChapelArray {
     return false;
   }
 
-  // TODO: remove me
-  proc chpl__tupToDomain(newDims) {
-    const dom = if newDims.size == 1 then {newDims(0), } else {(...newDims)};
-    return dom;
-  }
-
   // Array wrapper record
   pragma "array"
   pragma "has runtime type"
@@ -1445,7 +1439,7 @@ module ChapelArray {
     pragma "fn returns aliasing array"
     inline proc reindex(newDomain: domain)
      where this.domain.isRectangular() && newDomain.isRectangular() do
-      return this.chpl_reindex(newDomain.dims());
+      return this.chpl_reindex(newDomain);
 
     // The reason `newDims` arg is untyped is that it needs to allow
     // ranges of various types, ex. a mix of stridable and not.
@@ -1466,53 +1460,41 @@ module ChapelArray {
     pragma "no promotion when by ref"
     pragma "fn returns aliasing array"
     proc reindex(newDims...)
-      where this.domain.isRectangular() do
-        return this.chpl_reindex(newDims);
+     where this.domain.isRectangular() {
+      for param i in 0..newDims.size-1 do
+        if !isRange(newDims(i)) then
+          compilerError("cannot reindex() a rectangular array to a tuple containing non-ranges");
+
+//      pragma "no auto destroy"
+      const updom = if newDims.size == 1 then {newDims(0), }
+                                         else {(...newDims)};
+
+      return this.chpl_reindex(updom);
+    }
 
     pragma "no promotion when by ref"
     pragma "reference to const when const this"
     pragma "fn returns aliasing array"
     @chpldoc.nodoc
-    proc chpl_reindex(newDims)
-     where Reflection.canResolveMethod(this._value, "doiReindex", chpl__tupToDomain(newDims)) {
+    proc chpl_reindex(dom)
+     where Reflection.canResolveMethod(this._value, "doiReindex", dom) {
       writeln("Using doiReindex");
-
-      const dom = chpl__tupToDomain(newDims);
-
+      chpl__validateReindex(this, dom);
       return this._value.doiReindex(dom);
     }
 
     pragma "no promotion when by ref"
     pragma "fn returns aliasing array"
-    proc chpl_reindex(newDims...) {
-      for param i in 0..newDims.size-1 do
-        if !isRange(newDims(i)) then
-          compilerError("cannot reindex() a rectangular array to a tuple containing non-ranges");
+    proc chpl_reindex(updom) {
+      chpl__validateReindex(this, updom);
 
-      if this.rank != newDims.size then
-        compilerError("rank mismatch: cannot reindex() from " + this.rank:string +
-                      " dimension(s) to " + newDims.size:string);
-
-      const dom = this._value.dom;
-      const origDims = dom.dsiDims();
-
-      for param i in 0..rank-1 {
-        if newDims(i).sizeAs(uint) != origDims(i).sizeAs(uint) then
-          halt("extent mismatch in dimension ", i+1, ": cannot reindex() from ",
-               origDims(i), " to ", newDims(i));
-        if ! noNegativeStrideWarnings && origDims(i).hasPositiveStride()
-           && ! newDims(i).hasPositiveStride() then
-          warning("arrays and array slices with negatively-strided dimensions are currently unsupported and may lead to unexpected behavior; compile with -snoNegativeStrideWarnings to suppress this warning; in reindex() from ", origDims, " to ", newDims);
-      }
-
-      pragma "no auto destroy"
-      const updom = {(...newDims)};
+      const downDom = this._value.dom;
 
       const redist = new unmanaged ArrayViewReindexDist(downDistPid = this.domain.distribution._pid,
                                               downDistInst=this.domain.distribution._instance,
                                               updom = updom._value,
-                                              downdomPid = dom.pid,
-                                              downdomInst = dom);
+                                              downdomPid = downDom.pid,
+                                              downdomInst = downDom);
       const redistRec = new _distribution(redist);
       // redist._free_when_no_doms = true;
 
@@ -3167,6 +3149,21 @@ module ChapelArray {
       if boundsChecking && checkDims then
         chpl__validateReshape(this, dom);
       return this._value.doiReshape(dom);
+    }
+  }
+
+  proc chpl__validateReindex(arr, dom) {
+    if arr.rank != dom.rank then
+      compilerError("rank mismatch: cannot reindex() from " +
+                    arr.rank:string + " dimension(s) to " + dom.rank:string);
+
+    for param i in 0..<arr.rank {
+      if dom.dim(i).sizeAs(uint) != arr.domain.dim(i).sizeAs(uint) then
+        halt("extent mismatch in dimension ", i+1, ": cannot reindex() from ",
+             arr.domain.dim(i), " to ", dom.dim(i));
+      if !noNegativeStrideWarnings && arr.domain.dim(i).hasPositiveStride() &&
+         !dom.dim(i).hasPositiveStride() then
+           warning("arrays and array slices with negatively-strided dimensions are currently unsupported and may lead to unexpected behavior; compile with -snoNegativeStrideWarnings to suppress this warning; in reindex() from ", arr.domain, " to ", dom);
     }
   }
 

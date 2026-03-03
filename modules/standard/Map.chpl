@@ -127,7 +127,7 @@ module Map {
     const resizeThreshold = defaultHashTableResizeThreshold;
 
     @chpldoc.nodoc
-    var table: chpl__hashtable(keyType, valType);
+    var myTable: chpl__hashtable(keyType, valType);
 
     @chpldoc.nodoc
     var _lock = if parSafe then new _LockWrapper() else none;
@@ -171,7 +171,7 @@ module Map {
       } else {
         this.resizeThreshold = resizeThreshold;
       }
-      table = new chpl__hashtable(keyType, valType, this.resizeThreshold,
+      myTable = new chpl__hashtable(keyType, valType, this.resizeThreshold,
                                   initialCapacity);
     }
 
@@ -202,7 +202,7 @@ module Map {
       } else {
         this.resizeThreshold = resizeThreshold;
       }
-      table = new chpl__hashtable(keyType, valType, this.resizeThreshold,
+      myTable = new chpl__hashtable(keyType, valType, this.resizeThreshold,
                                   initialCapacity);
     }
 
@@ -232,7 +232,7 @@ module Map {
       }
 
       this.resizeThreshold = other.resizeThreshold;
-      this.table = new chpl__hashtable(keyType, valType,
+      this.myTable = new chpl__hashtable(keyType, valType,
                                        resizeThreshold);
       init this;
 
@@ -252,9 +252,9 @@ module Map {
                       valType:string, ' is not copyable');
       } else {
         for key in other.keys() {
-          const (_, slot) = table.findAvailableSlot(key);
-          const (_, slot2) = other.table.findFullSlot(key);
-          table.fillSlot(slot, key, other.table.table[slot2].val);
+          const (_, slot) = myTable.findAvailableSlot(key);
+          const (_, slot2) = other.myTable.findFullSlot(key);
+          myTable.fillSlot(slot, key, other.myTable.table[slot2].val);
         }
       }
     }
@@ -269,14 +269,14 @@ module Map {
     */
     proc ref clear() {
       _enter(); defer _leave();
-      for slot in table.allSlots() {
-        if table.isSlotFull(slot) {
+      for slot in myTable.allSlots() {
+        if myTable.isSlotFull(slot) {
           var key: keyType;
           var val: valType;
-          table.clearSlot(slot, key, val);
+          myTable.clearSlot(slot, key, val);
         }
       }
-      table.maybeShrinkAfterRemove();
+      myTable.maybeShrinkAfterRemove();
     }
 
     /*
@@ -290,7 +290,7 @@ module Map {
     /* As above, but the parSafe lock must be held on entry */
     @chpldoc.nodoc
     inline proc const _size {
-      return table.tableNumFullSlots;
+      return myTable.tableNumFullSlots;
     }
 
     /*
@@ -315,7 +315,7 @@ module Map {
     */
     proc const contains(const k: keyType): bool {
       _enter(); defer _leave();
-      var (result, _) = table.findFullSlot(k);
+      var (result, _) = myTable.findFullSlot(k);
       return result;
     }
 
@@ -333,9 +333,9 @@ module Map {
         compilerError("extending map with non-copyable type");
 
       for key in m.keys() {
-        var (_, slot) = table.findAvailableSlot(key);
-        var (_, slot2) = m.table.findAvailableSlot(key);
-        table.fillSlot(slot, key, m.table.table[slot2].val);
+        var (_, slot) = myTable.findAvailableSlot(key);
+        var (_, slot2) = m.myTable.findAvailableSlot(key);
+        myTable.fillSlot(slot, key, m.myTable.table[slot2].val);
       }
     }
 
@@ -366,14 +366,14 @@ module Map {
     proc update(const ref k: keyType, updater) throws {
       _enter(); defer _leave();
 
-      var (isFull, slot) = table.findFullSlot(k);
+      var (isFull, slot) = myTable.findFullSlot(k);
 
       if !isFull then
         throw new KeyNotFoundError(k);
 
       // TODO: Use table key or argument key?
-      const ref key = table.table[slot].key;
-      ref val = table.table[slot].val;
+      const ref key = myTable.table[slot].key;
+      ref val = myTable.table[slot].val;
 
       import Reflection;
       if !Reflection.canResolveMethod(updater, "this", key, val) then
@@ -398,12 +398,12 @@ module Map {
 
       _enter(); defer _leave();
 
-      var (_, slot) = table.findAvailableSlot(k);
-      if !table.isSlotFull(slot) {
+      var (_, slot) = myTable.findAvailableSlot(k);
+      if !myTable.isSlotFull(slot) {
         var val: valType;
-        table.fillSlot(slot, k, val);
+        myTable.fillSlot(slot, k, val);
       }
-      return table.table[slot].val;
+      return myTable.table[slot].val;
     }
 
     /*
@@ -430,11 +430,11 @@ module Map {
 
       _enter(); defer _leave();
 
-      var (_, slot) = table.findAvailableSlot(k);
-      if !table.isSlotFull(slot) {
+      var (_, slot) = myTable.findAvailableSlot(k);
+      if !myTable.isSlotFull(slot) {
         throw new KeyNotFoundError(k);
       }
-      ref result = table.table[slot].val;
+      ref result = myTable.table[slot].val;
       return result;
     }
 
@@ -443,10 +443,10 @@ module Map {
       _warnForParSafeIndexing();
 
       _enter(); defer _leave();
-      var (found, slot) = table.findFullSlot(k);
+      var (found, slot) = myTable.findFullSlot(k);
       if !found then
         throw new KeyNotFoundError(k);
-      const ref result = table.table[slot].val;
+      const ref result = myTable.table[slot].val;
       return result;
     }
 
@@ -467,11 +467,11 @@ module Map {
                       'map value type: ' + valType:string);
 
       _enter(); defer _leave();
-      var (found, slot) = table.findFullSlot(k);
+      var (found, slot) = myTable.findFullSlot(k);
       if !found then
         return sentinel;
       try! {
-        const result = table.table[slot].val: valType;
+        const result = myTable.table[slot].val: valType;
         return result;
       }
     }
@@ -480,13 +480,13 @@ module Map {
      */
     proc ref getAndRemove(k: keyType) {
       _enter(); defer _leave();
-      var (found, slot) = table.findFullSlot(k);
+      var (found, slot) = myTable.findFullSlot(k);
       if !found then
         boundsCheckHalt(try! "map index %? out of bounds".format(k));
       try! {
         var result: valType, key: keyType;
-        table.clearSlot(slot, key, result);
-        table.maybeShrinkAfterRemove();
+        myTable.clearSlot(slot, key, result);
+        myTable.maybeShrinkAfterRemove();
         return result: valType;
       }
     }
@@ -509,30 +509,34 @@ module Map {
 
       :yields: A reference to one of the keys contained in this map.
     */
-    iter keys() const ref {
-      foreach idx in 0..#table.tableSize {
-        if table.isSlotFull(idx) then
-          yield table.table[idx].key;
+    iter const keys() const ref {
+//      writeln("In my modified serial keys iter");
+      const ref myTab = myTable;
+      foreach idx in 0..#myTab.tableSize {
+        if myTab.isSlotFull(idx) then
+          yield myTab.table[idx].key;
       }
     }
     @chpldoc.nodoc
-    iter keys(param tag: iterKind) const ref where tag == iterKind.standalone {
-      const space = 0..#table.tableSize;
+    iter const keys(param tag: iterKind) const ref where tag == iterKind.standalone {
+//      writeln("In my modified keys iter");
+      const ref myTab = myTable;
+      const space = 0..#myTab.tableSize;
       foreach idx in space.these(tag) {
-        if table.isSlotFull(idx) then
-          yield table.table[idx].key;
+        if myTab.isSlotFull(idx) then
+          yield myTab.table[idx].key;
       }
     }
     @chpldoc.nodoc
-    iter keys(param tag: iterKind) where tag == iterKind.leader {
-      for followThis in table._evenSlots(tag) {
+    iter const keys(param tag: iterKind) where tag == iterKind.leader {
+      for followThis in myTable._evenSlots(tag) {
         yield followThis;
       }
     }
     @chpldoc.nodoc
-    iter keys(param tag: iterKind, followThis) const ref
+    iter const keys(param tag: iterKind, followThis) const ref
       where tag == iterKind.follower {
-      foreach val in table._evenSlots(followThis, tag) {
+      foreach val in myTable._evenSlots(followThis, tag) {
         yield val.key;
       }
     }
@@ -554,9 +558,9 @@ module Map {
         compilerError('in map.items(): map value type ' + valType:string +
                       ' is not copyable');
 
-      foreach slot in table.allSlots() {
-        if table.isSlotFull(slot) {
-          ref tabEntry = table.table[slot];
+      foreach slot in myTable.allSlots() {
+        if myTable.isSlotFull(slot) {
+          ref tabEntry = myTable.table[slot];
           yield (tabEntry.key, tabEntry.val);
         }
       }
@@ -568,29 +572,29 @@ module Map {
       :yields: A reference to one of the values contained in this map.
     */
     iter values() ref {
-      foreach idx in 0..#table.tableSize {
-        if table.isSlotFull(idx) then
-          yield table.table[idx].val;
+      foreach idx in 0..#myTable.tableSize {
+        if myTable.isSlotFull(idx) then
+          yield myTable.table[idx].val;
       }
     }
     @chpldoc.nodoc
     iter values(param tag: iterKind) ref where tag == iterKind.standalone {
-      const space = 0..#table.tableSize;
+      const space = 0..#myTable.tableSize;
       foreach idx in space.these(tag) {
-        if table.isSlotFull(idx) then
-          yield table.table[idx].val;
+        if myTable.isSlotFull(idx) then
+          yield myTable.table[idx].val;
       }
     }
     @chpldoc.nodoc
     iter values(param tag: iterKind) where tag == iterKind.leader {
-      for followThis in table._evenSlots(tag) {
+      for followThis in myTable._evenSlots(tag) {
         yield followThis;
       }
     }
     @chpldoc.nodoc
     iter values(param tag: iterKind, followThis) ref
       where tag == iterKind.follower {
-      foreach val in table._evenSlots(followThis, tag) {
+      foreach val in myTable._evenSlots(followThis, tag) {
         yield val.val;
       }
     }
@@ -658,9 +662,9 @@ module Map {
 
       var ser = serializer.startMap(writer, _size);
 
-      for slot in table.allSlots() {
-        if table.isSlotFull(slot) {
-          ref tabEntry = table.table[slot];
+      for slot in myTable.allSlots() {
+        if myTable.isSlotFull(slot) {
+          ref tabEntry = myTable.table[slot];
           ser.writeKey(tabEntry.key);
           ser.writeValue(tabEntry.val);
         }
@@ -685,12 +689,12 @@ module Map {
     */
     proc ref add(in k: keyType, in v: valType): bool lifetime this < v {
       _enter(); defer _leave();
-      var (found, slot) = table.findAvailableSlot(k);
+      var (found, slot) = myTable.findAvailableSlot(k);
       if found {
         return false;
       }
 
-      table.fillSlot(slot, k, v);
+      myTable.fillSlot(slot, k, v);
 
       return true;
     }
@@ -711,12 +715,12 @@ module Map {
     */
     proc ref replace(k: keyType, in v: valType): bool {
       _enter(); defer _leave();
-      var (found, slot) = table.findAvailableSlot(k);
+      var (found, slot) = myTable.findAvailableSlot(k);
       if !found {
         return false;
       }
 
-      table.fillSlot(slot, k, v);
+      myTable.fillSlot(slot, k, v);
 
       return true;
     }
@@ -727,8 +731,8 @@ module Map {
     */
     proc ref addOrReplace(in k: keyType, in v: valType) {
       _enter(); defer _leave();
-      var (found, slot) = table.findAvailableSlot(k);
-      table.fillSlot(slot, k, v);
+      var (found, slot) = myTable.findAvailableSlot(k);
+      myTable.fillSlot(slot, k, v);
     }
 
     /*
@@ -742,13 +746,13 @@ module Map {
     */
     proc ref remove(k: keyType): bool {
       _enter(); defer _leave();
-      var (found, slot) = table.findFullSlot(k);
+      var (found, slot) = myTable.findFullSlot(k);
       if !found {
         return false;
       }
       var outKey: keyType, outVal: valType;
-      table.clearSlot(slot, outKey, outVal);
-      table.maybeShrinkAfterRemove();
+      myTable.clearSlot(slot, outKey, outVal);
+      myTable.maybeShrinkAfterRemove();
       return true;
     }
 

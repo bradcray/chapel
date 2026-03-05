@@ -214,7 +214,7 @@
 //
 
 //#define PRINT_WIDEN_SUMMARY
-//#define PRINT_WIDE_ANALYSIS
+#define PRINT_WIDE_ANALYSIS
 
 #ifdef PRINT_WIDE_ANALYSIS
   #define DEBUG_PRINTF(...) printf(__VA_ARGS__)
@@ -226,15 +226,21 @@ static void debug(BaseAST* base, const char* format, ...) {
 #ifdef PRINT_WIDE_ANALYSIS
   Symbol* sym = toSymbol(base);
   if (sym == NULL) {
-    sym = toSymExpr(base)->symbol();
+    SymExpr* se = toSymExpr(base);
+    if (se) {
+      sym = se->symbol();
+    }
   }
-  INT_ASSERT(sym != NULL);
-
-  DEBUG_PRINTF("%s (%d) in %s : ", sym->cname, sym->id, sym->getModule()->cname);
-  va_list argptr;
-  va_start(argptr, format);
-  vfprintf(stdout, format, argptr);
-  va_end(argptr);
+  if (sym == NULL) {
+    printf("not a symbol: ");
+    list_view(base);
+  } else {
+    DEBUG_PRINTF("%s (%d) in %s : ", sym->cname, sym->id, sym->getModule()->cname);
+    va_list argptr;
+    va_start(argptr, format);
+    vfprintf(stdout, format, argptr);
+    va_end(argptr);
+  }
 #endif
 }
 
@@ -952,7 +958,7 @@ static void addKnownWides() {
 
     } else if (fn->isUsedAsValue() && !fn->hasForeignLinkage()) {
       DEBUG_PRINTF("Function %s (%d) is used as value, must be wide\n",
-                   fn->cname, fi->id);
+                   fn->cname, fn->id);
 
       for_formals(formal, fn) setWide(fn, formal);
       setWide(fn, fn->getReturnSymbol());

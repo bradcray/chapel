@@ -510,21 +510,21 @@ module Map {
       :yields: A reference to one of the keys contained in this map.
     */
     iter const keys() const ref {
-//      writeln("In my modified serial keys iter");
-      const ref myTab = myTable;
-      foreach idx in 0..#myTab.tableSize {
-        if myTab.isSlotFull(idx) then
-          yield myTab.table[idx].key;
+      //  NOTE: Capturing `myTable` into a local `const ref` makes this work
+      // on muliple locales
+      foreach idx in 0..#myTable.tableSize {
+        if myTable.isSlotFull(idx) then
+          yield myTable.table[idx].key;
       }
     }
     @chpldoc.nodoc
     iter const keys(param tag: iterKind) const ref where tag == iterKind.standalone {
-//      writeln("In my modified keys iter");
-      const ref myTab = myTable;
-      const space = 0..#myTab.tableSize;
+      //  NOTE: Capturing `myTable` into a local `const ref` makes this work
+      // on muliple locales
+      const space = 0..#myTable.tableSize;
       foreach idx in space.these(tag) {
-        if myTab.isSlotFull(idx) then
-          yield myTab.table[idx].key;
+        if myTable.isSlotFull(idx) then
+          yield myTable.table[idx].key;
       }
     }
     @chpldoc.nodoc

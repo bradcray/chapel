@@ -459,7 +459,7 @@ FnSymbol* build_accessor(AggregateType* ct, Symbol* field,
   FnSymbol*  fn           = new FnSymbol(field->name);
 
   fn->addFlag(FLAG_NO_IMPLICIT_COPY);
-  if (false && strcmp(fn->name, "myTable") == 0) {
+    if (false && strcmp(fn->name, "myTable") == 0) {
   //  if (strcmp(fn->name, "myTable") == 0) {
     printf("squashing inline for %s\n", fn->name);
   } else {

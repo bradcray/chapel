@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
 import sys
+import shutil
+
+
 
 # concat per test compiler good file (storing
 # output from --report-aliases) and exec good file
@@ -20,6 +23,8 @@ if '--report-aliases' in compopts:
     with open (goodCompOutputFile, 'r') as f:
         compGoodOutput = f.read()
 
+    shutil.copyfile(outfile, outfile+".KEEPME")
+                
     output = ''
     with open (outfile, 'r') as f:
         for line in f:

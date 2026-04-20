@@ -332,18 +332,25 @@ void addNoAliasSetsInFn(FnSymbol* fn) {
           // That pattern indicates compiler implementation oddities
           // rather than a new array.
 
-          bool createdByMove = false;
+          bool createdByMove = false /*,
+                                       createdByFnReturningAliasingArray = false */;
           for_SymbolDefs(defSe, var) {
             if (CallExpr* call = toCallExpr(defSe->parentExpr)) {
               if (call->isPrimitive(PRIM_MOVE) ||
                   call->isPrimitive(PRIM_ASSIGN)) {
                 if (defSe == call->get(1))
                   createdByMove = true;
+                /*
+              } else {
+                FnSymbol* fn = call->resolvedOrVirtualFunction();
+                if (fn && fn->hasFlag(FLAG_RETURNS_ALIASING_ARRAY))
+                  createdByFnReturningAliasingArray = true;
+                */
               }
             }
           }
 
-          if (createdByMove) {
+          if (createdByMove /* || createdByFnReturningAliasingArray */) {
             // These don't count.
             // Real array initializations happen by _retArg
           } else {
@@ -671,10 +678,13 @@ void computeNoAliasSets() {
   // don't worry about transitivity/propagating yet.
   for_alive_in_Vec(FnSymbol, fn, gFnSymbols) {
     if (fnHasRefFormal(fn)) {
-      if (fn->hasFlag(FLAG_EXPORT)) {
+      if (fn->hasFlag(FLAG_EXPORT) || fn->hasFlag(FLAG_RETURNS_ALIASING_ARRAY)) {
         // Assume exported functions can have formals aliasing each other
         for_formals(fnFormal, fn) {
           if (isRefFormal(fnFormal)) {
+            printf("Adding %s.%s\n", fn->name, fnFormal->name);
+            // TODO: For FLAG_RETURNS_ALIASING_ARRAY, limit to just array
+            // formals?
             formalsAliasingAnything.insert(fnFormal);
           }
         }

@@ -946,7 +946,7 @@ extended to handle real, imaginary, and complex types in the future.
 Exponentiation Operators
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The exponentiation operators are predefined as follows: 
+The basic exponentiation operators are predefined as follows: 
 
 .. code-block:: chapel
 
@@ -963,8 +963,23 @@ The exponentiation operators are predefined as follows:
    operator **(a: real(32), b: real(32)): real(32)
    operator **(a: real(64), b: real(64)): real(64)
 
+   operator **(a: complex(64), b: complex(64)): complex(64);
+   operator **(a: complex(128), b: complex(128)): complex(128);
+
+Chapel also supports overloads that operate on `param` values,
+returning `param` results:
+
+
+   
 For each of these definitions that return a value, the result is the
 value of the first operand raised to the power of the second operand.
+
+   *Implementation Notes*.
+
+   In our current implementation, 
+   The *––M* flag can be used to add to the module search path.
+   See :ref:`the chpl manual page <man-chpl>`.
+
 
 There is an expectation that the predefined exponentiation operators
 will be extended to handle imaginary and complex types in the future.

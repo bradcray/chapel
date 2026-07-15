@@ -179,7 +179,7 @@ module ChapelUnion {
   }
 
   @chpldoc.nodoc
-  proc _select_test(x: union) do return x.getActiveIndex();
+  proc _select_test(x: union) do return x;
 
   @chpldoc.nodoc
   operator ==(u1: union, u2: union) {

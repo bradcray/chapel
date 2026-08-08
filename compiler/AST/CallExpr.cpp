@@ -28,6 +28,7 @@
 #include "wellknown.h"
 
 #include "global-ast-vecs.h"
+#include "view.h"
 
 static void callExprHelper(CallExpr* call, BaseAST* arg);
 
@@ -870,4 +871,20 @@ bool isRecordInitOrReturn(CallExpr* call, SymExpr*& lhsSe, CallExpr*& initOrCtor
   lhsSe = NULL;
   initOrCtor = NULL;
   return false;
+}
+
+void handleCallExpr(const BaseAST* expr, BaseAST** lhs, BaseAST** rhs) {
+  const CallExpr* call = toConstCallExpr(expr);
+  if (call) {
+    if (call->isPrimitive(PRIM_ASSIGN) || call->isNamed("=")) {
+      if (call->argList.length == 2) {
+        *lhs = call->argList.head;
+        *rhs = call->argList.head->next;
+      } else if (call->argList.length > 2) {
+        //        printf("Had more than two arguments!\n");
+        //        list_view(call);
+        //        exit(1);
+      }
+    }
+  }
 }

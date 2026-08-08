@@ -560,6 +560,8 @@ static inline const CallExpr* toConstCallExpr(const BaseAST* a)
   for (std::vector<_t*>::iterator it = _vec.begin(); it != _vec.end(); it++) \
     { if (*it) call(*it, __VA_ARGS__); }
 
+void handleCallExpr(const BaseAST* expr, BaseAST** lhs, BaseAST** rhs);
+
 #define AST_CHILDREN_CALL(_a, call, ...)                                \
   switch (_a->astTag) {                                                 \
   case E_TemporaryConversionThunk:                                      \
@@ -567,7 +569,17 @@ static inline const CallExpr* toConstCallExpr(const BaseAST* a)
     break;                                                              \
   case E_CallExpr:                                                      \
     AST_CALL_CHILD(_a, CallExpr, baseExpr, call, __VA_ARGS__);          \
-    AST_CALL_LIST(_a, CallExpr, argList, call, __VA_ARGS__);            \
+    {                                                                   \
+    BaseAST* lhs = NULL;                                                \
+    BaseAST* rhs = NULL;                                                \
+    handleCallExpr(_a, &lhs, &rhs);                                     \
+    if (lhs != NULL) {                                                  \
+      call(rhs, __VA_ARGS__);                                           \
+      call(lhs, __VA_ARGS__);                                           \
+    } else {                                                            \
+      AST_CALL_LIST(_a, CallExpr, argList, call, __VA_ARGS__);          \
+    }                                                                   \
+    }                                                                   \
     break;                                                              \
   case E_ContextCallExpr:                                               \
     AST_CALL_LIST(_a, ContextCallExpr, options, call, __VA_ARGS__);     \

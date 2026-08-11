@@ -188,6 +188,14 @@ a valid lvalue (:ref:`LValue_Expressions`). It is evaluated
 before the expression on the right-hand side of the assignment operator,
 which can be any expression.
 
+.. note::
+
+  In the ``preview`` :ref:`edition of Chapel <readme-editions>`,
+  simple assignments evaluate their right-hand side expressions prior
+  to the left-hand side.  Compound assignments evaluate their
+  left-hand side before the right-hand side, as always.
+
+
 When the left-hand side is of a numerical type, there is an implicit
 conversion (:ref:`Implicit_Conversions`) of the right-hand side
 expression to the type of the left-hand side expression.

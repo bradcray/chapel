@@ -1,0 +1,22 @@
+Notes on the state of this branch:
+
+* doesn't actually fix #14287 as I thought earlier...  It makes it
+  execute without errors, but the LHS field gets assigned its default
+  value rather than the RHS field.  I have a feeling the original test
+  I wrote just used the default values s.t. I didn't notice.  I
+  haven't looked at all into why this doesn't work as expected and
+  don't anticipate doing so anytime soon.
+
+* my use of a helper function in the #define that crawls the AST was
+  done in order to support re-compilations faster, as I was working on
+  this in an evening on a vert slow computer.  That said, one of the
+  issues I seemed to hit when trying to inline it directly was that
+  baseAST.h didn't seem to have access to symbols like CallExpr, and
+  introducing more #includes just cascaded the issue due to
+  circularities.
+
+* this change would need to be guarded by an edition flag if we were
+  to proceed with it.  And, in retrospect, the .good updates I made
+  probably shouldn't have been, or the test should be split to run
+  with and without the --edition=preview flag to test both the old and
+  new behavior (but definitely not for all 50 of the tests).

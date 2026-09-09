@@ -14,6 +14,7 @@ Contributors to the Chapel 2.10 release
 * [Paul H. Hargrove], [Lawrence Berkeley National Laboratory]
 * Ben Harshbarger, [HPE]
 * David Longnecker, [HPE]
+* Madhav Madhusoodanan, individual contributor
 * Anna Rift, [HPE]
 
 Contributors to previous releases

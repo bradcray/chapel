@@ -39,10 +39,10 @@ proc doFancySelect() throws do
   }
 proc doSuperFancySelect() throws do
   select u.getActiveIndex() {
-    when U.x do writeln("x: ", u.x);
-    when U.y do writeln("y: ", u.y);
-    when U.z do writeln("z: ", u.z);
-    when U.w do writeln("w: ", u.w);
+    when 0 do writeln("x: ", u.x);
+    when 1 do writeln("y: ", u.y);
+    when 2 do writeln("z: ", u.z);
+    when 3 do writeln("w: ", u.w);
     otherwise
       throw new Error("union is not currently active");
   }

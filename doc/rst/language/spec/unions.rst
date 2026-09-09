@@ -133,25 +133,6 @@ not yet explicitly initialized, then
       -1
       1
 
-Each union field also has an associated index, this can be queried by accessing
-the field name as a member of the union type.
-
-   *Example (fieldIndex.chpl)*.
-
-    .. code-block:: chapel
-
-      union U {
-        var x: int;
-        var y: real;
-      }
-      writeln(U.x); // prints 0
-      writeln(U.y); // prints 1
-
-   .. BLOCK-test-chapeloutput
-
-      0
-      1
-
 Union fields should not be specified with initialization expressions.
 
 .. index::
@@ -456,9 +437,9 @@ conditionals.
 
    .. code-block:: chapel
 
-      if u.getActiveIndex() == U.x {
+      if u.getActiveIndex() == 0 {
         writeln("x is active with value ", u.x);
-      } else if u.getActiveIndex() == U.y {
+      } else if u.getActiveIndex() == 1 {
         writeln("y is active with value ", u.y);
       } else {
         writeln("no field is active");
